@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
+import { API_BASE } from "../config/api";
 
 export default function BuscarPaciente() {
   const [pacientes, setPacientes] = useState([]);
@@ -27,7 +28,7 @@ export default function BuscarPaciente() {
   // 🟡 Cargar pacientes
   const cargarPacientes = async () => {
     try {
-      const res = await fetch("http://192.168.1.7:4000/api/pacientes/listar");
+      const res = await fetch(`${API_BASE}/api/pacientes/listar`);
       const data = await res.json();
       setPacientes(data);
     } catch (error) {
@@ -40,7 +41,7 @@ export default function BuscarPaciente() {
     if (!searchTerm.trim()) return cargarPacientes();
     try {
       const res = await fetch(
-        `http://localhost:4000/api/pacientes/buscar?term=${searchTerm}`
+        `${API_BASE}/api/pacientes/buscar?term=${searchTerm}`
       );
       const data = await res.json();
       setPacientes(data);
@@ -59,7 +60,7 @@ export default function BuscarPaciente() {
   const handleSave = async () => {
     try {
       const res = await fetch(
-        `http://192.168.1.7:4000/api/pacientes/editar/${selectedPaciente.id}`,
+        `${API_BASE}/api/pacientes/editar/${selectedPaciente.id}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

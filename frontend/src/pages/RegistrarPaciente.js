@@ -8,6 +8,7 @@ import {
   Paper,
   MenuItem,
 } from "@mui/material";
+import { API_BASE } from "../config/api";
 
 export default function RegistrarPaciente() {
   const colorPrincipal = "#a36920ff";
@@ -281,7 +282,7 @@ export default function RegistrarPaciente() {
   }}
   onClick={async () => {
     try {
-      const response = await fetch("http://192.168.1.7:4000/api/pacientes/registrar", {
+      const response = await fetch(`${API_BASE}/api/pacientes/registrar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

@@ -11,6 +11,7 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
+import { API_BASE } from "../../config/api";
 
 export default function CrearTratamiento() {
   const colorPrincipal = "#a36920ff";
@@ -18,7 +19,7 @@ export default function CrearTratamiento() {
   const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "" });
 
   const cargarTratamientos = async () => {
-    const res = await fetch("http://192.168.1.7:4000/api/tratamientos/listar");
+    const res = await fetch(`${API_BASE}/api/tratamientos/listar`);
     const data = await res.json();
     setTratamientos(data);
   };
@@ -29,7 +30,7 @@ export default function CrearTratamiento() {
       return;
     }
 
-    const res = await fetch("http://192.168.1.7:4000/api/tratamientos/crear", {
+    const res = await fetch(`${API_BASE}/api/tratamientos/crear`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(nuevo),
@@ -46,7 +47,7 @@ export default function CrearTratamiento() {
 
   const eliminarTratamiento = async (id) => {
     if (!window.confirm("¿Deseas eliminar este tratamiento?")) return;
-    await fetch(`http://192.168.1.7:4000/api/tratamientos/eliminar/${id}`, {
+    await fetch(`${API_BASE}/api/tratamientos/eliminar/${id}`, {
       method: "DELETE",
     });
     cargarTratamientos();

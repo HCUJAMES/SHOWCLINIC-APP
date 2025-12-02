@@ -17,6 +17,7 @@ import {
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { API_BASE } from "../config/api";
 
 const Finanzas = () => {
   const [paciente, setPaciente] = useState("");
@@ -37,7 +38,7 @@ const Finanzas = () => {
       if (fechaInicio) params.fechaInicio = fechaInicio;
       if (fechaFin) params.fechaFin = fechaFin;
 
-      const res = await axios.get("http://192.168.1.7:4000/api/finanzas/reporte", { params });
+      const res = await axios.get(`${API_BASE}/api/finanzas/reporte`, { params });
       setReporte(res.data.resultados);
       setTotalGeneral(res.data.totalGeneral);
       setTotalesMetodo(res.data.totalesPorMetodo);

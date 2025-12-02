@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { useParams } from "react-router-dom";
 import axios from "axios";
+import { API_BASE } from "../../config/api";
 import { generarPDFPaciente } from "../../utils/generarPDF";
 
 const HistorialPaciente = () => {
@@ -22,8 +23,10 @@ const HistorialPaciente = () => {
   const [historial, setHistorial] = useState([]);
 
   useEffect(() => {
-    axios.get(`http://localhost:4000/api/pacientes/${id}`).then((res) => setPaciente(res.data));
-    axios.get(`http://localhost:4000/api/pacientes/${id}/historial`).then((res) => setHistorial(res.data));
+    axios.get(`${API_BASE}/api/pacientes/${id}`).then((res) => setPaciente(res.data));
+    axios
+      .get(`${API_BASE}/api/pacientes/${id}/historial`)
+      .then((res) => setHistorial(res.data));
   }, [id]);
 
   if (!paciente) return <p>Cargando datos del paciente...</p>;

@@ -14,6 +14,7 @@ import {
   Box,
 } from "@mui/material";
 import axios from "axios";
+import { API_BASE } from "../../config/api";
 
 const ComenzarTratamiento = () => {
   const [pacientes, setPacientes] = useState([]);
@@ -35,11 +36,11 @@ const ComenzarTratamiento = () => {
 
   // ✅ Cargar datos iniciales
   useEffect(() => {
-    axios.get("http://192.168.1.7:4000/api/pacientes/listar").then((res) => setPacientes(res.data));
-    axios.get("http://192.168.1.7:4000/api/tratamientos/listar").then((res) => setTratamientos(res.data));
-    axios.get("http://192.168.1.7:4000/api/tratamientos/productos").then((res) => setProductos(res.data));
-    axios.get("http://192.168.1.7:4000/api/tratamientos/marcas").then((res) => setMarcas(res.data));
-    axios.get("http://192.168.1.7:4000/api/especialistas/listar").then((res) => setEspecialistas(res.data)); // Nuevo
+    axios.get(`${API_BASE}/api/pacientes/listar`).then((res) => setPacientes(res.data));
+    axios.get(`${API_BASE}/api/tratamientos/listar`).then((res) => setTratamientos(res.data));
+    axios.get(`${API_BASE}/api/tratamientos/productos`).then((res) => setProductos(res.data));
+    axios.get(`${API_BASE}/api/tratamientos/marcas`).then((res) => setMarcas(res.data));
+    axios.get(`${API_BASE}/api/especialistas/listar`).then((res) => setEspecialistas(res.data)); // Nuevo
   }, []);
 
   // ✅ Calcular total general
@@ -91,7 +92,7 @@ const ComenzarTratamiento = () => {
     data.append("productos", JSON.stringify(bloques));
 
     try {
-      const res = await axios.post("http://192.168.1.7:4000/api/tratamientos/realizado", data);
+      const res = await axios.post(`${API_BASE}/api/tratamientos/realizado`, data);
       alert(res.data.message || "✅ Tratamiento registrado correctamente");
       setPaciente_id("");
       setEspecialista("");

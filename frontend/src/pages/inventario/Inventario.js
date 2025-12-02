@@ -17,6 +17,7 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import { API_BASE, DOCS_BASE } from "../../config/api";
 
 export default function Inventario() {
   const colorPrincipal = "#a36920ff";
@@ -36,7 +37,7 @@ export default function Inventario() {
 
   // ✅ Obtener productos
   const obtenerProductos = () => {
-    fetch("http://localhost:4000/api/inventario/listar")
+    fetch(`${API_BASE}/api/inventario/listar`)
       .then((r) => r.json())
       .then(setProductos)
       .catch(console.error);
@@ -50,8 +51,8 @@ export default function Inventario() {
   const guardarProducto = async () => {
     const metodo = editando ? "PUT" : "POST";
     const url = editando
-      ? `http://localhost:4000/api/inventario/editar/${editando}`
-      : "http://localhost:4000/api/inventario/crear";
+      ? `${API_BASE}/api/inventario/editar/${editando}`
+      : `${API_BASE}/api/inventario/crear`;
 
     const data = { ...form, actualizado_por: role };
 
@@ -83,10 +84,9 @@ export default function Inventario() {
   // ✅ Eliminar producto
   const eliminarProducto = async (id) => {
     if (!window.confirm("¿Eliminar producto?")) return;
-    const res = await fetch(
-      `http://localhost:4000/api/inventario/eliminar/${id}`,
-      { method: "DELETE" }
-    );
+    const res = await fetch(`${API_BASE}/api/inventario/eliminar/${id}`, {
+      method: "DELETE",
+    });
     if (res.ok) {
       alert("🗑️ Producto eliminado");
       obtenerProductos();
@@ -107,10 +107,10 @@ export default function Inventario() {
     data.append("documento", file);
 
     try {
-      const res = await fetch(
-        `http://localhost:4000/api/inventario/subir-pdf/${id}`,
-        { method: "POST", body: data }
-      );
+      const res = await fetch(`${API_BASE}/api/inventario/subir-pdf/${id}`, {
+        method: "POST",
+        body: data,
+      });
       if (res.ok) {
         alert("📄 Documento PDF subido correctamente");
         obtenerProductos();
@@ -235,23 +235,44 @@ export default function Inventario() {
 
                 {/* 📎 PDF del producto */}
                 <TableCell>
-                  {p.documento_pdf ? (
-                    <Tooltip title="Ver documento">
-                      <a
-                        href={`http://localhost:4000/uploads/docs/${p.documento_pdf}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <PictureAsPdfIcon sx={{ color: "#a36920", fontSize: 28 }} />
-                      </a>
-                    </Tooltip>
-                  ) : role === "doctor" ? (
+                  {p.documentos && p.documentos.length > 0 ? (
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                      {p.documentos.map((doc, idx) => (
+                        <Box
+                          key={`${doc.archivo}-${idx}`}
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                        >
+                          <Tooltip
+                            title={`Ver guía (${doc.uploaded_at?.split(" ")[0] || ""})`}
+                          >
+                            <a
+                              href={`${DOCS_BASE}/${doc.archivo}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <PictureAsPdfIcon
+                                sx={{ color: "#a36920", fontSize: 28 }}
+                              />
+                            </a>
+                          </Tooltip>
+                          <Typography variant="caption" color="textSecondary">
+                            {doc.uploaded_at?.split(" ")[0] || "Guía"}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography color="textSecondary">—</Typography>
+                  )}
+
+                  {role === "doctor" && (
                     <label
                       style={{
                         display: "inline-block",
                         color: "#a36920",
                         cursor: "pointer",
                         fontWeight: "bold",
+                        marginTop: 4,
                       }}
                     >
                       📎 Subir PDF
@@ -262,8 +283,6 @@ export default function Inventario() {
                         onChange={(e) => subirPDF(p.id, e.target.files[0])}
                       />
                     </label>
-                  ) : (
-                    <Typography color="textSecondary">—</Typography>
                   )}
                 </TableCell>
 

@@ -10,6 +10,8 @@ import {
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+import API_BASE from "../config/api";
+
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -17,7 +19,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     try {
-      const res = await axios.post("http://192.168.1.7:4000/api/auth/login", {
+      const res = await axios.post(`${API_BASE}/api/auth/login`, {
         username: username.trim(),
         password: password.trim(),
       });
@@ -25,7 +27,14 @@ export default function Login() {
       localStorage.setItem("role", res.data.role);
       navigate("/dashboard");
     } catch (e) {
-      alert("Usuario o contraseña incorrectos");
+      const status = e.response?.status;
+      if (status === 400 || status === 401) {
+        alert("Usuario o contraseña incorrectos");
+      } else {
+        alert(
+          "No se pudo conectar con el servidor. Verifica que el backend esté ejecutándose y accesible."
+        );
+      }
     }
   };
 

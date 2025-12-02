@@ -4,9 +4,17 @@ import bodyParser from "body-parser";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dbDir = path.join(__dirname, "../db");
+const dbPath = path.join(dbDir, "showclinic.db");
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
+const db = new sqlite3.Database(dbPath);
 router.use(bodyParser.json());
 
 /* ==============================================
@@ -77,12 +85,37 @@ router.post("/crear", (req, res) => {
    📋 LISTAR PRODUCTOS
 ============================================== */
 router.get("/listar", (req, res) => {
-  db.all("SELECT * FROM inventario ORDER BY id DESC", [], (err, rows) => {
+  db.all("SELECT * FROM inventario ORDER BY id DESC", [], (err, productos) => {
     if (err) {
       console.error("❌ Error al listar productos:", err.message);
       return res.status(500).json({ message: "Error al listar productos" });
     }
-    res.json(rows);
+
+    db.all(
+      `SELECT inventario_id, archivo, uploaded_at FROM inventario_documentos ORDER BY uploaded_at DESC`,
+      [],
+      (docsErr, docs) => {
+        if (docsErr) {
+          console.error("❌ Error al listar documentos:", docsErr.message);
+          return res
+            .status(500)
+            .json({ message: "Error al listar documentos de inventario" });
+        }
+
+        const documentosPorProducto = docs.reduce((acc, doc) => {
+          if (!acc[doc.inventario_id]) acc[doc.inventario_id] = [];
+          acc[doc.inventario_id].push(doc);
+          return acc;
+        }, {});
+
+        const respuesta = productos.map((p) => ({
+          ...p,
+          documentos: documentosPorProducto[p.id] || [],
+        }));
+
+        res.json(respuesta);
+      }
+    );
   });
 });
 
@@ -150,21 +183,43 @@ router.post("/subir-pdf/:id", upload.single("documento"), (req, res) => {
   if (!req.file)
     return res.status(400).json({ message: "No se subió ningún archivo PDF" });
 
-  db.run(
-    `
-    UPDATE inventario 
-    SET documento_pdf = ?, ultima_actualizacion = datetime('now', '-5 hours')
-    WHERE id = ?
-  `,
-    [req.file.filename, id],
-    function (err) {
-      if (err) {
-        console.error("❌ Error al guardar PDF:", err.message);
-        return res.status(500).json({ message: "Error al guardar PDF" });
+  db.serialize(() => {
+    db.run(
+      `
+        INSERT INTO inventario_documentos (inventario_id, archivo, uploaded_at)
+        VALUES (?, ?, datetime('now', '-5 hours'))
+      `,
+      [id, req.file.filename],
+      function (insertErr) {
+        if (insertErr) {
+          console.error("❌ Error al guardar PDF:", insertErr.message);
+          return res.status(500).json({ message: "Error al guardar PDF" });
+        }
+
+        db.run(
+          `
+            UPDATE inventario
+            SET documento_pdf = ?, ultima_actualizacion = datetime('now', '-5 hours')
+            WHERE id = ?
+          `,
+          [req.file.filename, id],
+          function (updateErr) {
+            if (updateErr) {
+              console.error("❌ Error al vincular PDF:", updateErr.message);
+              return res
+                .status(500)
+                .json({ message: "Error al vincular PDF con el producto" });
+            }
+
+            res.json({
+              message: "✅ Documento PDF guardado correctamente",
+              archivo: req.file.filename,
+            });
+          }
+        );
       }
-      res.json({ message: "✅ Documento PDF guardado correctamente" });
-    }
-  );
+    );
+  });
 });
 
 /* ==============================================

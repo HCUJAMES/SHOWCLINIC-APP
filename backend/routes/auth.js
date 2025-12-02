@@ -1,13 +1,14 @@
-const express = require("express");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const db = require("../db/database");
+import express from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import db from "../db/database.js";
 
 const router = express.Router();
-const SECRET = "showclinic_secret"; // puedes moverlo luego a .env
+const SECRET = process.env.JWT_SECRET || "showclinic_secret";
 
 router.post("/login", (req, res) => {
   const { username, password } = req.body;
+
   db.get("SELECT * FROM users WHERE username = ?", [username], (err, user) => {
     if (err) return res.status(500).json({ message: "Error interno" });
     if (!user) return res.status(400).json({ message: "Usuario no encontrado" });
@@ -20,8 +21,9 @@ router.post("/login", (req, res) => {
       SECRET,
       { expiresIn: "8h" }
     );
+
     res.json({ token, role: user.role });
   });
 });
 
-module.exports = router;
+export default router;

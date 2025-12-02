@@ -1,9 +1,18 @@
 import express from "express";
 import sqlite3 from "sqlite3";
 import bodyParser from "body-parser";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dbDir = path.join(__dirname, "../db");
+const dbPath = path.join(dbDir, "showclinic.db");
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
+const db = new sqlite3.Database(dbPath);
 router.use(bodyParser.json());
 
 // ✅ Listar especialistas
