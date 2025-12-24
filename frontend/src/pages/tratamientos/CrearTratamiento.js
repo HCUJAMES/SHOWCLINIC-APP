@@ -11,43 +11,113 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
+import { useToast } from "../../components/ToastProvider";
+
+ const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
 export default function CrearTratamiento() {
   const colorPrincipal = "#a36920ff";
+  const { showToast } = useToast();
   const [tratamientos, setTratamientos] = useState([]);
-  const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "" });
+  const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "", precio: "" });
+  const [editId, setEditId] = useState(null);
+  const role = localStorage.getItem("role");
+  const token = localStorage.getItem("token");
+  const isDoctor = role === "doctor";
+  const canCreate = role === "doctor" || role === "asistente";
 
   const cargarTratamientos = async () => {
-    const res = await fetch("http://192.168.1.7:4000/api/tratamientos/listar");
+    const res = await fetch(`${API_BASE_URL}/api/tratamientos/listar`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
     const data = await res.json();
     setTratamientos(data);
   };
 
-  const crearTratamiento = async () => {
-    if (!nuevo.nombre || !nuevo.descripcion) {
-      alert("Por favor, completa todos los campos.");
+  const guardarEdicion = async () => {
+    if (!isDoctor) {
+      showToast({ severity: "warning", message: "Solo el rol doctor puede modificar tratamientos" });
       return;
     }
 
-    const res = await fetch("http://192.168.1.7:4000/api/tratamientos/crear", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    if (!editId) return;
+
+    if (!nuevo.nombre || nuevo.precio === "") {
+      showToast({ severity: "warning", message: "Por favor, completa Nombre y Precio." });
+      return;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/api/tratamientos/${editId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(nuevo),
     });
 
     if (res.ok) {
-      alert("✅ Tratamiento creado correctamente");
-      setNuevo({ nombre: "", descripcion: "" });
+      showToast({ severity: "success", message: "Tratamiento actualizado correctamente" });
+      setNuevo({ nombre: "", descripcion: "", precio: "" });
+      setEditId(null);
       cargarTratamientos();
     } else {
-      alert("❌ Error al crear tratamiento");
+      showToast({ severity: "error", message: "Error al actualizar tratamiento" });
+    }
+  };
+
+  const editarTratamiento = (t) => {
+    setEditId(t.id);
+    setNuevo({
+      nombre: t.nombre || "",
+      descripcion: t.descripcion || "",
+      precio: t.precio == null ? "" : String(t.precio),
+    });
+  };
+
+  const cancelarEdicion = () => {
+    setEditId(null);
+    setNuevo({ nombre: "", descripcion: "", precio: "" });
+  };
+
+  const crearTratamiento = async () => {
+    if (!canCreate) {
+      showToast({ severity: "warning", message: "No tienes permisos para crear tratamientos" });
+      return;
+    }
+
+    if (!nuevo.nombre || nuevo.precio === "") {
+      showToast({ severity: "warning", message: "Por favor, completa Nombre y Precio." });
+      return;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/api/tratamientos/crear`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(nuevo),
+    });
+
+    if (res.ok) {
+      showToast({ severity: "success", message: "Tratamiento creado correctamente" });
+      setNuevo({ nombre: "", descripcion: "", precio: "" });
+      cargarTratamientos();
+    } else {
+      showToast({ severity: "error", message: "Error al crear tratamiento" });
     }
   };
 
   const eliminarTratamiento = async (id) => {
+    if (!isDoctor) {
+      showToast({ severity: "warning", message: "Solo el rol doctor puede modificar tratamientos" });
+      return;
+    }
     if (!window.confirm("¿Deseas eliminar este tratamiento?")) return;
-    await fetch(`http://192.168.1.7:4000/api/tratamientos/eliminar/${id}`, {
+    await fetch(`${API_BASE_URL}/api/tratamientos/eliminar/${id}`, {
       method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     cargarTratamientos();
   };
@@ -81,7 +151,10 @@ export default function CrearTratamiento() {
         sx={{
           p: 4,
           borderRadius: 4,
-          backgroundColor: "rgba(255,255,255,0.95)",
+          background:
+            "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
+          border: "1px solid rgba(212,175,55,0.22)",
+          backdropFilter: "blur(10px)",
           zIndex: 1,
           width: "90%",
           maxWidth: 800,
@@ -92,44 +165,69 @@ export default function CrearTratamiento() {
           sx={{ color: colorPrincipal, fontWeight: "bold", mb: 3 }}
           align="center"
         >
-          Crear Tratamientos
+          {isDoctor ? "Crear Tratamientos" : "Tratamientos de la clínica"}
         </Typography>
 
-        <Box sx={{ display: "grid", gap: 2, mb: 3 }}>
-          <TextField
-            label="Nombre del tratamiento"
-            value={nuevo.nombre}
-            onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
-          />
-          <TextField
-            label="Descripción"
-            multiline
-            rows={3}
-            value={nuevo.descripcion}
-            onChange={(e) =>
-              setNuevo({ ...nuevo, descripcion: e.target.value })
-            }
-          />
-          <Button
-            variant="contained"
-            sx={{
-              backgroundColor: colorPrincipal,
-              "&:hover": { backgroundColor: "#8a541a" },
-              color: "white",
-              py: 1.2,
-              borderRadius: 3,
-              fontWeight: "bold",
-            }}
-            onClick={crearTratamiento}
-          >
-            Guardar Tratamiento
-          </Button>
-        </Box>
+        {canCreate ? (
+          <Box sx={{ display: "grid", gap: 2, mb: 3 }}>
+            <TextField
+              label="Nombre del tratamiento"
+              value={nuevo.nombre}
+              onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
+            />
+            <TextField
+              label="Precio (S/.)"
+              type="number"
+              value={nuevo.precio}
+              onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value })}
+            />
+            <TextField
+              label="Descripción"
+              multiline
+              rows={3}
+              value={nuevo.descripcion}
+              onChange={(e) =>
+                setNuevo({ ...nuevo, descripcion: e.target.value })
+              }
+            />
+            <Button
+              variant="contained"
+              sx={{
+                backgroundColor: colorPrincipal,
+                "&:hover": { backgroundColor: "#8a541a" },
+                color: "white",
+                py: 1.2,
+                borderRadius: 3,
+                fontWeight: "bold",
+              }}
+              onClick={editId ? guardarEdicion : crearTratamiento}
+            >
+              {editId ? "Guardar cambios" : "Guardar Tratamiento"}
+            </Button>
+
+            {isDoctor && editId ? (
+              <Button
+                variant="outlined"
+                sx={{
+                  borderColor: colorPrincipal,
+                  color: colorPrincipal,
+                  py: 1.2,
+                  borderRadius: 3,
+                  fontWeight: "bold",
+                }}
+                onClick={cancelarEdicion}
+              >
+                Cancelar edición
+              </Button>
+            ) : null}
+          </Box>
+        ) : null}
 
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: colorPrincipal }}>
               <TableCell sx={{ color: "white" }}>Nombre</TableCell>
+              <TableCell sx={{ color: "white" }}>Precio</TableCell>
               <TableCell sx={{ color: "white" }}>Descripción</TableCell>
               <TableCell sx={{ color: "white" }}>Acciones</TableCell>
             </TableRow>
@@ -138,15 +236,29 @@ export default function CrearTratamiento() {
             {tratamientos.map((t) => (
               <TableRow key={t.id}>
                 <TableCell>{t.nombre}</TableCell>
+                <TableCell>{t.precio != null ? `S/ ${Number(t.precio).toFixed(2)}` : "—"}</TableCell>
                 <TableCell>{t.descripcion}</TableCell>
                 <TableCell>
-                  <Button
-                    size="small"
-                    color="error"
-                    onClick={() => eliminarTratamiento(t.id)}
-                  >
-                    Eliminar
-                  </Button>
+                  {isDoctor ? (
+                    <>
+                      <Button
+                        size="small"
+                        onClick={() => editarTratamiento(t)}
+                        sx={{ mr: 1 }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        onClick={() => eliminarTratamiento(t.id)}
+                      >
+                        Eliminar
+                      </Button>
+                    </>
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
               </TableRow>
             ))}

@@ -1,8 +1,10 @@
 import React from "react";
-import { Box, Typography, Button, Grid, Paper } from "@mui/material";
+import { Box, Typography, Button, Paper } from "@mui/material";
 
 export default function PacientesMenu() {
   const colorPrincipal = "#a36920ff";
+  const role = localStorage.getItem("role");
+  const canWritePatients = role === "doctor" || role === "asistente";
 
   return (
     <Box
@@ -30,12 +32,15 @@ export default function PacientesMenu() {
       <Paper
         elevation={6}
         sx={{
-          p: 5,
-          borderRadius: 4,
-          backgroundColor: "rgba(255,255,255,0.9)",
+          p: { xs: 3, sm: 4 },
+          borderRadius: 5,
+          background:
+            "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
+          border: "1px solid rgba(212,175,55,0.28)",
+          backdropFilter: "blur(10px)",
           textAlign: "center",
-          width: "400px",
-          boxShadow: "0 8px 20px rgba(163,105,32,0.3)",
+          width: { xs: "92vw", sm: 460 },
+          boxShadow: "0 18px 55px rgba(0,0,0,0.12), 0 0 0 1px rgba(212,175,55,0.10)",
         }}
       >
         <Typography
@@ -43,70 +48,105 @@ export default function PacientesMenu() {
           sx={{
             fontWeight: "bold",
             color: colorPrincipal,
-            mb: 3,
+            mb: 0.5,
+            letterSpacing: 0.6,
           }}
         >
           PACIENTES
         </Typography>
 
-        <Grid container spacing={3}>
-          {/* Buscar Paciente */}
-          <Grid item xs={12}>
-            <Button
-              fullWidth
-              variant="contained"
-              sx={{
-                backgroundColor: colorPrincipal,
-                "&:hover": { backgroundColor: "#8a541a" },
-                color: "white",
-                py: 1.5,
-                borderRadius: 3,
-                fontWeight: "bold",
-              }}
-              onClick={() => (window.location.href = "/pacientes/buscar")}
-            >
-              Buscar Paciente
-            </Button>
-          </Grid>
+        <Typography
+          variant="body2"
+          sx={{ color: "rgba(46,46,46,0.72)", mb: 3.2 }}
+        >
+          Selecciona una opción
+        </Typography>
 
-          {/* Registrar Paciente */}
-          <Grid item xs={12}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.6 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            sx={{
+              backgroundColor: colorPrincipal,
+              "&:hover": { backgroundColor: "#8a541a", transform: "translateY(-1px)" },
+              transition: "transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease",
+              boxShadow: "0 8px 18px rgba(0,0,0,0.12)",
+              color: "white",
+              py: 1.7,
+              minHeight: 56,
+              borderRadius: 3,
+              fontWeight: 800,
+              letterSpacing: 0.2,
+            }}
+            onClick={() => (window.location.href = "/pacientes/buscar")}
+          >
+            Buscar Paciente
+          </Button>
+
+          {canWritePatients ? (
             <Button
               fullWidth
               variant="contained"
               sx={{
                 backgroundColor: colorPrincipal,
-                "&:hover": { backgroundColor: "#8a541a" },
+                "&:hover": { backgroundColor: "#8a541a", transform: "translateY(-1px)" },
+                transition: "transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease",
+                boxShadow: "0 8px 18px rgba(0,0,0,0.12)",
                 color: "white",
-                py: 1.5,
+                py: 1.7,
+                minHeight: 56,
                 borderRadius: 3,
-                fontWeight: "bold",
+                fontWeight: 800,
+                letterSpacing: 0.2,
               }}
               onClick={() => (window.location.href = "/pacientes/registrar")}
             >
               Registrar Paciente
             </Button>
-          </Grid>
+          ) : null}
 
-          {/* Historial Clínico */}
-          <Grid item xs={12}>
+          {canWritePatients ? (
             <Button
               fullWidth
               variant="contained"
               sx={{
                 backgroundColor: colorPrincipal,
-                "&:hover": { backgroundColor: "#8a541a" },
+                "&:hover": { backgroundColor: "#8a541a", transform: "translateY(-1px)" },
+                transition: "transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease",
+                boxShadow: "0 8px 18px rgba(0,0,0,0.12)",
                 color: "white",
-                py: 1.5,
+                py: 1.7,
+                minHeight: 56,
                 borderRadius: 3,
-                fontWeight: "bold",
+                fontWeight: 800,
+                letterSpacing: 0.2,
               }}
               onClick={() => (window.location.href = "/historial-clinico")}
             >
               Historial Clínico
             </Button>
-          </Grid>
-        </Grid>
+          ) : null}
+
+          <Button
+            fullWidth
+            variant="contained"
+            sx={{
+              backgroundColor: colorPrincipal,
+              "&:hover": { backgroundColor: "#8a541a", transform: "translateY(-1px)" },
+              transition: "transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease",
+              boxShadow: "0 8px 18px rgba(0,0,0,0.12)",
+              color: "white",
+              py: 1.7,
+              minHeight: 56,
+              borderRadius: 3,
+              fontWeight: 800,
+              letterSpacing: 0.2,
+            }}
+            onClick={() => (window.location.href = "/pacientes/deudas")}
+          >
+            Pacientes con deudas
+          </Button>
+        </Box>
       </Paper>
     </Box>
   );

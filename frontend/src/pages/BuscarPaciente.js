@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
   TextField,
   Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   Table,
   TableBody,
   TableCell,
@@ -15,72 +19,171 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
+import { useToast } from "../components/ToastProvider";
+
+const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
 export default function BuscarPaciente() {
   const [pacientes, setPacientes] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [tratamientosBase, setTratamientosBase] = useState([]);
+  const [tratamientoFiltroId, setTratamientoFiltroId] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
+  const [pacienteTratamientos, setPacienteTratamientos] = useState([]);
+  const [pacienteTratamientosOwner, setPacienteTratamientosOwner] = useState(null);
   const [selectedPaciente, setSelectedPaciente] = useState(null);
   const [openModal, setOpenModal] = useState(false);
+  const [openTratamientosModal, setOpenTratamientosModal] = useState(false);
+
+  const { showToast } = useToast();
+
+  const token = localStorage.getItem("token");
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const role = localStorage.getItem("role");
+  const canWritePatients = role === "doctor" || role === "asistente";
 
   const colorPrincipal = "#a36920ff";
 
-  // 🟡 Cargar pacientes
+  // Cargar pacientes
   const cargarPacientes = async () => {
     try {
-      const res = await fetch("http://192.168.1.7:4000/api/pacientes/listar");
+      const res = await fetch(`${API_BASE_URL}/api/pacientes/listar`, { headers: authHeaders });
       const data = await res.json();
-      setPacientes(data);
+      setPacientes(Array.isArray(data) ? data : []);
+      setPacienteTratamientos([]);
+      setPacienteTratamientosOwner(null);
     } catch (error) {
       console.error("Error al cargar pacientes:", error);
+      setPacientes([]);
+      setPacienteTratamientos([]);
+      setPacienteTratamientosOwner(null);
     }
   };
 
-  // 🟡 Buscar pacientes
-  const buscarPacientes = async () => {
-    if (!searchTerm.trim()) return cargarPacientes();
+  const cargarTratamientosBase = async () => {
     try {
+      const res = await fetch(`${API_BASE_URL}/api/tratamientos/listar`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      setTratamientosBase(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error al cargar tratamientos base:", error);
+      setTratamientosBase([]);
+    }
+  };
+
+  const cargarTratamientosPaciente = useCallback(async (paciente) => {
+    try {
+      if (!paciente?.id) return;
+
+      const params = new URLSearchParams();
+      if (tratamientoFiltroId) params.set("tratamientoId", tratamientoFiltroId);
+      if (fechaDesde) params.set("fechaDesde", fechaDesde);
+      if (fechaHasta) params.set("fechaHasta", fechaHasta);
+
+      const qs = params.toString() ? `?${params.toString()}` : "";
       const res = await fetch(
-        `http://localhost:4000/api/pacientes/buscar?term=${searchTerm}`
+        `${API_BASE_URL}/api/tratamientos/historial/${paciente.id}${qs}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
       );
       const data = await res.json();
-      setPacientes(data);
+      setPacienteTratamientos(Array.isArray(data) ? data : []);
+      setPacienteTratamientosOwner(paciente);
+    } catch (error) {
+      console.error("Error al cargar tratamientos del paciente:", error);
+      setPacienteTratamientos([]);
+      setPacienteTratamientosOwner(paciente || null);
+    }
+  }, [tratamientoFiltroId, fechaDesde, fechaHasta]);
+
+  // Buscar pacientes
+  const buscarPacientes = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm.trim()) params.set("term", searchTerm.trim());
+      if (tratamientoFiltroId) params.set("tratamientoId", tratamientoFiltroId);
+      if (fechaDesde) params.set("fechaDesde", fechaDesde);
+      if (fechaHasta) params.set("fechaHasta", fechaHasta);
+
+      if (!params.toString()) {
+        return cargarPacientes();
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/pacientes/buscar?${params.toString()}`, {
+        headers: authHeaders,
+      });
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : [];
+      setPacientes(rows);
+
+      // Si la búsqueda devuelve un único paciente (ej. "Diana"), mostrar automáticamente sus tratamientos
+      if (rows.length === 1) {
+        await cargarTratamientosPaciente(rows[0]);
+      } else {
+        setPacienteTratamientos([]);
+        setPacienteTratamientosOwner(null);
+      }
     } catch (error) {
       console.error("Error al buscar pacientes:", error);
+      setPacientes([]);
+      setPacienteTratamientos([]);
+      setPacienteTratamientosOwner(null);
     }
   };
 
-  // 🟡 Abrir modal de edición
+  // Abrir modal de edición
   const handleEdit = (paciente) => {
+    if (!canWritePatients) {
+      showToast({ severity: "warning", message: "No tienes permisos para editar pacientes" });
+      return;
+    }
     setSelectedPaciente({ ...paciente });
     setOpenModal(true);
   };
 
-  // 🟡 Guardar cambios (editar paciente)
+  // Guardar cambios (editar paciente)
   const handleSave = async () => {
+    if (!canWritePatients) {
+      showToast({ severity: "warning", message: "No tienes permisos para editar pacientes" });
+      return;
+    }
     try {
       const res = await fetch(
-        `http://192.168.1.7:4000/api/pacientes/editar/${selectedPaciente.id}`,
+        `${API_BASE_URL}/api/pacientes/editar/${selectedPaciente.id}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify(selectedPaciente),
         }
       );
       if (res.ok) {
-        alert("✅ Paciente actualizado correctamente");
+        showToast({ severity: "success", message: "Paciente actualizado correctamente" });
         setOpenModal(false);
         cargarPacientes();
       } else {
-        alert("❌ Error al actualizar paciente");
+        showToast({ severity: "error", message: "Error al actualizar paciente" });
       }
     } catch (error) {
       console.error("Error al actualizar paciente:", error);
+      showToast({ severity: "error", message: "Error al actualizar paciente" });
     }
   };
 
   useEffect(() => {
     cargarPacientes();
+    cargarTratamientosBase();
   }, []);
+
+  useEffect(() => {
+    // Si hay un paciente seleccionado para tratamientos, al cambiar filtro se refresca la lista
+    if (pacienteTratamientosOwner?.id) {
+      cargarTratamientosPaciente(pacienteTratamientosOwner);
+    }
+  }, [tratamientoFiltroId, fechaDesde, fechaHasta, pacienteTratamientosOwner, cargarTratamientosPaciente]);
 
   return (
     <Box
@@ -113,8 +216,12 @@ export default function BuscarPaciente() {
           width: "90%",
           maxWidth: "1200px",
           borderRadius: 4,
-          backgroundColor: "rgba(255,255,255,0.95)",
-          boxShadow: "0 8px 25px rgba(163,105,32,0.4)",
+          background:
+            "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
+          border: "1px solid rgba(212,175,55,0.22)",
+          backdropFilter: "blur(10px)",
+          boxShadow:
+            "0 16px 40px rgba(0,0,0,0.10), 0 0 0 1px rgba(212,175,55,0.10)",
         }}
       >
         <Typography
@@ -129,7 +236,7 @@ export default function BuscarPaciente() {
           Buscar y Editar Pacientes
         </Typography>
 
-        {/* 🟡 Barra de búsqueda */}
+        {/* Barra de búsqueda */}
         <Box
           sx={{
             display: "flex",
@@ -137,6 +244,7 @@ export default function BuscarPaciente() {
             justifyContent: "center",
             alignItems: "center",
             mb: 3,
+            flexWrap: "wrap",
           }}
         >
           <TextField
@@ -145,11 +253,67 @@ export default function BuscarPaciente() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             sx={{
-              width: "60%",
-              backgroundColor: "white",
-              borderRadius: 1,
+              width: { xs: "100%", md: "40%" },
+              "& .MuiInputBase-root": {
+                backgroundColor: "rgba(255,255,255,0.72)",
+                borderRadius: 2,
+              },
             }}
           />
+          <FormControl
+            sx={{
+              width: { xs: "100%", md: "26%" },
+              "& .MuiInputBase-root": {
+                backgroundColor: "rgba(255,255,255,0.72)",
+                borderRadius: 2,
+              },
+            }}
+          >
+            <InputLabel>Filtrar por tratamiento</InputLabel>
+            <Select
+              label="Filtrar por tratamiento"
+              value={tratamientoFiltroId}
+              onChange={(e) => setTratamientoFiltroId(e.target.value)}
+            >
+              <MenuItem value="">Todos</MenuItem>
+              {tratamientosBase.map((t) => (
+                <MenuItem key={t.id} value={String(t.id)}>
+                  {t.nombre}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <TextField
+            label="Desde"
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              width: { xs: "100%", md: "14%" },
+              "& .MuiInputBase-root": {
+                backgroundColor: "rgba(255,255,255,0.72)",
+                borderRadius: 2,
+              },
+            }}
+          />
+
+          <TextField
+            label="Hasta"
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              width: { xs: "100%", md: "14%" },
+              "& .MuiInputBase-root": {
+                backgroundColor: "rgba(255,255,255,0.72)",
+                borderRadius: 2,
+              },
+            }}
+          />
+
           <Button
             variant="contained"
             sx={{
@@ -160,6 +324,7 @@ export default function BuscarPaciente() {
               py: 1.2,
               borderRadius: 3,
               fontWeight: "bold",
+              width: { xs: "100%", md: "auto" },
             }}
             onClick={buscarPacientes}
           >
@@ -167,7 +332,7 @@ export default function BuscarPaciente() {
           </Button>
         </Box>
 
-        {/* 🟡 Tabla */}
+        {/* Tabla */}
         <Box
           sx={{
             maxHeight: "60vh",
@@ -189,7 +354,7 @@ export default function BuscarPaciente() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {pacientes.length === 0 ? (
+              {!Array.isArray(pacientes) || pacientes.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                     No se encontraron pacientes
@@ -217,6 +382,21 @@ export default function BuscarPaciente() {
                       >
                         Editar
                       </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        sx={{
+                          borderColor: colorPrincipal,
+                          color: colorPrincipal,
+                          "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
+                        }}
+                        onClick={async () => {
+                          await cargarTratamientosPaciente(p);
+                          setOpenTratamientosModal(true);
+                        }}
+                      >
+                        Ver tratamientos
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -225,7 +405,53 @@ export default function BuscarPaciente() {
           </Table>
         </Box>
 
-        {/* 🟡 Modal para editar paciente */}
+        {/* Resumen rápido debajo de la tabla (cuando la búsqueda es específica) */}
+        {pacienteTratamientosOwner && !openTratamientosModal && (
+          <Box sx={{ mt: 3 }}>
+            <Typography sx={{ color: colorPrincipal, fontWeight: "bold", mb: 1 }}>
+              Tratamientos de {pacienteTratamientosOwner.nombre} {pacienteTratamientosOwner.apellido}
+            </Typography>
+            {!pacienteTratamientos.length ? (
+              <Typography>No hay tratamientos registrados.</Typography>
+            ) : (
+              <Box
+                sx={{
+                  maxHeight: 240,
+                  overflowY: "auto",
+                  borderRadius: 2,
+                  border: "1px solid rgba(163,105,32,0.2)",
+                }}
+              >
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: "rgba(163,105,32,0.08)" }}>
+                      <TableCell sx={{ fontWeight: "bold" }}>Fecha</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Tratamiento</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Sesión</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Pago</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Total</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {pacienteTratamientos.map((tr) => (
+                      <TableRow key={tr.id}>
+                        <TableCell>{tr.fecha?.split(" ")[0] || tr.fecha}</TableCell>
+                        <TableCell>{tr.nombreTratamiento || "—"}</TableCell>
+                        <TableCell>{tr.sesion ?? "—"}</TableCell>
+                        <TableCell>{tr.pagoMetodo || "—"}</TableCell>
+                        <TableCell>
+                          S/ {Number(tr.precio_total || 0).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* Modal para editar paciente */}
         <Dialog
           open={openModal}
           onClose={() => setOpenModal(false)}
@@ -276,6 +502,64 @@ export default function BuscarPaciente() {
             >
               Guardar Cambios
             </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Modal para ver tratamientos realizados */}
+        <Dialog
+          open={openTratamientosModal}
+          onClose={() => setOpenTratamientosModal(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold" }}>
+            Tratamientos realizados
+          </DialogTitle>
+          <DialogContent dividers>
+            {pacienteTratamientosOwner ? (
+              <>
+                <Typography sx={{ mb: 2 }}>
+                  <strong>Paciente:</strong> {pacienteTratamientosOwner.nombre} {pacienteTratamientosOwner.apellido}
+                </Typography>
+                {!pacienteTratamientos.length ? (
+                  <Typography>No hay tratamientos registrados.</Typography>
+                ) : (
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: "bold" }}>Fecha</TableCell>
+                        <TableCell sx={{ fontWeight: "bold" }}>Tratamiento</TableCell>
+                        <TableCell sx={{ fontWeight: "bold" }}>Tipo Atención</TableCell>
+                        <TableCell sx={{ fontWeight: "bold" }}>Especialista</TableCell>
+                        <TableCell sx={{ fontWeight: "bold" }}>Sesión</TableCell>
+                        <TableCell sx={{ fontWeight: "bold" }}>Pago</TableCell>
+                        <TableCell sx={{ fontWeight: "bold" }}>Total</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pacienteTratamientos.map((tr) => (
+                        <TableRow key={tr.id}>
+                          <TableCell>{tr.fecha?.split(" ")[0] || tr.fecha}</TableCell>
+                          <TableCell>{tr.nombreTratamiento || "—"}</TableCell>
+                          <TableCell>{tr.tipoAtencion || "—"}</TableCell>
+                          <TableCell>{tr.especialista || "—"}</TableCell>
+                          <TableCell>{tr.sesion ?? "—"}</TableCell>
+                          <TableCell>{tr.pagoMetodo || "—"}</TableCell>
+                          <TableCell>
+                            S/ {Number(tr.precio_total || 0).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </>
+            ) : (
+              <Typography>Selecciona un paciente para ver sus tratamientos.</Typography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenTratamientosModal(false)}>Cerrar</Button>
           </DialogActions>
         </Dialog>
       </Paper>

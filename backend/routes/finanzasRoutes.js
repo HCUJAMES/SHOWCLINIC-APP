@@ -4,6 +4,23 @@ import sqlite3 from "sqlite3";
 const router = express.Router();
 const db = new sqlite3.Database("./db/showclinic.db");
 
+const normalizarMetodo = (metodo) => String(metodo || "").trim().toLowerCase();
+
+const aplicarComisionPOS = (monto, metodo) => {
+  const m = parseFloat(monto) || 0;
+  if (!(m > 0)) return 0;
+  const met = normalizarMetodo(metodo);
+  if (met === "tarjeta") return m * 0.96;
+  return m;
+};
+
+const calcularComisionPOS = (monto, metodo) => {
+  const bruto = parseFloat(monto) || 0;
+  if (!(bruto > 0)) return 0;
+  const neto = aplicarComisionPOS(bruto, metodo);
+  return Math.max(0, bruto - neto);
+};
+
 // 📊 OBTENER REPORTE FINANCIERO FILTRADO
 router.get("/reporte", (req, res) => {
   const { fechaInicio, fechaFin, paciente, metodoPago } = req.query;
@@ -16,10 +33,43 @@ router.get("/reporte", (req, res) => {
       tr.fecha,
       tr.precio_total,
       tr.descuento,
-      tr.pagoMetodo
+      tr.pagoMetodo,
+      d.estado AS deuda_estado,
+      d.monto_adelanto,
+      d.monto_saldo,
+      d.cancelado_monto,
+      d.cancelado_metodo,
+      COALESCE(dp.total_pagado, 0) AS pagos_total_pagado,
+      COALESCE(dp.cantidad_pagos, 0) AS pagos_cantidad,
+      dpm.metodos AS pagos_metodos,
+      dpm2.metodos_montos AS pagos_metodos_montos
     FROM tratamientos_realizados tr
     JOIN patients p ON p.id = tr.paciente_id
     JOIN tratamientos t ON t.id = tr.tratamiento_id
+    LEFT JOIN deudas_tratamientos d ON d.tratamiento_realizado_id = tr.id
+    LEFT JOIN (
+      SELECT deuda_id, SUM(monto) AS total_pagado, COUNT(*) AS cantidad_pagos
+      FROM deudas_pagos
+      GROUP BY deuda_id
+    ) dp ON dp.deuda_id = d.id
+    LEFT JOIN (
+      SELECT deuda_id, GROUP_CONCAT(metodo, '/') AS metodos
+      FROM (
+        SELECT deuda_id, metodo
+        FROM deudas_pagos
+        ORDER BY deuda_id, numero ASC
+      )
+      GROUP BY deuda_id
+    ) dpm ON dpm.deuda_id = d.id
+    LEFT JOIN (
+      SELECT deuda_id, GROUP_CONCAT(metodo || ':' || monto_total, '|') AS metodos_montos
+      FROM (
+        SELECT deuda_id, metodo, SUM(monto) AS monto_total
+        FROM deudas_pagos
+        GROUP BY deuda_id, metodo
+      )
+      GROUP BY deuda_id
+    ) dpm2 ON dpm2.deuda_id = d.id
     WHERE 1 = 1
   `;
   const params = [];
@@ -40,8 +90,9 @@ router.get("/reporte", (req, res) => {
   }
 
   if (metodoPago) {
-    query += " AND tr.pagoMetodo = ?";
-    params.push(metodoPago);
+    query +=
+      " AND (tr.pagoMetodo = ? OR d.cancelado_metodo = ? OR EXISTS (SELECT 1 FROM deudas_pagos x WHERE x.deuda_id = d.id AND x.metodo = ?))";
+    params.push(metodoPago, metodoPago, metodoPago);
   }
 
   query += " ORDER BY tr.fecha DESC";
@@ -52,17 +103,201 @@ router.get("/reporte", (req, res) => {
       return res.status(500).json({ message: "Error al obtener reporte financiero" });
     }
 
-    // Calcular totales
-    const totalGeneral = rows.reduce((acc, r) => acc + (r.precio_total || 0), 0);
+    const resultados = (rows || []).map((r) => {
+      const precioTotal = parseFloat(r.precio_total) || 0;
+      const saldo = parseFloat(r.monto_saldo) || 0;
 
-    const totalesPorMetodo = rows.reduce((acc, r) => {
-      const metodo = r.pagoMetodo || "Desconocido";
-      if (!acc[metodo]) acc[metodo] = 0;
-      acc[metodo] += r.precio_total || 0;
+      const pagosCantidad = parseInt(r.pagos_cantidad, 10) || 0;
+      const pagosTotalPagado = parseFloat(r.pagos_total_pagado) || 0;
+      const pagosMetodos = typeof r.pagos_metodos === "string" ? r.pagos_metodos : "";
+
+      const tieneTablaPagos = pagosCantidad > 0;
+
+      const metodoAdelantoLegacy = r.pagoMetodo || "Desconocido";
+      const metodoCancelacionLegacy = r.cancelado_metodo || "";
+
+      const tienePagoEnPartesLegacy = (parseFloat(r.monto_adelanto) || 0) > 0 && saldo > 0;
+
+      const montoBruto = (() => {
+        if (tieneTablaPagos) {
+          const packed = String(r.pagos_metodos_montos || "");
+          if (packed) {
+            return packed
+              .split("|")
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .reduce((acc, item) => {
+                const [, montoStr] = item.split(":");
+                const montoNum = parseFloat(montoStr);
+                if (!(montoNum > 0)) return acc;
+                return acc + montoNum;
+              }, 0);
+          }
+          return pagosTotalPagado;
+        }
+
+        if (tienePagoEnPartesLegacy) {
+          return (parseFloat(r.monto_adelanto) || 0) + (parseFloat(r.cancelado_monto) || 0);
+        }
+
+        return precioTotal;
+      })();
+
+      const montoCobrado = (() => {
+        if (tieneTablaPagos) {
+          const packed = String(r.pagos_metodos_montos || "");
+          if (packed) {
+            return packed
+              .split("|")
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .reduce((acc, item) => {
+                const [metodo, montoStr] = item.split(":");
+                const metodoKey = (metodo || "").trim() || "Desconocido";
+                const montoNum = parseFloat(montoStr);
+                if (!(montoNum > 0)) return acc;
+                return acc + aplicarComisionPOS(montoNum, metodoKey);
+              }, 0);
+          }
+
+          // Fallback: no hay detalle por método, usamos el total (sin descuento porque no sabemos método).
+          return pagosTotalPagado;
+        }
+
+        if (tienePagoEnPartesLegacy) {
+          const adelanto = parseFloat(r.monto_adelanto) || 0;
+          const canceladoMonto = parseFloat(r.cancelado_monto) || 0;
+          return (
+            aplicarComisionPOS(adelanto, metodoAdelantoLegacy) +
+            aplicarComisionPOS(canceladoMonto, metodoCancelacionLegacy)
+          );
+        }
+
+        return aplicarComisionPOS(precioTotal, metodoAdelantoLegacy);
+      })();
+
+      const comisionPOS = (() => {
+        if (tieneTablaPagos) {
+          const packed = String(r.pagos_metodos_montos || "");
+          if (packed) {
+            return packed
+              .split("|")
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .reduce((acc, item) => {
+                const [metodo, montoStr] = item.split(":");
+                const metodoKey = (metodo || "").trim() || "Desconocido";
+                const montoNum = parseFloat(montoStr);
+                if (!(montoNum > 0)) return acc;
+                return acc + calcularComisionPOS(montoNum, metodoKey);
+              }, 0);
+          }
+          // Sin detalle: no se puede inferir comisión por método.
+          return 0;
+        }
+
+        if (tienePagoEnPartesLegacy) {
+          const adelanto = parseFloat(r.monto_adelanto) || 0;
+          const canceladoMonto = parseFloat(r.cancelado_monto) || 0;
+          return (
+            calcularComisionPOS(adelanto, metodoAdelantoLegacy) +
+            calcularComisionPOS(canceladoMonto, metodoCancelacionLegacy)
+          );
+        }
+
+        return calcularComisionPOS(precioTotal, metodoAdelantoLegacy);
+      })();
+
+      const deudaPendiente =
+        String(r.deuda_estado || "").toLowerCase() === "pendiente" ? saldo : 0;
+
+      const pagoMetodoMostrado = tieneTablaPagos
+        ? pagosMetodos || metodoAdelantoLegacy
+        : tienePagoEnPartesLegacy
+          ? (parseFloat(r.cancelado_monto) || 0) > 0 && metodoCancelacionLegacy && metodoCancelacionLegacy !== metodoAdelantoLegacy
+            ? `${metodoAdelantoLegacy}/${metodoCancelacionLegacy}`
+            : metodoAdelantoLegacy
+          : metodoAdelantoLegacy;
+
+      return {
+        ...r,
+        monto_bruto: montoBruto,
+        comision_pos: comisionPOS,
+        monto_cobrado: montoCobrado,
+        deuda_pendiente: deudaPendiente,
+        pagoMetodo_mostrado: pagoMetodoMostrado,
+      };
+    });
+
+    // Calcular totales SOLO con lo cobrado (la deuda pendiente NO suma)
+    const totalGeneral = resultados.reduce((acc, r) => acc + (r.monto_cobrado || 0), 0);
+
+    const totalBruto = resultados.reduce((acc, r) => acc + (r.monto_bruto || 0), 0);
+    const totalComision = resultados.reduce((acc, r) => acc + (r.comision_pos || 0), 0);
+
+    const totalesPorMetodo = resultados.reduce((acc, r) => {
+      const precioTotal = parseFloat(r.precio_total) || 0;
+      const saldo = parseFloat(r.monto_saldo) || 0;
+
+      const pagosCantidad = parseInt(r.pagos_cantidad, 10) || 0;
+
+      if (pagosCantidad > 0) {
+        const packed = String(r.pagos_metodos_montos || "");
+        if (packed) {
+          packed
+            .split("|")
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .forEach((item) => {
+              const [metodo, montoStr] = item.split(":");
+              const metodoKey = (metodo || "").trim() || "Desconocido";
+              const montoNum = parseFloat(montoStr);
+              if (!(montoNum > 0)) return;
+              if (!acc[metodoKey]) acc[metodoKey] = 0;
+              acc[metodoKey] += aplicarComisionPOS(montoNum, metodoKey);
+            });
+          return acc;
+        }
+
+        // Fallback (debería ser raro): si no hay detalle, sumar al primer método.
+        const metodos = String(r.pagos_metodos || "").split("/").filter(Boolean);
+        const metodoFallback = metodos[0] || r.pagoMetodo || "Desconocido";
+        if (!acc[metodoFallback]) acc[metodoFallback] = 0;
+        acc[metodoFallback] += parseFloat(r.monto_cobrado) || 0;
+        return acc;
+      }
+
+      const adelanto = parseFloat(r.monto_adelanto) || 0;
+      const canceladoMonto = parseFloat(r.cancelado_monto) || 0;
+      const tienePagoEnPartes = adelanto > 0 && saldo > 0;
+
+      if (!tienePagoEnPartes) {
+        const metodo = r.pagoMetodo || "Desconocido";
+        if (!acc[metodo]) acc[metodo] = 0;
+        acc[metodo] += aplicarComisionPOS(precioTotal, metodo);
+        return acc;
+      }
+
+      const metodoAdelanto = r.pagoMetodo || "Desconocido";
+      if (!acc[metodoAdelanto]) acc[metodoAdelanto] = 0;
+      acc[metodoAdelanto] += aplicarComisionPOS(adelanto, metodoAdelanto);
+
+      if (canceladoMonto > 0) {
+        const metodoCancelacion = r.cancelado_metodo || "Desconocido";
+        if (!acc[metodoCancelacion]) acc[metodoCancelacion] = 0;
+        acc[metodoCancelacion] += aplicarComisionPOS(canceladoMonto, metodoCancelacion);
+      }
+
       return acc;
     }, {});
 
-    res.json({ resultados: rows, totalGeneral, totalesPorMetodo });
+    res.json({
+      resultados: resultados,
+      totalGeneral,
+      totalBruto,
+      totalComision,
+      totalesPorMetodo,
+    });
   });
 });
 

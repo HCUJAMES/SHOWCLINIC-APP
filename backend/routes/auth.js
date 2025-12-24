@@ -1,7 +1,7 @@
-const express = require("express");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const db = require("../db/database");
+import express from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import db from "../db/database.js";
 
 const router = express.Router();
 const SECRET = "showclinic_secret"; // puedes moverlo luego a .env
@@ -24,4 +24,4 @@ router.post("/login", (req, res) => {
   });
 });
 
-module.exports = router;
+export default router;

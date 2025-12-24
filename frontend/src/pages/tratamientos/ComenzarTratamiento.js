@@ -7,20 +7,28 @@ import {
   Grid,
   MenuItem,
   Paper,
-  InputLabel,
   Select,
   FormControl,
   Divider,
   Box,
+  Autocomplete,
 } from "@mui/material";
 import axios from "axios";
+import { useToast } from "../../components/ToastProvider";
+
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || `http://${window.location.hostname}:4000`;
 
 const ComenzarTratamiento = () => {
+  const colorPrincipal = "#a36920";
+  const { showToast } = useToast();
+  const token = localStorage.getItem("token");
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   const [pacientes, setPacientes] = useState([]);
   const [tratamientos, setTratamientos] = useState([]);
-  const [productos, setProductos] = useState([]);
-  const [marcas, setMarcas] = useState([]);
+  const [variantesInv, setVariantesInv] = useState([]);
   const [especialistas, setEspecialistas] = useState([]);
+  const [recetasPorTratamiento, setRecetasPorTratamiento] = useState({});
 
   const [tipoAtencion, setTipoAtencion] = useState("Tratamiento");
   const [paciente_id, setPaciente_id] = useState("");
@@ -28,59 +36,199 @@ const ComenzarTratamiento = () => {
   const [pagoMetodo, setPagoMetodo] = useState("Efectivo");
   const [sesion, setSesion] = useState(1);
   const [bloques, setBloques] = useState([
-    { tratamiento_id: "", producto: "", marca: "", cantidad: 1, precio: 0, descuento: 0, total: 0 },
+    {
+      tratamiento_id: "",
+      producto: "",
+      variante_id: "",
+      marca: "",
+      cantidad: 1,
+      dosis_unidades: "",
+      precio: 0,
+      descuento: 0,
+      total: 0,
+      pago_en_partes: false,
+      monto_adelanto: "",
+    },
   ]);
 
   const [totalGeneral, setTotalGeneral] = useState(0);
 
-  // ✅ Cargar datos iniciales
+  // Cargar datos iniciales
   useEffect(() => {
-    axios.get("http://192.168.1.7:4000/api/pacientes/listar").then((res) => setPacientes(res.data));
-    axios.get("http://192.168.1.7:4000/api/tratamientos/listar").then((res) => setTratamientos(res.data));
-    axios.get("http://192.168.1.7:4000/api/tratamientos/productos").then((res) => setProductos(res.data));
-    axios.get("http://192.168.1.7:4000/api/tratamientos/marcas").then((res) => setMarcas(res.data));
-    axios.get("http://192.168.1.7:4000/api/especialistas/listar").then((res) => setEspecialistas(res.data)); // Nuevo
+    axios
+      .get(`${API_BASE_URL}/api/pacientes/listar`, { headers: authHeaders })
+      .then((res) => setPacientes(res.data));
+    axios
+      .get(`${API_BASE_URL}/api/tratamientos/listar`, { headers: authHeaders })
+      .then((res) => setTratamientos(res.data));
+    axios
+      .get(`${API_BASE_URL}/api/inventario/variantes`, { headers: authHeaders })
+      .then((res) => setVariantesInv(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setVariantesInv([]));
+    axios
+      .get(`${API_BASE_URL}/api/especialistas/listar`, { headers: authHeaders })
+      .then((res) => setEspecialistas(res.data));
   }, []);
 
-  // ✅ Calcular total general
+  // Calcular total general
   useEffect(() => {
     const total = bloques.reduce((sum, b) => sum + b.total, 0);
     setTotalGeneral(total);
   }, [bloques]);
 
-  // ✅ Actualizar bloque de tratamiento
+  // Recalcular totales cuando llegan recetas (carga async)
+  useEffect(() => {
+    setBloques((prev) =>
+      (prev || []).map((b) => {
+        const tratamientoIdActual = b?.tratamiento_id;
+        const receta = tratamientoIdActual ? recetasPorTratamiento[tratamientoIdActual] || [] : [];
+
+        const factorCantidad =
+          parseFloat(b?.dosis_unidades) > 0
+            ? parseFloat(b.dosis_unidades)
+            : parseFloat(b?.cantidad) > 0
+              ? parseFloat(b.cantidad)
+              : 1;
+
+        const precio = parseFloat(b?.precio) || 0;
+        const descuento = parseFloat(b?.descuento) || 0;
+
+        const subtotal = Array.isArray(receta) && receta.length > 0
+          ? receta.reduce((acc, r) => {
+              const pu = parseFloat(r?.precio_unitario) || 0;
+              const qty = (parseFloat(r?.cantidad_unidades) || 0) * factorCantidad;
+              return acc + pu * qty;
+            }, 0)
+          : precio * factorCantidad;
+
+        const totalConDescuento = subtotal - subtotal * (descuento / 100);
+
+        return { ...b, total: totalConDescuento };
+      })
+    );
+  }, [recetasPorTratamiento]);
+
+  // Actualizar bloque de tratamiento
   const actualizarBloque = (index, campo, valor) => {
     const nuevosBloques = [...bloques];
     nuevosBloques[index][campo] = valor;
 
-    const prod = productos.find((p) => p.producto === nuevosBloques[index].producto);
+    if (campo === "pago_en_partes" && !valor) {
+      nuevosBloques[index].monto_adelanto = "";
+    }
 
-    const precio = prod ? prod.precio : nuevosBloques[index].precio;
-    const cantidad = parseFloat(nuevosBloques[index].cantidad) || 0;
+    if (campo === "tratamiento_id") {
+      const tratamientoId = valor;
+      if (tratamientoId && !recetasPorTratamiento[tratamientoId]) {
+        axios
+          .get(`${API_BASE_URL}/api/tratamientos/recetas/${tratamientoId}`, { headers: authHeaders })
+          .then((res) => {
+            setRecetasPorTratamiento((prev) => ({
+              ...prev,
+              [tratamientoId]: Array.isArray(res.data) ? res.data : [],
+            }));
+          })
+          .catch(() => {
+            setRecetasPorTratamiento((prev) => ({ ...prev, [tratamientoId]: [] }));
+          });
+      }
+
+      // Si el tratamiento tiene receta, por defecto la dosis queda vacía para que el doctor la indique
+      // y la cantidad (venta) se mantiene para no romper precios.
+    }
+
+    if (campo === "variante_id") {
+      const v = valor
+        ? variantesInv.find((x) => String(x.id) === String(valor))
+        : null;
+      if (v && v.precio_unitario != null) {
+        nuevosBloques[index].precio = Number(v.precio_unitario) || 0;
+      } else {
+        nuevosBloques[index].precio = 0;
+      }
+    }
+
+    const precio = parseFloat(nuevosBloques[index].precio) || 0;
     const descuento = parseFloat(nuevosBloques[index].descuento) || 0;
 
-    const subtotal = precio * cantidad;
+    const tratamientoIdActual = nuevosBloques[index].tratamiento_id;
+    const receta = tratamientoIdActual ? recetasPorTratamiento[tratamientoIdActual] || [] : [];
+
+    const factorCantidad =
+      parseFloat(nuevosBloques[index].dosis_unidades) > 0
+        ? parseFloat(nuevosBloques[index].dosis_unidades)
+        : parseFloat(nuevosBloques[index].cantidad) > 0
+          ? parseFloat(nuevosBloques[index].cantidad)
+          : 1;
+
+    const subtotal = Array.isArray(receta) && receta.length > 0
+      ? receta.reduce((acc, r) => {
+          const pu = parseFloat(r.precio_unitario) || 0;
+          const qty = (parseFloat(r.cantidad_unidades) || 0) * factorCantidad;
+          return acc + pu * qty;
+        }, 0)
+      : precio * factorCantidad;
+
     const totalConDescuento = subtotal - subtotal * (descuento / 100);
 
-    nuevosBloques[index].precio = precio;
     nuevosBloques[index].total = totalConDescuento;
-
-    if (campo === "producto" && prod) nuevosBloques[index].marca = prod.marca;
 
     setBloques(nuevosBloques);
   };
 
-  // ✅ Agregar nuevo tratamiento
+  // Agregar nuevo tratamiento
   const agregarBloque = () => {
     setBloques([
       ...bloques,
-      { tratamiento_id: "", producto: "", marca: "", cantidad: 1, precio: 0, descuento: 0, total: 0 },
+      {
+        tratamiento_id: "",
+        producto: "",
+        variante_id: "",
+        marca: "",
+        cantidad: 1,
+        dosis_unidades: "",
+        precio: 0,
+        descuento: 0,
+        total: 0,
+        pago_en_partes: false,
+        monto_adelanto: "",
+      },
     ]);
   };
 
-  // ✅ Guardar tratamiento
+  const quitarBloque = (index) => {
+    setBloques((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Guardar tratamiento
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const bloquesValidos = (bloques || []).filter((b) => {
+      const id = b?.tratamiento_id;
+      return id != null && String(id).trim() !== "";
+    });
+
+    if (bloquesValidos.length === 0) {
+      showToast({ severity: "warning", message: "Agrega al menos un tratamiento antes de guardar" });
+      return;
+    }
+
+    const bloqueSinProducto = (bloquesValidos || []).find((b) => {
+      const tratamientoId = b?.tratamiento_id;
+      const receta = tratamientoId ? recetasPorTratamiento[tratamientoId] || [] : [];
+      const tieneReceta = Array.isArray(receta) && receta.length > 0;
+      const varianteOk = b?.variante_id != null && String(b.variante_id).trim() !== "";
+      return !tieneReceta && !varianteOk;
+    });
+
+    if (bloqueSinProducto) {
+      showToast({
+        severity: "warning",
+        message: "Selecciona un producto (variante) para calcular el precio y descontar del inventario",
+      });
+      return;
+    }
 
     const data = new FormData();
     data.append("tipoAtencion", tipoAtencion);
@@ -88,66 +236,112 @@ const ComenzarTratamiento = () => {
     data.append("especialista", especialista);
     data.append("pagoMetodo", pagoMetodo);
     data.append("sesion", sesion);
-    data.append("productos", JSON.stringify(bloques));
+    data.append("productos", JSON.stringify(bloquesValidos));
 
     try {
-      const res = await axios.post("http://192.168.1.7:4000/api/tratamientos/realizado", data);
-      alert(res.data.message || "✅ Tratamiento registrado correctamente");
+      const res = await axios.post(`${API_BASE_URL}/api/tratamientos/realizado`, data, {
+        headers: authHeaders,
+      });
+      showToast({ severity: "success", message: res.data.message || "Tratamiento registrado correctamente" });
       setPaciente_id("");
       setEspecialista("");
       setPagoMetodo("Efectivo");
       setSesion(1);
-      setBloques([{ tratamiento_id: "", producto: "", marca: "", cantidad: 1, precio: 0, descuento: 0, total: 0 }]);
+      setBloques([
+        {
+          tratamiento_id: "",
+          producto: "",
+          variante_id: "",
+          marca: "",
+          cantidad: 1,
+          dosis_unidades: "",
+          precio: 0,
+          descuento: 0,
+          total: 0,
+          pago_en_partes: false,
+          monto_adelanto: "",
+        },
+      ]);
       setTotalGeneral(0);
     } catch (err) {
       console.error(err);
-      alert("Error al registrar tratamiento");
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.message;
+      showToast({
+        severity: "error",
+        message: msg ? `Error al registrar tratamiento${status ? ` (${status})` : ""}: ${msg}` : "Error al registrar tratamiento",
+      });
     }
   };
 
   return (
-    <div
-      style={{
-        backgroundImage:
-          "linear-gradient(rgba(255,255,255,0.85), rgba(232,211,57,0.85)), url('/images/background-showclinic.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
+    <Box
+      sx={{
         minHeight: "100vh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "60px 20px",
+        px: 2,
+        py: { xs: 5, sm: 7 },
+        backgroundImage:
+          "radial-gradient(circle at top, rgba(255,255,255,0.92), rgba(247,234,193,0.62), rgba(0,0,0,0.05)), url('/images/background-showclinic.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        position: "relative",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(135deg, rgba(255,255,255,0.50), rgba(250,240,210,0.35))",
+          pointerEvents: "none",
+        },
+        "& > *": { position: "relative", zIndex: 1 },
       }}
     >
-      <Container maxWidth="md">
+      <Container maxWidth="xl">
         <Paper
           elevation={6}
           sx={{
-            p: 6,
-            backgroundColor: "rgba(255,255,255,0.95)",
-            borderRadius: "20px",
-            boxShadow: "0px 10px 35px rgba(0,0,0,0.15)",
+            p: { xs: 3, sm: 5 },
+            backgroundColor: "rgba(255,255,255,0.82)",
+            borderRadius: 5,
+            border: "1px solid rgba(212,175,55,0.20)",
+            backdropFilter: "blur(10px)",
+            boxShadow: "0 18px 48px rgba(0,0,0,0.14)",
           }}
         >
           <Typography
             variant="h5"
             align="center"
             gutterBottom
-            sx={{ color: "#a36920", fontWeight: "bold", mb: 5 }}
+            sx={{ color: colorPrincipal, fontWeight: 800, mb: 0.5, letterSpacing: 0.2 }}
           >
-            💆‍♀️ Comenzar Tratamiento
+            Comenzar Tratamiento
+          </Typography>
+
+          <Typography
+            variant="body2"
+            align="center"
+            sx={{ color: "rgba(46,46,46,0.75)", mb: 4 }}
+          >
+            Registra la sesión y el detalle de la venta
           </Typography>
 
           <form onSubmit={handleSubmit}>
             <Grid container spacing={4}>
               {/* Tipo de atención */}
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={12} md={3}>
                 <FormControl fullWidth>
-                  <InputLabel>Tipo de Atención</InputLabel>
                   <Select
                     value={tipoAtencion}
                     onChange={(e) => setTipoAtencion(e.target.value)}
-                    sx={{ minHeight: "60px", backgroundColor: "#fff" }}
+                    inputProps={{ "aria-label": "Tipo de Atención" }}
+                    sx={{
+                      minHeight: "56px",
+                      backgroundColor: "rgba(255,255,255,0.95)",
+                      borderRadius: 3,
+                    }}
                   >
                     <MenuItem value="Tratamiento">Tratamiento</MenuItem>
                     <MenuItem value="Control">Control</MenuItem>
@@ -157,20 +351,51 @@ const ComenzarTratamiento = () => {
               </Grid>
 
               {/* Paciente */}
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={12} md={7} sx={{ minWidth: 260 }}>
                 <FormControl fullWidth>
-                  <InputLabel>Paciente</InputLabel>
-                  <Select
-                    value={paciente_id}
-                    onChange={(e) => setPaciente_id(e.target.value)}
-                    sx={{ minHeight: "60px", backgroundColor: "#fff" }}
-                  >
-                    {pacientes.map((p) => (
-                      <MenuItem key={p.id} value={p.id}>
-                        {p.nombre} {p.apellido}
-                      </MenuItem>
-                    ))}
-                  </Select>
+                  <Autocomplete
+                    fullWidth
+                    options={pacientes}
+                    value={pacientes.find((p) => p.id === paciente_id) || null}
+                    onChange={(_, newValue) => setPaciente_id(newValue?.id || "")}
+                    getOptionLabel={(option) =>
+                      `${option?.nombre || ""} ${option?.apellido || ""}`.trim() || "-"
+                    }
+                    isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                    filterOptions={(options, state) => {
+                      const input = String(state.inputValue || "").trim().toLowerCase();
+                      if (!input) return options;
+                      return options.filter((p) => {
+                        const nombre = String(p?.nombre || "").toLowerCase();
+                        const apellido = String(p?.apellido || "").toLowerCase();
+                        const dni = String(p?.dni || "").toLowerCase();
+                        return (
+                          nombre.includes(input) ||
+                          apellido.includes(input) ||
+                          `${nombre} ${apellido}`.includes(input) ||
+                          dni.includes(input)
+                        );
+                      });
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Seleccionar paciente"
+                        placeholder="Buscar por nombre o DNI"
+                        fullWidth
+                        sx={{
+                          "& .MuiInputBase-root": {
+                            minHeight: "56px",
+                            backgroundColor: "rgba(255,255,255,0.95)",
+                            borderRadius: 3,
+                          },
+                          "& .MuiInputBase-input": {
+                            textOverflow: "clip",
+                          },
+                        }}
+                      />
+                    )}
+                  />
                 </FormControl>
               </Grid>
 
@@ -180,24 +405,113 @@ const ComenzarTratamiento = () => {
                   <Paper
                     elevation={3}
                     sx={{
-                      p: 4,
-                      borderRadius: "12px",
-                      backgroundColor: "rgba(255,255,255,0.97)",
-                      mb: 5,
+                      p: { xs: 2.5, sm: 3.5 },
+                      borderRadius: 4,
+                      backgroundColor: "rgba(255,255,255,0.90)",
+                      border: "1px solid rgba(212,175,55,0.18)",
+                      boxShadow: "0 12px 28px rgba(0,0,0,0.08)",
+                      mb: 2.5,
+                      position: "relative",
+                      overflow: "hidden",
+                      "&::before": {
+                        content: '""',
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "radial-gradient(circle at top, rgba(212,175,55,0.14), transparent 55%)",
+                        pointerEvents: "none",
+                      },
+                      "& > *": { position: "relative", zIndex: 1 },
                     }}
                   >
-                    <Typography variant="subtitle1" sx={{ color: "#a36920", fontWeight: "bold", mb: 3 }}>
-                      💉 Tratamiento #{index + 1}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 2,
+                        mb: 2.5,
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{ color: colorPrincipal, fontWeight: 800 }}
+                      >
+                        Tratamiento #{index + 1}
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        {bloques.length > 1 && (
+                          <Button
+                            variant="outlined"
+                            color="inherit"
+                            onClick={() => quitarBloque(index)}
+                            sx={{
+                              borderRadius: 999,
+                              textTransform: "none",
+                              fontWeight: 800,
+                              px: 2,
+                              borderColor: "rgba(163,105,32,0.35)",
+                              color: colorPrincipal,
+                              backgroundColor: "rgba(255,255,255,0.75)",
+                              "&:hover": {
+                                borderColor: "rgba(163,105,32,0.55)",
+                                backgroundColor: "rgba(255,255,255,0.92)",
+                              },
+                            }}
+                          >
+                            Quitar
+                          </Button>
+                        )}
+                        <Box
+                          sx={{
+                            px: 1.5,
+                            py: 0.8,
+                            borderRadius: 999,
+                            backgroundColor: "rgba(255,246,234,0.95)",
+                            border: "1px solid rgba(224,195,155,0.9)",
+                          }}
+                        >
+                          <Typography
+                            sx={{ color: colorPrincipal, fontWeight: 800, fontSize: 13 }}
+                          >
+                            Total: S/ {b.total.toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(46,46,46,0.70)", mb: 2.5 }}
+                    >
+                      Completa los campos para registrar el detalle de la venta.
                     </Typography>
 
-                    <Grid container spacing={3}>
-                      <Grid item xs={12} sm={4}>
+                    <Grid container spacing={2.2}>
+                      <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 260 }}>
                         <FormControl fullWidth>
-                          <InputLabel>Tratamiento</InputLabel>
                           <Select
                             value={b.tratamiento_id}
                             onChange={(e) => actualizarBloque(index, "tratamiento_id", e.target.value)}
-                            sx={{ backgroundColor: "#fff" }}
+                            displayEmpty
+                            inputProps={{ "aria-label": `Tratamiento ${index + 1}` }}
+                            renderValue={(selected) => {
+                              if (selected) {
+                                const t = tratamientos.find((x) => x.id === selected);
+                                if (t) return t.nombre;
+                                return String(selected);
+                              }
+                              return (
+                                <Box component="span" sx={{ color: "rgba(46,46,46,0.55)" }}>
+                                  Selecciona tratamiento
+                                </Box>
+                              );
+                            }}
+                            sx={{
+                              minHeight: "56px",
+                              backgroundColor: "rgba(255,255,255,0.95)",
+                              borderRadius: 3,
+                            }}
                           >
                             {tratamientos.map((t) => (
                               <MenuItem key={t.id} value={t.id}>
@@ -208,83 +522,185 @@ const ComenzarTratamiento = () => {
                         </FormControl>
                       </Grid>
 
-                      <Grid item xs={12} sm={4}>
-                        <FormControl fullWidth>
-                          <InputLabel>Producto</InputLabel>
-                          <Select
-                            value={b.producto}
-                            onChange={(e) => actualizarBloque(index, "producto", e.target.value)}
-                            sx={{ backgroundColor: "#fff" }}
-                          >
-                            {productos.map((prod) => (
-                              <MenuItem key={prod.id} value={prod.producto}>
-                                {prod.producto}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
+                      {(() => {
+                        const receta = b.tratamiento_id
+                          ? recetasPorTratamiento[b.tratamiento_id] || null
+                          : null;
 
-                      <Grid item xs={12} sm={4}>
-                        <FormControl fullWidth>
-                          <InputLabel>Marca</InputLabel>
-                          <Select
-                            value={b.marca}
-                            onChange={(e) => actualizarBloque(index, "marca", e.target.value)}
-                            sx={{ backgroundColor: "#fff" }}
-                          >
-                            {marcas.map((m, i) => (
-                              <MenuItem key={i} value={m.marca}>
-                                {m.marca}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
+                        if (!receta || receta.length === 0) return null;
 
-                      <Grid item xs={12} sm={4}>
-                        <TextField
-                          label="Cantidad"
-                          type="number"
+                        const unidades = Array.from(
+                          new Set((receta || []).map((r) => r.unidad_base).filter(Boolean))
+                        );
+                        const unidadLabel = unidades.length === 1 ? unidades[0] : "unidad";
+
+                        return (
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              label={`Dosis (${unidadLabel})`}
+                              placeholder={unidadLabel === "U" ? "Ej: 50" : "Ej: 1"}
+                              type="number"
+                              fullWidth
+                              value={b.dosis_unidades}
+                              onChange={(e) =>
+                                actualizarBloque(index, "dosis_unidades", e.target.value)
+                              }
+                              sx={{
+                                "& .MuiInputBase-root": {
+                                  backgroundColor: "rgba(255,255,255,0.95)",
+                                  borderRadius: 3,
+                                  minHeight: "56px",
+                                },
+                              }}
+                              helperText={
+                                receta && receta.length
+                                  ? `Receta: ${receta
+                                      .map(
+                                        (r) =>
+                                          `${r.producto_base_nombre || ""} ${r.variante_nombre || ""} (${r.cantidad_unidades}${r.unidad_base || ""})`
+                                      )
+                                      .join(" + ")}. La dosis multiplica la receta para el consumo de stock.`
+                                  : ""
+                              }
+                            />
+                          </Grid>
+                        );
+                      })()}
+
+                      <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 260 }}>
+                        <Autocomplete
                           fullWidth
-                          value={b.cantidad}
-                          onChange={(e) => actualizarBloque(index, "cantidad", parseFloat(e.target.value))}
+                          options={variantesInv}
+                          value={
+                            b.variante_id
+                              ? variantesInv.find((v) => String(v.id) === String(b.variante_id)) || null
+                              : null
+                          }
+                          getOptionLabel={(opt) => {
+                            if (!opt) return "";
+                            const marca = opt.producto_base_nombre || "";
+                            const nombre = opt.nombre || "";
+                            return `${marca} - ${nombre}`.trim();
+                          }}
+                          isOptionEqualToValue={(opt, val) => String(opt.id) === String(val.id)}
+                          onChange={(_, val) => {
+                            actualizarBloque(index, "variante_id", val ? val.id : "");
+                            actualizarBloque(
+                              index,
+                              "producto",
+                              val
+                                ? `${val.producto_base_nombre || ""} - ${val.nombre || ""}`.trim()
+                                : ""
+                            );
+                          }}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label=""
+                              placeholder="Seleccionar producto"
+                              fullWidth
+                              sx={{
+                                "& .MuiInputBase-root": {
+                                  backgroundColor: "rgba(255,255,255,0.95)",
+                                  borderRadius: 3,
+                                  minHeight: "56px",
+                                },
+                                "& .MuiInputBase-input": {
+                                  textOverflow: "clip",
+                                },
+                              }}
+                            />
+                          )}
                         />
                       </Grid>
 
-                      <Grid item xs={12} sm={4}>
+                      <Grid item xs={12} sm="auto" md="auto">
+                        <TextField
+                          label="Cantidad"
+                          type="number"
+                          value={b.cantidad}
+                          onChange={(e) => actualizarBloque(index, "cantidad", e.target.value)}
+                          sx={{
+                            "& .MuiInputBase-root": {
+                              backgroundColor: "rgba(255,255,255,0.95)",
+                              borderRadius: 3,
+                              minHeight: "56px",
+                            },
+                            width: { xs: "100%", sm: 160 },
+                          }}
+                          helperText="Cantidad para descontar stock del inventario."
+                        />
+                      </Grid>
+
+                      <Grid item xs={12} sm={6} md={4}>
                         <TextField
                           label="Precio Unitario (S/)"
                           value={b.precio}
                           fullWidth
                           InputProps={{ readOnly: true }}
+                          sx={{
+                            "& .MuiInputBase-root": {
+                              borderRadius: 3,
+                              backgroundColor: "rgba(255,255,255,0.95)",
+                            },
+                          }}
                         />
                       </Grid>
 
-                      <Grid item xs={12} sm={4}>
+                      <Grid item xs={12} sm={6} md={4}>
+                        <FormControl fullWidth>
+                          <Select
+                            value={b.pago_en_partes ? "SI" : "NO"}
+                            onChange={(e) =>
+                              actualizarBloque(index, "pago_en_partes", e.target.value === "SI")
+                            }
+                            inputProps={{ "aria-label": "Pago en partes" }}
+                            sx={{
+                              minHeight: "56px",
+                              backgroundColor: "rgba(255,255,255,0.95)",
+                              borderRadius: 3,
+                            }}
+                          >
+                            <MenuItem value="NO">Pago completo</MenuItem>
+                            <MenuItem value="SI">Pago en partes</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      {b.pago_en_partes && (
+                        <Grid item xs={12} sm={6} md={4}>
+                          <TextField
+                            label="Adelanto (S/)"
+                            type="number"
+                            fullWidth
+                            value={b.monto_adelanto}
+                            onChange={(e) => actualizarBloque(index, "monto_adelanto", e.target.value)}
+                            sx={{
+                              "& .MuiInputBase-root": {
+                                borderRadius: 3,
+                                backgroundColor: "rgba(255,255,255,0.95)",
+                                minHeight: "56px",
+                              },
+                            }}
+                            helperText="Se registrará como deuda pendiente."
+                          />
+                        </Grid>
+                      )}
+
+                      <Grid item xs={12} sm={6} md={4}>
                         <TextField
                           label="Descuento (%)"
                           type="number"
                           fullWidth
                           value={b.descuento}
                           onChange={(e) => actualizarBloque(index, "descuento", parseFloat(e.target.value))}
-                        />
-                      </Grid>
-
-                      <Grid item xs={12}>
-                        <Box
                           sx={{
-                            backgroundColor: "#fff6ea",
-                            border: "1px solid #e0c39b",
-                            borderRadius: "8px",
-                            p: 1.5,
-                            textAlign: "center",
+                            "& .MuiInputBase-root": {
+                              borderRadius: 3,
+                              backgroundColor: "rgba(255,255,255,0.95)",
+                            },
                           }}
-                        >
-                          <Typography sx={{ color: "#a36920", fontWeight: "bold" }}>
-                            💰 Total: S/ {b.total.toFixed(2)}
-                          </Typography>
-                        </Box>
+                        />
                       </Grid>
                     </Grid>
                   </Paper>
@@ -298,11 +714,13 @@ const ComenzarTratamiento = () => {
                   fullWidth
                   onClick={agregarBloque}
                   sx={{
-                    borderColor: "#a36920",
-                    color: "#a36920",
+                    borderColor: colorPrincipal,
+                    color: colorPrincipal,
                     fontWeight: "bold",
-                    py: 1.2,
-                    "&:hover": { backgroundColor: "#f6e3c5" },
+                    py: 1.3,
+                    borderRadius: 999,
+                    backgroundColor: "rgba(255,255,255,0.65)",
+                    "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
                   }}
                 >
                   + Agregar otro tratamiento
@@ -319,16 +737,31 @@ const ComenzarTratamiento = () => {
                   fullWidth
                   value={sesion}
                   onChange={(e) => setSesion(e.target.value)}
+                  sx={{
+                    "& .MuiInputBase-root": {
+                      borderRadius: 3,
+                      backgroundColor: "rgba(255,255,255,0.95)",
+                    },
+                  }}
                 />
               </Grid>
 
               <Grid item xs={12} sm={6}>
                 <FormControl fullWidth>
-                  <InputLabel>Especialista</InputLabel>
                   <Select
                     value={especialista}
                     onChange={(e) => setEspecialista(e.target.value)}
-                    sx={{ backgroundColor: "#fff" }}
+                    displayEmpty
+                    inputProps={{ "aria-label": "Especialista" }}
+                    renderValue={(selected) => {
+                      if (selected) return selected;
+                      return (
+                        <Box component="span" sx={{ color: "rgba(46,46,46,0.55)" }}>
+                          Selecciona especialista
+                        </Box>
+                      );
+                    }}
+                    sx={{ backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 3 }}
                   >
                     {especialistas.map((esp) => (
                       <MenuItem key={esp.id} value={esp.nombre}>
@@ -341,11 +774,15 @@ const ComenzarTratamiento = () => {
 
               <Grid item xs={12}>
                 <FormControl fullWidth>
-                  <InputLabel>Método de Pago</InputLabel>
                   <Select
                     value={pagoMetodo}
                     onChange={(e) => setPagoMetodo(e.target.value)}
-                    sx={{ backgroundColor: "#fff" }}
+                    inputProps={{ "aria-label": "Método de Pago" }}
+                    sx={{
+                      minHeight: "56px",
+                      backgroundColor: "rgba(255,255,255,0.95)",
+                      borderRadius: 3,
+                    }}
                   >
                     <MenuItem value="Efectivo">Efectivo</MenuItem>
                     <MenuItem value="Tarjeta">Tarjeta</MenuItem>
@@ -358,19 +795,32 @@ const ComenzarTratamiento = () => {
 
               {/* Total general */}
               <Grid item xs={12}>
-                <Typography
-                  variant="h6"
-                  align="center"
+                <Box
                   sx={{
-                    color: "#a36920",
-                    fontWeight: "bold",
-                    mt: 3,
-                    mb: 3,
-                    fontSize: "1.4rem",
+                    mt: 2,
+                    mb: 2,
+                    p: 2,
+                    borderRadius: 4,
+                    border: "1px solid rgba(224,195,155,0.9)",
+                    background:
+                      "linear-gradient(90deg, rgba(255,246,234,0.92), rgba(255,255,255,0.85))",
+                    boxShadow: "0 10px 22px rgba(0,0,0,0.06)",
+                    textAlign: "center",
                   }}
                 >
-                  TOTAL GENERAL: S/ {totalGeneral.toFixed(2)}
-                </Typography>
+                  <Typography
+                    variant="overline"
+                    sx={{ color: "rgba(46,46,46,0.72)", letterSpacing: 1.2 }}
+                  >
+                    Total general
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    sx={{ color: colorPrincipal, fontWeight: 900, mt: 0.2 }}
+                  >
+                    S/ {totalGeneral.toFixed(2)}
+                  </Typography>
+                </Box>
               </Grid>
 
               {/* Guardar */}
@@ -380,10 +830,12 @@ const ComenzarTratamiento = () => {
                   fullWidth
                   variant="contained"
                   sx={{
-                    backgroundColor: "#a36920",
+                    backgroundColor: colorPrincipal,
                     fontSize: "1.1rem",
                     fontWeight: "bold",
-                    py: 1.5,
+                    py: 1.6,
+                    borderRadius: 999,
+                    boxShadow: "0 14px 28px rgba(163,105,32,0.26)",
                     "&:hover": { backgroundColor: "#8b581b" },
                   }}
                 >
@@ -394,7 +846,7 @@ const ComenzarTratamiento = () => {
           </form>
         </Paper>
       </Container>
-    </div>
+    </Box>
   );
 };
 

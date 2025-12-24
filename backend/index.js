@@ -2,14 +2,21 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import sqlite3 from "sqlite3";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import authRoutes from "./routes/auth.js";
 import patientRoutes from "./routes/patientRoutes.js";
 import treatmentRoutes from "./routes/treatmentRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
+import deudasRoutes from "./routes/deudasRoutes.js";
 import especialistasRoutes from "./routes/especialistas.js";
 import finanzasRoutes from "./routes/finanzasRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import bcrypt from "bcryptjs";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
@@ -53,6 +60,35 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
+     const ensureUser = (username, passwordPlain, role) => {
+      db.get(
+        "SELECT id FROM users WHERE username = ?",
+        [username],
+        (getErr, existing) => {
+          if (getErr) {
+            console.error("❌ Error verificando usuario:", getErr.message);
+            return;
+          }
+          if (existing?.id) return;
+          const hash = bcrypt.hashSync(passwordPlain, 10);
+          db.run(
+            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            [username, hash, role],
+            (insertErr) => {
+              if (insertErr) {
+                console.error("❌ Error creando usuario:", insertErr.message);
+              } else {
+                console.log(`✅ Usuario creado: ${username} / ${passwordPlain} (${role})`);
+              }
+            }
+          );
+        }
+      );
+     };
+
+     ensureUser("logistica", "1234", "logistica");
+     ensureUser("asistente", "1234", "asistente");
+
     // 🧱 Tabla de pacientes
     db.run(`
       CREATE TABLE IF NOT EXISTS patients (
@@ -76,9 +112,60 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
         tabaco TEXT,
         alcohol TEXT,
         referencia TEXT,
+        numeroHijos INTEGER,
         fechaRegistro TEXT DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    db.all("PRAGMA table_info(patients)", [], (err, rows) => {
+      if (err) {
+        console.error("❌ Error verificando columnas de patients:", err.message);
+      } else {
+        const tieneNumeroHijos = rows.some((col) => col.name === "numeroHijos");
+        if (!tieneNumeroHijos) {
+          db.run("ALTER TABLE patients ADD COLUMN numeroHijos INTEGER", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna numeroHijos:", alterErr.message);
+            } else {
+              console.log("✅ Columna numeroHijos agregada a patients");
+            }
+          });
+        }
+
+        const tieneEmbarazada = rows.some((col) => col.name === "embarazada");
+        if (!tieneEmbarazada) {
+          db.run("ALTER TABLE patients ADD COLUMN embarazada TEXT", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna embarazada:", alterErr.message);
+            } else {
+              console.log("✅ Columna embarazada agregada a patients");
+            }
+          });
+        }
+
+        const tieneObservaciones = rows.some((col) => col.name === "observaciones");
+        if (!tieneObservaciones) {
+          db.run("ALTER TABLE patients ADD COLUMN observaciones TEXT", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna observaciones:", alterErr.message);
+            } else {
+              console.log("✅ Columna observaciones agregada a patients");
+            }
+          });
+        }
+
+        const tieneFotoPerfil = rows.some((col) => col.name === "fotoPerfil");
+        if (!tieneFotoPerfil) {
+          db.run("ALTER TABLE patients ADD COLUMN fotoPerfil TEXT", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna fotoPerfil:", alterErr.message);
+            } else {
+              console.log("✅ Columna fotoPerfil agregada a patients");
+            }
+          });
+        }
+      }
+    });
 
     // 🧱 Tabla de tratamientos base
     db.run(`
@@ -88,6 +175,23 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
         descripcion TEXT
       )
     `);
+
+    db.all("PRAGMA table_info(tratamientos)", [], (err, rows) => {
+      if (err) {
+        console.error("❌ Error verificando columnas de tratamientos:", err.message);
+      } else {
+        const tienePrecio = rows.some((col) => col.name === "precio");
+        if (!tienePrecio) {
+          db.run("ALTER TABLE tratamientos ADD COLUMN precio REAL", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna precio en tratamientos:", alterErr.message);
+            } else {
+              console.log("✅ Columna precio agregada a tratamientos");
+            }
+          });
+        }
+      }
+    });
 
     // 🧱 Tabla de tratamientos realizados
     db.run(`
@@ -120,6 +224,101 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
         FOREIGN KEY(tratamiento_id) REFERENCES tratamientos(id)
       )
     `);
+
+    // 💳 Deudas por pago en partes (por tratamiento realizado)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS deudas_tratamientos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        tratamiento_realizado_id INTEGER NOT NULL,
+        tratamiento_id INTEGER,
+        monto_total REAL NOT NULL,
+        monto_adelanto REAL NOT NULL,
+        monto_saldo REAL NOT NULL,
+        estado TEXT NOT NULL DEFAULT 'pendiente',
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        cancelado_en TEXT,
+        cancelado_monto REAL,
+        cancelado_metodo TEXT,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id),
+        FOREIGN KEY(tratamiento_realizado_id) REFERENCES tratamientos_realizados(id),
+        FOREIGN KEY(tratamiento_id) REFERENCES tratamientos(id)
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS deudas_pagos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        deuda_id INTEGER NOT NULL,
+        numero INTEGER NOT NULL,
+        monto REAL NOT NULL,
+        metodo TEXT NOT NULL,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(deuda_id) REFERENCES deudas_tratamientos(id)
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS patient_observaciones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        texto TEXT NOT NULL,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id)
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS patient_ofertas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        items_json TEXT NOT NULL,
+        total REAL NOT NULL,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id)
+      )
+    `);
+
+    db.all(
+      `SELECT id, observaciones FROM patients WHERE observaciones IS NOT NULL AND TRIM(observaciones) != ''`,
+      [],
+      (err, rows) => {
+        if (err) {
+          console.error("❌ Error leyendo observaciones antiguas:", err.message);
+          return;
+        }
+
+        (rows || []).forEach((r) => {
+          db.get(
+            `SELECT COUNT(*) as count FROM patient_observaciones WHERE paciente_id = ?`,
+            [r.id],
+            (countErr, countRow) => {
+              if (countErr) {
+                console.error("❌ Error verificando observaciones por paciente:", countErr.message);
+                return;
+              }
+
+              if ((countRow?.count || 0) > 0) return;
+
+              const creadoEn = new Date()
+                .toLocaleString("sv-SE", { timeZone: "America/Lima" })
+                .replace("T", " ")
+                .slice(0, 19);
+
+              db.run(
+                `INSERT INTO patient_observaciones (paciente_id, texto, creado_en) VALUES (?, ?, ?)`,
+                [r.id, String(r.observaciones), creadoEn],
+                (insErr) => {
+                  if (insErr) {
+                    console.error("❌ Error migrando observación antigua:", insErr.message);
+                  }
+                }
+              );
+            }
+          );
+        });
+      }
+    );
 
     const ensureColumnExists = (table, column, definition) => {
       db.all(`PRAGMA table_info(${table})`, (err, rows) => {
@@ -191,6 +390,100 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       )
     `);
 
+    db.run(`
+      CREATE TABLE IF NOT EXISTS productos_base (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        categoria TEXT,
+        descripcion TEXT
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS variantes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        producto_base_id INTEGER NOT NULL,
+        nombre TEXT NOT NULL,
+        laboratorio TEXT,
+        sku TEXT,
+        unidad_base TEXT NOT NULL,
+        contenido_por_presentacion REAL NOT NULL,
+        es_medico INTEGER NOT NULL DEFAULT 0,
+        costo_unitario REAL,
+        precio_unitario REAL,
+        stock_minimo_unidades REAL DEFAULT 0,
+        FOREIGN KEY(producto_base_id) REFERENCES productos_base(id)
+      )
+    `);
+
+    [
+      ["laboratorio", "TEXT"],
+    ].forEach(([column, definition]) =>
+      ensureColumnExists("variantes", column, definition)
+    );
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS stock_lotes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        variante_id INTEGER NOT NULL,
+        lote TEXT,
+        fecha_vencimiento TEXT,
+        ubicacion TEXT,
+        cantidad_unidades REAL NOT NULL,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en TEXT,
+        FOREIGN KEY(variante_id) REFERENCES variantes(id)
+      )
+    `);
+
+    [
+      ["cantidad_reservada_unidades", "REAL NOT NULL DEFAULT 0"],
+      ["condicion_almacenamiento", "TEXT"],
+      ["estado", "TEXT NOT NULL DEFAULT 'Disponible'"],
+      ["documento_pdf", "TEXT"],
+    ].forEach(([column, definition]) =>
+      ensureColumnExists("stock_lotes", column, definition)
+    );
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS movimientos_inventario (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo TEXT NOT NULL,
+        motivo TEXT,
+        fecha TEXT DEFAULT CURRENT_TIMESTAMP,
+        referencia_tipo TEXT,
+        referencia_id INTEGER,
+        usuario TEXT
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS movimientos_detalle (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        movimiento_id INTEGER NOT NULL,
+        variante_id INTEGER NOT NULL,
+        stock_lote_id INTEGER,
+        cantidad_unidades REAL NOT NULL,
+        costo_unitario REAL,
+        FOREIGN KEY(movimiento_id) REFERENCES movimientos_inventario(id),
+        FOREIGN KEY(variante_id) REFERENCES variantes(id),
+        FOREIGN KEY(stock_lote_id) REFERENCES stock_lotes(id)
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS recetas_tratamiento (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tratamiento_id INTEGER NOT NULL,
+        variante_id INTEGER NOT NULL,
+        cantidad_unidades REAL NOT NULL,
+        unidad_mostrada TEXT,
+        obligatorio INTEGER DEFAULT 1,
+        FOREIGN KEY(tratamiento_id) REFERENCES tratamientos(id),
+        FOREIGN KEY(variante_id) REFERENCES variantes(id)
+      )
+    `);
+
     console.log("🧩 Todas las tablas listas para usar ✅");
   }
 });
@@ -200,9 +493,18 @@ app.use("/api/auth", authRoutes);
 app.use("/api/pacientes", patientRoutes);
 app.use("/api/tratamientos", treatmentRoutes);
 app.use("/api/inventario", inventoryRoutes);
+app.use("/api/deudas", deudasRoutes);
 app.use("/api/especialistas", especialistasRoutes);
 app.use("/api/finanzas", finanzasRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
+
+// ✅ Servir frontend (React build) para acceso remoto (ej. iPad/iPhone)
+const frontendBuildPath = path.join(__dirname, "..", "frontend", "build");
+app.use(express.static(frontendBuildPath));
+app.get(/^(?!\/api\/)(?!\/uploads\/).*/, (req, res) => {
+  res.sendFile(path.join(frontendBuildPath, "index.html"));
+});
 
 
 // ✅ Servidor en puerto 4000

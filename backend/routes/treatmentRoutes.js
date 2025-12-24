@@ -4,10 +4,82 @@ import bodyParser from "body-parser";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import jwt from "jsonwebtoken";
+
+import { consumirStockFEFO } from "../services/inventoryOps.js";
 
 const router = express.Router();
 const db = new sqlite3.Database("./db/showclinic.db");
 router.use(bodyParser.json());
+
+const SECRET = "showclinic_secret";
+
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
+  if (!authHeader) {
+    return res.status(401).json({ message: "Token no proporcionado" });
+  }
+
+  const [, token] = authHeader.split(" ");
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    console.error("❌ Token inválido en tratamientos:", err.message);
+    return res.status(401).json({ message: "Token inválido" });
+  }
+};
+
+const requireDoctor = (req, res, next) => {
+  if (req.user?.role !== "doctor") {
+    return res.status(403).json({ message: "Solo el rol doctor puede modificar tratamientos" });
+  }
+  next();
+};
+
+const requireTreatmentBaseCreate = (req, res, next) => {
+  const role = req.user?.role;
+  if (role !== "doctor" && role !== "asistente") {
+    return res.status(403).json({ message: "No tienes permisos para crear tratamientos" });
+  }
+  next();
+};
+
+const requireTratamientoRealizadoWrite = (req, res, next) => {
+  const role = req.user?.role;
+  if (role !== "doctor" && role !== "asistente") {
+    return res.status(403).json({ message: "No tienes permisos para registrar tratamientos" });
+  }
+  next();
+};
+
+router.use(authMiddleware);
+
+// Helpers simples para usar sqlite3 con async/await sin cambiar el resto del código
+const dbAll = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows);
+    });
+  });
+
+const dbRun = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) return reject(err);
+      resolve(this);
+    });
+  });
+
+const dbGet = (sql, params = []) =>
+  new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) return reject(err);
+      resolve(row);
+    });
+  });
 
 /* ==============================
    📁 CONFIGURAR SUBIDA DE FOTOS
@@ -29,19 +101,23 @@ const upload = multer({ storage });
 ============================== */
 
 // ✅ Crear tratamiento
-router.post("/crear", (req, res) => {
-  const { nombre, descripcion } = req.body;
-  if (!nombre || !descripcion) {
-    return res.status(400).json({ message: "Faltan datos" });
+router.post("/crear", requireTreatmentBaseCreate, (req, res) => {
+  const { nombre, descripcion, precio } = req.body;
+  if (!nombre) {
+    return res.status(400).json({ message: "Falta nombre" });
+  }
+  const precioNum = precio == null || precio === "" ? null : parseFloat(precio);
+  if (precioNum != null && (isNaN(precioNum) || precioNum < 0)) {
+    return res.status(400).json({ message: "Precio inválido" });
   }
 
   db.run(
-    `INSERT INTO tratamientos (nombre, descripcion) VALUES (?, ?)`,
-    [nombre, descripcion],
+    `INSERT INTO tratamientos (nombre, descripcion, precio) VALUES (?, ?, ?)`,
+    [nombre, descripcion || "", precioNum],
     function (err) {
       if (err)
         return res.status(500).json({ message: "Error al crear tratamiento" });
-      res.json({ id: this.lastID, nombre, descripcion });
+      res.json({ id: this.lastID, nombre, descripcion: descripcion || "", precio: precioNum });
     }
   );
 });
@@ -53,6 +129,138 @@ router.get("/listar", (req, res) => {
       return res.status(500).json({ message: "Error al listar tratamientos" });
     res.json(rows);
   });
+});
+
+router.delete("/eliminar/:id", requireDoctor, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await dbRun(`DELETE FROM tratamientos WHERE id = ?`, [id]);
+    res.json({ message: "✅ Tratamiento eliminado" });
+  } catch (err) {
+    console.error("❌ Error al eliminar tratamiento:", err.message);
+    res.status(500).json({ message: "Error al eliminar tratamiento" });
+  }
+});
+
+router.put("/:id", requireDoctor, async (req, res) => {
+  const { id } = req.params;
+  const idNum = Number(id);
+  const { nombre, descripcion, precio } = req.body || {};
+
+  if (!Number.isFinite(idNum) || idNum <= 0) {
+    return res.status(400).json({ message: "ID inválido" });
+  }
+
+  const nombreStr = typeof nombre === "string" ? nombre.trim() : "";
+  if (!nombreStr) {
+    return res.status(400).json({ message: "Falta nombre" });
+  }
+
+  const precioNum = precio == null || precio === "" ? null : parseFloat(precio);
+  if (precioNum != null && (isNaN(precioNum) || precioNum < 0)) {
+    return res.status(400).json({ message: "Precio inválido" });
+  }
+
+  const descripcionStr = typeof descripcion === "string" ? descripcion : "";
+
+  try {
+    const result = await dbRun(
+      `UPDATE tratamientos SET nombre = ?, descripcion = ?, precio = ? WHERE id = ?`,
+      [nombreStr, descripcionStr, precioNum, idNum]
+    );
+
+    if ((result?.changes || 0) === 0) {
+      return res.status(404).json({ message: "Tratamiento no encontrado" });
+    }
+
+    res.json({ id: idNum, nombre: nombreStr, descripcion: descripcionStr, precio: precioNum });
+  } catch (err) {
+    console.error("❌ Error al editar tratamiento:", err.message);
+    res.status(500).json({ message: "Error al editar tratamiento" });
+  }
+});
+
+router.post("/reset", requireDoctor, async (req, res) => {
+  const lista = [
+    { nombre: "Modulación 1/3 superior", precio: 1200 },
+    { nombre: "Modulación Maseteros", precio: 1500 },
+    { nombre: "Modulación Peribucal", precio: 1200 },
+    { nombre: "Modulación Nefertiti", precio: 1200 },
+    { nombre: "Rinomodelación", precio: 1200 },
+    { nombre: "Proyección de Mentón", precio: 1200 },
+    { nombre: "Marcación Mandibular", precio: 1200 },
+    { nombre: "Diseño de Labios", precio: 1200 },
+    { nombre: "Proyección de Pómulos", precio: 1200 },
+    { nombre: "Lifting de Surcos Nasogenianos", precio: 1200 },
+    { nombre: "Bioestimuladores de Colágeno", precio: 2700 },
+    { nombre: "Rejuvenecimiento Periocular", precio: 1500 },
+    { nombre: "Revitalización Facial Integral", precio: 1500 },
+    { nombre: "Bioestimulación intensiva a ti-edad", precio: 1500 },
+    { nombre: "Lifting Bioestructural avanzado", precio: 1500 },
+    { nombre: "Lipomapada Enzimática", precio: 1800 },
+    { nombre: "Reducción corporal enzimática", precio: 1800 },
+    { nombre: "Regeneración celular Facial", precio: 1800 },
+    { nombre: "Hifu Facial", precio: 700 },
+    { nombre: "Hifu Corporal", precio: 700 },
+    { nombre: "Peeling Hollywood", precio: 500 },
+  ];
+
+  try {
+    await dbRun("BEGIN TRANSACTION");
+    await dbRun("DELETE FROM tratamientos");
+    await dbRun("DELETE FROM sqlite_sequence WHERE name = 'tratamientos'");
+    for (const t of lista) {
+      await dbRun(
+        `INSERT INTO tratamientos (nombre, descripcion, precio) VALUES (?, ?, ?)`,
+        [t.nombre, "", t.precio]
+      );
+    }
+    await dbRun("COMMIT");
+    res.json({ message: "✅ Tratamientos reseteados", count: lista.length });
+  } catch (err) {
+    try {
+      await dbRun("ROLLBACK");
+    } catch (_) {}
+    console.error("❌ Error reseteando tratamientos:", err.message);
+    res.status(500).json({ message: "Error al resetear tratamientos" });
+  }
+});
+
+// Obtener receta de un tratamiento (si existe)
+router.get("/recetas/:tratamiento_id", async (req, res) => {
+  try {
+    const { tratamiento_id } = req.params;
+    const id = Number(tratamiento_id);
+    if (!id) {
+      return res.status(400).json({ message: "tratamiento_id inválido" });
+    }
+
+    const rows = await dbAll(
+      `
+        SELECT
+          rt.id,
+          rt.tratamiento_id,
+          rt.variante_id,
+          rt.cantidad_unidades,
+          v.nombre AS variante_nombre,
+          v.precio_unitario,
+          v.unidad_base,
+          v.contenido_por_presentacion,
+          pb.nombre AS producto_base_nombre
+        FROM recetas_tratamiento rt
+        LEFT JOIN variantes v ON v.id = rt.variante_id
+        LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+        WHERE rt.tratamiento_id = ?
+        ORDER BY rt.id ASC
+      `,
+      [id]
+    );
+
+    res.json(rows || []);
+  } catch (err) {
+    console.error("Error al obtener receta del tratamiento:", err);
+    res.status(500).json({ message: "Error al obtener receta del tratamiento" });
+  }
 });
 
 /* ==============================
@@ -81,38 +289,200 @@ router.get("/marcas", (req, res) => {
 
 /* ==============================
    💉 REGISTRO DE TRATAMIENTOS REALIZADOS
+   - Soporta recetas_tratamiento + variantes + stock_lotes (FEFO, cantidades decimales)
+   - Mantiene compatibilidad con inventario clásico cuando no hay receta
 ============================== */
 
-router.post("/realizado", upload.array("fotos", 6), (req, res) => {
+router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos", 6), async (req, res) => {
   try {
     const { paciente_id, productos, pagoMetodo, sesion, especialista, tipoAtencion } = req.body;
     const productosData = JSON.parse(productos);
 
-    if (!productosData || productosData.length === 0)
+    if (!productosData || productosData.length === 0) {
       return res.status(400).json({ message: "No se enviaron tratamientos" });
+    }
 
     const fechaLocal = new Date()
-      .toLocaleString("sv-SE")
+      .toLocaleString("sv-SE", { timeZone: "America/Lima" })
       .replace("T", " ")
       .slice(0, 19);
 
-    // 🔁 Procesar cada tratamiento
-    productosData.forEach((b) => {
-      const subtotal = b.precio * b.cantidad;
-      const descuentoAplicado = (b.descuento / 100) * subtotal;
+    // 1) VALIDAR STOCK PARA TODOS LOS TRATAMIENTOS QUE TENGAN RECETA
+    for (const b of productosData) {
+      if (!b.tratamiento_id) continue; // sin tratamiento asociado, usa flujo clásico
+
+      const recetas = await dbAll(
+        `SELECT * FROM recetas_tratamiento WHERE tratamiento_id = ?`,
+        [b.tratamiento_id]
+      );
+
+      if (!recetas || recetas.length === 0) continue; // tratamiento sin receta, flujo clásico
+
+      const factorCantidad =
+        parseFloat(b.dosis_unidades) > 0
+          ? parseFloat(b.dosis_unidades)
+          : parseFloat(b.cantidad) > 0
+            ? parseFloat(b.cantidad)
+            : 1;
+
+      for (const receta of recetas) {
+        const cantidadNecesaria = receta.cantidad_unidades * factorCantidad; // siempre en unidades base
+
+        const lotes = await dbAll(
+          `
+            SELECT *
+            FROM stock_lotes
+            WHERE variante_id = ? AND cantidad_unidades > 0
+              AND (estado IS NULL OR estado = 'Disponible')
+            ORDER BY (fecha_vencimiento IS NULL) ASC, fecha_vencimiento ASC, id ASC
+          `,
+          [receta.variante_id]
+        );
+
+        const disponibleTotal = lotes.reduce((sum, l) => {
+          const dispo = (l.cantidad_unidades || 0) - (l.cantidad_reservada_unidades || 0);
+          return sum + Math.max(0, dispo);
+        }, 0);
+
+        if (disponibleTotal < cantidadNecesaria) {
+          const varianteRows = await dbAll(
+            `SELECT nombre FROM variantes WHERE id = ?`,
+            [receta.variante_id]
+          );
+          const nombreVariante = varianteRows[0]?.nombre || "variante";
+          return res.status(400).json({
+            message: `Stock insuficiente para ${nombreVariante}. Necesario: ${cantidadNecesaria}, disponible: ${disponibleTotal}`,
+          });
+        }
+      }
+    }
+
+    // 1.b) VALIDAR STOCK PARA LOS BLOQUES CON VARIANTE SELECCIONADA (siempre que se quiera consumir por producto elegido)
+    for (const b of productosData) {
+      const varianteId = b.variante_id ? Number(b.variante_id) : null;
+      if (!varianteId) continue;
+
+      const cantidadNecesaria =
+        parseFloat(b.dosis_unidades) > 0
+          ? parseFloat(b.dosis_unidades)
+          : parseFloat(b.cantidad) > 0
+            ? parseFloat(b.cantidad)
+            : 0;
+      if (!(cantidadNecesaria > 0)) continue;
+
+      const lotes = await dbAll(
+        `
+          SELECT *
+          FROM stock_lotes
+          WHERE variante_id = ? AND cantidad_unidades > 0
+            AND (estado IS NULL OR estado = 'Disponible')
+          ORDER BY (fecha_vencimiento IS NULL) ASC, fecha_vencimiento ASC, id ASC
+        `,
+        [varianteId]
+      );
+
+      const disponibleTotal = lotes.reduce((sum, l) => {
+        const dispo = (l.cantidad_unidades || 0) - (l.cantidad_reservada_unidades || 0);
+        return sum + Math.max(0, dispo);
+      }, 0);
+
+      if (disponibleTotal < cantidadNecesaria) {
+        const varianteRows = await dbAll(
+          `SELECT nombre FROM variantes WHERE id = ?`,
+          [varianteId]
+        );
+        const nombreVariante = varianteRows[0]?.nombre || "variante";
+        return res.status(400).json({
+          message: `Stock insuficiente para ${nombreVariante}. Necesario: ${cantidadNecesaria}, disponible: ${disponibleTotal}`,
+        });
+      }
+    }
+
+    // 2) REGISTRAR TRATAMIENTOS Y DESCONTAR STOCK (RECETAS + FEFO)
+    for (const b of productosData) {
+      const descuentoPct = parseFloat(b.descuento) || 0;
+
+      const tratamientoId = b.tratamiento_id ? Number(b.tratamiento_id) : null;
+
+      const recetaDetallada = tratamientoId
+        ? await dbAll(
+            `
+              SELECT
+                rt.variante_id,
+                rt.cantidad_unidades,
+                v.precio_unitario
+              FROM recetas_tratamiento rt
+              LEFT JOIN variantes v ON v.id = rt.variante_id
+              WHERE rt.tratamiento_id = ?
+            `,
+            [tratamientoId]
+          )
+        : [];
+
+      const factorCantidad =
+        parseFloat(b.dosis_unidades) > 0
+          ? parseFloat(b.dosis_unidades)
+          : parseFloat(b.cantidad) > 0
+            ? parseFloat(b.cantidad)
+            : 1;
+
+      if (!(factorCantidad > 0)) {
+        return res.status(400).json({ message: "Cantidad inválida para calcular el precio" });
+      }
+
+      let subtotal = 0;
+      let precioUnitario = 0;
+      let cantidadParaPrecio = factorCantidad;
+
+      // Si hay receta, el precio se calcula por ingredientes (sumatoria).
+      if (Array.isArray(recetaDetallada) && recetaDetallada.length > 0) {
+        subtotal = recetaDetallada.reduce((acc, r) => {
+          const pu = parseFloat(r.precio_unitario) || 0;
+          const qty = (parseFloat(r.cantidad_unidades) || 0) * (factorCantidad || 0);
+          return acc + pu * qty;
+        }, 0);
+      } else {
+        // Sin receta: si hay variante seleccionada, el precio viene de la variante.
+        const varianteId = b.variante_id ? Number(b.variante_id) : null;
+        if (varianteId) {
+          const v = await dbGet(`SELECT precio_unitario FROM variantes WHERE id = ?`, [varianteId]);
+          precioUnitario = parseFloat(v?.precio_unitario) || 0;
+          subtotal = precioUnitario * (factorCantidad || 0);
+        } else {
+          // Fallback: compatibilidad con flujos viejos que aún envían precio.
+          const precioLegacy = parseFloat(b.precio) || 0;
+          precioUnitario = precioLegacy;
+          cantidadParaPrecio = 1;
+          subtotal = precioLegacy;
+        }
+      }
+
+      if (!(subtotal > 0)) {
+        return res.status(400).json({ message: "No se pudo calcular el precio del tratamiento (revisa el precio de la variante)" });
+      }
+
+      const descuentoAplicado = (descuentoPct / 100) * subtotal;
       const totalFinal = subtotal - descuentoAplicado;
 
-      db.run(
+      // Registrar tratamiento realizado
+      const insertTratamiento = await dbRun(
         `
-        INSERT INTO tratamientos_realizados
-        (paciente_id, tratamiento_id, productos, cantidad_total, precio_total, descuento, pagoMetodo, especialista, sesion, tipoAtencion, fecha)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
+          INSERT INTO tratamientos_realizados
+          (paciente_id, tratamiento_id, productos, cantidad_total, precio_total, descuento, pagoMetodo, especialista, sesion, tipoAtencion, fecha)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
         [
           paciente_id,
           b.tratamiento_id || null,
-          JSON.stringify([{ producto: b.producto, cantidad: b.cantidad, precio: b.precio }]),
-          b.cantidad,
+          JSON.stringify([
+            {
+              producto: b.producto,
+              cantidad: cantidadParaPrecio,
+              precio: precioUnitario,
+              variante_id: b.variante_id || null,
+            },
+          ]),
+          cantidadParaPrecio,
           totalFinal,
           b.descuento || 0,
           pagoMetodo,
@@ -120,29 +490,155 @@ router.post("/realizado", upload.array("fotos", 6), (req, res) => {
           sesion || 1,
           tipoAtencion || "Tratamiento",
           fechaLocal,
-        ],
-        function (err) {
-          if (err) {
-            console.error("❌ Error al registrar:", err.message);
-          } else {
-            console.log(`✅ Tratamiento registrado correctamente (ID ${this.lastID})`);
-          }
-        }
+        ]
       );
 
-      // 🔻 Actualizar stock
-      db.run(
-        `UPDATE inventario SET stock = stock - ? WHERE producto = ?`,
-        [b.cantidad, b.producto],
-        (err) => {
-          if (err) console.error(`Error al actualizar stock de ${b.producto}`);
-        }
+      const tratamientoRealizadoId = insertTratamiento.lastID;
+      console.log(
+        `✅ Tratamiento registrado correctamente (ID ${tratamientoRealizadoId})`
       );
-    });
+
+      const pagoEnPartes =
+        b.pago_en_partes === true ||
+        b.pago_en_partes === 1 ||
+        String(b.pago_en_partes || "").toLowerCase() === "true";
+      if (pagoEnPartes) {
+        const adelanto = parseFloat(b.monto_adelanto);
+        if (!(adelanto > 0)) {
+          return res.status(400).json({ message: "Monto de adelanto inválido" });
+        }
+
+        if (!(totalFinal > 0)) {
+          return res.status(400).json({ message: "Monto total inválido" });
+        }
+
+        if (adelanto >= totalFinal) {
+          return res.status(400).json({ message: "El adelanto debe ser menor al total" });
+        }
+
+        const saldo = totalFinal - adelanto;
+
+        const deudaInsert = await dbRun(
+          `
+            INSERT INTO deudas_tratamientos
+            (paciente_id, tratamiento_realizado_id, tratamiento_id, monto_total, monto_adelanto, monto_saldo, estado, creado_en)
+            VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)
+          `,
+          [
+            paciente_id,
+            tratamientoRealizadoId,
+            b.tratamiento_id || null,
+            totalFinal,
+            adelanto,
+            saldo,
+            fechaLocal,
+          ]
+        );
+
+        const deudaId = deudaInsert?.lastID;
+        if (deudaId) {
+          await dbRun(
+            `
+              INSERT INTO deudas_pagos (deuda_id, numero, monto, metodo, creado_en)
+              VALUES (?, 1, ?, ?, ?)
+            `,
+            [deudaId, adelanto, pagoMetodo || "Desconocido", fechaLocal]
+          );
+        }
+      }
+
+      // Intentar usar receta_tratamiento si existe
+      let usoReceta = false;
+      if (b.tratamiento_id) {
+        const recetas = await dbAll(
+          `SELECT * FROM recetas_tratamiento WHERE tratamiento_id = ?`,
+          [b.tratamiento_id]
+        );
+
+        if (recetas && recetas.length > 0) {
+          usoReceta = true;
+
+          const factorCantidad =
+            parseFloat(b.dosis_unidades) > 0
+              ? parseFloat(b.dosis_unidades)
+              : parseFloat(b.cantidad) > 0
+                ? parseFloat(b.cantidad)
+                : 1;
+
+          // Por cada ingrediente de la receta, aplicar FEFO y descontar lotes
+          for (const receta of recetas) {
+            const cantidadNecesaria = receta.cantidad_unidades * factorCantidad;
+
+            // Crear cabecera de movimiento por cada ingrediente (mantiene trazabilidad clara)
+            const movimiento = await dbRun(
+              `
+                INSERT INTO movimientos_inventario
+                (tipo, motivo, referencia_tipo, referencia_id, usuario)
+                VALUES ('salida', 'tratamiento', 'tratamientos_realizados', ?, ?)
+              `,
+              [tratamientoRealizadoId, especialista || "No especificado"]
+            );
+
+            const result = await consumirStockFEFO({
+              dbAll,
+              dbRun,
+              movimientoId: movimiento.lastID,
+              varianteId: receta.variante_id,
+              cantidad: cantidadNecesaria,
+              stockLoteId: null,
+            });
+
+            if (!result.ok) {
+              return res.status(result.status).json({ message: result.message });
+            }
+          }
+        }
+      }
+
+      // Consumir por producto seleccionado (variante_id) siempre que venga en el payload.
+      // Esto conecta directamente Comenzar Tratamiento -> Inventario.
+      const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
+      const cantidadElegida =
+        parseFloat(b.dosis_unidades) > 0
+          ? parseFloat(b.dosis_unidades)
+          : parseFloat(b.cantidad) > 0
+            ? parseFloat(b.cantidad)
+            : 0;
+
+      if (varianteIdElegida && cantidadElegida > 0) {
+        const movimiento = await dbRun(
+          `
+            INSERT INTO movimientos_inventario
+            (tipo, motivo, referencia_tipo, referencia_id, usuario)
+            VALUES ('salida', 'tratamiento', 'tratamientos_realizados', ?, ?)
+          `,
+          [tratamientoRealizadoId, especialista || "No especificado"]
+        );
+
+        const result = await consumirStockFEFO({
+          dbAll,
+          dbRun,
+          movimientoId: movimiento.lastID,
+          varianteId: varianteIdElegida,
+          cantidad: cantidadElegida,
+          stockLoteId: null,
+        });
+
+        if (!result.ok) {
+          return res.status(result.status).json({ message: result.message });
+        }
+      } else if (!usoReceta) {
+        // Compatibilidad con inventario clásico solo si no hay receta y no se eligió variante.
+        await dbRun(
+          `UPDATE inventario SET stock = stock - ? WHERE producto = ?`,
+          [b.cantidad, b.producto]
+        );
+      }
+    }
 
     res.json({ message: "✅ Tratamientos registrados correctamente" });
   } catch (error) {
-    console.error("Error general:", error);
+    console.error("Error general en /realizado:", error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 });
@@ -153,40 +649,33 @@ router.post("/realizado", upload.array("fotos", 6), (req, res) => {
 
 router.post(
   "/subir-fotos/:id",
+  requireTratamientoRealizadoWrite,
   upload.fields([
-    { name: "fotosAntes", maxCount: 3 },
-    { name: "fotosDespues", maxCount: 3 },
-    // Compatibilidad con el formato anterior (un solo array "fotos")
-    { name: "fotos", maxCount: 6 },
+    { name: "fotos", maxCount: 3 },
   ]),
   (req, res) => {
     const { id } = req.params;
-    const archivosAntes = req.files?.fotosAntes || [];
-    const archivosDespues = req.files?.fotosDespues || [];
+    const archivos = req.files?.fotos || [];
 
-    // Soportar cargas antiguas en un único campo "fotos"
-    const archivosLegacy = req.files?.fotos || [];
-    if (!archivosAntes.length && !archivosDespues.length && archivosLegacy.length) {
-      archivosAntes.push(...archivosLegacy.slice(0, 3));
-      archivosDespues.push(...archivosLegacy.slice(3, 6));
-    }
-
-    if (!archivosAntes.length && !archivosDespues.length) {
+    if (!archivos.length) {
       return res.status(400).json({ message: "No se han subido imágenes" });
     }
 
-    const camposAntes = ["foto_antes1", "foto_antes2", "foto_antes3"];
-    const camposDespues = ["foto_despues1", "foto_despues2", "foto_despues3"];
+    if (archivos.length > 3) {
+      return res.status(400).json({ message: "Solo puedes subir hasta 3 fotos por tratamiento" });
+    }
 
-    const fotosAntes = camposAntes.map((_, idx) => archivosAntes[idx]?.filename || null);
-    const fotosDespues = camposDespues.map((_, idx) => archivosDespues[idx]?.filename || null);
+    const camposFotos = ["foto_antes1", "foto_antes2", "foto_antes3"];
+    const fotos = camposFotos.map((_, idx) => archivos[idx]?.filename || null);
 
     db.run(
       `UPDATE tratamientos_realizados
        SET foto_antes1 = ?, foto_antes2 = ?, foto_antes3 = ?,
-           foto_despues1 = ?, foto_despues2 = ?, foto_despues3 = ?
+           foto_despues1 = NULL, foto_despues2 = NULL, foto_despues3 = NULL,
+           foto_izquierda = NULL, foto_frontal = NULL, foto_derecha = NULL,
+           foto_extra1 = NULL, foto_extra2 = NULL, foto_extra3 = NULL
        WHERE id = ?`,
-      [...fotosAntes, ...fotosDespues, id],
+      [...fotos, id],
       function (err) {
         if (err) {
           console.error("❌ Error al guardar fotos:", err.message);
@@ -204,15 +693,39 @@ router.post(
 
 router.get("/historial/:paciente_id", (req, res) => {
   const { paciente_id } = req.params;
+  const { tratamientoId, fechaDesde, fechaHasta } = req.query;
+
+  const tratamientoIdNum = tratamientoId ? Number(tratamientoId) : null;
+  const where = [];
+  const params = [paciente_id];
+
+  if (tratamientoIdNum) {
+    where.push("tr.tratamiento_id = ?");
+    params.push(tratamientoIdNum);
+  }
+
+  const fechaDesdeStr = typeof fechaDesde === "string" ? fechaDesde.trim() : "";
+  const fechaHastaStr = typeof fechaHasta === "string" ? fechaHasta.trim() : "";
+  if (fechaDesdeStr) {
+    where.push("tr.fecha >= ?");
+    params.push(`${fechaDesdeStr} 00:00:00`);
+  }
+  if (fechaHastaStr) {
+    where.push("tr.fecha <= ?");
+    params.push(`${fechaHastaStr} 23:59:59`);
+  }
+
+  const whereExtra = where.length ? `AND ${where.join(" AND ")}` : "";
   db.all(
     `
     SELECT tr.*, t.nombre AS nombreTratamiento
     FROM tratamientos_realizados tr
     LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
     WHERE tr.paciente_id = ?
+    ${whereExtra}
     ORDER BY tr.fecha DESC
   `,
-    [paciente_id],
+    params,
     (err, rows) => {
       if (err)
         return res

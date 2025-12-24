@@ -16,14 +16,23 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import { generarPDFPaciente } from "../../utils/generarPDF";
 
+const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
+
 const HistorialPaciente = () => {
   const { id } = useParams();
   const [paciente, setPaciente] = useState(null);
   const [historial, setHistorial] = useState([]);
 
+  const token = localStorage.getItem("token");
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
   useEffect(() => {
-    axios.get(`http://localhost:4000/api/pacientes/${id}`).then((res) => setPaciente(res.data));
-    axios.get(`http://localhost:4000/api/pacientes/${id}/historial`).then((res) => setHistorial(res.data));
+    axios
+      .get(`${API_BASE_URL}/api/pacientes/${id}`, { headers: authHeaders })
+      .then((res) => setPaciente(res.data));
+    axios
+      .get(`${API_BASE_URL}/api/pacientes/${id}/historial`, { headers: authHeaders })
+      .then((res) => setHistorial(res.data));
   }, [id]);
 
   if (!paciente) return <p>Cargando datos del paciente...</p>;
@@ -58,12 +67,14 @@ const HistorialPaciente = () => {
               <Typography><strong>DNI:</strong> {paciente.dni}</Typography>
               <Typography><strong>Edad:</strong> {paciente.edad}</Typography>
               <Typography><strong>Sexo:</strong> {paciente.sexo}</Typography>
+              <Typography><strong>Embarazada:</strong> {paciente.embarazada || "No especifica"}</Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
               <Typography><strong>Teléfono:</strong> {paciente.celular}</Typography>
               <Typography><strong>Correo:</strong> {paciente.correo}</Typography>
               <Typography><strong>Dirección:</strong> {paciente.direccion}</Typography>
               <Typography><strong>Ciudad:</strong> {paciente.ciudadResidencia}</Typography>
+              <Typography><strong>Número de hijos:</strong> {paciente.numeroHijos ?? "No registrado"}</Typography>
             </Grid>
           </Grid>
 

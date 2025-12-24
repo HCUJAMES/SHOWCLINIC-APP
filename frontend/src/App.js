@@ -5,28 +5,110 @@ import Dashboard from "./pages/Dashboard";
 import PacientesMenu from "./pages/PacientesMenu";
 import RegistrarPaciente from "./pages/RegistrarPaciente";
 import BuscarPaciente from "./pages/BuscarPaciente";
+import PacientesConDeudas from "./pages/PacientesConDeudas";
 import TratamientosMenu from "./pages/tratamientos/TratamientosMenu";
 import CrearTratamiento from "./pages/tratamientos/CrearTratamiento";
 import ComenzarTratamiento from "./pages/tratamientos/ComenzarTratamiento";
 import Inventario from "./pages/inventario/Inventario";
 import HistorialClinico from "./pages/HistorialClinico";
 import Finanzas from "./pages/Finanzas";
+import FotosPaciente from "./pages/FotosPaciente";
+import ProtectedRoute from "./components/ProtectedRoute";
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/pacientes" element={<PacientesMenu />} />
-        <Route path="/pacientes/registrar" element={<RegistrarPaciente />} />
-        <Route path="/pacientes/buscar" element={<BuscarPaciente />} />
-        <Route path="/tratamientos" element={<TratamientosMenu />} />
-        <Route path="/tratamientos/crear" element={<CrearTratamiento />} /> 
-        <Route path="/tratamientos/comenzar" element={<ComenzarTratamiento />} />
-        <Route path="/inventario" element={<Inventario />} />
-        
-        <Route path="/historial-clinico" element={<HistorialClinico />} />
-         <Route path="/finanzas" element={<Finanzas />} /> {/* ✅ Nueva ruta */}
+        <Route path="/fotos-paciente" element={<FotosPaciente />} />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pacientes"
+          element={
+            <ProtectedRoute>
+              <PacientesMenu />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pacientes/registrar"
+          element={
+            <ProtectedRoute>
+              <RegistrarPaciente />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pacientes/buscar"
+          element={
+            <ProtectedRoute>
+              <BuscarPaciente />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pacientes/deudas"
+          element={
+            <ProtectedRoute>
+              <PacientesConDeudas />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tratamientos"
+          element={
+            <ProtectedRoute>
+              <TratamientosMenu />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tratamientos/crear"
+          element={
+            <ProtectedRoute>
+              <CrearTratamiento />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tratamientos/comenzar"
+          element={
+            <ProtectedRoute>
+              <ComenzarTratamiento />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/inventario"
+          element={
+            <ProtectedRoute>
+              <Inventario />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/historial-clinico"
+          element={
+            <ProtectedRoute>
+              <HistorialClinico />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/finanzas"
+          element={
+            <ProtectedRoute>
+              <Finanzas />
+            </ProtectedRoute>
+          }
+        />
 
       </Routes>
     </BrowserRouter>
