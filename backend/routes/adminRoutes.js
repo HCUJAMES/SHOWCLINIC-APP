@@ -1,56 +1,13 @@
 import express from "express";
-import sqlite3 from "sqlite3";
-import jwt from "jsonwebtoken";
 import fs from "fs";
 import path from "path";
+import db, { dbAll, dbRun } from "../db/database.js";
+import { authMiddleware, requireDoctor } from "../middleware/auth.js";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
-
-const SECRET = "showclinic_secret";
-
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
-  if (!authHeader) {
-    return res.status(401).json({ message: "Token no proporcionado" });
-  }
-
-  const [, token] = authHeader.split(" ");
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.error("❌ Token inválido en admin:", err.message);
-    return res.status(401).json({ message: "Token inválido" });
-  }
-};
-
-const requireDoctor = (req, res, next) => {
-  if (req.user?.role !== "doctor") {
-    return res.status(403).json({ message: "Solo el rol doctor puede ejecutar esta acción" });
-  }
-  next();
-};
 
 router.use(express.json());
 router.use(authMiddleware);
-
-const dbAll = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
-
-const dbRun = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve(this);
-    });
-  });
 
 const fechaStamp = () => {
   const s = new Date().toISOString().replace(/[:.]/g, "-");

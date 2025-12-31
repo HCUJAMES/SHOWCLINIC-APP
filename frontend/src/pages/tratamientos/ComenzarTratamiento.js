@@ -12,7 +12,17 @@ import {
   Divider,
   Box,
   Autocomplete,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItemButton,
+  ListItemText,
 } from "@mui/material";
+import { ArrowBack, Receipt, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "../../components/ToastProvider";
 
@@ -20,6 +30,7 @@ const API_BASE_URL =
   process.env.REACT_APP_API_URL || `http://${window.location.hostname}:4000`;
 
 const ComenzarTratamiento = () => {
+  const navigate = useNavigate();
   const colorPrincipal = "#a36920";
   const { showToast } = useToast();
   const token = localStorage.getItem("token");
@@ -29,6 +40,11 @@ const ComenzarTratamiento = () => {
   const [variantesInv, setVariantesInv] = useState([]);
   const [especialistas, setEspecialistas] = useState([]);
   const [recetasPorTratamiento, setRecetasPorTratamiento] = useState({});
+
+  // Estado para presupuestos/ofertas del paciente
+  const [ofertasPaciente, setOfertasPaciente] = useState([]);
+  const [openOfertasModal, setOpenOfertasModal] = useState(false);
+  const [presupuestoAplicado, setPresupuestoAplicado] = useState(false);
 
   const [tipoAtencion, setTipoAtencion] = useState("Tratamiento");
   const [paciente_id, setPaciente_id] = useState("");
@@ -141,10 +157,17 @@ const ComenzarTratamiento = () => {
       const v = valor
         ? variantesInv.find((x) => String(x.id) === String(valor))
         : null;
-      if (v && v.precio_unitario != null) {
-        nuevosBloques[index].precio = Number(v.precio_unitario) || 0;
-      } else {
-        nuevosBloques[index].precio = 0;
+      
+      // Solo actualizar el precio si NO hay un precio manual ya establecido (presupuesto)
+      const precioActual = parseFloat(nuevosBloques[index].precio) || 0;
+      const tienePresupuesto = presupuestoAplicado && precioActual > 0;
+      
+      if (!tienePresupuesto) {
+        if (v && v.precio_unitario != null) {
+          nuevosBloques[index].precio = Number(v.precio_unitario) || 0;
+        } else {
+          nuevosBloques[index].precio = 0;
+        }
       }
     }
 
@@ -200,6 +223,121 @@ const ComenzarTratamiento = () => {
     setBloques((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Cargar ofertas/presupuestos del paciente seleccionado
+  const cargarOfertasPaciente = async (idPaciente) => {
+    if (!idPaciente) {
+      setOfertasPaciente([]);
+      return;
+    }
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/pacientes/${idPaciente}/ofertas`, {
+        headers: authHeaders,
+      });
+      setOfertasPaciente(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Error al cargar ofertas:", err);
+      setOfertasPaciente([]);
+    }
+  };
+
+  // Abrir modal de presupuestos
+  const abrirPresupuestos = () => {
+    if (!paciente_id) {
+      showToast({ severity: "warning", message: "Primero selecciona un paciente" });
+      return;
+    }
+    cargarOfertasPaciente(paciente_id);
+    setOpenOfertasModal(true);
+  };
+
+  // Aplicar oferta seleccionada al primer bloque
+  const aplicarOferta = (oferta) => {
+    if (!oferta?.items || oferta.items.length === 0) {
+      showToast({ severity: "warning", message: "Esta oferta no tiene items" });
+      return;
+    }
+
+    // Crear bloques a partir de los items de la oferta
+    const nuevosBloques = oferta.items.map((item) => {
+      // El item tiene: tratamientoId, nombre, precio
+      const nombreTratamiento = String(item.nombre || item.tratamiento || "").trim().toLowerCase();
+      const tratamientoIdGuardado = item.tratamientoId;
+      
+      // Primero intentar buscar por ID si existe
+      let tratamientoEncontrado = null;
+      if (tratamientoIdGuardado) {
+        tratamientoEncontrado = tratamientos.find(
+          (t) => t.id === tratamientoIdGuardado || String(t.id) === String(tratamientoIdGuardado)
+        );
+      }
+      
+      // Si no encuentra por ID, buscar por nombre (exacto)
+      if (!tratamientoEncontrado && nombreTratamiento) {
+        tratamientoEncontrado = tratamientos.find(
+          (t) => String(t.nombre || "").trim().toLowerCase() === nombreTratamiento
+        );
+      }
+      
+      // Si no encuentra exacto, buscar que contenga el nombre
+      if (!tratamientoEncontrado && nombreTratamiento) {
+        tratamientoEncontrado = tratamientos.find(
+          (t) => String(t.nombre || "").trim().toLowerCase().includes(nombreTratamiento) ||
+                 nombreTratamiento.includes(String(t.nombre || "").trim().toLowerCase())
+        );
+      }
+
+      return {
+        tratamiento_id: tratamientoEncontrado?.id || "",
+        producto: "",
+        variante_id: "",
+        marca: "",
+        cantidad: 1,
+        dosis_unidades: "",
+        precio: Number(item.precio) || 0,
+        descuento: 0,
+        total: Number(item.precio) || 0,
+        pago_en_partes: false,
+        monto_adelanto: "",
+      };
+    });
+
+    setBloques(nuevosBloques);
+    setPresupuestoAplicado(true);
+    setOpenOfertasModal(false);
+    
+    // Verificar si todos los tratamientos fueron encontrados
+    const noEncontrados = nuevosBloques.filter(b => !b.tratamiento_id);
+    if (noEncontrados.length > 0) {
+      showToast({ 
+        severity: "warning", 
+        message: `Presupuesto aplicado. ${noEncontrados.length} tratamiento(s) no encontrado(s) en el sistema, selecciónalos manualmente.` 
+      });
+    } else {
+      showToast({ severity: "success", message: "Presupuesto aplicado correctamente" });
+    }
+  };
+
+  // Cancelar/limpiar presupuesto aplicado
+  const cancelarPresupuesto = () => {
+    setBloques([
+      {
+        tratamiento_id: "",
+        producto: "",
+        variante_id: "",
+        marca: "",
+        cantidad: 1,
+        dosis_unidades: "",
+        precio: 0,
+        descuento: 0,
+        total: 0,
+        pago_en_partes: false,
+        monto_adelanto: "",
+      },
+    ]);
+    setPresupuestoAplicado(false);
+    showToast({ severity: "info", message: "Presupuesto cancelado" });
+  };
+
   // Guardar tratamiento
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -214,18 +352,19 @@ const ComenzarTratamiento = () => {
       return;
     }
 
-    const bloqueSinProducto = (bloquesValidos || []).find((b) => {
-      const tratamientoId = b?.tratamiento_id;
-      const receta = tratamientoId ? recetasPorTratamiento[tratamientoId] || [] : [];
-      const tieneReceta = Array.isArray(receta) && receta.length > 0;
-      const varianteOk = b?.variante_id != null && String(b.variante_id).trim() !== "";
-      return !tieneReceta && !varianteOk;
+    // Validar que cada bloque tenga al menos un precio establecido
+    const bloqueSinPrecio = (bloquesValidos || []).find((b) => {
+      const tienePrecio = parseFloat(b?.precio) > 0;
+      const tieneTotal = parseFloat(b?.total) > 0;
+      
+      // Si tiene precio o total, está OK
+      return !tienePrecio && !tieneTotal;
     });
 
-    if (bloqueSinProducto) {
+    if (bloqueSinPrecio) {
       showToast({
         severity: "warning",
-        message: "Selecciona un producto (variante) para calcular el precio y descontar del inventario",
+        message: "Establece un precio para cada tratamiento antes de guardar",
       });
       return;
     }
@@ -311,14 +450,20 @@ const ComenzarTratamiento = () => {
             boxShadow: "0 18px 48px rgba(0,0,0,0.14)",
           }}
         >
-          <Typography
-            variant="h5"
-            align="center"
-            gutterBottom
-            sx={{ color: colorPrincipal, fontWeight: 800, mb: 0.5, letterSpacing: 0.2 }}
-          >
-            Comenzar Tratamiento
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+            <IconButton onClick={() => navigate("/tratamientos")} sx={{ color: colorPrincipal }}>
+              <ArrowBack />
+            </IconButton>
+            <Typography
+              variant="h5"
+              sx={{ color: colorPrincipal, fontWeight: 800, flex: 1, textAlign: "center", letterSpacing: 0.2 }}
+            >
+              Nueva Sesión
+            </Typography>
+            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+              <Home />
+            </IconButton>
+          </Box>
 
           <Typography
             variant="body2"
@@ -351,7 +496,7 @@ const ComenzarTratamiento = () => {
               </Grid>
 
               {/* Paciente */}
-              <Grid item xs={12} sm={12} md={7} sx={{ minWidth: 260 }}>
+              <Grid item xs={12} sm={12} md={5} sx={{ minWidth: 220 }}>
                 <FormControl fullWidth>
                   <Autocomplete
                     fullWidth
@@ -397,6 +542,47 @@ const ComenzarTratamiento = () => {
                     )}
                   />
                 </FormControl>
+              </Grid>
+
+              {/* Botón Presupuesto Inicial */}
+              <Grid item xs={12} sm={6} md={2}>
+                <Box sx={{ display: "flex", gap: 1 }}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<Receipt />}
+                    onClick={abrirPresupuestos}
+                    sx={{
+                      minHeight: "56px",
+                      borderColor: colorPrincipal,
+                      color: colorPrincipal,
+                      fontWeight: 700,
+                      borderRadius: 3,
+                      backgroundColor: "rgba(255,255,255,0.95)",
+                      "&:hover": {
+                        borderColor: "#8a541a",
+                        backgroundColor: "rgba(163,105,32,0.08)",
+                      },
+                    }}
+                  >
+                    Presupuesto
+                  </Button>
+                  {presupuestoAplicado && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={cancelarPresupuesto}
+                      sx={{
+                        minHeight: "56px",
+                        minWidth: "56px",
+                        borderRadius: 3,
+                        fontWeight: 700,
+                      }}
+                    >
+                      ✕
+                    </Button>
+                  )}
+                </Box>
               </Grid>
 
               {/* BLOQUES DE TRATAMIENTO */}
@@ -635,13 +821,15 @@ const ComenzarTratamiento = () => {
                       <Grid item xs={12} sm={6} md={4}>
                         <TextField
                           label="Precio Unitario (S/)"
+                          type="number"
                           value={b.precio}
+                          onChange={(e) => actualizarBloque(index, "precio", parseFloat(e.target.value) || 0)}
                           fullWidth
-                          InputProps={{ readOnly: true }}
                           sx={{
                             "& .MuiInputBase-root": {
                               borderRadius: 3,
                               backgroundColor: "rgba(255,255,255,0.95)",
+                              minHeight: "56px",
                             },
                           }}
                         />
@@ -846,6 +1034,78 @@ const ComenzarTratamiento = () => {
           </form>
         </Paper>
       </Container>
+
+      {/* Modal de Presupuestos Iniciales */}
+      <Dialog
+        open={openOfertasModal}
+        onClose={() => setOpenOfertasModal(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            background: "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.95) 100%)",
+          },
+        }}
+      >
+        <DialogTitle sx={{ color: colorPrincipal, fontWeight: 800 }}>
+          Presupuestos Iniciales
+        </DialogTitle>
+        <DialogContent dividers>
+          {ofertasPaciente.length === 0 ? (
+            <Typography sx={{ color: "rgba(46,46,46,0.70)", py: 2, textAlign: "center" }}>
+              Este paciente no tiene presupuestos registrados.
+            </Typography>
+          ) : (
+            <List sx={{ pt: 0 }}>
+              {ofertasPaciente.map((oferta) => (
+                <ListItemButton
+                  key={oferta.id}
+                  onClick={() => aplicarOferta(oferta)}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 1,
+                    border: "1px solid rgba(212,175,55,0.25)",
+                    "&:hover": {
+                      backgroundColor: "rgba(163,105,32,0.08)",
+                    },
+                  }}
+                >
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <Typography sx={{ fontWeight: 700, color: colorPrincipal }}>
+                          {oferta.creado_en?.split(" ")[0] || "Sin fecha"}
+                        </Typography>
+                        <Typography sx={{ fontWeight: 800, color: colorPrincipal }}>
+                          S/ {Number(oferta.total || 0).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    }
+                    secondary={
+                      <Box sx={{ mt: 0.5 }}>
+                        {(oferta.items || []).map((item, idx) => (
+                          <Typography key={idx} variant="body2" sx={{ color: "rgba(46,46,46,0.75)" }}>
+                            • {item.nombre || item.tratamiento || "Sin nombre"} - S/ {Number(item.precio || 0).toFixed(2)}
+                          </Typography>
+                        ))}
+                      </Box>
+                    }
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button
+            onClick={() => setOpenOfertasModal(false)}
+            sx={{ color: colorPrincipal, fontWeight: 700 }}
+          >
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

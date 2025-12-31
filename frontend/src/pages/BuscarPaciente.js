@@ -18,12 +18,17 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  IconButton,
 } from "@mui/material";
+import { ArrowBack, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
-
-const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
+import { useAuth } from "../hooks/useAuth";
+import { canWritePatients } from "../utils/permissions";
+import { COLORS, API_BASE_URL } from "../constants";
 
 export default function BuscarPaciente() {
+  const navigate = useNavigate();
   const [pacientes, setPacientes] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [tratamientosBase, setTratamientosBase] = useState([]);
@@ -37,13 +42,9 @@ export default function BuscarPaciente() {
   const [openTratamientosModal, setOpenTratamientosModal] = useState(false);
 
   const { showToast } = useToast();
-
-  const token = localStorage.getItem("token");
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-  const role = localStorage.getItem("role");
-  const canWritePatients = role === "doctor" || role === "asistente";
-
-  const colorPrincipal = "#a36920ff";
+  const { token, role, authHeaders } = useAuth();
+  const canWrite = canWritePatients(role);
+  const colorPrincipal = COLORS.PRIMARY;
 
   // Cargar pacientes
   const cargarPacientes = async () => {
@@ -137,7 +138,7 @@ export default function BuscarPaciente() {
 
   // Abrir modal de edición
   const handleEdit = (paciente) => {
-    if (!canWritePatients) {
+    if (!canWrite) {
       showToast({ severity: "warning", message: "No tienes permisos para editar pacientes" });
       return;
     }
@@ -147,7 +148,7 @@ export default function BuscarPaciente() {
 
   // Guardar cambios (editar paciente)
   const handleSave = async () => {
-    if (!canWritePatients) {
+    if (!canWrite) {
       showToast({ severity: "warning", message: "No tienes permisos para editar pacientes" });
       return;
     }
@@ -224,17 +225,25 @@ export default function BuscarPaciente() {
             "0 16px 40px rgba(0,0,0,0.10), 0 0 0 1px rgba(212,175,55,0.10)",
         }}
       >
-        <Typography
-          variant="h5"
-          align="center"
-          sx={{
-            fontWeight: "bold",
-            color: colorPrincipal,
-            mb: 3,
-          }}
-        >
-          Buscar y Editar Pacientes
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+          <IconButton onClick={() => navigate("/pacientes")} sx={{ color: colorPrincipal }}>
+            <ArrowBack />
+          </IconButton>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: "bold",
+              color: colorPrincipal,
+              flex: 1,
+              textAlign: "center",
+            }}
+          >
+            Buscar y Editar Pacientes
+          </Typography>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+            <Home />
+          </IconButton>
+        </Box>
 
         {/* Barra de búsqueda */}
         <Box

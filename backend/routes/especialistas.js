@@ -1,11 +1,10 @@
 import express from "express";
-import sqlite3 from "sqlite3";
-import bodyParser from "body-parser";
+import db from "../db/database.js";
+import { authMiddleware, requireDoctor } from "../middleware/auth.js";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
-router.use(bodyParser.json());
 
+// Listar especialistas no requiere auth (se usa en ComenzarTratamiento)
 // ✅ Listar especialistas
 router.get("/listar", (req, res) => {
   db.all("SELECT * FROM especialistas ORDER BY nombre ASC", [], (err, rows) => {
@@ -17,8 +16,8 @@ router.get("/listar", (req, res) => {
   });
 });
 
-// ✅ Crear especialista
-router.post("/crear", (req, res) => {
+// ✅ Crear especialista (solo doctor)
+router.post("/crear", authMiddleware, requireDoctor, (req, res) => {
   const { nombre, especialidad, telefono, correo } = req.body;
 
   if (!nombre) {
@@ -41,8 +40,8 @@ router.post("/crear", (req, res) => {
   });
 });
 
-// ✅ Eliminar especialista
-router.delete("/eliminar/:id", (req, res) => {
+// ✅ Eliminar especialista (solo doctor)
+router.delete("/eliminar/:id", authMiddleware, requireDoctor, (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM especialistas WHERE id = ?", [id], function (err) {
     if (err) {

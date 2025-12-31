@@ -13,6 +13,9 @@ import Inventario from "./pages/inventario/Inventario";
 import HistorialClinico from "./pages/HistorialClinico";
 import Finanzas from "./pages/Finanzas";
 import FotosPaciente from "./pages/FotosPaciente";
+import Especialistas from "./pages/Especialistas";
+import Estadisticas from "./pages/Estadisticas";
+import Gestion from "./pages/Gestion";
 import ProtectedRoute from "./components/ProtectedRoute";
 function App() {
   return (
@@ -106,6 +109,32 @@ function App() {
           element={
             <ProtectedRoute>
               <Finanzas />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/especialistas"
+          element={
+            <ProtectedRoute>
+              <Especialistas />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/estadisticas"
+          element={
+            <ProtectedRoute>
+              <Estadisticas />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/gestion"
+          element={
+            <ProtectedRoute>
+              <Gestion />
             </ProtectedRoute>
           }
         />

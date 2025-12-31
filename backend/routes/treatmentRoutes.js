@@ -1,46 +1,18 @@
 import express from "express";
-import sqlite3 from "sqlite3";
-import bodyParser from "body-parser";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import jwt from "jsonwebtoken";
 
 import { consumirStockFEFO } from "../services/inventoryOps.js";
+import db, { dbAll, dbRun, dbGet } from "../db/database.js";
+import { authMiddleware, requireDoctor } from "../middleware/auth.js";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
-router.use(bodyParser.json());
 
-const SECRET = "showclinic_secret";
-
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
-  if (!authHeader) {
-    return res.status(401).json({ message: "Token no proporcionado" });
-  }
-
-  const [, token] = authHeader.split(" ");
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.error("❌ Token inválido en tratamientos:", err.message);
-    return res.status(401).json({ message: "Token inválido" });
-  }
-};
-
-const requireDoctor = (req, res, next) => {
-  if (req.user?.role !== "doctor") {
-    return res.status(403).json({ message: "Solo el rol doctor puede modificar tratamientos" });
-  }
-  next();
-};
-
+// Middlewares específicos de tratamientos
 const requireTreatmentBaseCreate = (req, res, next) => {
   const role = req.user?.role;
-  if (role !== "doctor" && role !== "asistente") {
+  if (role !== "doctor" && role !== "asistente" && role !== "master") {
     return res.status(403).json({ message: "No tienes permisos para crear tratamientos" });
   }
   next();
@@ -48,38 +20,13 @@ const requireTreatmentBaseCreate = (req, res, next) => {
 
 const requireTratamientoRealizadoWrite = (req, res, next) => {
   const role = req.user?.role;
-  if (role !== "doctor" && role !== "asistente") {
+  if (role !== "doctor" && role !== "asistente" && role !== "master") {
     return res.status(403).json({ message: "No tienes permisos para registrar tratamientos" });
   }
   next();
 };
 
 router.use(authMiddleware);
-
-// Helpers simples para usar sqlite3 con async/await sin cambiar el resto del código
-const dbAll = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
-
-const dbRun = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve(this);
-    });
-  });
-
-const dbGet = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
 
 /* ==============================
    📁 CONFIGURAR SUBIDA DE FOTOS
@@ -442,23 +389,31 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           return acc + pu * qty;
         }, 0);
       } else {
-        // Sin receta: si hay variante seleccionada, el precio viene de la variante.
+        // Sin receta: primero intentar usar el precio manual del frontend
+        const precioManual = parseFloat(b.precio) || 0;
+        const totalManual = parseFloat(b.total) || 0;
+        
+        // Si hay variante seleccionada, usar su precio (a menos que haya precio manual)
         const varianteId = b.variante_id ? Number(b.variante_id) : null;
-        if (varianteId) {
+        
+        if (precioManual > 0) {
+          // Usar precio manual del frontend (presupuesto o editado manualmente)
+          precioUnitario = precioManual;
+          cantidadParaPrecio = 1;
+          subtotal = totalManual > 0 ? totalManual : precioManual;
+        } else if (varianteId) {
+          // Usar precio de la variante
           const v = await dbGet(`SELECT precio_unitario FROM variantes WHERE id = ?`, [varianteId]);
           precioUnitario = parseFloat(v?.precio_unitario) || 0;
           subtotal = precioUnitario * (factorCantidad || 0);
         } else {
-          // Fallback: compatibilidad con flujos viejos que aún envían precio.
-          const precioLegacy = parseFloat(b.precio) || 0;
-          precioUnitario = precioLegacy;
-          cantidadParaPrecio = 1;
-          subtotal = precioLegacy;
+          // Sin precio manual ni variante
+          subtotal = 0;
         }
       }
 
       if (!(subtotal > 0)) {
-        return res.status(400).json({ message: "No se pudo calcular el precio del tratamiento (revisa el precio de la variante)" });
+        return res.status(400).json({ message: "No se pudo calcular el precio del tratamiento. Establece un precio o selecciona un producto." });
       }
 
       const descuentoAplicado = (descuentoPct / 100) * subtotal;

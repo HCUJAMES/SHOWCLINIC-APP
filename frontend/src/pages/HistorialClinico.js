@@ -15,7 +15,10 @@ import {
   TableRow,
   Divider,
   Box,
+  IconButton,
 } from "@mui/material";
+import { ArrowBack, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -88,6 +91,7 @@ const CAMPOS_FOTOS_LEGACY = [
 ];
 
 const HistorialClinico = () => {
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const [pacientes, setPacientes] = useState([]);
   const [filtro, setFiltro] = useState("");
@@ -630,13 +634,20 @@ const HistorialClinico = () => {
               "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(212,175,55,0.10)",
           }}
         >
-          <Typography
-            variant="h5"
-            align="center"
-            sx={{ mb: 4, color: "#a36920", fontWeight: "bold" }}
-          >
-            Historial Clínico de Pacientes
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+            <IconButton onClick={() => navigate("/pacientes")} sx={{ color: "#a36920" }}>
+              <ArrowBack />
+            </IconButton>
+            <Typography
+              variant="h5"
+              sx={{ flex: 1, color: "#a36920", fontWeight: "bold", textAlign: "center" }}
+            >
+              Historial Clínico de Pacientes
+            </Typography>
+            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: "#a36920" }} title="Inicio">
+              <Home />
+            </IconButton>
+          </Box>
 
           {!pacienteSeleccionado ? (
             <>

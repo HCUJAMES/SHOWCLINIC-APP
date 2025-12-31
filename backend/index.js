@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
@@ -13,6 +14,8 @@ import deudasRoutes from "./routes/deudasRoutes.js";
 import especialistasRoutes from "./routes/especialistas.js";
 import finanzasRoutes from "./routes/finanzasRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import statsRoutes from "./routes/statsRoutes.js";
+import backupRoutes from "./routes/backupRoutes.js";
 import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -88,6 +91,7 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 
      ensureUser("logistica", "1234", "logistica");
      ensureUser("asistente", "1234", "asistente");
+     ensureUser("master", "2006", "master");
 
     // 🧱 Tabla de pacientes
     db.run(`
@@ -497,6 +501,8 @@ app.use("/api/deudas", deudasRoutes);
 app.use("/api/especialistas", especialistasRoutes);
 app.use("/api/finanzas", finanzasRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/stats", statsRoutes);
+app.use("/api/backup", backupRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
 
 // ✅ Servir frontend (React build) para acceso remoto (ej. iPad/iPhone)
@@ -507,8 +513,8 @@ app.get(/^(?!\/api\/)(?!\/uploads\/).*/, (req, res) => {
 });
 
 
-// ✅ Servidor en puerto 4000
-const PORT = 4000;
+// ✅ Servidor en puerto configurable (default 4000)
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, "0.0.0.0", () =>
   console.log(`🚀 Servidor backend disponible en red en http://0.0.0.0:${PORT}`)
 );

@@ -1,62 +1,15 @@
 import express from "express";
-import sqlite3 from "sqlite3";
-import bodyParser from "body-parser";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import jwt from "jsonwebtoken";
 
 import { reservarStockFEFO, consumirStockFEFO } from "../services/inventoryOps.js";
+import db, { dbAll, dbRun } from "../db/database.js";
+import { authMiddleware, requireInventoryWrite } from "../middleware/auth.js";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
-router.use(bodyParser.json());
-
-const SECRET = "showclinic_secret";
-
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
-  if (!authHeader) {
-    return res.status(401).json({ message: "Token no proporcionado" });
-  }
-
-  const [, token] = authHeader.split(" ");
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.error("❌ Token inválido en inventario:", err.message);
-    return res.status(401).json({ message: "Token inválido" });
-  }
-};
-
-const requireInventoryWrite = (req, res, next) => {
-  const role = req.user?.role;
-  if (role !== "doctor" && role !== "logistica") {
-    return res.status(403).json({ message: "No tienes permisos para modificar el inventario" });
-  }
-  next();
-};
 
 router.use(authMiddleware);
-
-// Helpers simples para usar sqlite3 con async/await en las nuevas rutas
-const dbAll = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
-
-const dbRun = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve(this);
-    });
-  });
 
 /* ==============================================
    📁 CONFIGURAR SUBIDA DE DOCUMENTOS PDF

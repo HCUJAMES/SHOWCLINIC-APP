@@ -1,10 +1,16 @@
 import React from "react";
-import { Box, Typography, Button, Paper } from "@mui/material";
+import { Box, Typography, Button, Paper, IconButton } from "@mui/material";
+import { ArrowBack, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { canWritePatients } from "../utils/permissions";
+import { COLORS } from "../constants";
 
 export default function PacientesMenu() {
-  const colorPrincipal = "#a36920ff";
-  const role = localStorage.getItem("role");
-  const canWritePatients = role === "doctor" || role === "asistente";
+  const navigate = useNavigate();
+  const { role } = useAuth();
+  const colorPrincipal = COLORS.PRIMARY;
+  const canWrite = canWritePatients(role);
 
   return (
     <Box
@@ -43,17 +49,25 @@ export default function PacientesMenu() {
           boxShadow: "0 18px 55px rgba(0,0,0,0.12), 0 0 0 1px rgba(212,175,55,0.10)",
         }}
       >
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: "bold",
-            color: colorPrincipal,
-            mb: 0.5,
-            letterSpacing: 0.6,
-          }}
-        >
-          PACIENTES
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }}>
+            <ArrowBack />
+          </IconButton>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: "bold",
+              color: colorPrincipal,
+              flex: 1,
+              letterSpacing: 0.6,
+            }}
+          >
+            PACIENTES
+          </Typography>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+            <Home />
+          </IconButton>
+        </Box>
 
         <Typography
           variant="body2"
@@ -83,7 +97,7 @@ export default function PacientesMenu() {
             Buscar Paciente
           </Button>
 
-          {canWritePatients ? (
+          {canWrite ? (
             <Button
               fullWidth
               variant="contained"
@@ -105,7 +119,7 @@ export default function PacientesMenu() {
             </Button>
           ) : null}
 
-          {canWritePatients ? (
+          {canWrite ? (
             <Button
               fullWidth
               variant="contained"

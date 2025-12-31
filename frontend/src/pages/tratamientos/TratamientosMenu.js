@@ -1,12 +1,16 @@
 import React from "react";
-import { Box, Paper, Button, Typography } from "@mui/material";
+import { Box, Paper, Button, Typography, IconButton } from "@mui/material";
+import { ArrowBack, Home } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth";
+import { canCreateTreatments } from "../../utils/permissions";
+import { COLORS } from "../../constants";
 
 export default function TratamientosMenu() {
   const navigate = useNavigate();
-  const colorPrincipal = "#a36920ff";
-  const role = localStorage.getItem("role"); // Obtiene el rol del usuario logueado
-  const canCreateTratamiento = role === "doctor" || role === "asistente";
+  const { role } = useAuth();
+  const colorPrincipal = COLORS.PRIMARY;
+  const canCreateTratamiento = canCreateTreatments(role);
 
   return (
     <Box
@@ -46,17 +50,25 @@ export default function TratamientosMenu() {
           boxShadow: "0 16px 40px rgba(0,0,0,0.10), 0 0 0 1px rgba(212,175,55,0.10)",
         }}
       >
-        <Typography
-          variant="h5"
-          sx={{
-            color: colorPrincipal,
-            fontWeight: "bold",
-            mb: 4,
-            textShadow: "0 1px 2px rgba(0,0,0,0.1)",
-          }}
-        >
-          Módulo de Tratamientos
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }}>
+            <ArrowBack />
+          </IconButton>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: "bold",
+              color: colorPrincipal,
+              flex: 1,
+              letterSpacing: 0.6,
+            }}
+          >
+            TRATAMIENTOS
+          </Typography>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+            <Home />
+          </IconButton>
+        </Box>
 
         {/* Botón visible solo para DOCTOR o ASISTENTE */}
         {canCreateTratamiento && (
@@ -73,7 +85,7 @@ export default function TratamientosMenu() {
             }}
             onClick={() => navigate("/tratamientos/crear")}
           >
-            CREAR TRATAMIENTO
+            NUEVO PROTOCOLO
           </Button>
         )}
 
@@ -109,7 +121,7 @@ export default function TratamientosMenu() {
           }}
           onClick={() => navigate("/tratamientos/comenzar")}
         >
-          COMENZAR TRATAMIENTO
+          NUEVA SESIÓN
         </Button>
       </Paper>
     </Box>

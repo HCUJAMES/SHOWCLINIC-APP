@@ -1,42 +1,11 @@
 import express from "express";
-import sqlite3 from "sqlite3";
-import bodyParser from "body-parser";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import jwt from "jsonwebtoken";
+import db from "../db/database.js";
+import { authMiddleware, requirePatientWrite } from "../middleware/auth.js";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
-
-router.use(bodyParser.json());
-
-const SECRET = "showclinic_secret";
-
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
-  if (!authHeader) {
-    return res.status(401).json({ message: "Token no proporcionado" });
-  }
-
-  const [, token] = authHeader.split(" ");
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.error("❌ Token inválido en pacientes:", err.message);
-    return res.status(401).json({ message: "Token inválido" });
-  }
-};
-
-const requirePatientWrite = (req, res, next) => {
-  const role = req.user?.role;
-  if (role !== "doctor" && role !== "asistente") {
-    return res.status(403).json({ message: "No tienes permisos para modificar pacientes" });
-  }
-  next();
-};
 
 router.use(authMiddleware);
 
@@ -204,9 +173,9 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
   db.run(
     query,
     [
-      dniStr,
-      nombreStr,
-      apellidoStr,
+      dni,
+      nombre,
+      apellido,
       edad,
       sexo,
       direccion,
@@ -217,7 +186,7 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
       alergias,
       enfermedad,
       correo,
-      celularStr,
+      celular,
       cirugiaEstetica,
       embarazada,
       drogas,

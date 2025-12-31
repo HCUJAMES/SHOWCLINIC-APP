@@ -7,15 +7,19 @@ import {
   Grid,
   Paper,
   MenuItem,
+  IconButton,
 } from "@mui/material";
+import { ArrowBack, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
-
-const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
+import { useAuth } from "../hooks/useAuth";
+import { COLORS, API_BASE_URL } from "../constants";
 
 export default function RegistrarPaciente() {
-  const colorPrincipal = "#a36920";
+  const navigate = useNavigate();
+  const colorPrincipal = COLORS.PRIMARY;
   const { showToast } = useToast();
-  const token = localStorage.getItem("token");
+  const { token } = useAuth();
   const [formData, setFormData] = useState({
     dni: "",
     nombre: "",
@@ -123,13 +127,20 @@ export default function RegistrarPaciente() {
             "0 16px 40px rgba(0,0,0,0.10), 0 0 0 1px rgba(212,175,55,0.10)",
         }}
       >
-        <Typography
-          variant="h5"
-          sx={{ color: colorPrincipal, fontWeight: "bold", mb: 3 }}
-          align="center"
-        >
-          Registro de Paciente
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+          <IconButton onClick={() => navigate("/pacientes")} sx={{ color: colorPrincipal }}>
+            <ArrowBack />
+          </IconButton>
+          <Typography
+            variant="h5"
+            sx={{ color: colorPrincipal, fontWeight: "bold", flex: 1, textAlign: "center" }}
+          >
+            Registro de Paciente
+          </Typography>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+            <Home />
+          </IconButton>
+        </Box>
 
         <Grid container spacing={2}>
           {/* Primera fila */}

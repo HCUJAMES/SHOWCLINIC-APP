@@ -1,8 +1,7 @@
 import express from "express";
-import sqlite3 from "sqlite3";
+import db from "../db/database.js";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
 
 const normalizarMetodo = (metodo) => String(metodo || "").trim().toLowerCase();
 

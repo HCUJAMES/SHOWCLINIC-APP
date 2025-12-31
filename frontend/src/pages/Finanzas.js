@@ -13,7 +13,11 @@ import {
   TableCell,
   TableBody,
   Divider,
+  Box,
+  IconButton,
 } from "@mui/material";
+import { ArrowBack, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -76,6 +80,7 @@ const API_BASE_URL =
   process.env.REACT_APP_API_URL || `http://${window.location.hostname}:4000`;
 
 const Finanzas = () => {
+  const navigate = useNavigate();
   const [paciente, setPaciente] = useState("");
   const [metodoPago, setMetodoPago] = useState("");
   const [fechaInicio, setFechaInicio] = useState("");
@@ -273,13 +278,20 @@ const Finanzas = () => {
               "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(212,175,55,0.10)",
           }}
         >
-          <Typography
-            variant="h5"
-            align="center"
-            sx={{ mb: 4, color: colorPrincipal, fontWeight: "bold" }}
-          >
-            Reporte Financiero
-          </Typography>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }}>
+              <ArrowBack />
+            </IconButton>
+            <Typography
+              variant="h5"
+              sx={{ color: colorPrincipal, fontWeight: "bold", flex: 1, textAlign: "center" }}
+            >
+              Finanzas
+            </Typography>
+            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+              <Home />
+            </IconButton>
+          </Box>
 
           <Grid container spacing={2}>
             <Grid item xs={12} sm={4}>

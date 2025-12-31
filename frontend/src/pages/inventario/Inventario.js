@@ -14,8 +14,11 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  IconButton,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
+import { ArrowBack, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useToast } from "../../components/ToastProvider";
@@ -25,6 +28,7 @@ const API_BASE =
   `${window.location.protocol}//${window.location.hostname}:4000`;
 
 export default function Inventario() {
+  const navigate = useNavigate();
   const colorPrincipal = "#a36920ff";
   const colorPrincipalPdf = [163, 105, 32];
   const { showToast } = useToast();
@@ -51,7 +55,7 @@ export default function Inventario() {
   const [editCantidad, setEditCantidad] = useState("");
   const [guardandoEdicionLote, setGuardandoEdicionLote] = useState(false);
   const role = localStorage.getItem("role");
-  const canWriteInventory = role === "doctor" || role === "logistica";
+  const canWriteInventory = role === "doctor" || role === "logistica" || role === "master";
   const token = localStorage.getItem("token");
 
   const fechaPeru = () =>
@@ -614,13 +618,20 @@ export default function Inventario() {
           boxShadow: "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(212,175,55,0.10)",
         }}
       >
-        <Typography
-          variant="h5"
-          sx={{ color: colorPrincipal, fontWeight: "bold", mb: 3 }}
-          align="center"
-        >
-          Inventario Clínico
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }}>
+            <ArrowBack />
+          </IconButton>
+          <Typography
+            variant="h5"
+            sx={{ color: colorPrincipal, fontWeight: "bold", flex: 1, textAlign: "center" }}
+          >
+            Inventario Clínico
+          </Typography>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+            <Home />
+          </IconButton>
+        </Box>
 
         <Box
           sx={{

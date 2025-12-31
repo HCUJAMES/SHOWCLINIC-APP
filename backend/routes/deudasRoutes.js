@@ -1,66 +1,13 @@
 import express from "express";
-import sqlite3 from "sqlite3";
-import bodyParser from "body-parser";
-import jwt from "jsonwebtoken";
+import db, { dbAll, dbRun, dbGet } from "../db/database.js";
+import { authMiddleware, requireDoctor } from "../middleware/auth.js";
 
 const router = express.Router();
-const db = new sqlite3.Database("./db/showclinic.db");
-router.use(bodyParser.json());
-
-const SECRET = "showclinic_secret";
-
-const authMiddleware = (req, res, next) => {
-  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
-  if (!authHeader) {
-    return res.status(401).json({ message: "Token no proporcionado" });
-  }
-
-  const [, token] = authHeader.split(" ");
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    console.error("❌ Token inválido en deudas:", err.message);
-    return res.status(401).json({ message: "Token inválido" });
-  }
-};
-
-const requireDoctor = (req, res, next) => {
-  if (req.user?.role !== "doctor") {
-    return res.status(403).json({ message: "Solo el rol doctor puede modificar deudas" });
-  }
-  next();
-};
 
 router.use(authMiddleware);
 
-const dbAll = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
-
-const dbRun = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) return reject(err);
-      resolve(this);
-    });
-  });
-
 const fechaLima = () =>
   new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
-
-const dbGet = (sql, params = []) =>
-  new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) return reject(err);
-      resolve(row);
-    });
-  });
 
 const abonarDeuda = async ({ deudaIdNum, metodoStr, montoNum, fechaLocal }) => {
   const deuda = await dbGet(

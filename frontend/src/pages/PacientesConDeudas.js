@@ -18,17 +18,21 @@ import {
   DialogContent,
   DialogActions,
   Grid,
+  IconButton,
 } from "@mui/material";
+import { ArrowBack, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 
 const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
 export default function PacientesConDeudas() {
+  const navigate = useNavigate();
   const colorPrincipal = "#a36920ff";
   const { showToast } = useToast();
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
-  const canModifyDeudas = role === "doctor";
+  const canModifyDeudas = role === "doctor" || role === "master";
 
   const [rows, setRows] = useState([]);
   const [tratamientosBase, setTratamientosBase] = useState([]);
@@ -170,10 +174,16 @@ export default function PacientesConDeudas() {
           backdropFilter: "blur(10px)",
         }}
       >
-        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-          <Typography variant="h5" sx={{ color: colorPrincipal, fontWeight: 800 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap", mb: 2 }}>
+          <IconButton onClick={() => navigate("/pacientes")} sx={{ color: colorPrincipal }}>
+            <ArrowBack />
+          </IconButton>
+          <Typography variant="h5" sx={{ color: colorPrincipal, fontWeight: 800, flex: 1 }}>
             Pacientes con deudas
           </Typography>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+            <Home />
+          </IconButton>
           <Button
             variant="outlined"
             sx={{ borderColor: colorPrincipal, color: colorPrincipal, fontWeight: "bold" }}

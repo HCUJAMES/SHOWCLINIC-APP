@@ -10,21 +10,25 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  IconButton,
 } from "@mui/material";
+import { ArrowBack, Home } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/ToastProvider";
-
- const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
+import { useAuth } from "../../hooks/useAuth";
+import { canCreateTreatments, isDoctor as checkIsDoctor } from "../../utils/permissions";
+import { COLORS, API_BASE_URL } from "../../constants";
 
 export default function CrearTratamiento() {
-  const colorPrincipal = "#a36920ff";
+  const navigate = useNavigate();
+  const colorPrincipal = COLORS.PRIMARY;
   const { showToast } = useToast();
+  const { role, token } = useAuth();
   const [tratamientos, setTratamientos] = useState([]);
   const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "", precio: "" });
   const [editId, setEditId] = useState(null);
-  const role = localStorage.getItem("role");
-  const token = localStorage.getItem("token");
-  const isDoctor = role === "doctor";
-  const canCreate = role === "doctor" || role === "asistente";
+  const isDoctor = checkIsDoctor(role);
+  const canCreate = canCreateTreatments(role);
 
   const cargarTratamientos = async () => {
     const res = await fetch(`${API_BASE_URL}/api/tratamientos/listar`, {
@@ -160,13 +164,20 @@ export default function CrearTratamiento() {
           maxWidth: 800,
         }}
       >
-        <Typography
-          variant="h5"
-          sx={{ color: colorPrincipal, fontWeight: "bold", mb: 3 }}
-          align="center"
-        >
-          {isDoctor ? "Crear Tratamientos" : "Tratamientos de la clínica"}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+          <IconButton onClick={() => navigate("/tratamientos")} sx={{ color: colorPrincipal }}>
+            <ArrowBack />
+          </IconButton>
+          <Typography
+            variant="h5"
+            sx={{ color: colorPrincipal, fontWeight: "bold", flex: 1, textAlign: "center" }}
+          >
+            {isDoctor ? "Nuevo Protocolo" : "Protocolos de la clínica"}
+          </Typography>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+            <Home />
+          </IconButton>
+        </Box>
 
         {canCreate ? (
           <Box sx={{ display: "grid", gap: 2, mb: 3 }}>
