@@ -35,11 +35,19 @@ echo ========================================
 echo [2/7] DESCARGANDO CAMBIOS DESDE GITHUB
 echo ========================================
 cd ..
+echo Descartando cambios locales...
+git reset --hard
+git clean -fd
+echo.
+echo Descargando ultima version desde GitHub...
 git pull
 if %errorlevel% neq 0 (
     color 0C
     echo.
     echo ERROR: No se pudo descargar cambios
+    echo Intenta ejecutar manualmente:
+    echo   git fetch origin
+    echo   git reset --hard origin/main
     echo.
     pause
     exit /b 1
