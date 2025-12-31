@@ -113,8 +113,10 @@ export default function Login() {
           alignItems: "center",
           px: { xs: 3, sm: 6, md: 8 },
           py: 4,
-          background: "rgba(255, 255, 255, 0.85)",
-          backdropFilter: "blur(10px)",
+          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%)",
+          backdropFilter: "blur(20px)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+          borderLeft: "1px solid rgba(255, 255, 255, 0.18)",
         }}
       >
         <Box sx={{ width: "100%", maxWidth: 420 }}>
@@ -141,8 +143,9 @@ export default function Login() {
             sx={{
               fontWeight: 700,
               mb: 1,
-              color: "#2E2E2E",
+              color: "#1a1a1a",
               textAlign: "left",
+              textShadow: "0 2px 4px rgba(255,255,255,0.5)",
             }}
           >
             Iniciar Sesión
@@ -151,8 +154,9 @@ export default function Login() {
             variant="body2"
             sx={{
               mb: 4,
-              color: "rgba(46,46,46,0.6)",
+              color: "rgba(26,26,26,0.8)",
               textAlign: "left",
+              textShadow: "0 1px 2px rgba(255,255,255,0.5)",
             }}
           >
             Ingresa tus credenciales para continuar
@@ -161,7 +165,7 @@ export default function Login() {
           {/* Campo Usuario */}
           <Typography
             variant="body2"
-            sx={{ mb: 0.5, fontWeight: 600, color: "#2E2E2E" }}
+            sx={{ mb: 0.5, fontWeight: 600, color: "#1a1a1a", textShadow: "0 1px 2px rgba(255,255,255,0.5)" }}
           >
             Usuario
           </Typography>
@@ -181,18 +185,21 @@ export default function Login() {
             sx={{
               mb: 3,
               "& .MuiOutlinedInput-root": {
-                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                backgroundColor: "rgba(255, 255, 255, 0.4)",
                 borderRadius: 2,
-                backdropFilter: "blur(5px)",
+                backdropFilter: "blur(10px)",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
                 "& fieldset": {
-                  borderColor: "rgba(0,0,0,0.15)",
+                  borderColor: "rgba(255,255,255,0.3)",
                 },
                 "&:hover fieldset": {
-                  borderColor: "rgba(212,175,55,0.5)",
+                  borderColor: "rgba(212,175,55,0.6)",
+                  backgroundColor: "rgba(255, 255, 255, 0.5)",
                 },
                 "&.Mui-focused fieldset": {
                   borderColor: "#D4AF37",
                   borderWidth: 2,
+                  backgroundColor: "rgba(255, 255, 255, 0.6)",
                 },
               },
             }}
@@ -201,7 +208,7 @@ export default function Login() {
           {/* Campo Contraseña */}
           <Typography
             variant="body2"
-            sx={{ mb: 0.5, fontWeight: 600, color: "#2E2E2E" }}
+            sx={{ mb: 0.5, fontWeight: 600, color: "#1a1a1a", textShadow: "0 1px 2px rgba(255,255,255,0.5)" }}
           >
             Contraseña
           </Typography>
@@ -233,18 +240,21 @@ export default function Login() {
             sx={{
               mb: 2,
               "& .MuiOutlinedInput-root": {
-                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                backgroundColor: "rgba(255, 255, 255, 0.4)",
                 borderRadius: 2,
-                backdropFilter: "blur(5px)",
+                backdropFilter: "blur(10px)",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
                 "& fieldset": {
-                  borderColor: "rgba(0,0,0,0.15)",
+                  borderColor: "rgba(255,255,255,0.3)",
                 },
                 "&:hover fieldset": {
-                  borderColor: "rgba(212,175,55,0.5)",
+                  borderColor: "rgba(212,175,55,0.6)",
+                  backgroundColor: "rgba(255, 255, 255, 0.5)",
                 },
                 "&.Mui-focused fieldset": {
                   borderColor: "#D4AF37",
                   borderWidth: 2,
+                  backgroundColor: "rgba(255, 255, 255, 0.6)",
                 },
               },
             }}
@@ -273,7 +283,7 @@ export default function Login() {
                 />
               }
               label={
-                <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.7)" }}>
+                <Typography variant="body2" sx={{ color: "rgba(26,26,26,0.8)", textShadow: "0 1px 2px rgba(255,255,255,0.5)" }}>
                   Recordarme
                 </Typography>
               }
@@ -318,7 +328,7 @@ export default function Login() {
               color: "rgba(46,46,46,0.5)",
             }}
           >
-            ShowClinic CRM © 2024
+            ShowClinic CRM © 2026
           </Typography>
         </Box>
       </Box>
