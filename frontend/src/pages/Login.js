@@ -48,6 +48,9 @@ export default function Login() {
         display: "flex",
         minHeight: "100vh",
         overflow: "hidden",
+        backgroundImage: "url('/images/fondologin.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
       }}
     >
       {/* LADO IZQUIERDO - Welcome Back */}
@@ -110,7 +113,8 @@ export default function Login() {
           alignItems: "center",
           px: { xs: 3, sm: 6, md: 8 },
           py: 4,
-          backgroundColor: "#FAFAFA",
+          background: "rgba(255, 255, 255, 0.85)",
+          backdropFilter: "blur(10px)",
         }}
       >
         <Box sx={{ width: "100%", maxWidth: 420 }}>
@@ -177,8 +181,9 @@ export default function Login() {
             sx={{
               mb: 3,
               "& .MuiOutlinedInput-root": {
-                backgroundColor: "white",
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
                 borderRadius: 2,
+                backdropFilter: "blur(5px)",
                 "& fieldset": {
                   borderColor: "rgba(0,0,0,0.15)",
                 },
@@ -228,8 +233,9 @@ export default function Login() {
             sx={{
               mb: 2,
               "& .MuiOutlinedInput-root": {
-                backgroundColor: "white",
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
                 borderRadius: 2,
+                backdropFilter: "blur(5px)",
                 "& fieldset": {
                   borderColor: "rgba(0,0,0,0.15)",
                 },
