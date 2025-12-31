@@ -113,13 +113,14 @@ export default function Login() {
           alignItems: "center",
           px: { xs: 3, sm: 6, md: 8 },
           py: 4,
-          backgroundColor: "#FFFFFF",
-          boxShadow: "-4px 0 24px rgba(0, 0, 0, 0.08)",
-          animation: "slideInRight 0.6s ease-out",
+          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%)",
+          backdropFilter: "blur(20px)",
+          boxShadow: "-8px 0 32px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.5)",
+          animation: "slideInRight 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
           "@keyframes slideInRight": {
             "0%": {
               opacity: 0,
-              transform: "translateX(30px)",
+              transform: "translateX(40px)",
             },
             "100%": {
               opacity: 1,
@@ -128,13 +129,13 @@ export default function Login() {
           },
         }}
       >
-        <Box sx={{ width: "100%", maxWidth: 450 }}>
+        <Box sx={{ width: "100%", maxWidth: 420 }}>
           {/* Logo */}
           <Box 
             sx={{ 
               textAlign: "center", 
               mb: 5,
-              animation: "fadeInScale 0.8s ease-out",
+              animation: "fadeInScale 1s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both",
               "@keyframes fadeInScale": {
                 "0%": {
                   opacity: 0,
@@ -147,19 +148,45 @@ export default function Login() {
               },
             }}
           >
-            <img
-              src="/logo-showclinic.png"
-              alt="ShowClinic"
-              style={{
-                width: 120,
-                height: 120,
-                objectFit: "cover",
-                borderRadius: "50%",
-                backgroundColor: "white",
-                border: "4px solid #D4AF37",
-                boxShadow: "0 8px 24px rgba(212,175,55,0.25)",
+            <Box
+              sx={{
+                position: "relative",
+                display: "inline-block",
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  inset: -8,
+                  background: "linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.05))",
+                  borderRadius: "50%",
+                  animation: "pulse 3s ease-in-out infinite",
+                },
+                "@keyframes pulse": {
+                  "0%, 100%": {
+                    opacity: 0.5,
+                    transform: "scale(1)",
+                  },
+                  "50%": {
+                    opacity: 1,
+                    transform: "scale(1.05)",
+                  },
+                },
               }}
-            />
+            >
+              <img
+                src="/logo-showclinic.png"
+                alt="ShowClinic"
+                style={{
+                  width: 110,
+                  height: 110,
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                  backgroundColor: "white",
+                  border: "4px solid #D4AF37",
+                  boxShadow: "0 8px 24px rgba(212,175,55,0.3), 0 0 0 8px rgba(212,175,55,0.05)",
+                  position: "relative",
+                }}
+              />
+            </Box>
           </Box>
 
           {/* Título */}
@@ -170,7 +197,7 @@ export default function Login() {
               mb: 2,
               color: "#2E2E2E",
               textAlign: "center",
-              animation: "fadeInUp 0.8s ease-out 0.2s both",
+              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both",
               "@keyframes fadeInUp": {
                 "0%": {
                   opacity: 0,
@@ -183,22 +210,25 @@ export default function Login() {
               },
             }}
           >
-            Iniciar Sesión
+            INICIAR SESIÓN
           </Typography>
           <Box
             sx={{
               width: 60,
               height: 3,
-              backgroundColor: "#D4AF37",
+              background: "linear-gradient(90deg, #D4AF37, #F4D03F)",
               margin: "0 auto 16px",
               borderRadius: 2,
-              animation: "expandWidth 0.6s ease-out 0.4s both",
+              boxShadow: "0 2px 8px rgba(212,175,55,0.3)",
+              animation: "expandWidth 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.5s both",
               "@keyframes expandWidth": {
                 "0%": {
                   width: 0,
+                  opacity: 0,
                 },
                 "100%": {
                   width: 60,
+                  opacity: 1,
                 },
               },
             }}
@@ -209,7 +239,7 @@ export default function Login() {
               mb: 5,
               color: "rgba(46,46,46,0.7)",
               textAlign: "center",
-              animation: "fadeInUp 0.8s ease-out 0.3s both",
+              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both",
             }}
           >
             Ingresa tus credenciales para continuar
@@ -223,7 +253,7 @@ export default function Login() {
               fontWeight: 600, 
               color: "#2E2E2E", 
               textAlign: "center",
-              animation: "fadeInUp 0.8s ease-out 0.4s both",
+              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.5s both",
             }}
           >
             Usuario
@@ -237,24 +267,35 @@ export default function Login() {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <PersonOutline sx={{ color: "rgba(0,0,0,0.4)" }} />
+                  <PersonOutline sx={{ color: "rgba(212,175,55,0.6)" }} />
                 </InputAdornment>
               ),
             }}
             sx={{
               mb: 3.5,
-              animation: "fadeInUp 0.8s ease-out 0.5s both",
+              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.6s both",
               "& .MuiOutlinedInput-root": {
-                backgroundColor: "#FAFAFA",
-                borderRadius: 2,
-                transition: "all 0.3s ease",
+                backgroundColor: "rgba(250, 250, 250, 0.7)",
+                backdropFilter: "blur(10px)",
+                borderRadius: 3,
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                 "& fieldset": {
-                  borderColor: "rgba(0,0,0,0.12)",
-                  transition: "all 0.3s ease",
+                  borderColor: "rgba(212,175,55,0.15)",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                },
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.9)",
+                  boxShadow: "0 4px 12px rgba(212,175,55,0.15)",
+                  transform: "translateY(-2px)",
                 },
                 "&:hover fieldset": {
-                  borderColor: "rgba(212,175,55,0.5)",
-                  backgroundColor: "#F5F5F5",
+                  borderColor: "rgba(212,175,55,0.4)",
+                },
+                "&.Mui-focused": {
+                  backgroundColor: "rgba(255, 255, 255, 0.95)",
+                  boxShadow: "0 6px 20px rgba(212,175,55,0.2)",
+                  transform: "translateY(-2px)",
                 },
                 "&.Mui-focused fieldset": {
                   borderColor: "#D4AF37",
@@ -272,7 +313,7 @@ export default function Login() {
               fontWeight: 600, 
               color: "#2E2E2E", 
               textAlign: "center",
-              animation: "fadeInUp 0.8s ease-out 0.6s both",
+              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.7s both",
             }}
           >
             Contraseña
@@ -287,7 +328,7 @@ export default function Login() {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <LockOutlined sx={{ color: "rgba(0,0,0,0.4)" }} />
+                  <LockOutlined sx={{ color: "rgba(212,175,55,0.6)" }} />
                 </InputAdornment>
               ),
               endAdornment: (
@@ -295,7 +336,14 @@ export default function Login() {
                   <IconButton
                     onClick={() => setShowPassword(!showPassword)}
                     edge="end"
-                    sx={{ color: "rgba(0,0,0,0.4)" }}
+                    sx={{ 
+                      color: "rgba(212,175,55,0.6)",
+                      transition: "all 0.3s ease",
+                      "&:hover": {
+                        color: "#D4AF37",
+                        transform: "scale(1.1)",
+                      },
+                    }}
                   >
                     {showPassword ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
@@ -304,18 +352,29 @@ export default function Login() {
             }}
             sx={{
               mb: 3,
-              animation: "fadeInUp 0.8s ease-out 0.7s both",
+              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.8s both",
               "& .MuiOutlinedInput-root": {
-                backgroundColor: "#FAFAFA",
-                borderRadius: 2,
-                transition: "all 0.3s ease",
+                backgroundColor: "rgba(250, 250, 250, 0.7)",
+                backdropFilter: "blur(10px)",
+                borderRadius: 3,
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
                 "& fieldset": {
-                  borderColor: "rgba(0,0,0,0.12)",
-                  transition: "all 0.3s ease",
+                  borderColor: "rgba(212,175,55,0.15)",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                },
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.9)",
+                  boxShadow: "0 4px 12px rgba(212,175,55,0.15)",
+                  transform: "translateY(-2px)",
                 },
                 "&:hover fieldset": {
-                  borderColor: "rgba(212,175,55,0.5)",
-                  backgroundColor: "#F5F5F5",
+                  borderColor: "rgba(212,175,55,0.4)",
+                },
+                "&.Mui-focused": {
+                  backgroundColor: "rgba(255, 255, 255, 0.95)",
+                  boxShadow: "0 6px 20px rgba(212,175,55,0.2)",
+                  transform: "translateY(-2px)",
                 },
                 "&.Mui-focused fieldset": {
                   borderColor: "#D4AF37",
@@ -332,7 +391,7 @@ export default function Login() {
               justifyContent: "center",
               alignItems: "center",
               mb: 4,
-              animation: "fadeInUp 0.8s ease-out 0.8s both",
+              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.9s both",
             }}
           >
             <FormControlLabel
@@ -341,9 +400,13 @@ export default function Login() {
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   sx={{
-                    color: "rgba(0,0,0,0.3)",
+                    color: "rgba(212,175,55,0.4)",
+                    transition: "all 0.3s ease",
                     "&.Mui-checked": {
                       color: "#D4AF37",
+                    },
+                    "&:hover": {
+                      transform: "scale(1.1)",
                     },
                   }}
                 />
@@ -363,23 +426,39 @@ export default function Login() {
             onClick={handleLogin}
             sx={{
               py: 2,
-              borderRadius: 2.5,
-              backgroundColor: "#D4AF37",
+              borderRadius: 3,
+              background: "linear-gradient(135deg, #D4AF37 0%, #F4D03F 100%)",
               color: "white",
               fontWeight: 700,
-              fontSize: "1.1rem",
+              fontSize: "1.05rem",
               textTransform: "none",
-              boxShadow: "0 6px 20px rgba(212,175,55,0.35)",
+              letterSpacing: "0.5px",
+              boxShadow: "0 6px 20px rgba(212,175,55,0.4), 0 0 0 0 rgba(212,175,55,0.5)",
+              position: "relative",
+              overflow: "hidden",
+              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 1s both",
               transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-              animation: "fadeInUp 0.8s ease-out 0.9s both",
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                top: 0,
+                left: "-100%",
+                width: "100%",
+                height: "100%",
+                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+                transition: "left 0.5s ease",
+              },
               "&:hover": {
-                backgroundColor: "#B8860B",
-                boxShadow: "0 8px 28px rgba(212,175,55,0.45)",
+                background: "linear-gradient(135deg, #F4D03F 0%, #D4AF37 100%)",
+                boxShadow: "0 8px 28px rgba(212,175,55,0.5), 0 0 0 4px rgba(212,175,55,0.1)",
                 transform: "translateY(-3px)",
+              },
+              "&:hover::before": {
+                left: "100%",
               },
               "&:active": {
                 transform: "translateY(-1px)",
-                boxShadow: "0 4px 16px rgba(212,175,55,0.35)",
+                boxShadow: "0 4px 16px rgba(212,175,55,0.4)",
               },
             }}
           >
@@ -394,7 +473,7 @@ export default function Login() {
               textAlign: "center",
               mt: 5,
               color: "rgba(46,46,46,0.5)",
-              animation: "fadeIn 1s ease-out 1s both",
+              animation: "fadeIn 1s ease-out 1.2s both",
               "@keyframes fadeIn": {
                 "0%": {
                   opacity: 0,
