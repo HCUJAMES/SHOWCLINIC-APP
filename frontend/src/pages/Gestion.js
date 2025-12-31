@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Container, Typography, Button, Paper, Box, IconButton, CircularProgress } from "@mui/material";
-import { ArrowBack, Backup } from "@mui/icons-material";
+import { ArrowBack, Backup, PhotoLibrary } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { useAuth } from "../hooks/useAuth";
@@ -12,6 +12,7 @@ const Gestion = () => {
   const { token, role } = useAuth();
   const colorPrincipal = COLORS.PRIMARY;
   const [generandoBackup, setGenerandoBackup] = useState(false);
+  const [generandoBackupImagenes, setGenerandoBackupImagenes] = useState(false);
 
   // Verificar que el usuario sea master
   if (role !== "master") {
@@ -90,6 +91,54 @@ const Gestion = () => {
       showToast({ severity: "error", message: err.message || "Error al generar backup" });
     } finally {
       setGenerandoBackup(false);
+    }
+  };
+
+  const realizarBackupImagenes = async () => {
+    try {
+      setGenerandoBackupImagenes(true);
+      
+      const response = await fetch(`${API_BASE_URL}/api/backup/imagenes`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Error al generar backup de imágenes");
+      }
+
+      // Obtener el blob del archivo
+      const blob = await response.blob();
+      
+      // Obtener el nombre del archivo del header
+      const contentDisposition = response.headers.get("Content-Disposition");
+      let filename = "showclinic_imagenes.zip";
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Crear un enlace temporal para descargar el archivo
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      showToast({ severity: "success", message: "Backup de imágenes generado y descargado exitosamente" });
+    } catch (err) {
+      console.error("Error al generar backup de imágenes:", err);
+      showToast({ severity: "error", message: err.message || "Error al generar backup de imágenes" });
+    } finally {
+      setGenerandoBackupImagenes(false);
     }
   };
 
@@ -193,6 +242,59 @@ const Gestion = () => {
                 }}
               >
                 {generandoBackup ? "Generando Backup..." : "Realizar Backup"}
+              </Button>
+            </Paper>
+
+            {/* Botón de Backup de Imágenes */}
+            <Paper
+              elevation={3}
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                border: "1px solid rgba(212,175,55,0.25)",
+                backgroundColor: "rgba(255,255,255,0.95)",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+                <PhotoLibrary sx={{ fontSize: 40, color: colorPrincipal }} />
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h6" sx={{ color: colorPrincipal, fontWeight: 700 }}>
+                    Backup de Imágenes
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.70)" }}>
+                    Descarga todas las fotos y archivos del sistema en un archivo ZIP
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Typography variant="body2" sx={{ mb: 2, color: "rgba(46,46,46,0.65)" }}>
+                El backup incluye:
+              </Typography>
+              <ul style={{ margin: 0, paddingLeft: 20, color: "rgba(46,46,46,0.65)" }}>
+                <li>Fotos de perfil de pacientes</li>
+                <li>Fotos de tratamientos realizados (antes/después)</li>
+                <li>Documentos PDF de inventario</li>
+                <li>Todas las imágenes subidas al sistema</li>
+              </ul>
+
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={generandoBackupImagenes ? <CircularProgress size={20} color="inherit" /> : <PhotoLibrary />}
+                onClick={realizarBackupImagenes}
+                disabled={generandoBackupImagenes}
+                sx={{
+                  mt: 3,
+                  py: 1.5,
+                  backgroundColor: "#1976d2",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  borderRadius: 2,
+                  "&:hover": { backgroundColor: "#115293" },
+                  "&:disabled": { backgroundColor: "rgba(25,118,210,0.5)" },
+                }}
+              >
+                {generandoBackupImagenes ? "Generando Backup..." : "Descargar Imágenes"}
               </Button>
             </Paper>
           </Box>
