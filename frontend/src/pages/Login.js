@@ -115,22 +115,49 @@ export default function Login() {
           py: 4,
           backgroundColor: "#FFFFFF",
           boxShadow: "-4px 0 24px rgba(0, 0, 0, 0.08)",
+          animation: "slideInRight 0.6s ease-out",
+          "@keyframes slideInRight": {
+            "0%": {
+              opacity: 0,
+              transform: "translateX(30px)",
+            },
+            "100%": {
+              opacity: 1,
+              transform: "translateX(0)",
+            },
+          },
         }}
       >
-        <Box sx={{ width: "100%", maxWidth: 420 }}>
+        <Box sx={{ width: "100%", maxWidth: 450 }}>
           {/* Logo */}
-          <Box sx={{ textAlign: "center", mb: 4 }}>
+          <Box 
+            sx={{ 
+              textAlign: "center", 
+              mb: 5,
+              animation: "fadeInScale 0.8s ease-out",
+              "@keyframes fadeInScale": {
+                "0%": {
+                  opacity: 0,
+                  transform: "scale(0.8)",
+                },
+                "100%": {
+                  opacity: 1,
+                  transform: "scale(1)",
+                },
+              },
+            }}
+          >
             <img
               src="/logo-showclinic.png"
               alt="ShowClinic"
               style={{
-                width: 100,
-                height: 100,
+                width: 120,
+                height: 120,
                 objectFit: "cover",
                 borderRadius: "50%",
                 backgroundColor: "white",
-                border: "3px solid #D4AF37",
-                boxShadow: "0 4px 12px rgba(212,175,55,0.2)",
+                border: "4px solid #D4AF37",
+                boxShadow: "0 8px 24px rgba(212,175,55,0.25)",
               }}
             />
           </Box>
@@ -140,19 +167,49 @@ export default function Login() {
             variant="h4"
             sx={{
               fontWeight: 700,
-              mb: 1,
+              mb: 2,
               color: "#2E2E2E",
               textAlign: "center",
+              animation: "fadeInUp 0.8s ease-out 0.2s both",
+              "@keyframes fadeInUp": {
+                "0%": {
+                  opacity: 0,
+                  transform: "translateY(20px)",
+                },
+                "100%": {
+                  opacity: 1,
+                  transform: "translateY(0)",
+                },
+              },
             }}
           >
             Iniciar Sesión
           </Typography>
+          <Box
+            sx={{
+              width: 60,
+              height: 3,
+              backgroundColor: "#D4AF37",
+              margin: "0 auto 16px",
+              borderRadius: 2,
+              animation: "expandWidth 0.6s ease-out 0.4s both",
+              "@keyframes expandWidth": {
+                "0%": {
+                  width: 0,
+                },
+                "100%": {
+                  width: 60,
+                },
+              },
+            }}
+          />
           <Typography
             variant="body2"
             sx={{
-              mb: 4,
+              mb: 5,
               color: "rgba(46,46,46,0.7)",
               textAlign: "center",
+              animation: "fadeInUp 0.8s ease-out 0.3s both",
             }}
           >
             Ingresa tus credenciales para continuar
@@ -161,7 +218,13 @@ export default function Login() {
           {/* Campo Usuario */}
           <Typography
             variant="body2"
-            sx={{ mb: 0.5, fontWeight: 600, color: "#2E2E2E", textAlign: "center" }}
+            sx={{ 
+              mb: 1, 
+              fontWeight: 600, 
+              color: "#2E2E2E", 
+              textAlign: "center",
+              animation: "fadeInUp 0.8s ease-out 0.4s both",
+            }}
           >
             Usuario
           </Typography>
@@ -179,15 +242,19 @@ export default function Login() {
               ),
             }}
             sx={{
-              mb: 3,
+              mb: 3.5,
+              animation: "fadeInUp 0.8s ease-out 0.5s both",
               "& .MuiOutlinedInput-root": {
                 backgroundColor: "#FAFAFA",
                 borderRadius: 2,
+                transition: "all 0.3s ease",
                 "& fieldset": {
                   borderColor: "rgba(0,0,0,0.12)",
+                  transition: "all 0.3s ease",
                 },
                 "&:hover fieldset": {
                   borderColor: "rgba(212,175,55,0.5)",
+                  backgroundColor: "#F5F5F5",
                 },
                 "&.Mui-focused fieldset": {
                   borderColor: "#D4AF37",
@@ -200,7 +267,13 @@ export default function Login() {
           {/* Campo Contraseña */}
           <Typography
             variant="body2"
-            sx={{ mb: 0.5, fontWeight: 600, color: "#2E2E2E", textAlign: "center" }}
+            sx={{ 
+              mb: 1, 
+              fontWeight: 600, 
+              color: "#2E2E2E", 
+              textAlign: "center",
+              animation: "fadeInUp 0.8s ease-out 0.6s both",
+            }}
           >
             Contraseña
           </Typography>
@@ -230,15 +303,19 @@ export default function Login() {
               ),
             }}
             sx={{
-              mb: 2,
+              mb: 3,
+              animation: "fadeInUp 0.8s ease-out 0.7s both",
               "& .MuiOutlinedInput-root": {
                 backgroundColor: "#FAFAFA",
                 borderRadius: 2,
+                transition: "all 0.3s ease",
                 "& fieldset": {
                   borderColor: "rgba(0,0,0,0.12)",
+                  transition: "all 0.3s ease",
                 },
                 "&:hover fieldset": {
                   borderColor: "rgba(212,175,55,0.5)",
+                  backgroundColor: "#F5F5F5",
                 },
                 "&.Mui-focused fieldset": {
                   borderColor: "#D4AF37",
@@ -254,7 +331,8 @@ export default function Login() {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              mb: 3,
+              mb: 4,
+              animation: "fadeInUp 0.8s ease-out 0.8s both",
             }}
           >
             <FormControlLabel
@@ -284,22 +362,24 @@ export default function Login() {
             variant="contained"
             onClick={handleLogin}
             sx={{
-              py: 1.5,
-              borderRadius: 2,
+              py: 2,
+              borderRadius: 2.5,
               backgroundColor: "#D4AF37",
               color: "white",
-              fontWeight: 600,
-              fontSize: "1rem",
+              fontWeight: 700,
+              fontSize: "1.1rem",
               textTransform: "none",
-              boxShadow: "0 4px 12px rgba(212,175,55,0.3)",
-              transition: "all 0.3s ease",
+              boxShadow: "0 6px 20px rgba(212,175,55,0.35)",
+              transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+              animation: "fadeInUp 0.8s ease-out 0.9s both",
               "&:hover": {
                 backgroundColor: "#B8860B",
-                boxShadow: "0 6px 16px rgba(212,175,55,0.4)",
-                transform: "translateY(-2px)",
+                boxShadow: "0 8px 28px rgba(212,175,55,0.45)",
+                transform: "translateY(-3px)",
               },
               "&:active": {
-                transform: "translateY(0px)",
+                transform: "translateY(-1px)",
+                boxShadow: "0 4px 16px rgba(212,175,55,0.35)",
               },
             }}
           >
@@ -312,8 +392,17 @@ export default function Login() {
             sx={{
               display: "block",
               textAlign: "center",
-              mt: 4,
+              mt: 5,
               color: "rgba(46,46,46,0.5)",
+              animation: "fadeIn 1s ease-out 1s both",
+              "@keyframes fadeIn": {
+                "0%": {
+                  opacity: 0,
+                },
+                "100%": {
+                  opacity: 1,
+                },
+              },
             }}
           >
             ShowClinic CRM © 2026
