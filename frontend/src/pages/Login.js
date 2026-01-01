@@ -18,6 +18,20 @@ export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
+  // Array de imágenes de fondo que cambian aleatoriamente
+  const backgroundImages = [
+    "/images/fotologin.jpg",
+    "/images/fotologin2.jpg",
+    "/images/fotologin3.jpg",
+    "/images/fotologin4.jpg",
+  ];
+
+  // Seleccionar imagen aleatoria al cargar
+  const [backgroundImage] = useState(() => {
+    const randomIndex = Math.floor(Math.random() * backgroundImages.length);
+    return backgroundImages[randomIndex];
+  });
+
   const handleLogin = async () => {
     try {
       const res = await axios.post(`${API_BASE}/api/auth/login`, {
@@ -48,9 +62,10 @@ export default function Login() {
         display: "flex",
         minHeight: "100vh",
         overflow: "hidden",
-        backgroundImage: "url('/images/fondologin.jpg')",
+        backgroundImage: `url('${backgroundImage}')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
       }}
     >
       {/* LADO IZQUIERDO - Welcome Back */}
@@ -58,9 +73,6 @@ export default function Login() {
         sx={{
           flex: 1,
           position: "relative",
-          backgroundImage: "url('/images/fondologin.jpg')",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
           display: { xs: "none", md: "flex" },
           flexDirection: "column",
           justifyContent: "center",
@@ -70,7 +82,7 @@ export default function Login() {
             content: '""',
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.7) 100%)",
+            background: "linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%)",
           },
         }}
       >
@@ -113,9 +125,10 @@ export default function Login() {
           alignItems: "center",
           px: { xs: 3, sm: 6, md: 8 },
           py: 4,
-          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%)",
-          backdropFilter: "blur(20px)",
-          boxShadow: "-8px 0 32px rgba(0, 0, 0, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.5)",
+          background: "rgba(255, 255, 255, 0.15)",
+          backdropFilter: "blur(30px) saturate(180%)",
+          boxShadow: "-8px 0 32px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.3)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
           animation: "slideInRight 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
           "@keyframes slideInRight": {
             "0%": {
@@ -195,7 +208,7 @@ export default function Login() {
             sx={{
               fontWeight: 700,
               mb: 2,
-              color: "#2E2E2E",
+              color: "white",
               textAlign: "center",
               animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both",
               "@keyframes fadeInUp": {
@@ -237,7 +250,7 @@ export default function Login() {
             variant="body2"
             sx={{
               mb: 5,
-              color: "rgba(46,46,46,0.7)",
+              color: "rgba(255,255,255,0.9)",
               textAlign: "center",
               animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both",
             }}
@@ -251,7 +264,7 @@ export default function Login() {
             sx={{ 
               mb: 1, 
               fontWeight: 600, 
-              color: "#2E2E2E", 
+              color: "white", 
               textAlign: "center",
               animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.5s both",
             }}
@@ -311,7 +324,7 @@ export default function Login() {
             sx={{ 
               mb: 1, 
               fontWeight: 600, 
-              color: "#2E2E2E", 
+              color: "white", 
               textAlign: "center",
               animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.7s both",
             }}
@@ -412,7 +425,7 @@ export default function Login() {
                 />
               }
               label={
-                <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.7)" }}>
+                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.9)" }}>
                   Recordarme
                 </Typography>
               }
@@ -472,7 +485,7 @@ export default function Login() {
               display: "block",
               textAlign: "center",
               mt: 5,
-              color: "rgba(46,46,46,0.5)",
+              color: "rgba(255,255,255,0.7)",
               animation: "fadeIn 1s ease-out 1.2s both",
               "@keyframes fadeIn": {
                 "0%": {

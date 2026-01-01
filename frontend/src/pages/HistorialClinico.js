@@ -17,12 +17,14 @@ import {
   Box,
   IconButton,
 } from "@mui/material";
-import { ArrowBack, Home } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useToast } from "../components/ToastProvider";
+import ReciboTicket from "../components/ReciboTicket";
+import ReciboConsolidado from "../components/ReciboConsolidado";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -113,6 +115,14 @@ const HistorialClinico = () => {
   const [subiendoFotoPerfil, setSubiendoFotoPerfil] = useState(false);
   const [fotosTratamiento, setFotosTratamiento] = useState([]);
   const [tratamientoSeleccionado, setTratamientoSeleccionado] = useState(null);
+
+  // Estado para modal de recibo
+  const [openReciboModal, setOpenReciboModal] = useState(false);
+  const [datosRecibo, setDatosRecibo] = useState(null);
+
+  // Estado para modal de recibo consolidado
+  const [openReciboConsolidado, setOpenReciboConsolidado] = useState(false);
+  const [datosReciboConsolidado, setDatosReciboConsolidado] = useState(null);
 
   const token = localStorage.getItem("token");
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
@@ -610,6 +620,66 @@ const HistorialClinico = () => {
 
     doc.save(`Historial_${p.nombre}_${p.apellido}.pdf`);
   };
+
+  // Función para abrir modal de recibo de un tratamiento específico
+  const abrirReciboTratamiento = (tratamiento) => {
+    setDatosRecibo({
+      paciente: pacienteSeleccionado,
+      tratamiento: {
+        nombre: tratamiento.nombreTratamiento,
+        precio: tratamiento.precio_total,
+      },
+      especialista: tratamiento.especialista,
+      fecha: tratamiento.fecha?.split(" ")[0] || new Date().toLocaleDateString("es-PE"),
+      pagoMetodo: tratamiento.pagoMetodo,
+      sesion: tratamiento.sesion,
+      total: tratamiento.precio_total,
+      descuento: tratamiento.descuento || 0,
+    });
+    setOpenReciboModal(true);
+  };
+
+  // Función para abrir modal de recibo consolidado por fecha
+  const abrirReciboConsolidadoPorFecha = (fecha) => {
+    // Filtrar tratamientos de la misma fecha
+    const tratamientosMismaFecha = tratamientos.filter(t => {
+      const fechaTratamiento = t.fecha?.split(" ")[0];
+      return fechaTratamiento === fecha;
+    });
+
+    if (tratamientosMismaFecha.length === 0) return;
+
+    // Preparar datos para el recibo consolidado
+    const tratamientosRecibo = tratamientosMismaFecha.map(t => ({
+      nombre: t.nombreTratamiento,
+      especialista: t.especialista,
+      sesion: t.sesion,
+      precio: t.precio_total,
+      descuento: t.descuento || 0,
+      total: t.precio_total,
+      pagoMetodo: t.pagoMetodo,
+    }));
+
+    const totalGeneral = tratamientosMismaFecha.reduce((sum, t) => sum + (t.precio_total || 0), 0);
+
+    setDatosReciboConsolidado({
+      paciente: pacienteSeleccionado,
+      tratamientos: tratamientosRecibo,
+      fecha: fecha,
+      totalGeneral: totalGeneral,
+    });
+    setOpenReciboConsolidado(true);
+  };
+
+  // Agrupar tratamientos por fecha
+  const tratamientosPorFecha = tratamientos.reduce((acc, t) => {
+    const fecha = t.fecha?.split(" ")[0];
+    if (!acc[fecha]) {
+      acc[fecha] = [];
+    }
+    acc[fecha].push(t);
+    return acc;
+  }, {});
 
   return (
     <div
@@ -1400,12 +1470,43 @@ const HistorialClinico = () => {
               <Divider sx={{ mb: 3 }} />
 
               {/* Tratamientos realizados */}
-              <Typography
-                variant="h6"
-                sx={{ color: "#a36920", fontWeight: "bold", mb: 2 }}
-              >
-                Tratamientos realizados
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                <Typography
+                  variant="h6"
+                  sx={{ color: "#a36920", fontWeight: "bold" }}
+                >
+                  Tratamientos realizados
+                </Typography>
+                
+                {/* Mostrar botón de recibo consolidado si hay fechas con múltiples tratamientos */}
+                {Object.keys(tratamientosPorFecha).some(fecha => tratamientosPorFecha[fecha].length > 1) && (
+                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    {Object.keys(tratamientosPorFecha)
+                      .filter(fecha => tratamientosPorFecha[fecha].length > 1)
+                      .map(fecha => (
+                        <Button
+                          key={fecha}
+                          variant="outlined"
+                          size="small"
+                          startIcon={<Receipt />}
+                          sx={{
+                            borderColor: "#D4AF37",
+                            color: "#D4AF37",
+                            fontWeight: 600,
+                            borderRadius: 2,
+                            "&:hover": {
+                              backgroundColor: "rgba(212,175,55,0.1)",
+                              borderColor: "#B8941F",
+                            },
+                          }}
+                          onClick={() => abrirReciboConsolidadoPorFecha(fecha)}
+                        >
+                          Recibo {fecha} ({tratamientosPorFecha[fecha].length} servicios)
+                        </Button>
+                      ))}
+                  </Box>
+                )}
+              </Box>
 
               {tratamientos.length === 0 ? (
                 <Typography>No hay tratamientos registrados.</Typography>
@@ -1433,6 +1534,7 @@ const HistorialClinico = () => {
                           <TableCell sx={{ fontWeight: "bold" }}>Pago</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Sesión</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Fotos</TableCell>
+                          <TableCell sx={{ fontWeight: "bold" }}>Recibo</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1522,6 +1624,23 @@ const HistorialClinico = () => {
                                 </Box>
                               )}
                             </TableCell>
+
+                            {/* Columna de Recibo */}
+                            <TableCell>
+                              <IconButton
+                                size="small"
+                                sx={{
+                                  color: "#D4AF37",
+                                  "&:hover": {
+                                    backgroundColor: "rgba(212,175,55,0.1)",
+                                  },
+                                }}
+                                onClick={() => abrirReciboTratamiento(t)}
+                                title="Imprimir recibo"
+                              >
+                                <Receipt />
+                              </IconButton>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -1541,6 +1660,20 @@ const HistorialClinico = () => {
           )}
         </Paper>
       </Container>
+
+      {/* Modal de Recibo para Ticketera */}
+      <ReciboTicket
+        open={openReciboModal}
+        onClose={() => setOpenReciboModal(false)}
+        datos={datosRecibo}
+      />
+
+      {/* Modal de Recibo Consolidado */}
+      <ReciboConsolidado
+        open={openReciboConsolidado}
+        onClose={() => setOpenReciboConsolidado(false)}
+        datos={datosReciboConsolidado}
+      />
     </div>
   );
 };

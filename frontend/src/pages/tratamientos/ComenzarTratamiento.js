@@ -382,6 +382,8 @@ const ComenzarTratamiento = () => {
         headers: authHeaders,
       });
       showToast({ severity: "success", message: res.data.message || "Tratamiento registrado correctamente" });
+      
+      // Limpiar formulario
       setPaciente_id("");
       setEspecialista("");
       setPagoMetodo("Efectivo");
