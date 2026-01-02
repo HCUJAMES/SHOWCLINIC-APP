@@ -18,19 +18,8 @@ export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  // Array de imágenes de fondo que cambian aleatoriamente
-  const backgroundImages = [
-    "/images/fotologin.jpg",
-    "/images/fotologin2.jpg",
-    "/images/fotologin3.jpg",
-    "/images/fotologin4.jpg",
-  ];
-
-  // Seleccionar imagen aleatoria al cargar
-  const [backgroundImage] = useState(() => {
-    const randomIndex = Math.floor(Math.random() * backgroundImages.length);
-    return backgroundImages[randomIndex];
-  });
+  // Imagen de fondo fija
+  const backgroundImage = "/images/imagenlogin2.jpg";
 
   const handleLogin = async () => {
     try {
