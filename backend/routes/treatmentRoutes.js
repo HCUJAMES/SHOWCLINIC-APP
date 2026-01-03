@@ -691,4 +691,133 @@ router.get("/historial/:paciente_id", (req, res) => {
   );
 });
 
+/* ==============================
+   🗑️ CANCELAR TRATAMIENTO REALIZADO
+============================== */
+router.delete("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) => {
+  const { id } = req.params;
+  const tratamientoId = Number(id);
+
+  if (!Number.isFinite(tratamientoId) || tratamientoId <= 0) {
+    return res.status(400).json({ message: "ID de tratamiento inválido" });
+  }
+
+  try {
+    // Verificar que el tratamiento existe
+    const tratamiento = await dbGet(
+      `SELECT * FROM tratamientos_realizados WHERE id = ?`,
+      [tratamientoId]
+    );
+
+    if (!tratamiento) {
+      return res.status(404).json({ message: "Tratamiento no encontrado" });
+    }
+
+    // Verificar si tiene deuda asociada
+    const deuda = await dbGet(
+      `SELECT * FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?`,
+      [tratamientoId]
+    );
+
+    if (deuda && deuda.estado === 'pendiente') {
+      return res.status(400).json({ 
+        message: "No se puede cancelar un tratamiento con deuda pendiente. Cancela la deuda primero." 
+      });
+    }
+
+    // Eliminar el tratamiento
+    await dbRun(`DELETE FROM tratamientos_realizados WHERE id = ?`, [tratamientoId]);
+
+    res.json({ message: "✅ Tratamiento cancelado correctamente" });
+  } catch (err) {
+    console.error("❌ Error al cancelar tratamiento:", err.message);
+    res.status(500).json({ message: "Error al cancelar tratamiento" });
+  }
+});
+
+/* ==============================
+   ✏️ EDITAR TRATAMIENTO REALIZADO
+============================== */
+router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) => {
+  const { id } = req.params;
+  const tratamientoId = Number(id);
+
+  if (!Number.isFinite(tratamientoId) || tratamientoId <= 0) {
+    return res.status(400).json({ message: "ID de tratamiento inválido" });
+  }
+
+  const {
+    especialista,
+    sesion,
+    precio_total,
+    descuento,
+    pagoMetodo,
+    tipoAtencion,
+  } = req.body;
+
+  try {
+    // Verificar que el tratamiento existe
+    const tratamiento = await dbGet(
+      `SELECT * FROM tratamientos_realizados WHERE id = ?`,
+      [tratamientoId]
+    );
+
+    if (!tratamiento) {
+      return res.status(404).json({ message: "Tratamiento no encontrado" });
+    }
+
+    // Validaciones
+    const especialistaStr = typeof especialista === "string" ? especialista.trim() : tratamiento.especialista;
+    const sesionNum = sesion != null ? Number(sesion) : tratamiento.sesion;
+    const precioNum = precio_total != null ? Number(precio_total) : tratamiento.precio_total;
+    const descuentoNum = descuento != null ? Number(descuento) : tratamiento.descuento;
+    const pagoMetodoStr = typeof pagoMetodo === "string" ? pagoMetodo.trim() : tratamiento.pagoMetodo;
+    const tipoAtencionStr = typeof tipoAtencion === "string" ? tipoAtencion.trim() : tratamiento.tipoAtencion;
+
+    if (!Number.isFinite(sesionNum) || sesionNum < 1) {
+      return res.status(400).json({ message: "Sesión inválida" });
+    }
+
+    if (!Number.isFinite(precioNum) || precioNum < 0) {
+      return res.status(400).json({ message: "Precio inválido" });
+    }
+
+    if (!Number.isFinite(descuentoNum) || descuentoNum < 0 || descuentoNum > 100) {
+      return res.status(400).json({ message: "Descuento inválido (0-100)" });
+    }
+
+    // Actualizar el tratamiento
+    await dbRun(
+      `UPDATE tratamientos_realizados 
+       SET especialista = ?, sesion = ?, precio_total = ?, descuento = ?, 
+           pagoMetodo = ?, tipoAtencion = ?
+       WHERE id = ?`,
+      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, tratamientoId]
+    );
+
+    // Si hay deuda asociada, actualizar el monto total
+    const deuda = await dbGet(
+      `SELECT * FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?`,
+      [tratamientoId]
+    );
+
+    if (deuda) {
+      const montoAdelanto = Number(deuda.monto_adelanto) || 0;
+      const nuevoSaldo = Math.max(0, precioNum - montoAdelanto);
+      
+      await dbRun(
+        `UPDATE deudas_tratamientos 
+         SET monto_total = ?, monto_saldo = ?
+         WHERE tratamiento_realizado_id = ?`,
+        [precioNum, nuevoSaldo, tratamientoId]
+      );
+    }
+
+    res.json({ message: "✅ Tratamiento actualizado correctamente" });
+  } catch (err) {
+    console.error("❌ Error al editar tratamiento:", err.message);
+    res.status(500).json({ message: "Error al editar tratamiento" });
+  }
+});
+
 export default router;

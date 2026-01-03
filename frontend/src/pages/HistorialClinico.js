@@ -16,8 +16,16 @@ import {
   Divider,
   Box,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -123,6 +131,20 @@ const HistorialClinico = () => {
   // Estado para modal de recibo consolidado
   const [openReciboConsolidado, setOpenReciboConsolidado] = useState(false);
   const [datosReciboConsolidado, setDatosReciboConsolidado] = useState(null);
+
+  // Estados para editar tratamiento
+  const [openEditarModal, setOpenEditarModal] = useState(false);
+  const [tratamientoEditar, setTratamientoEditar] = useState(null);
+  const [editEspecialista, setEditEspecialista] = useState("");
+  const [editSesion, setEditSesion] = useState(1);
+  const [editPrecio, setEditPrecio] = useState(0);
+  const [editDescuento, setEditDescuento] = useState(0);
+  const [editPagoMetodo, setEditPagoMetodo] = useState("Efectivo");
+  const [editTipoAtencion, setEditTipoAtencion] = useState("Tratamiento");
+
+  // Estados para confirmar cancelación
+  const [openConfirmarCancelar, setOpenConfirmarCancelar] = useState(false);
+  const [tratamientoCancelar, setTratamientoCancelar] = useState(null);
 
   const token = localStorage.getItem("token");
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
@@ -680,6 +702,72 @@ const HistorialClinico = () => {
     acc[fecha].push(t);
     return acc;
   }, {});
+
+  // Función para abrir modal de edición
+  const abrirEditarTratamiento = (tratamiento) => {
+    setTratamientoEditar(tratamiento);
+    setEditEspecialista(tratamiento.especialista || "");
+    setEditSesion(tratamiento.sesion || 1);
+    setEditPrecio(tratamiento.precio_total || 0);
+    setEditDescuento(tratamiento.descuento || 0);
+    setEditPagoMetodo(tratamiento.pagoMetodo || "Efectivo");
+    setEditTipoAtencion(tratamiento.tipoAtencion || "Tratamiento");
+    setOpenEditarModal(true);
+  };
+
+  // Función para guardar cambios del tratamiento
+  const guardarEditarTratamiento = async () => {
+    if (!tratamientoEditar) return;
+
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/tratamientos/realizado/${tratamientoEditar.id}`,
+        {
+          especialista: editEspecialista,
+          sesion: editSesion,
+          precio_total: editPrecio,
+          descuento: editDescuento,
+          pagoMetodo: editPagoMetodo,
+          tipoAtencion: editTipoAtencion,
+        },
+        { headers: authHeaders }
+      );
+
+      showToast({ severity: "success", message: "Tratamiento actualizado correctamente" });
+      setOpenEditarModal(false);
+      cargarHistorial(pacienteSeleccionado.id);
+    } catch (error) {
+      console.error("Error al editar tratamiento:", error);
+      const mensaje = error.response?.data?.message || "Error al editar tratamiento";
+      showToast({ severity: "error", message: mensaje });
+    }
+  };
+
+  // Función para abrir confirmación de cancelación
+  const abrirConfirmacionCancelar = (tratamiento) => {
+    setTratamientoCancelar(tratamiento);
+    setOpenConfirmarCancelar(true);
+  };
+
+  // Función para cancelar tratamiento
+  const cancelarTratamiento = async () => {
+    if (!tratamientoCancelar) return;
+
+    try {
+      await axios.delete(
+        `${API_BASE_URL}/api/tratamientos/realizado/${tratamientoCancelar.id}`,
+        { headers: authHeaders }
+      );
+
+      showToast({ severity: "success", message: "Tratamiento cancelado correctamente" });
+      setOpenConfirmarCancelar(false);
+      cargarHistorial(pacienteSeleccionado.id);
+    } catch (error) {
+      console.error("Error al cancelar tratamiento:", error);
+      const mensaje = error.response?.data?.message || "Error al cancelar tratamiento";
+      showToast({ severity: "error", message: mensaje });
+    }
+  };
 
   return (
     <div
@@ -1535,6 +1623,7 @@ const HistorialClinico = () => {
                           <TableCell sx={{ fontWeight: "bold" }}>Sesión</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Fotos</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Recibo</TableCell>
+                          <TableCell sx={{ fontWeight: "bold" }}>Acciones</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1641,6 +1730,38 @@ const HistorialClinico = () => {
                                 <Receipt />
                               </IconButton>
                             </TableCell>
+
+                            {/* Columna de Acciones */}
+                            <TableCell>
+                              <Box sx={{ display: "flex", gap: 0.5 }}>
+                                <IconButton
+                                  size="small"
+                                  sx={{
+                                    color: "#1976d2",
+                                    "&:hover": {
+                                      backgroundColor: "rgba(25,118,210,0.1)",
+                                    },
+                                  }}
+                                  onClick={() => abrirEditarTratamiento(t)}
+                                  title="Editar tratamiento"
+                                >
+                                  <Edit />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  sx={{
+                                    color: "#d32f2f",
+                                    "&:hover": {
+                                      backgroundColor: "rgba(211,47,47,0.1)",
+                                    },
+                                  }}
+                                  onClick={() => abrirConfirmacionCancelar(t)}
+                                  title="Cancelar tratamiento"
+                                >
+                                  <Delete />
+                                </IconButton>
+                              </Box>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -1674,6 +1795,138 @@ const HistorialClinico = () => {
         onClose={() => setOpenReciboConsolidado(false)}
         datos={datosReciboConsolidado}
       />
+
+      {/* Modal para Editar Tratamiento */}
+      <Dialog open={openEditarModal} onClose={() => setOpenEditarModal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#a36920", color: "white" }}>
+          Editar Tratamiento
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Especialista"
+                value={editEspecialista}
+                onChange={(e) => setEditEspecialista(e.target.value)}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Sesión"
+                type="number"
+                value={editSesion}
+                onChange={(e) => setEditSesion(Number(e.target.value))}
+                inputProps={{ min: 1 }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <FormControl fullWidth>
+                <InputLabel>Tipo de Atención</InputLabel>
+                <Select
+                  value={editTipoAtencion}
+                  onChange={(e) => setEditTipoAtencion(e.target.value)}
+                  label="Tipo de Atención"
+                >
+                  <MenuItem value="Tratamiento">Tratamiento</MenuItem>
+                  <MenuItem value="Consulta">Consulta</MenuItem>
+                  <MenuItem value="Seguimiento">Seguimiento</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Precio Total (S/)"
+                type="number"
+                value={editPrecio}
+                onChange={(e) => setEditPrecio(Number(e.target.value))}
+                inputProps={{ min: 0, step: 0.01 }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Descuento (%)"
+                type="number"
+                value={editDescuento}
+                onChange={(e) => setEditDescuento(Number(e.target.value))}
+                inputProps={{ min: 0, max: 100 }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Método de Pago</InputLabel>
+                <Select
+                  value={editPagoMetodo}
+                  onChange={(e) => setEditPagoMetodo(e.target.value)}
+                  label="Método de Pago"
+                >
+                  <MenuItem value="Efectivo">Efectivo</MenuItem>
+                  <MenuItem value="Tarjeta">Tarjeta</MenuItem>
+                  <MenuItem value="Transferencia">Transferencia</MenuItem>
+                  <MenuItem value="Yape">Yape</MenuItem>
+                  <MenuItem value="Plin">Plin</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenEditarModal(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={guardarEditarTratamiento}
+            variant="contained"
+            sx={{
+              backgroundColor: "#a36920",
+              "&:hover": { backgroundColor: "#8a5a1a" },
+            }}
+          >
+            Guardar Cambios
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de Confirmación para Cancelar Tratamiento */}
+      <Dialog open={openConfirmarCancelar} onClose={() => setOpenConfirmarCancelar(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white" }}>
+          Confirmar Cancelación
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Typography>
+            ¿Estás seguro de que deseas cancelar este tratamiento?
+          </Typography>
+          {tratamientoCancelar && (
+            <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
+              <Typography variant="body2"><strong>Tratamiento:</strong> {tratamientoCancelar.nombreTratamiento}</Typography>
+              <Typography variant="body2"><strong>Fecha:</strong> {tratamientoCancelar.fecha?.split(" ")[0]}</Typography>
+              <Typography variant="body2"><strong>Especialista:</strong> {tratamientoCancelar.especialista}</Typography>
+              <Typography variant="body2"><strong>Total:</strong> S/ {tratamientoCancelar.precio_total?.toFixed(2)}</Typography>
+            </Box>
+          )}
+          <Typography sx={{ mt: 2, color: "#d32f2f", fontWeight: "bold" }}>
+            Esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenConfirmarCancelar(false)} sx={{ color: "#666" }}>
+            No, mantener
+          </Button>
+          <Button
+            onClick={cancelarTratamiento}
+            variant="contained"
+            sx={{
+              backgroundColor: "#d32f2f",
+              "&:hover": { backgroundColor: "#b71c1c" },
+            }}
+          >
+            Sí, cancelar tratamiento
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
