@@ -115,6 +115,9 @@ const HistorialClinico = () => {
   const [observacionEditTexto, setObservacionEditTexto] = useState("");
   const [guardandoObservacionEdit, setGuardandoObservacionEdit] = useState(false);
   const [tratamientosBase, setTratamientosBase] = useState([]);
+  const [paquetesActivos, setPaquetesActivos] = useState([]);
+  const [paquetesPaciente, setPaquetesPaciente] = useState([]);
+  const [asignandoPaquete, setAsignandoPaquete] = useState(false);
   const [showOferta, setShowOferta] = useState(false);
   const [ofertaItems, setOfertaItems] = useState([]);
   const [guardandoOferta, setGuardandoOferta] = useState(false);
@@ -163,6 +166,20 @@ const HistorialClinico = () => {
       .catch((err) => {
         console.error("Error al obtener tratamientos base:", err);
         setTratamientosBase([]);
+      });
+
+    // Cargar paquetes activos
+    axios
+      .get(`${API_BASE_URL}/api/paquetes`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      .then((res) => {
+        const activos = (res.data || []).filter(p => p.estado === 'activo');
+        setPaquetesActivos(activos);
+      })
+      .catch((err) => {
+        console.error("Error al obtener paquetes:", err);
+        setPaquetesActivos([]);
       });
   }, []);
 
@@ -215,8 +232,118 @@ const HistorialClinico = () => {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       setTratamientos(res.data);
+
+      // Cargar paquetes asignados al paciente
+      try {
+        const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${id}`, {
+          headers: authHeaders,
+        });
+        setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+      } catch (e) {
+        console.error("Error al obtener paquetes del paciente:", e);
+        setPaquetesPaciente([]);
+      }
     } catch (error) {
       console.error("Error al obtener historial clínico:", error);
+    }
+  };
+
+  // Asignar paquete al paciente
+  const asignarPaquete = async (paquete) => {
+    if (!pacienteSeleccionado?.id) return;
+    
+    setAsignandoPaquete(true);
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/paquetes/asignar`,
+        {
+          paciente_id: pacienteSeleccionado.id,
+          paquete_id: paquete.id,
+        },
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: `Paquete "${paquete.nombre}" asignado exitosamente` });
+      
+      // Recargar paquetes del paciente
+      const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+    } catch (error) {
+      console.error("Error al asignar paquete:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al asignar paquete" });
+    } finally {
+      setAsignandoPaquete(false);
+    }
+  };
+
+  // Marcar sesión como completada
+  const completarSesion = async (sesionId) => {
+    try {
+      await axios.patch(
+        `${API_BASE_URL}/api/paquetes/sesion/${sesionId}/completar`,
+        {},
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Sesión completada" });
+      
+      // Recargar paquetes del paciente
+      const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+    } catch (error) {
+      console.error("Error al completar sesión:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al completar sesión" });
+    }
+  };
+
+  // Desmarcar sesión (revertir completada)
+  const desmarcarSesion = async (sesionId) => {
+    try {
+      await axios.patch(
+        `${API_BASE_URL}/api/paquetes/sesion/${sesionId}/desmarcar`,
+        {},
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Sesión desmarcada" });
+      
+      // Recargar paquetes del paciente
+      const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+    } catch (error) {
+      console.error("Error al desmarcar sesión:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al desmarcar sesión" });
+    }
+  };
+
+  // Eliminar paquete del paciente
+  const eliminarPaquetePaciente = async (paquetePacienteId) => {
+    if (!window.confirm("¿Estás seguro de eliminar este paquete del paciente? Esta acción no se puede deshacer.")) {
+      return;
+    }
+    
+    try {
+      await axios.delete(
+        `${API_BASE_URL}/api/paquetes/paciente/${paquetePacienteId}`,
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Paquete eliminado" });
+      
+      // Recargar paquetes del paciente
+      const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+    } catch (error) {
+      console.error("Error al eliminar paquete:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al eliminar paquete" });
     }
   };
 
@@ -281,6 +408,106 @@ const HistorialClinico = () => {
     } finally {
       setGuardandoObservacionEdit(false);
     }
+  };
+
+  // Generar recibo PDF del paquete completado
+  const generarReciboPaquete = (paquete) => {
+    if (!pacienteSeleccionado || !paquete) return;
+
+    const doc = new jsPDF("p", "mm", [80, 200]);
+    const pageWidth = 80;
+    let y = 10;
+
+    // Logo y encabezado
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Centro de Estética", pageWidth / 2, y, { align: "center" });
+    y += 8;
+
+    // Línea separadora
+    doc.setDrawColor(200);
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Título del recibo
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("RECIBO DE PAQUETE", pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    // Datos del paciente
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
+    doc.text(`Cliente: ${nombrePaciente}`, 5, y);
+    y += 4;
+    doc.text(`DNI: ${pacienteSeleccionado.dni || "-"}`, 5, y);
+    y += 4;
+    doc.text(`Fecha: ${new Date().toLocaleDateString("es-PE")}`, 5, y);
+    y += 6;
+
+    // Línea separadora
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Nombre del paquete
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(paquete.paquete_nombre, pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    // Sesiones realizadas
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    
+    if (paquete.sesiones && paquete.sesiones.length > 0) {
+      paquete.sesiones.forEach((sesion) => {
+        const estado = sesion.estado === 'completada' ? '✓' : '○';
+        const fecha = sesion.fecha_realizada ? sesion.fecha_realizada.split(' ')[0] : '-';
+        doc.text(`${estado} ${sesion.tratamiento_nombre}`, 5, y);
+        y += 3.5;
+        doc.text(`   Sesión ${sesion.sesion_numero} - ${fecha}`, 5, y);
+        y += 4;
+      });
+    }
+
+    y += 2;
+    // Línea separadora
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Total
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL PAQUETE:", 5, y);
+    doc.text(`S/ ${(paquete.precio_total || 0).toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    y += 6;
+
+    // Estado
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Estado: ${paquete.estado.toUpperCase()}`, pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    // Línea separadora
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Mensaje de agradecimiento
+    doc.setFontSize(7);
+    doc.text("¡Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    doc.text("ShowClinic - Tu belleza, nuestra pasión", pageWidth / 2, y, { align: "center" });
+
+    // Abrir en nueva ventana para imprimir
+    const pdfBlob = doc.output("blob");
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, "_blank");
   };
 
   const toggleOfertaItem = (t) => {
@@ -1556,6 +1783,336 @@ const HistorialClinico = () => {
               )}
 
               <Divider sx={{ mb: 3 }} />
+
+              {/* Paquetes Promocionales Activos */}
+              {paquetesActivos.length > 0 && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mb: 3,
+                    p: 2.5,
+                    borderRadius: 3,
+                    backgroundColor: "rgba(76, 175, 80, 0.08)",
+                    border: "1px solid rgba(76, 175, 80, 0.3)",
+                  }}
+                >
+                  <Typography
+                    variant="h6"
+                    sx={{ color: "#2e7d32", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+                  >
+                    🎁 Paquetes Promocionales Disponibles
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                      gap: 2,
+                    }}
+                  >
+                    {paquetesActivos.map((paquete) => {
+                      let tratamientosIncluidos = [];
+                      try {
+                        tratamientosIncluidos = paquete.tratamientos_json ? JSON.parse(paquete.tratamientos_json) : [];
+                      } catch (e) {
+                        tratamientosIncluidos = [];
+                      }
+                      
+                      return (
+                        <Paper
+                          key={paquete.id}
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            backgroundColor: "white",
+                            border: "1px solid rgba(76, 175, 80, 0.2)",
+                          }}
+                        >
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+                            <Typography sx={{ fontWeight: "bold", color: "#333" }}>
+                              {paquete.nombre}
+                            </Typography>
+                            <Box sx={{ 
+                              backgroundColor: "#ff9800", 
+                              color: "white", 
+                              px: 1.5, 
+                              py: 0.5, 
+                              borderRadius: 2,
+                              fontWeight: "bold",
+                              fontSize: "0.85rem"
+                            }}>
+                              {paquete.descuento_porcentaje?.toFixed(0)}% OFF
+                            </Box>
+                          </Box>
+                          
+                          {paquete.descripcion && (
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                              {paquete.descripcion}
+                            </Typography>
+                          )}
+                          
+                          {tratamientosIncluidos.length > 0 && (
+                            <Box sx={{ mb: 1.5 }}>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: "bold" }}>
+                                Incluye:
+                              </Typography>
+                              {tratamientosIncluidos.map((t, idx) => (
+                                <Typography key={idx} variant="body2" sx={{ ml: 1 }}>
+                                  ✓ {t.nombre} ({t.sesiones} sesión{t.sesiones > 1 ? 'es' : ''})
+                                </Typography>
+                              ))}
+                            </Box>
+                          )}
+                          
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 1 }}>
+                            <Box>
+                              <Typography variant="caption" sx={{ textDecoration: "line-through", color: "#999" }}>
+                                S/ {paquete.precio_regular?.toFixed(2)}
+                              </Typography>
+                              <Typography sx={{ fontWeight: "bold", color: "#2e7d32", fontSize: "1.1rem" }}>
+                                S/ {paquete.precio_paquete?.toFixed(2)}
+                              </Typography>
+                            </Box>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              disabled={asignandoPaquete || !pacienteSeleccionado}
+                              onClick={() => asignarPaquete(paquete)}
+                              sx={{
+                                backgroundColor: "#4caf50",
+                                "&:hover": { backgroundColor: "#388e3c" },
+                                fontWeight: "bold",
+                                borderRadius: 2,
+                              }}
+                            >
+                              {asignandoPaquete ? "Asignando..." : "Asignar"}
+                            </Button>
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                  </Box>
+                </Paper>
+              )}
+
+              {/* Paquetes Asignados al Paciente */}
+              {paquetesPaciente.length > 0 && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mb: 3,
+                    p: 2.5,
+                    borderRadius: 3,
+                    backgroundColor: "rgba(33, 150, 243, 0.08)",
+                    border: "1px solid rgba(33, 150, 243, 0.3)",
+                  }}
+                >
+                  <Typography
+                    variant="h6"
+                    sx={{ color: "#1565c0", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+                  >
+                    📦 Paquetes del Paciente
+                  </Typography>
+                  <Box sx={{ display: "grid", gap: 2 }}>
+                    {paquetesPaciente.map((paquete) => {
+                      const progreso = paquete.sesiones_totales > 0 
+                        ? Math.round((paquete.sesiones_completadas / paquete.sesiones_totales) * 100) 
+                        : 0;
+                      
+                      return (
+                        <Paper
+                          key={paquete.id}
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            backgroundColor: "white",
+                            border: `1px solid ${paquete.estado === 'completado' ? '#4caf50' : paquete.estado === 'cancelado' ? '#f44336' : '#2196f3'}`,
+                          }}
+                        >
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+                            <Box>
+                              <Typography sx={{ fontWeight: "bold", color: "#333" }}>
+                                {paquete.paquete_nombre}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Asignado: {paquete.fecha_inicio?.split(' ')[0]}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ 
+                              backgroundColor: paquete.estado === 'completado' ? '#4caf50' : paquete.estado === 'cancelado' ? '#f44336' : '#2196f3',
+                              color: "white", 
+                              px: 1.5, 
+                              py: 0.5, 
+                              borderRadius: 2,
+                              fontWeight: "bold",
+                              fontSize: "0.75rem",
+                              textTransform: "uppercase"
+                            }}>
+                              {paquete.estado}
+                            </Box>
+                          </Box>
+                          
+                          {/* Barra de progreso */}
+                          <Box sx={{ mb: 2 }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary">
+                                Progreso: {paquete.sesiones_completadas}/{paquete.sesiones_totales} sesiones
+                              </Typography>
+                              <Typography variant="caption" sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                                {progreso}%
+                              </Typography>
+                            </Box>
+                            <Box sx={{ 
+                              height: 8, 
+                              backgroundColor: "#e0e0e0", 
+                              borderRadius: 4,
+                              overflow: "hidden"
+                            }}>
+                              <Box sx={{ 
+                                height: "100%", 
+                                width: `${progreso}%`,
+                                backgroundColor: paquete.estado === 'completado' ? '#4caf50' : '#2196f3',
+                                borderRadius: 4,
+                                transition: "width 0.3s ease"
+                              }} />
+                            </Box>
+                          </Box>
+
+                          {/* Sesiones del paquete */}
+                          {paquete.sesiones && paquete.sesiones.length > 0 && (
+                            <Box sx={{ mt: 1 }}>
+                              <Typography variant="caption" sx={{ fontWeight: "bold", color: "#666", mb: 1, display: "block" }}>
+                                Sesiones:
+                              </Typography>
+                              <Box sx={{ display: "grid", gap: 0.5 }}>
+                                {paquete.sesiones.map((sesion) => (
+                                  <Box
+                                    key={sesion.id}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      p: 1,
+                                      backgroundColor: sesion.estado === 'completada' ? "rgba(76, 175, 80, 0.1)" : "rgba(0,0,0,0.02)",
+                                      borderRadius: 1,
+                                      border: `1px solid ${sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0'}`,
+                                    }}
+                                  >
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                      <Box sx={{
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: "50%",
+                                        backgroundColor: sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0',
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.7rem",
+                                        color: sesion.estado === 'completada' ? 'white' : '#666'
+                                      }}>
+                                        {sesion.estado === 'completada' ? '✓' : sesion.sesion_numero}
+                                      </Box>
+                                      <Typography variant="body2">
+                                        {sesion.tratamiento_nombre} - Sesión {sesion.sesion_numero}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        (S/ {sesion.precio_sesion?.toFixed(2)})
+                                      </Typography>
+                                    </Box>
+                                    {sesion.estado === 'pendiente' && paquete.estado === 'activo' && (
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => completarSesion(sesion.id)}
+                                        sx={{
+                                          fontSize: "0.7rem",
+                                          py: 0.25,
+                                          px: 1,
+                                          borderColor: "#4caf50",
+                                          color: "#4caf50",
+                                          "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" }
+                                        }}
+                                      >
+                                        Completar
+                                      </Button>
+                                    )}
+                                    {sesion.estado === 'completada' && (
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <Typography variant="caption" color="success.main">
+                                          {sesion.fecha_realizada?.split(' ')[0]}
+                                        </Typography>
+                                        <Button
+                                          size="small"
+                                          variant="text"
+                                          onClick={() => desmarcarSesion(sesion.id)}
+                                          sx={{
+                                            fontSize: "0.65rem",
+                                            py: 0,
+                                            px: 0.5,
+                                            minWidth: "auto",
+                                            color: "#f44336",
+                                            "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" }
+                                          }}
+                                        >
+                                          Deshacer
+                                        </Button>
+                                      </Box>
+                                    )}
+                                  </Box>
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
+
+                          {/* Total del paquete y botones */}
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Total del paquete:
+                              </Typography>
+                              <Typography sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                                S/ {paquete.precio_total?.toFixed(2)}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 1 }}>
+                              {paquete.estado === 'completado' && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => generarReciboPaquete(paquete)}
+                                  sx={{
+                                    fontSize: "0.7rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    backgroundColor: "#4caf50",
+                                    "&:hover": { backgroundColor: "#388e3c" }
+                                  }}
+                                >
+                                  🧾 Imprimir Recibo
+                                </Button>
+                              )}
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                onClick={() => eliminarPaquetePaciente(paquete.id)}
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  py: 0.5,
+                                  borderRadius: 2,
+                                }}
+                              >
+                                Eliminar
+                              </Button>
+                            </Box>
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                  </Box>
+                </Paper>
+              )}
 
               {/* Tratamientos realizados */}
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>

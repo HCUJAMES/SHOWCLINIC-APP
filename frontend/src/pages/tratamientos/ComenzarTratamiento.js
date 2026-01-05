@@ -43,8 +43,10 @@ const ComenzarTratamiento = () => {
 
   // Estado para presupuestos/ofertas del paciente
   const [ofertasPaciente, setOfertasPaciente] = useState([]);
+  const [paquetesPaciente, setPaquetesPaciente] = useState([]);
   const [openOfertasModal, setOpenOfertasModal] = useState(false);
   const [presupuestoAplicado, setPresupuestoAplicado] = useState(false);
+  const [paqueteAplicado, setPaqueteAplicado] = useState(null);
 
   const [tipoAtencion, setTipoAtencion] = useState("Tratamiento");
   const [paciente_id, setPaciente_id] = useState("");
@@ -92,31 +94,15 @@ const ComenzarTratamiento = () => {
     setTotalGeneral(total);
   }, [bloques]);
 
-  // Recalcular totales cuando llegan recetas (carga async)
+  // Recalcular totales cuando cambian los bloques
   useEffect(() => {
     setBloques((prev) =>
       (prev || []).map((b) => {
-        const tratamientoIdActual = b?.tratamiento_id;
-        const receta = tratamientoIdActual ? recetasPorTratamiento[tratamientoIdActual] || [] : [];
-
-        const factorCantidad =
-          parseFloat(b?.dosis_unidades) > 0
-            ? parseFloat(b.dosis_unidades)
-            : parseFloat(b?.cantidad) > 0
-              ? parseFloat(b.cantidad)
-              : 1;
-
         const precio = parseFloat(b?.precio) || 0;
+        const cantidad = parseFloat(b?.cantidad) || 1;
         const descuento = parseFloat(b?.descuento) || 0;
 
-        const subtotal = Array.isArray(receta) && receta.length > 0
-          ? receta.reduce((acc, r) => {
-              const pu = parseFloat(r?.precio_unitario) || 0;
-              const qty = (parseFloat(r?.cantidad_unidades) || 0) * factorCantidad;
-              return acc + pu * qty;
-            }, 0)
-          : precio * factorCantidad;
-
+        const subtotal = precio * cantidad;
         const totalConDescuento = subtotal - subtotal * (descuento / 100);
 
         return { ...b, total: totalConDescuento };
@@ -163,8 +149,9 @@ const ComenzarTratamiento = () => {
       const tienePresupuesto = presupuestoAplicado && precioActual > 0;
       
       if (!tienePresupuesto) {
-        if (v && v.precio_unitario != null) {
-          nuevosBloques[index].precio = Number(v.precio_unitario) || 0;
+        // Usar precio_cliente (precio de venta al paciente) si existe, sino precio_unitario
+        if (v && (v.precio_cliente != null || v.precio_unitario != null)) {
+          nuevosBloques[index].precio = Number(v.precio_cliente) || Number(v.precio_unitario) || 0;
         } else {
           nuevosBloques[index].precio = 0;
         }
@@ -172,25 +159,11 @@ const ComenzarTratamiento = () => {
     }
 
     const precio = parseFloat(nuevosBloques[index].precio) || 0;
+    const cantidad = parseFloat(nuevosBloques[index].cantidad) || 1;
     const descuento = parseFloat(nuevosBloques[index].descuento) || 0;
 
-    const tratamientoIdActual = nuevosBloques[index].tratamiento_id;
-    const receta = tratamientoIdActual ? recetasPorTratamiento[tratamientoIdActual] || [] : [];
-
-    const factorCantidad =
-      parseFloat(nuevosBloques[index].dosis_unidades) > 0
-        ? parseFloat(nuevosBloques[index].dosis_unidades)
-        : parseFloat(nuevosBloques[index].cantidad) > 0
-          ? parseFloat(nuevosBloques[index].cantidad)
-          : 1;
-
-    const subtotal = Array.isArray(receta) && receta.length > 0
-      ? receta.reduce((acc, r) => {
-          const pu = parseFloat(r.precio_unitario) || 0;
-          const qty = (parseFloat(r.cantidad_unidades) || 0) * factorCantidad;
-          return acc + pu * qty;
-        }, 0)
-      : precio * factorCantidad;
+    // Calcular subtotal: precio * cantidad (ml)
+    const subtotal = precio * cantidad;
 
     const totalConDescuento = subtotal - subtotal * (descuento / 100);
 
@@ -227,6 +200,7 @@ const ComenzarTratamiento = () => {
   const cargarOfertasPaciente = async (idPaciente) => {
     if (!idPaciente) {
       setOfertasPaciente([]);
+      setPaquetesPaciente([]);
       return;
     }
     try {
@@ -237,6 +211,20 @@ const ComenzarTratamiento = () => {
     } catch (err) {
       console.error("Error al cargar ofertas:", err);
       setOfertasPaciente([]);
+    }
+    
+    // Cargar paquetes del paciente
+    try {
+      const resPaquetes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${idPaciente}`, {
+        headers: authHeaders,
+      });
+      // Solo mostrar paquetes activos (no completados ni cancelados)
+      const paquetesActivos = (Array.isArray(resPaquetes.data) ? resPaquetes.data : [])
+        .filter(p => p.estado === 'activo');
+      setPaquetesPaciente(paquetesActivos);
+    } catch (err) {
+      console.error("Error al cargar paquetes:", err);
+      setPaquetesPaciente([]);
     }
   };
 
@@ -317,6 +305,54 @@ const ComenzarTratamiento = () => {
     }
   };
 
+  // Aplicar paquete del paciente - cada sesión pendiente como bloque individual
+  const aplicarPaquete = (paquete) => {
+    if (!paquete?.sesiones || paquete.sesiones.length === 0) {
+      showToast({ severity: "warning", message: "Este paquete no tiene sesiones pendientes" });
+      return;
+    }
+
+    // Filtrar solo sesiones pendientes
+    const sesionesPendientes = paquete.sesiones.filter(s => s.estado === 'pendiente');
+    
+    if (sesionesPendientes.length === 0) {
+      showToast({ severity: "warning", message: "No hay sesiones pendientes en este paquete" });
+      return;
+    }
+
+    // Crear un bloque por CADA sesión pendiente
+    const nuevosBloques = sesionesPendientes.map((sesion) => {
+      const tratamientoEncontrado = tratamientos.find(
+        (t) => t.id === sesion.tratamiento_id || String(t.id) === String(sesion.tratamiento_id)
+      );
+
+      return {
+        tratamiento_id: tratamientoEncontrado?.id || sesion.tratamiento_id,
+        producto: "",
+        variante_id: "",
+        marca: "",
+        cantidad: 1,
+        dosis_unidades: "",
+        precio: Number(sesion.precio_sesion) || 0,
+        descuento: 0,
+        total: Number(sesion.precio_sesion) || 0,
+        pago_en_partes: false,
+        monto_adelanto: "",
+        sesion_paquete_id: sesion.id, // Guardar referencia a la sesión del paquete
+      };
+    });
+
+    setBloques(nuevosBloques);
+    setPresupuestoAplicado(true);
+    setPaqueteAplicado(paquete);
+    setOpenOfertasModal(false);
+    
+    showToast({ 
+      severity: "success", 
+      message: `Paquete "${paquete.paquete_nombre}" aplicado - ${sesionesPendientes.length} sesión(es)` 
+    });
+  };
+
   // Cancelar/limpiar presupuesto aplicado
   const cancelarPresupuesto = () => {
     setBloques([
@@ -335,6 +371,7 @@ const ComenzarTratamiento = () => {
       },
     ]);
     setPresupuestoAplicado(false);
+    setPaqueteAplicado(null);
     showToast({ severity: "info", message: "Presupuesto cancelado" });
   };
 
@@ -352,8 +389,11 @@ const ComenzarTratamiento = () => {
       return;
     }
 
-    // Validar que cada bloque tenga al menos un precio establecido
+    // Validar que cada bloque tenga al menos un precio establecido (excepto si viene de un paquete)
     const bloqueSinPrecio = (bloquesValidos || []).find((b) => {
+      // Si viene de un paquete, no validar precio (ya fue pagado)
+      if (b.sesion_paquete_id) return false;
+      
       const tienePrecio = parseFloat(b?.precio) > 0;
       const tieneTotal = parseFloat(b?.total) > 0;
       
@@ -383,6 +423,23 @@ const ComenzarTratamiento = () => {
       });
       showToast({ severity: "success", message: res.data.message || "Tratamiento registrado correctamente" });
       
+      // Si hay sesiones de paquete, marcarlas como completadas
+      const sesionesConPaquete = bloquesValidos.filter(b => b.sesion_paquete_id);
+      if (sesionesConPaquete.length > 0) {
+        for (const bloque of sesionesConPaquete) {
+          try {
+            await axios.patch(
+              `${API_BASE_URL}/api/paquetes/sesion/${bloque.sesion_paquete_id}/completar`,
+              { especialista },
+              { headers: authHeaders }
+            );
+          } catch (errPaquete) {
+            console.error("Error al completar sesión del paquete:", errPaquete);
+          }
+        }
+        showToast({ severity: "info", message: `${sesionesConPaquete.length} sesión(es) del paquete marcadas como completadas` });
+      }
+      
       // Limpiar formulario
       setPaciente_id("");
       setEspecialista("");
@@ -404,6 +461,8 @@ const ComenzarTratamiento = () => {
         },
       ]);
       setTotalGeneral(0);
+      setPresupuestoAplicado(false);
+      setPaqueteAplicado(null);
     } catch (err) {
       console.error(err);
       const status = err?.response?.status;
@@ -710,104 +769,89 @@ const ComenzarTratamiento = () => {
                         </FormControl>
                       </Grid>
 
+                      {/* Mostrar productos configurados para el tratamiento */}
                       {(() => {
-                        const receta = b.tratamiento_id
-                          ? recetasPorTratamiento[b.tratamiento_id] || null
-                          : null;
-
+                        const receta = b.tratamiento_id ? recetasPorTratamiento[b.tratamiento_id] || [] : [];
                         if (!receta || receta.length === 0) return null;
-
-                        const unidades = Array.from(
-                          new Set((receta || []).map((r) => r.unidad_base).filter(Boolean))
-                        );
-                        const unidadLabel = unidades.length === 1 ? unidades[0] : "unidad";
-
                         return (
-                          <Grid item xs={12} md={6}>
-                            <TextField
-                              label={`Dosis (${unidadLabel})`}
-                              placeholder={unidadLabel === "U" ? "Ej: 50" : "Ej: 1"}
-                              type="number"
-                              fullWidth
-                              value={b.dosis_unidades}
-                              onChange={(e) =>
-                                actualizarBloque(index, "dosis_unidades", e.target.value)
-                              }
-                              sx={{
-                                "& .MuiInputBase-root": {
-                                  backgroundColor: "rgba(255,255,255,0.95)",
-                                  borderRadius: 3,
-                                  minHeight: "56px",
-                                },
-                              }}
-                              helperText={
-                                receta && receta.length
-                                  ? `Receta: ${receta
-                                      .map(
-                                        (r) =>
-                                          `${r.producto_base_nombre || ""} ${r.variante_nombre || ""} (${r.cantidad_unidades}${r.unidad_base || ""})`
-                                      )
-                                      .join(" + ")}. La dosis multiplica la receta para el consumo de stock.`
-                                  : ""
-                              }
-                            />
+                          <Grid item xs={12}>
+                            <Typography variant="body2" sx={{ color: "#666", fontStyle: "italic", mb: -1 }}>
+                              Productos disponibles: {receta.map(r => `${r.producto_base_nombre || ""} ${r.variante_nombre || ""}`).join(", ")}
+                            </Typography>
                           </Grid>
                         );
                       })()}
 
                       <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 260 }}>
-                        <Autocomplete
-                          fullWidth
-                          options={variantesInv}
-                          value={
-                            b.variante_id
-                              ? variantesInv.find((v) => String(v.id) === String(b.variante_id)) || null
-                              : null
-                          }
-                          getOptionLabel={(opt) => {
-                            if (!opt) return "";
-                            const marca = opt.producto_base_nombre || "";
-                            const nombre = opt.nombre || "";
-                            return `${marca} - ${nombre}`.trim();
-                          }}
-                          isOptionEqualToValue={(opt, val) => String(opt.id) === String(val.id)}
-                          onChange={(_, val) => {
-                            actualizarBloque(index, "variante_id", val ? val.id : "");
-                            actualizarBloque(
-                              index,
-                              "producto",
-                              val
-                                ? `${val.producto_base_nombre || ""} - ${val.nombre || ""}`.trim()
-                                : ""
-                            );
-                          }}
-                          renderInput={(params) => (
-                            <TextField
-                              {...params}
-                              label=""
-                              placeholder="Seleccionar producto"
+                        {(() => {
+                          // Filtrar productos según la receta del tratamiento
+                          const receta = b.tratamiento_id ? recetasPorTratamiento[b.tratamiento_id] || [] : [];
+                          const tieneReceta = Array.isArray(receta) && receta.length > 0;
+                          
+                          // Si hay receta, solo mostrar los productos de la receta
+                          // Si no hay receta, mostrar todos los productos
+                          const opcionesProductos = tieneReceta
+                            ? variantesInv.filter(v => receta.some(r => String(r.variante_id) === String(v.id)))
+                            : variantesInv;
+
+                          return (
+                            <Autocomplete
                               fullWidth
-                              sx={{
-                                "& .MuiInputBase-root": {
-                                  backgroundColor: "rgba(255,255,255,0.95)",
-                                  borderRadius: 3,
-                                  minHeight: "56px",
-                                },
-                                "& .MuiInputBase-input": {
-                                  textOverflow: "clip",
-                                },
+                              options={opcionesProductos}
+                              value={
+                                b.variante_id
+                                  ? variantesInv.find((v) => String(v.id) === String(b.variante_id)) || null
+                                  : null
+                              }
+                              getOptionLabel={(opt) => {
+                                if (!opt) return "";
+                                const marca = opt.producto_base_nombre || "";
+                                const nombre = opt.nombre || "";
+                                const precio = opt.precio_cliente ? ` - S/ ${Number(opt.precio_cliente).toFixed(2)}` : "";
+                                return `${marca} - ${nombre}${precio}`.trim();
                               }}
+                              isOptionEqualToValue={(opt, val) => String(opt.id) === String(val.id)}
+                              onChange={(_, val) => {
+                                actualizarBloque(index, "variante_id", val ? val.id : "");
+                                actualizarBloque(
+                                  index,
+                                  "producto",
+                                  val
+                                    ? `${val.producto_base_nombre || ""} - ${val.nombre || ""}`.trim()
+                                    : ""
+                                );
+                              }}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  label={tieneReceta ? "Producto (filtrado)" : "Producto"}
+                                  placeholder={tieneReceta ? "Productos configurados para este tratamiento" : "Seleccionar producto"}
+                                  fullWidth
+                                  helperText={tieneReceta ? `${opcionesProductos.length} producto(s) disponible(s)` : ""}
+                                  sx={{
+                                    "& .MuiInputBase-root": {
+                                      backgroundColor: "rgba(255,255,255,0.95)",
+                                      borderRadius: 3,
+                                      minHeight: "56px",
+                                    },
+                                    "& .MuiInputBase-input": {
+                                      textOverflow: "clip",
+                                    },
+                                  }}
+                                />
+                              )}
                             />
-                          )}
-                        />
+                          );
+                        })()}
                       </Grid>
 
                       <Grid item xs={12} sm="auto" md="auto">
                         <TextField
-                          label="Cantidad"
+                          label="Cantidad (ml)"
                           type="number"
                           value={b.cantidad}
                           onChange={(e) => actualizarBloque(index, "cantidad", e.target.value)}
+                          inputProps={{ min: 0.1, step: 0.1 }}
                           sx={{
                             "& .MuiInputBase-root": {
                               backgroundColor: "rgba(255,255,255,0.95)",
@@ -816,7 +860,7 @@ const ComenzarTratamiento = () => {
                             },
                             width: { xs: "100%", sm: 160 },
                           }}
-                          helperText="Cantidad para descontar stock del inventario."
+                          helperText="ml a descontar del inventario"
                         />
                       </Grid>
 
@@ -1051,52 +1095,133 @@ const ComenzarTratamiento = () => {
         }}
       >
         <DialogTitle sx={{ color: colorPrincipal, fontWeight: 800 }}>
-          Presupuestos Iniciales
+          Presupuestos y Paquetes
         </DialogTitle>
         <DialogContent dividers>
-          {ofertasPaciente.length === 0 ? (
-            <Typography sx={{ color: "rgba(46,46,46,0.70)", py: 2, textAlign: "center" }}>
-              Este paciente no tiene presupuestos registrados.
-            </Typography>
-          ) : (
-            <List sx={{ pt: 0 }}>
-              {ofertasPaciente.map((oferta) => (
-                <ListItemButton
-                  key={oferta.id}
-                  onClick={() => aplicarOferta(oferta)}
-                  sx={{
-                    borderRadius: 2,
-                    mb: 1,
-                    border: "1px solid rgba(212,175,55,0.25)",
-                    "&:hover": {
-                      backgroundColor: "rgba(163,105,32,0.08)",
-                    },
-                  }}
-                >
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <Typography sx={{ fontWeight: 700, color: colorPrincipal }}>
-                          {oferta.creado_en?.split(" ")[0] || "Sin fecha"}
-                        </Typography>
-                        <Typography sx={{ fontWeight: 800, color: colorPrincipal }}>
-                          S/ {Number(oferta.total || 0).toFixed(2)}
-                        </Typography>
-                      </Box>
-                    }
-                    secondary={
-                      <Box sx={{ mt: 0.5 }}>
-                        {(oferta.items || []).map((item, idx) => (
-                          <Typography key={idx} variant="body2" sx={{ color: "rgba(46,46,46,0.75)" }}>
-                            • {item.nombre || item.tratamiento || "Sin nombre"} - S/ {Number(item.precio || 0).toFixed(2)}
+          {/* Sección de Paquetes Contratados */}
+          {paquetesPaciente.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography sx={{ fontWeight: 700, color: "#1565c0", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                📦 Paquetes Contratados (En Curso)
+              </Typography>
+              <List sx={{ pt: 0 }}>
+                {paquetesPaciente.map((paquete) => {
+                  const sesionesPendientes = (paquete.sesiones || []).filter(s => s.estado === 'pendiente');
+                  return (
+                    <ListItemButton
+                      key={paquete.id}
+                      onClick={() => aplicarPaquete(paquete)}
+                      sx={{
+                        borderRadius: 2,
+                        mb: 1,
+                        border: "2px solid rgba(33, 150, 243, 0.4)",
+                        backgroundColor: "rgba(33, 150, 243, 0.05)",
+                        "&:hover": {
+                          backgroundColor: "rgba(33, 150, 243, 0.12)",
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <Typography sx={{ fontWeight: 700, color: "#1565c0" }}>
+                              🎁 {paquete.paquete_nombre}
+                            </Typography>
+                            <Box sx={{ 
+                              backgroundColor: "#2196f3", 
+                              color: "white", 
+                              px: 1.5, 
+                              py: 0.3, 
+                              borderRadius: 2,
+                              fontSize: "0.75rem",
+                              fontWeight: "bold"
+                            }}>
+                              {sesionesPendientes.length} pendiente(s)
+                            </Box>
+                          </Box>
+                        }
+                        secondary={
+                          <Box sx={{ mt: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.6)" }}>
+                              Progreso: {paquete.sesiones_completadas}/{paquete.sesiones_totales} sesiones
+                            </Typography>
+                            {sesionesPendientes.slice(0, 3).map((sesion, idx) => (
+                              <Typography key={idx} variant="body2" sx={{ color: "#1565c0" }}>
+                                • {sesion.tratamiento_nombre} - Sesión {sesion.sesion_numero} (S/ {(sesion.precio_sesion || 0).toFixed(2)})
+                              </Typography>
+                            ))}
+                            {sesionesPendientes.length > 3 && (
+                              <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.6)", fontStyle: "italic" }}>
+                                ... y {sesionesPendientes.length - 3} más
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                      />
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+            </Box>
+          )}
+
+          {/* Separador si hay ambos */}
+          {paquetesPaciente.length > 0 && ofertasPaciente.length > 0 && (
+            <Divider sx={{ my: 2 }} />
+          )}
+
+          {/* Sección de Presupuestos Iniciales */}
+          {ofertasPaciente.length > 0 && (
+            <Box>
+              <Typography sx={{ fontWeight: 700, color: colorPrincipal, mb: 1.5 }}>
+                📋 Presupuestos Iniciales
+              </Typography>
+              <List sx={{ pt: 0 }}>
+                {ofertasPaciente.map((oferta) => (
+                  <ListItemButton
+                    key={oferta.id}
+                    onClick={() => aplicarOferta(oferta)}
+                    sx={{
+                      borderRadius: 2,
+                      mb: 1,
+                      border: "1px solid rgba(212,175,55,0.25)",
+                      "&:hover": {
+                        backgroundColor: "rgba(163,105,32,0.08)",
+                      },
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <Typography sx={{ fontWeight: 700, color: colorPrincipal }}>
+                            {oferta.creado_en?.split(" ")[0] || "Sin fecha"}
                           </Typography>
-                        ))}
-                      </Box>
-                    }
-                  />
-                </ListItemButton>
-              ))}
-            </List>
+                          <Typography sx={{ fontWeight: 800, color: colorPrincipal }}>
+                            S/ {Number(oferta.total || 0).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      }
+                      secondary={
+                        <Box sx={{ mt: 0.5 }}>
+                          {(oferta.items || []).map((item, idx) => (
+                            <Typography key={idx} variant="body2" sx={{ color: "rgba(46,46,46,0.75)" }}>
+                              • {item.nombre || item.tratamiento || "Sin nombre"} - S/ {Number(item.precio || 0).toFixed(2)}
+                            </Typography>
+                          ))}
+                        </Box>
+                      }
+                    />
+                  </ListItemButton>
+                ))}
+              </List>
+            </Box>
+          )}
+
+          {/* Mensaje si no hay nada */}
+          {ofertasPaciente.length === 0 && paquetesPaciente.length === 0 && (
+            <Typography sx={{ color: "rgba(46,46,46,0.70)", py: 2, textAlign: "center" }}>
+              Este paciente no tiene presupuestos ni paquetes registrados.
+            </Typography>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>

@@ -16,6 +16,7 @@ import finanzasRoutes from "./routes/finanzasRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import statsRoutes from "./routes/statsRoutes.js";
 import backupRoutes from "./routes/backupRoutes.js";
+import paquetesRoutes from "./routes/paquetesRoutes.js";
 import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -283,6 +284,79 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       )
     `);
 
+    // 🎁 Tabla de paquetes de tratamientos
+    db.run(`
+      CREATE TABLE IF NOT EXISTS paquetes_tratamientos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        descripcion TEXT,
+        tratamiento_id INTEGER,
+        tratamientos_json TEXT,
+        productos_json TEXT,
+        precio_regular REAL NOT NULL,
+        precio_paquete REAL NOT NULL,
+        descuento_porcentaje REAL,
+        sesiones INTEGER NOT NULL DEFAULT 1,
+        vigencia_inicio TEXT,
+        vigencia_fin TEXT,
+        estado TEXT NOT NULL DEFAULT 'activo',
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en TEXT,
+        creado_por TEXT,
+        FOREIGN KEY(tratamiento_id) REFERENCES tratamientos(id)
+      )
+    `);
+
+    // Agregar columna tratamientos_json si no existe (migración)
+    db.run(`ALTER TABLE paquetes_tratamientos ADD COLUMN tratamientos_json TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna tratamientos_json ya existe o error:", err.message);
+      }
+    });
+
+    console.log("✅ Tabla de paquetes de tratamientos creada");
+
+    // 🎁 Tabla de paquetes asignados a pacientes
+    db.run(`
+      CREATE TABLE IF NOT EXISTS paquetes_pacientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        paquete_id INTEGER NOT NULL,
+        paquete_nombre TEXT NOT NULL,
+        tratamientos_json TEXT NOT NULL,
+        precio_total REAL NOT NULL,
+        estado TEXT NOT NULL DEFAULT 'activo',
+        fecha_inicio TEXT DEFAULT CURRENT_TIMESTAMP,
+        fecha_fin TEXT,
+        notas TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        creado_por TEXT,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id),
+        FOREIGN KEY(paquete_id) REFERENCES paquetes_tratamientos(id)
+      )
+    `);
+
+    // 🎁 Tabla de sesiones de paquetes (tracking de cada sesión realizada)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS paquetes_sesiones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paquete_paciente_id INTEGER NOT NULL,
+        tratamiento_id INTEGER NOT NULL,
+        tratamiento_nombre TEXT NOT NULL,
+        sesion_numero INTEGER NOT NULL,
+        precio_sesion REAL NOT NULL,
+        estado TEXT NOT NULL DEFAULT 'pendiente',
+        fecha_realizada TEXT,
+        especialista TEXT,
+        notas TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(paquete_paciente_id) REFERENCES paquetes_pacientes(id),
+        FOREIGN KEY(tratamiento_id) REFERENCES tratamientos(id)
+      )
+    `);
+
+    console.log("✅ Tablas de paquetes de pacientes creadas");
+
     db.all(
       `SELECT id, observaciones FROM patients WHERE observaciones IS NOT NULL AND TRIM(observaciones) != ''`,
       [],
@@ -422,6 +496,7 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 
     [
       ["laboratorio", "TEXT"],
+      ["precio_cliente", "REAL"],
     ].forEach(([column, definition]) =>
       ensureColumnExists("variantes", column, definition)
     );
@@ -497,6 +572,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/pacientes", patientRoutes);
 app.use("/api/tratamientos", treatmentRoutes);
 app.use("/api/inventario", inventoryRoutes);
+app.use("/api/paquetes", paquetesRoutes);
 app.use("/api/deudas", deudasRoutes);
 app.use("/api/especialistas", especialistasRoutes);
 app.use("/api/finanzas", finanzasRoutes);

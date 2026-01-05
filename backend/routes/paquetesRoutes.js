@@ -1,0 +1,689 @@
+import express from "express";
+import { dbAll, dbGet, dbRun } from "../db/database.js";
+import { authMiddleware, requireRole } from "../middleware/auth.js";
+
+const router = express.Router();
+
+// Middleware para verificar permisos
+// Solo master puede crear/editar/eliminar paquetes base
+const requirePaquetesWrite = [authMiddleware, requireRole("master")];
+// Todos pueden leer paquetes (para ver en historial, nueva sesión, etc.)
+const requirePaquetesRead = [authMiddleware, requireRole("doctor", "master", "asistente", "admin")];
+// Doctor, asistente y master pueden asignar paquetes a pacientes y gestionar sesiones
+const requirePaquetesAsignar = [authMiddleware, requireRole("doctor", "master", "asistente")];
+
+/* ==============================
+   📋 LISTAR TODOS LOS PAQUETES
+============================== */
+router.get("/", authMiddleware, async (req, res) => {
+  try {
+    const paquetes = await dbAll(
+      `SELECT 
+        p.*,
+        t.nombre as tratamiento_nombre
+       FROM paquetes_tratamientos p
+       LEFT JOIN tratamientos t ON p.tratamiento_id = t.id
+       ORDER BY p.creado_en DESC`
+    );
+
+    res.json(paquetes);
+  } catch (err) {
+    console.error("❌ Error al listar paquetes:", err.message);
+    res.status(500).json({ message: "Error al listar paquetes" });
+  }
+});
+
+/* ==============================
+   📋 LISTAR PAQUETES ACTIVOS Y VIGENTES
+============================== */
+router.get("/activos", authMiddleware, async (req, res) => {
+  try {
+    const hoy = new Date().toISOString().split("T")[0];
+    
+    const paquetes = await dbAll(
+      `SELECT 
+        p.*,
+        t.nombre as tratamiento_nombre
+       FROM paquetes_tratamientos p
+       LEFT JOIN tratamientos t ON p.tratamiento_id = t.id
+       WHERE p.estado = 'activo'
+       AND (p.vigencia_inicio IS NULL OR p.vigencia_inicio <= ?)
+       AND (p.vigencia_fin IS NULL OR p.vigencia_fin >= ?)
+       ORDER BY p.nombre ASC`,
+      [hoy, hoy]
+    );
+
+    res.json(paquetes);
+  } catch (err) {
+    console.error("❌ Error al listar paquetes activos:", err.message);
+    res.status(500).json({ message: "Error al listar paquetes activos" });
+  }
+});
+
+/* ==============================
+   🔍 OBTENER UN PAQUETE POR ID
+============================== */
+router.get("/:id", authMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const paquete = await dbGet(
+      `SELECT 
+        p.*,
+        t.nombre as tratamiento_nombre
+       FROM paquetes_tratamientos p
+       LEFT JOIN tratamientos t ON p.tratamiento_id = t.id
+       WHERE p.id = ?`,
+      [id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete no encontrado" });
+    }
+
+    // Parsear productos_json si existe
+    if (paquete.productos_json) {
+      try {
+        paquete.productos = JSON.parse(paquete.productos_json);
+      } catch (e) {
+        paquete.productos = [];
+      }
+    }
+
+    res.json(paquete);
+  } catch (err) {
+    console.error("❌ Error al obtener paquete:", err.message);
+    res.status(500).json({ message: "Error al obtener paquete" });
+  }
+});
+
+/* ==============================
+   ➕ CREAR NUEVO PAQUETE
+============================== */
+router.post("/", requirePaquetesWrite, async (req, res) => {
+  const {
+    nombre,
+    descripcion,
+    tratamientos,
+    productos,
+    precio_regular,
+    precio_paquete,
+    sesiones,
+    vigencia_inicio,
+    vigencia_fin,
+  } = req.body;
+
+  // Validaciones
+  if (!nombre || !nombre.trim()) {
+    return res.status(400).json({ message: "El nombre es requerido" });
+  }
+
+  if (!precio_regular || precio_regular <= 0) {
+    return res.status(400).json({ message: "El precio regular debe ser mayor a 0" });
+  }
+
+  if (!precio_paquete || precio_paquete <= 0) {
+    return res.status(400).json({ message: "El precio del paquete debe ser mayor a 0" });
+  }
+
+  if (!sesiones || sesiones < 1) {
+    return res.status(400).json({ message: "Las sesiones deben ser al menos 1" });
+  }
+
+  // Validar fechas de vigencia
+  if (vigencia_inicio && vigencia_fin) {
+    if (new Date(vigencia_inicio) > new Date(vigencia_fin)) {
+      return res.status(400).json({ 
+        message: "La fecha de inicio no puede ser posterior a la fecha de fin" 
+      });
+    }
+  }
+
+  try {
+    // Calcular descuento porcentaje
+    const descuento_porcentaje = ((precio_regular - precio_paquete) / precio_regular) * 100;
+
+    // Convertir tratamientos y productos a JSON
+    const tratamientos_json = tratamientos && tratamientos.length > 0 
+      ? JSON.stringify(tratamientos) 
+      : null;
+    const productos_json = productos && productos.length > 0 
+      ? JSON.stringify(productos) 
+      : null;
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const username = req.user?.username || "sistema";
+
+    const result = await dbRun(
+      `INSERT INTO paquetes_tratamientos (
+        nombre, descripcion, tratamientos_json, productos_json,
+        precio_regular, precio_paquete, descuento_porcentaje,
+        sesiones, vigencia_inicio, vigencia_fin,
+        estado, creado_en, creado_por
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?, ?)`,
+      [
+        nombre.trim(),
+        descripcion?.trim() || null,
+        tratamientos_json,
+        productos_json,
+        precio_regular,
+        precio_paquete,
+        descuento_porcentaje,
+        sesiones,
+        vigencia_inicio || null,
+        vigencia_fin || null,
+        ahora,
+        username,
+      ]
+    );
+
+    res.status(201).json({
+      message: "✅ Paquete creado exitosamente",
+      id: result.lastID,
+    });
+  } catch (err) {
+    console.error("❌ Error al crear paquete:", err.message);
+    res.status(500).json({ message: "Error al crear paquete" });
+  }
+});
+
+/* ==============================
+   ✏️ EDITAR PAQUETE
+============================== */
+router.put("/:id", requirePaquetesWrite, async (req, res) => {
+  const { id } = req.params;
+  const {
+    nombre,
+    descripcion,
+    tratamientos,
+    productos,
+    precio_regular,
+    precio_paquete,
+    sesiones,
+    vigencia_inicio,
+    vigencia_fin,
+    estado,
+  } = req.body;
+
+  try {
+    // Verificar que el paquete existe
+    const paquete = await dbGet(
+      `SELECT * FROM paquetes_tratamientos WHERE id = ?`,
+      [id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete no encontrado" });
+    }
+
+    // Validaciones
+    if (nombre && !nombre.trim()) {
+      return res.status(400).json({ message: "El nombre no puede estar vacío" });
+    }
+
+    if (precio_regular && precio_regular <= 0) {
+      return res.status(400).json({ message: "El precio regular debe ser mayor a 0" });
+    }
+
+    if (precio_paquete && precio_paquete <= 0) {
+      return res.status(400).json({ message: "El precio del paquete debe ser mayor a 0" });
+    }
+
+    if (sesiones && sesiones < 1) {
+      return res.status(400).json({ message: "Las sesiones deben ser al menos 1" });
+    }
+
+    // Validar fechas de vigencia
+    const inicio = vigencia_inicio !== undefined ? vigencia_inicio : paquete.vigencia_inicio;
+    const fin = vigencia_fin !== undefined ? vigencia_fin : paquete.vigencia_fin;
+    
+    if (inicio && fin) {
+      if (new Date(inicio) > new Date(fin)) {
+        return res.status(400).json({ 
+          message: "La fecha de inicio no puede ser posterior a la fecha de fin" 
+        });
+      }
+    }
+
+    // Calcular nuevo descuento porcentaje
+    const precioReg = precio_regular !== undefined ? precio_regular : paquete.precio_regular;
+    const precioPaq = precio_paquete !== undefined ? precio_paquete : paquete.precio_paquete;
+    const descuento_porcentaje = ((precioReg - precioPaq) / precioReg) * 100;
+
+    // Convertir tratamientos y productos a JSON
+    const tratamientos_json = tratamientos !== undefined
+      ? (tratamientos && tratamientos.length > 0 ? JSON.stringify(tratamientos) : null)
+      : paquete.tratamientos_json;
+    const productos_json = productos !== undefined
+      ? (productos && productos.length > 0 ? JSON.stringify(productos) : null)
+      : paquete.productos_json;
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+
+    await dbRun(
+      `UPDATE paquetes_tratamientos SET
+        nombre = ?,
+        descripcion = ?,
+        tratamientos_json = ?,
+        productos_json = ?,
+        precio_regular = ?,
+        precio_paquete = ?,
+        descuento_porcentaje = ?,
+        sesiones = ?,
+        vigencia_inicio = ?,
+        vigencia_fin = ?,
+        estado = ?,
+        actualizado_en = ?
+       WHERE id = ?`,
+      [
+        nombre !== undefined ? nombre.trim() : paquete.nombre,
+        descripcion !== undefined ? (descripcion?.trim() || null) : paquete.descripcion,
+        tratamientos_json,
+        productos_json,
+        precioReg,
+        precioPaq,
+        descuento_porcentaje,
+        sesiones !== undefined ? sesiones : paquete.sesiones,
+        inicio,
+        fin,
+        estado !== undefined ? estado : paquete.estado,
+        ahora,
+        id,
+      ]
+    );
+
+    res.json({ message: "✅ Paquete actualizado exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al actualizar paquete:", err.message);
+    res.status(500).json({ message: "Error al actualizar paquete" });
+  }
+});
+
+/* ==============================
+   🗑️ ELIMINAR PAQUETE
+============================== */
+router.delete("/:id", requirePaquetesWrite, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const paquete = await dbGet(
+      `SELECT * FROM paquetes_tratamientos WHERE id = ?`,
+      [id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete no encontrado" });
+    }
+
+    await dbRun(`DELETE FROM paquetes_tratamientos WHERE id = ?`, [id]);
+
+    res.json({ message: "✅ Paquete eliminado exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al eliminar paquete:", err.message);
+    res.status(500).json({ message: "Error al eliminar paquete" });
+  }
+});
+
+/* ==============================
+   🔄 CAMBIAR ESTADO DEL PAQUETE
+============================== */
+router.patch("/:id/estado", requirePaquetesWrite, async (req, res) => {
+  const { id } = req.params;
+  const { estado } = req.body;
+
+  if (!["activo", "inactivo"].includes(estado)) {
+    return res.status(400).json({ 
+      message: "Estado inválido. Debe ser 'activo' o 'inactivo'" 
+    });
+  }
+
+  try {
+    const paquete = await dbGet(
+      `SELECT * FROM paquetes_tratamientos WHERE id = ?`,
+      [id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete no encontrado" });
+    }
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+
+    await dbRun(
+      `UPDATE paquetes_tratamientos SET estado = ?, actualizado_en = ? WHERE id = ?`,
+      [estado, ahora, id]
+    );
+
+    res.json({ 
+      message: `✅ Paquete ${estado === 'activo' ? 'activado' : 'desactivado'} exitosamente` 
+    });
+  } catch (err) {
+    console.error("❌ Error al cambiar estado del paquete:", err.message);
+    res.status(500).json({ message: "Error al cambiar estado del paquete" });
+  }
+});
+
+/* ==============================
+   🎁 ASIGNAR PAQUETE A PACIENTE
+============================== */
+router.post("/asignar", requirePaquetesAsignar, async (req, res) => {
+  const { paciente_id, paquete_id, notas } = req.body;
+
+  if (!paciente_id || !paquete_id) {
+    return res.status(400).json({ message: "paciente_id y paquete_id son requeridos" });
+  }
+
+  try {
+    // Obtener el paquete
+    const paquete = await dbGet(
+      `SELECT * FROM paquetes_tratamientos WHERE id = ?`,
+      [paquete_id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete no encontrado" });
+    }
+
+    if (paquete.estado !== 'activo') {
+      return res.status(400).json({ message: "El paquete no está activo" });
+    }
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const username = req.user?.username || "sistema";
+
+    // Crear registro de paquete asignado
+    const result = await dbRun(
+      `INSERT INTO paquetes_pacientes (
+        paciente_id, paquete_id, paquete_nombre, tratamientos_json,
+        precio_total, estado, fecha_inicio, notas, creado_en, creado_por
+      ) VALUES (?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?)`,
+      [
+        paciente_id,
+        paquete_id,
+        paquete.nombre,
+        paquete.tratamientos_json,
+        paquete.precio_paquete,
+        ahora,
+        notas || null,
+        ahora,
+        username
+      ]
+    );
+
+    const paquetePacienteId = result.lastID;
+
+    // Crear las sesiones individuales del paquete
+    const tratamientos = paquete.tratamientos_json ? JSON.parse(paquete.tratamientos_json) : [];
+    
+    for (const t of tratamientos) {
+      const sesiones = t.sesiones || 1;
+      const precioSesion = (t.precio_unitario || 0) / sesiones;
+      
+      for (let i = 1; i <= sesiones; i++) {
+        await dbRun(
+          `INSERT INTO paquetes_sesiones (
+            paquete_paciente_id, tratamiento_id, tratamiento_nombre,
+            sesion_numero, precio_sesion, estado, creado_en
+          ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
+          [
+            paquetePacienteId,
+            t.tratamiento_id,
+            t.nombre,
+            i,
+            precioSesion,
+            ahora
+          ]
+        );
+      }
+    }
+
+    res.status(201).json({ 
+      message: "✅ Paquete asignado exitosamente",
+      paquete_paciente_id: paquetePacienteId
+    });
+  } catch (err) {
+    console.error("❌ Error al asignar paquete:", err.message);
+    res.status(500).json({ message: "Error al asignar paquete" });
+  }
+});
+
+/* ==============================
+   📋 PACIENTES CON PAQUETES ACTIVOS
+============================== */
+router.get("/pacientes-en-tratamiento", requirePaquetesRead, async (req, res) => {
+  try {
+    const pacientes = await dbAll(
+      `SELECT DISTINCT 
+        p.id, p.nombre, p.apellido, p.dni, p.celular,
+        (SELECT COUNT(*) FROM paquetes_pacientes pp2 WHERE pp2.paciente_id = p.id AND pp2.estado = 'activo') as paquetes_activos,
+        (SELECT COUNT(*) FROM paquetes_sesiones ps 
+          JOIN paquetes_pacientes pp3 ON ps.paquete_paciente_id = pp3.id 
+          WHERE pp3.paciente_id = p.id AND ps.estado = 'pendiente') as sesiones_pendientes
+       FROM pacientes p
+       INNER JOIN paquetes_pacientes pp ON pp.paciente_id = p.id
+       WHERE pp.estado = 'activo'
+       ORDER BY p.nombre ASC`
+    );
+
+    // Obtener paquetes de cada paciente
+    for (const paciente of pacientes) {
+      paciente.paquetes = await dbAll(
+        `SELECT pp.*, 
+          (SELECT COUNT(*) FROM paquetes_sesiones ps WHERE ps.paquete_paciente_id = pp.id AND ps.estado = 'completada') as sesiones_completadas,
+          (SELECT COUNT(*) FROM paquetes_sesiones ps WHERE ps.paquete_paciente_id = pp.id) as sesiones_totales
+         FROM paquetes_pacientes pp
+         WHERE pp.paciente_id = ? AND pp.estado = 'activo'
+         ORDER BY pp.creado_en DESC`,
+        [paciente.id]
+      );
+
+      // Obtener sesiones de cada paquete
+      for (const paquete of paciente.paquetes) {
+        paquete.sesiones = await dbAll(
+          `SELECT * FROM paquetes_sesiones WHERE paquete_paciente_id = ? ORDER BY tratamiento_nombre, sesion_numero`,
+          [paquete.id]
+        );
+      }
+    }
+
+    res.json(pacientes);
+  } catch (err) {
+    console.error("❌ Error al obtener pacientes en tratamiento:", err.message);
+    res.status(500).json({ message: "Error al obtener pacientes en tratamiento" });
+  }
+});
+
+/* ==============================
+   📋 OBTENER PAQUETES DE UN PACIENTE
+============================== */
+router.get("/paciente/:paciente_id", requirePaquetesRead, async (req, res) => {
+  const { paciente_id } = req.params;
+
+  try {
+    const paquetes = await dbAll(
+      `SELECT pp.*, 
+        (SELECT COUNT(*) FROM paquetes_sesiones ps WHERE ps.paquete_paciente_id = pp.id AND ps.estado = 'completada') as sesiones_completadas,
+        (SELECT COUNT(*) FROM paquetes_sesiones ps WHERE ps.paquete_paciente_id = pp.id) as sesiones_totales
+       FROM paquetes_pacientes pp
+       WHERE pp.paciente_id = ?
+       ORDER BY pp.creado_en DESC`,
+      [paciente_id]
+    );
+
+    // Obtener sesiones de cada paquete
+    for (const paquete of paquetes) {
+      paquete.sesiones = await dbAll(
+        `SELECT * FROM paquetes_sesiones WHERE paquete_paciente_id = ? ORDER BY tratamiento_nombre, sesion_numero`,
+        [paquete.id]
+      );
+    }
+
+    res.json(paquetes);
+  } catch (err) {
+    console.error("❌ Error al obtener paquetes del paciente:", err.message);
+    res.status(500).json({ message: "Error al obtener paquetes del paciente" });
+  }
+});
+
+/* ==============================
+   ✅ MARCAR SESIÓN COMO COMPLETADA
+============================== */
+router.patch("/sesion/:sesion_id/completar", requirePaquetesAsignar, async (req, res) => {
+  const { sesion_id } = req.params;
+  const { especialista, notas } = req.body;
+
+  try {
+    const sesion = await dbGet(
+      `SELECT * FROM paquetes_sesiones WHERE id = ?`,
+      [sesion_id]
+    );
+
+    if (!sesion) {
+      return res.status(404).json({ message: "Sesión no encontrada" });
+    }
+
+    if (sesion.estado === 'completada') {
+      return res.status(400).json({ message: "La sesión ya está completada" });
+    }
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+
+    await dbRun(
+      `UPDATE paquetes_sesiones SET 
+        estado = 'completada', 
+        fecha_realizada = ?, 
+        especialista = ?,
+        notas = ?
+       WHERE id = ?`,
+      [ahora, especialista || null, notas || null, sesion_id]
+    );
+
+    // Verificar si todas las sesiones del paquete están completadas
+    const paquetePaciente = await dbGet(
+      `SELECT pp.*, 
+        (SELECT COUNT(*) FROM paquetes_sesiones ps WHERE ps.paquete_paciente_id = pp.id AND ps.estado = 'completada') as completadas,
+        (SELECT COUNT(*) FROM paquetes_sesiones ps WHERE ps.paquete_paciente_id = pp.id) as total
+       FROM paquetes_pacientes pp
+       WHERE pp.id = ?`,
+      [sesion.paquete_paciente_id]
+    );
+
+    // Si todas las sesiones están completadas, marcar el paquete como completado
+    // Nota: completadas ya incluye la sesión recién actualizada
+    if (paquetePaciente && paquetePaciente.completadas >= paquetePaciente.total) {
+      await dbRun(
+        `UPDATE paquetes_pacientes SET estado = 'completado', fecha_fin = ? WHERE id = ?`,
+        [ahora, sesion.paquete_paciente_id]
+      );
+    }
+
+    res.json({ message: "✅ Sesión completada exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al completar sesión:", err.message);
+    res.status(500).json({ message: "Error al completar sesión" });
+  }
+});
+
+/* ==============================
+   ↩️ DESMARCAR SESIÓN (REVERTIR COMPLETADA)
+============================== */
+router.patch("/sesion/:sesion_id/desmarcar", requirePaquetesAsignar, async (req, res) => {
+  const { sesion_id } = req.params;
+
+  try {
+    const sesion = await dbGet(
+      `SELECT * FROM paquetes_sesiones WHERE id = ?`,
+      [sesion_id]
+    );
+
+    if (!sesion) {
+      return res.status(404).json({ message: "Sesión no encontrada" });
+    }
+
+    if (sesion.estado !== 'completada') {
+      return res.status(400).json({ message: "La sesión no está completada" });
+    }
+
+    await dbRun(
+      `UPDATE paquetes_sesiones SET 
+        estado = 'pendiente', 
+        fecha_realizada = NULL, 
+        especialista = NULL,
+        notas = NULL
+       WHERE id = ?`,
+      [sesion_id]
+    );
+
+    // Si el paquete estaba completado, volver a activo
+    await dbRun(
+      `UPDATE paquetes_pacientes SET estado = 'activo', fecha_fin = NULL WHERE id = ? AND estado = 'completado'`,
+      [sesion.paquete_paciente_id]
+    );
+
+    res.json({ message: "✅ Sesión desmarcada exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al desmarcar sesión:", err.message);
+    res.status(500).json({ message: "Error al desmarcar sesión" });
+  }
+});
+
+/* ==============================
+   🗑️ ELIMINAR PAQUETE DE PACIENTE
+============================== */
+router.delete("/paciente/:paquete_paciente_id", requirePaquetesAsignar, async (req, res) => {
+  const { paquete_paciente_id } = req.params;
+
+  try {
+    const paquete = await dbGet(
+      `SELECT * FROM paquetes_pacientes WHERE id = ?`,
+      [paquete_paciente_id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete del paciente no encontrado" });
+    }
+
+    // Eliminar sesiones del paquete
+    await dbRun(`DELETE FROM paquetes_sesiones WHERE paquete_paciente_id = ?`, [paquete_paciente_id]);
+    
+    // Eliminar el paquete asignado
+    await dbRun(`DELETE FROM paquetes_pacientes WHERE id = ?`, [paquete_paciente_id]);
+
+    res.json({ message: "✅ Paquete eliminado exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al eliminar paquete:", err.message);
+    res.status(500).json({ message: "Error al eliminar paquete" });
+  }
+});
+
+/* ==============================
+   ❌ CANCELAR PAQUETE DE PACIENTE
+============================== */
+router.patch("/paciente/:paquete_paciente_id/cancelar", requirePaquetesAsignar, async (req, res) => {
+  const { paquete_paciente_id } = req.params;
+
+  try {
+    const paquete = await dbGet(
+      `SELECT * FROM paquetes_pacientes WHERE id = ?`,
+      [paquete_paciente_id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete del paciente no encontrado" });
+    }
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+
+    await dbRun(
+      `UPDATE paquetes_pacientes SET estado = 'cancelado', fecha_fin = ? WHERE id = ?`,
+      [ahora, paquete_paciente_id]
+    );
+
+    res.json({ message: "✅ Paquete cancelado exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al cancelar paquete:", err.message);
+    res.status(500).json({ message: "Error al cancelar paquete" });
+  }
+});
+
+export default router;

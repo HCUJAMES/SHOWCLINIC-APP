@@ -16,6 +16,7 @@ import FotosPaciente from "./pages/FotosPaciente";
 import Especialistas from "./pages/Especialistas";
 import Estadisticas from "./pages/Estadisticas";
 import Gestion from "./pages/Gestion";
+import Paquetes from "./pages/Paquetes";
 import ProtectedRoute from "./components/ProtectedRoute";
 function App() {
   return (
@@ -135,6 +136,15 @@ function App() {
           element={
             <ProtectedRoute>
               <Gestion />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/paquetes"
+          element={
+            <ProtectedRoute requiredRole="master">
+              <Paquetes />
             </ProtectedRoute>
           }
         />

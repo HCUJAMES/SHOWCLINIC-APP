@@ -17,6 +17,7 @@ import {
   Badge,
   Insights,
   Settings,
+  CardGiftcard,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
@@ -24,6 +25,7 @@ import { useNavigate } from "react-router-dom";
 const moduleIcons = {
   Pacientes: People,
   Tratamientos: MedicalServices,
+  Paquetes: CardGiftcard,
   Inventario: Inventory2,
   Finanzas: AccountBalance,
   Especialistas: Badge,
@@ -67,6 +69,7 @@ export default function Dashboard() {
     master: [
       { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
       { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
+      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
       { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
       { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },

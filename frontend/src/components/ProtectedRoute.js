@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Box, Button } from "@mui/material";
 import { useToast } from "./ToastProvider";
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, requiredRole }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
@@ -13,11 +13,27 @@ const ProtectedRoute = ({ children }) => {
     if (!token) {
       showToast({ severity: "warning", message: "Inicia sesión para continuar" });
       navigate("/", { replace: true, state: { from: location.pathname } });
+      return;
     }
-  }, [navigate, showToast, location.pathname]);
+
+    // Verificar rol si es requerido
+    if (requiredRole) {
+      const userRole = localStorage.getItem("role");
+      if (userRole !== requiredRole) {
+        showToast({ severity: "error", message: "No tienes permisos para acceder a esta sección" });
+        navigate("/dashboard", { replace: true });
+      }
+    }
+  }, [navigate, showToast, location.pathname, requiredRole]);
 
   const token = localStorage.getItem("token");
   if (!token) return null;
+
+  // Verificar rol si es requerido
+  if (requiredRole) {
+    const userRole = localStorage.getItem("role");
+    if (userRole !== requiredRole) return null;
+  }
 
   const logout = () => {
     localStorage.removeItem("token");

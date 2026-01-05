@@ -54,6 +54,9 @@ export default function Inventario() {
   const [editLote, setEditLote] = useState("");
   const [editCantidad, setEditCantidad] = useState("");
   const [guardandoEdicionLote, setGuardandoEdicionLote] = useState(false);
+  const [editPrecioVarianteId, setEditPrecioVarianteId] = useState(null);
+  const [editPrecioCliente, setEditPrecioCliente] = useState("");
+  const [guardandoPrecio, setGuardandoPrecio] = useState(false);
   const role = localStorage.getItem("role");
   const canWriteInventory = role === "doctor" || role === "logistica" || role === "master";
   const token = localStorage.getItem("token");
@@ -253,7 +256,7 @@ export default function Inventario() {
       });
     });
 
-    // Enlazar laboratorio y stock mínimo desde variantes
+    // Enlazar laboratorio, stock mínimo y precio_cliente desde variantes
     variantes.forEach((v) => {
       const key = String(v.id);
       const row = map.get(key);
@@ -263,6 +266,7 @@ export default function Inventario() {
       row.producto_base_nombre = v.producto_base_nombre || row.producto_base_nombre;
       row.variante_nombre = v.nombre || row.variante_nombre;
       row.unidad_base = v.unidad_base || row.unidad_base;
+      row.precio_cliente = v.precio_cliente != null ? parseFloat(v.precio_cliente) : null;
     });
 
     const res = Array.from(map.values()).map((r) => {
@@ -459,6 +463,37 @@ export default function Inventario() {
     } catch (e) {
       console.error(e);
       showToast({ severity: "error", message: "Error al eliminar lote" });
+    }
+  };
+
+  const guardarPrecioCliente = async (varianteId) => {
+    if (!canWriteInventory) return;
+    const precio = parseFloat(editPrecioCliente);
+    if (isNaN(precio) || precio < 0) {
+      showToast({ severity: "warning", message: "Precio inválido" });
+      return;
+    }
+
+    try {
+      setGuardandoPrecio(true);
+      const res = await fetch(`${API_BASE}/api/inventario/variantes/${varianteId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ precio_cliente: precio }),
+      });
+      if (!res.ok) throw new Error();
+      await obtenerVariantes();
+      setEditPrecioVarianteId(null);
+      setEditPrecioCliente("");
+      showToast({ severity: "success", message: "Precio actualizado" });
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: "Error al guardar precio" });
+    } finally {
+      setGuardandoPrecio(false);
     }
   };
 
@@ -699,6 +734,7 @@ export default function Inventario() {
               <TableCell>Marca</TableCell>
               <TableCell>Variante</TableCell>
               <TableCell>Laboratorio</TableCell>
+              <TableCell>Precio Cliente (S/)</TableCell>
               <TableCell>Disponible</TableCell>
               <TableCell>Mínimo</TableCell>
               <TableCell>Estado</TableCell>
@@ -717,6 +753,64 @@ export default function Inventario() {
                 <TableCell>{r.producto_base_nombre}</TableCell>
                 <TableCell>{r.variante_nombre}</TableCell>
                 <TableCell>{r.laboratorio || "—"}</TableCell>
+                <TableCell>
+                  {editPrecioVarianteId === r.variante_id ? (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <TextField
+                        size="small"
+                        type="number"
+                        value={editPrecioCliente}
+                        onChange={(e) => setEditPrecioCliente(e.target.value)}
+                        sx={{ width: 100 }}
+                        placeholder="0.00"
+                        disabled={guardandoPrecio}
+                      />
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={() => guardarPrecioCliente(r.variante_id)}
+                        disabled={guardandoPrecio}
+                        sx={{ minWidth: 40, backgroundColor: colorPrincipal }}
+                      >
+                        ✓
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          setEditPrecioVarianteId(null);
+                          setEditPrecioCliente("");
+                        }}
+                        disabled={guardandoPrecio}
+                        sx={{ minWidth: 40 }}
+                      >
+                        ✕
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        cursor: canWriteInventory ? "pointer" : "default",
+                      }}
+                      onClick={() => {
+                        if (canWriteInventory) {
+                          setEditPrecioVarianteId(r.variante_id);
+                          setEditPrecioCliente(r.precio_cliente != null ? String(r.precio_cliente) : "");
+                        }
+                      }}
+                    >
+                      <strong style={{ color: r.precio_cliente != null ? "#2e7d32" : "#999" }}>
+                        {r.precio_cliente != null ? `S/ ${Number(r.precio_cliente).toFixed(2)}` : "Sin precio"}
+                      </strong>
+                      {canWriteInventory && (
+                        <span style={{ fontSize: 12, color: "#888" }}>✏️</span>
+                      )}
+                    </Box>
+                  )}
+                </TableCell>
                 <TableCell>
                   <strong>
                     {Number(r.disponible_efectivo || 0).toFixed(2)} {r.unidad_base}
@@ -917,7 +1011,7 @@ export default function Inventario() {
               </Grid>
               <Grid item xs={12} md={3}>
                 <TextField
-                  label="Cantidad (unidades)"
+                  label="Cantidad (ml)"
                   type="number"
                   fullWidth
                   size="small"
@@ -925,6 +1019,8 @@ export default function Inventario() {
                   onChange={(e) =>
                     setFormIngresoSimple((p) => ({ ...p, cantidad: e.target.value }))
                   }
+                  inputProps={{ min: 0.1, step: 0.1 }}
+                  helperText="Ej: caja 2x1ml = 2 ml"
                 />
               </Grid>
               <Grid item xs={12} md={3}>

@@ -372,6 +372,7 @@ router.post("/variantes", requireInventoryWrite, async (req, res) => {
     es_medico,
     costo_unitario,
     precio_unitario,
+    precio_cliente,
     stock_minimo_unidades,
   } = req.body;
 
@@ -383,8 +384,8 @@ router.post("/variantes", requireInventoryWrite, async (req, res) => {
     const result = await dbRun(
       `
         INSERT INTO variantes
-        (producto_base_id, nombre, laboratorio, sku, unidad_base, contenido_por_presentacion, es_medico, costo_unitario, precio_unitario, stock_minimo_unidades)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (producto_base_id, nombre, laboratorio, sku, unidad_base, contenido_por_presentacion, es_medico, costo_unitario, precio_unitario, precio_cliente, stock_minimo_unidades)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         producto_base_id,
@@ -396,6 +397,7 @@ router.post("/variantes", requireInventoryWrite, async (req, res) => {
         es_medico ? 1 : 0,
         costo_unitario != null ? parseFloat(costo_unitario) : null,
         precio_unitario != null ? parseFloat(precio_unitario) : null,
+        precio_cliente != null ? parseFloat(precio_cliente) : null,
         stock_minimo_unidades != null ? parseFloat(stock_minimo_unidades) : 0,
       ]
     );
@@ -404,6 +406,59 @@ router.post("/variantes", requireInventoryWrite, async (req, res) => {
   } catch (err) {
     console.error("❌ Error al crear variante:", err.message);
     res.status(500).json({ message: "Error al crear variante" });
+  }
+});
+
+router.put("/variantes/:id", requireInventoryWrite, async (req, res) => {
+  const { id } = req.params;
+  const {
+    nombre,
+    laboratorio,
+    sku,
+    unidad_base,
+    contenido_por_presentacion,
+    es_medico,
+    costo_unitario,
+    precio_unitario,
+    precio_cliente,
+    stock_minimo_unidades,
+  } = req.body;
+
+  try {
+    await dbRun(
+      `
+        UPDATE variantes SET
+          nombre = COALESCE(?, nombre),
+          laboratorio = COALESCE(?, laboratorio),
+          sku = COALESCE(?, sku),
+          unidad_base = COALESCE(?, unidad_base),
+          contenido_por_presentacion = COALESCE(?, contenido_por_presentacion),
+          es_medico = COALESCE(?, es_medico),
+          costo_unitario = COALESCE(?, costo_unitario),
+          precio_unitario = COALESCE(?, precio_unitario),
+          precio_cliente = COALESCE(?, precio_cliente),
+          stock_minimo_unidades = COALESCE(?, stock_minimo_unidades)
+        WHERE id = ?
+      `,
+      [
+        nombre || null,
+        laboratorio || null,
+        sku || null,
+        unidad_base || null,
+        contenido_por_presentacion != null ? parseFloat(contenido_por_presentacion) : null,
+        es_medico != null ? (es_medico ? 1 : 0) : null,
+        costo_unitario != null ? parseFloat(costo_unitario) : null,
+        precio_unitario != null ? parseFloat(precio_unitario) : null,
+        precio_cliente != null ? parseFloat(precio_cliente) : null,
+        stock_minimo_unidades != null ? parseFloat(stock_minimo_unidades) : null,
+        id,
+      ]
+    );
+
+    res.json({ message: "✅ Variante actualizada correctamente" });
+  } catch (err) {
+    console.error("❌ Error al actualizar variante:", err.message);
+    res.status(500).json({ message: "Error al actualizar variante" });
   }
 });
 

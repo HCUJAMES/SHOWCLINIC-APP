@@ -19,8 +19,13 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
+  Tabs,
+  Tab,
+  Chip,
+  Collapse,
+  LinearProgress,
 } from "@mui/material";
-import { ArrowBack, Home } from "@mui/icons-material";
+import { ArrowBack, Home, ExpandMore, ExpandLess } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { useAuth } from "../hooks/useAuth";
@@ -40,6 +45,9 @@ export default function BuscarPaciente() {
   const [selectedPaciente, setSelectedPaciente] = useState(null);
   const [openModal, setOpenModal] = useState(false);
   const [openTratamientosModal, setOpenTratamientosModal] = useState(false);
+  const [tabValue, setTabValue] = useState(0);
+  const [pacientesEnTratamiento, setPacientesEnTratamiento] = useState([]);
+  const [expandedPaciente, setExpandedPaciente] = useState(null);
 
   const { showToast } = useToast();
   const { token, role, authHeaders } = useAuth();
@@ -72,6 +80,29 @@ export default function BuscarPaciente() {
     } catch (error) {
       console.error("Error al cargar tratamientos base:", error);
       setTratamientosBase([]);
+    }
+  };
+
+  const cargarPacientesEnTratamiento = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/paquetes/pacientes-en-tratamiento`, {
+        headers: authHeaders,
+      });
+      
+      if (!res.ok) {
+        console.error("Error en respuesta:", res.status, res.statusText);
+        const errorData = await res.text();
+        console.error("Detalles del error:", errorData);
+        setPacientesEnTratamiento([]);
+        return;
+      }
+      
+      const data = await res.json();
+      console.log("Pacientes en tratamiento recibidos:", data);
+      setPacientesEnTratamiento(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error al cargar pacientes en tratamiento:", error);
+      setPacientesEnTratamiento([]);
     }
   };
 
@@ -177,6 +208,7 @@ export default function BuscarPaciente() {
   useEffect(() => {
     cargarPacientes();
     cargarTratamientosBase();
+    cargarPacientesEnTratamiento();
   }, []);
 
   useEffect(() => {
@@ -238,13 +270,49 @@ export default function BuscarPaciente() {
               textAlign: "center",
             }}
           >
-            Buscar y Editar Pacientes
+            Gestión de Pacientes
           </Typography>
           <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
             <Home />
           </IconButton>
         </Box>
 
+        {/* Tabs */}
+        <Tabs
+          value={tabValue}
+          onChange={(e, newValue) => setTabValue(newValue)}
+          sx={{
+            mb: 3,
+            "& .MuiTab-root": { color: "#666", fontWeight: "bold" },
+            "& .Mui-selected": { color: colorPrincipal },
+            "& .MuiTabs-indicator": { backgroundColor: colorPrincipal },
+          }}
+        >
+          <Tab label="Buscar Pacientes" />
+          <Tab 
+            label={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                Pacientes en Tratamiento
+                {pacientesEnTratamiento.length > 0 && (
+                  <Chip 
+                    label={pacientesEnTratamiento.length} 
+                    size="small" 
+                    sx={{ 
+                      backgroundColor: "#4caf50", 
+                      color: "white",
+                      height: 20,
+                      fontSize: "0.7rem"
+                    }} 
+                  />
+                )}
+              </Box>
+            } 
+          />
+        </Tabs>
+
+        {/* Tab 0: Buscar Pacientes */}
+        {tabValue === 0 && (
+          <>
         {/* Barra de búsqueda */}
         <Box
           sx={{
@@ -455,6 +523,192 @@ export default function BuscarPaciente() {
                     ))}
                   </TableBody>
                 </Table>
+              </Box>
+            )}
+          </Box>
+        )}
+          </>
+        )}
+
+        {/* Tab 1: Pacientes en Tratamiento */}
+        {tabValue === 1 && (
+          <Box>
+            {pacientesEnTratamiento.length === 0 ? (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <Typography color="text.secondary">
+                  No hay pacientes con paquetes activos
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ display: "grid", gap: 2 }}>
+                {pacientesEnTratamiento.map((paciente) => (
+                  <Paper
+                    key={paciente.id}
+                    elevation={2}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: "1px solid rgba(163,105,32,0.2)",
+                      backgroundColor: "rgba(255,255,255,0.9)",
+                    }}
+                  >
+                    {/* Cabecera del paciente */}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => setExpandedPaciente(expandedPaciente === paciente.id ? null : paciente.id)}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <Box>
+                          <Typography sx={{ fontWeight: "bold", color: colorPrincipal }}>
+                            {paciente.nombre} {paciente.apellido}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            DNI: {paciente.dni} | Tel: {paciente.celular || "-"}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                        <Chip
+                          label={`${paciente.paquetes_activos} paquete(s)`}
+                          size="small"
+                          sx={{ backgroundColor: "#2196f3", color: "white" }}
+                        />
+                        <Chip
+                          label={`${paciente.sesiones_pendientes} sesiones pendientes`}
+                          size="small"
+                          sx={{ backgroundColor: "#ff9800", color: "white" }}
+                        />
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/historial/${paciente.id}`);
+                          }}
+                          sx={{ borderColor: colorPrincipal, color: colorPrincipal }}
+                        >
+                          Ver Historial
+                        </Button>
+                        <IconButton size="small">
+                          {expandedPaciente === paciente.id ? <ExpandLess /> : <ExpandMore />}
+                        </IconButton>
+                      </Box>
+                    </Box>
+
+                    {/* Paquetes del paciente (expandible) */}
+                    <Collapse in={expandedPaciente === paciente.id}>
+                      <Box sx={{ mt: 2, pl: 2 }}>
+                        {paciente.paquetes?.map((paquete) => {
+                          const progreso = paquete.sesiones_totales > 0
+                            ? Math.round((paquete.sesiones_completadas / paquete.sesiones_totales) * 100)
+                            : 0;
+
+                          return (
+                            <Paper
+                              key={paquete.id}
+                              elevation={0}
+                              sx={{
+                                p: 2,
+                                mb: 2,
+                                borderRadius: 2,
+                                backgroundColor: "rgba(33, 150, 243, 0.05)",
+                                border: "1px solid rgba(33, 150, 243, 0.2)",
+                              }}
+                            >
+                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                                <Typography sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                                  {paquete.paquete_nombre}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Asignado: {paquete.fecha_inicio?.split(' ')[0]}
+                                </Typography>
+                              </Box>
+
+                              {/* Barra de progreso */}
+                              <Box sx={{ mb: 2 }}>
+                                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                                  <Typography variant="caption" color="text.secondary">
+                                    Progreso: {paquete.sesiones_completadas}/{paquete.sesiones_totales} sesiones
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                                    {progreso}%
+                                  </Typography>
+                                </Box>
+                                <LinearProgress
+                                  variant="determinate"
+                                  value={progreso}
+                                  sx={{
+                                    height: 8,
+                                    borderRadius: 4,
+                                    backgroundColor: "#e0e0e0",
+                                    "& .MuiLinearProgress-bar": {
+                                      backgroundColor: "#2196f3",
+                                      borderRadius: 4,
+                                    },
+                                  }}
+                                />
+                              </Box>
+
+                              {/* Sesiones */}
+                              <Box sx={{ display: "grid", gap: 0.5 }}>
+                                {paquete.sesiones?.map((sesion) => (
+                                  <Box
+                                    key={sesion.id}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      p: 1,
+                                      backgroundColor: sesion.estado === 'completada' ? "rgba(76, 175, 80, 0.1)" : "rgba(255,255,255,0.8)",
+                                      borderRadius: 1,
+                                      border: `1px solid ${sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0'}`,
+                                    }}
+                                  >
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                      <Box
+                                        sx={{
+                                          width: 20,
+                                          height: 20,
+                                          borderRadius: "50%",
+                                          backgroundColor: sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0',
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: "0.7rem",
+                                          color: sesion.estado === 'completada' ? 'white' : '#666',
+                                        }}
+                                      >
+                                        {sesion.estado === 'completada' ? '✓' : sesion.sesion_numero}
+                                      </Box>
+                                      <Typography variant="body2">
+                                        {sesion.tratamiento_nombre} - Sesión {sesion.sesion_numero}
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="caption" color={sesion.estado === 'completada' ? "success.main" : "text.secondary"}>
+                                      {sesion.estado === 'completada' ? sesion.fecha_realizada?.split(' ')[0] : 'Pendiente'}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                              </Box>
+
+                              {/* Total */}
+                              <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "flex-end" }}>
+                                <Typography sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                                  Total: S/ {paquete.precio_total?.toFixed(2)}
+                                </Typography>
+                              </Box>
+                            </Paper>
+                          );
+                        })}
+                      </Box>
+                    </Collapse>
+                  </Paper>
+                ))}
               </Box>
             )}
           </Box>

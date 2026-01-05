@@ -5,7 +5,7 @@ import fs from "fs";
 
 import { consumirStockFEFO } from "../services/inventoryOps.js";
 import db, { dbAll, dbRun, dbGet } from "../db/database.js";
-import { authMiddleware, requireDoctor } from "../middleware/auth.js";
+import { authMiddleware, requireDoctor, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -89,6 +89,130 @@ router.delete("/eliminar/:id", requireDoctor, async (req, res) => {
   }
 });
 
+// ========== RUTAS DE RECETAS (deben ir ANTES de /:id) ==========
+
+// Obtener receta de un tratamiento (si existe)
+router.get("/recetas/:tratamiento_id", async (req, res) => {
+  try {
+    const { tratamiento_id } = req.params;
+    const id = Number(tratamiento_id);
+    if (!id) {
+      return res.status(400).json({ message: "tratamiento_id inválido" });
+    }
+
+    const rows = await dbAll(
+      `
+        SELECT
+          rt.id,
+          rt.tratamiento_id,
+          rt.variante_id,
+          rt.cantidad_unidades,
+          v.nombre AS variante_nombre,
+          v.precio_unitario,
+          v.unidad_base,
+          v.contenido_por_presentacion,
+          pb.nombre AS producto_base_nombre
+        FROM recetas_tratamiento rt
+        LEFT JOIN variantes v ON v.id = rt.variante_id
+        LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+        WHERE rt.tratamiento_id = ?
+        ORDER BY rt.id ASC
+      `,
+      [id]
+    );
+
+    res.json(rows || []);
+  } catch (err) {
+    console.error("Error al obtener receta del tratamiento:", err);
+    res.status(500).json({ message: "Error al obtener receta del tratamiento" });
+  }
+});
+
+// Agregar producto a la receta de un tratamiento
+router.post("/recetas/:tratamiento_id", requireRole("doctor", "master"), async (req, res) => {
+  try {
+    const { tratamiento_id } = req.params;
+    const { variante_id, cantidad_unidades, unidad_mostrada, obligatorio } = req.body;
+
+    if (!variante_id) {
+      return res.status(400).json({ message: "variante_id es requerido" });
+    }
+
+    const existe = await dbAll(
+      `SELECT id FROM recetas_tratamiento WHERE tratamiento_id = ? AND variante_id = ?`,
+      [tratamiento_id, variante_id]
+    );
+
+    if (existe && existe.length > 0) {
+      return res.status(400).json({ message: "Este producto ya está en la receta del tratamiento" });
+    }
+
+    const result = await dbRun(
+      `INSERT INTO recetas_tratamiento (tratamiento_id, variante_id, cantidad_unidades, unidad_mostrada, obligatorio)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        tratamiento_id,
+        variante_id,
+        cantidad_unidades || 1,
+        unidad_mostrada || null,
+        obligatorio !== undefined ? (obligatorio ? 1 : 0) : 1
+      ]
+    );
+
+    res.json({ id: result.lastID, message: "Producto agregado a la receta" });
+  } catch (err) {
+    console.error("Error al agregar producto a receta:", err);
+    res.status(500).json({ message: "Error al agregar producto a la receta" });
+  }
+});
+
+// Eliminar producto de la receta de un tratamiento
+router.delete("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "master"), async (req, res) => {
+  try {
+    const { tratamiento_id, variante_id } = req.params;
+
+    await dbRun(
+      `DELETE FROM recetas_tratamiento WHERE tratamiento_id = ? AND variante_id = ?`,
+      [tratamiento_id, variante_id]
+    );
+
+    res.json({ message: "Producto eliminado de la receta" });
+  } catch (err) {
+    console.error("Error al eliminar producto de receta:", err);
+    res.status(500).json({ message: "Error al eliminar producto de la receta" });
+  }
+});
+
+// Actualizar cantidad de producto en receta
+router.put("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "master"), async (req, res) => {
+  try {
+    const { tratamiento_id, variante_id } = req.params;
+    const { cantidad_unidades, unidad_mostrada, obligatorio } = req.body;
+
+    await dbRun(
+      `UPDATE recetas_tratamiento 
+       SET cantidad_unidades = COALESCE(?, cantidad_unidades),
+           unidad_mostrada = COALESCE(?, unidad_mostrada),
+           obligatorio = COALESCE(?, obligatorio)
+       WHERE tratamiento_id = ? AND variante_id = ?`,
+      [
+        cantidad_unidades,
+        unidad_mostrada,
+        obligatorio !== undefined ? (obligatorio ? 1 : 0) : null,
+        tratamiento_id,
+        variante_id
+      ]
+    );
+
+    res.json({ message: "Receta actualizada" });
+  } catch (err) {
+    console.error("Error al actualizar receta:", err);
+    res.status(500).json({ message: "Error al actualizar receta" });
+  }
+});
+
+// ========== FIN RUTAS DE RECETAS ==========
+
 router.put("/:id", requireDoctor, async (req, res) => {
   const { id } = req.params;
   const idNum = Number(id);
@@ -170,43 +294,6 @@ router.post("/reset", requireDoctor, async (req, res) => {
     } catch (_) {}
     console.error("❌ Error reseteando tratamientos:", err.message);
     res.status(500).json({ message: "Error al resetear tratamientos" });
-  }
-});
-
-// Obtener receta de un tratamiento (si existe)
-router.get("/recetas/:tratamiento_id", async (req, res) => {
-  try {
-    const { tratamiento_id } = req.params;
-    const id = Number(tratamiento_id);
-    if (!id) {
-      return res.status(400).json({ message: "tratamiento_id inválido" });
-    }
-
-    const rows = await dbAll(
-      `
-        SELECT
-          rt.id,
-          rt.tratamiento_id,
-          rt.variante_id,
-          rt.cantidad_unidades,
-          v.nombre AS variante_nombre,
-          v.precio_unitario,
-          v.unidad_base,
-          v.contenido_por_presentacion,
-          pb.nombre AS producto_base_nombre
-        FROM recetas_tratamiento rt
-        LEFT JOIN variantes v ON v.id = rt.variante_id
-        LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
-        WHERE rt.tratamiento_id = ?
-        ORDER BY rt.id ASC
-      `,
-      [id]
-    );
-
-    res.json(rows || []);
-  } catch (err) {
-    console.error("Error al obtener receta del tratamiento:", err);
-    res.status(500).json({ message: "Error al obtener receta del tratamiento" });
   }
 });
 
@@ -366,58 +453,29 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           )
         : [];
 
-      const factorCantidad =
-        parseFloat(b.dosis_unidades) > 0
-          ? parseFloat(b.dosis_unidades)
-          : parseFloat(b.cantidad) > 0
-            ? parseFloat(b.cantidad)
-            : 1;
-
-      if (!(factorCantidad > 0)) {
-        return res.status(400).json({ message: "Cantidad inválida para calcular el precio" });
+      // Usar el total calculado por el frontend (precio * cantidad - descuento)
+      const precioUnitario = parseFloat(b.precio) || 0;
+      const cantidadMl = parseFloat(b.cantidad) || 1;
+      const totalDelFrontend = parseFloat(b.total) || 0;
+      
+      // Si el frontend envía total, usarlo; sino calcular
+      let subtotal = totalDelFrontend > 0 ? totalDelFrontend : precioUnitario * cantidadMl;
+      
+      // Si aún no hay subtotal, intentar obtener precio de la variante
+      if (!(subtotal > 0) && b.variante_id) {
+        const v = await dbGet(`SELECT precio_cliente, precio_unitario FROM variantes WHERE id = ?`, [b.variante_id]);
+        const precioVariante = parseFloat(v?.precio_cliente) || parseFloat(v?.precio_unitario) || 0;
+        subtotal = precioVariante * cantidadMl;
       }
 
-      let subtotal = 0;
-      let precioUnitario = 0;
-      let cantidadParaPrecio = factorCantidad;
-
-      // Si hay receta, el precio se calcula por ingredientes (sumatoria).
-      if (Array.isArray(recetaDetallada) && recetaDetallada.length > 0) {
-        subtotal = recetaDetallada.reduce((acc, r) => {
-          const pu = parseFloat(r.precio_unitario) || 0;
-          const qty = (parseFloat(r.cantidad_unidades) || 0) * (factorCantidad || 0);
-          return acc + pu * qty;
-        }, 0);
-      } else {
-        // Sin receta: primero intentar usar el precio manual del frontend
-        const precioManual = parseFloat(b.precio) || 0;
-        const totalManual = parseFloat(b.total) || 0;
-        
-        // Si hay variante seleccionada, usar su precio (a menos que haya precio manual)
-        const varianteId = b.variante_id ? Number(b.variante_id) : null;
-        
-        if (precioManual > 0) {
-          // Usar precio manual del frontend (presupuesto o editado manualmente)
-          precioUnitario = precioManual;
-          cantidadParaPrecio = 1;
-          subtotal = totalManual > 0 ? totalManual : precioManual;
-        } else if (varianteId) {
-          // Usar precio de la variante
-          const v = await dbGet(`SELECT precio_unitario FROM variantes WHERE id = ?`, [varianteId]);
-          precioUnitario = parseFloat(v?.precio_unitario) || 0;
-          subtotal = precioUnitario * (factorCantidad || 0);
-        } else {
-          // Sin precio manual ni variante
-          subtotal = 0;
-        }
-      }
-
-      if (!(subtotal > 0)) {
+      // Permitir precio 0 si viene de un paquete (sesion_paquete_id presente)
+      if (!(subtotal > 0) && !b.sesion_paquete_id) {
         return res.status(400).json({ message: "No se pudo calcular el precio del tratamiento. Establece un precio o selecciona un producto." });
       }
 
-      const descuentoAplicado = (descuentoPct / 100) * subtotal;
-      const totalFinal = subtotal - descuentoAplicado;
+      // El descuento ya está aplicado en el total del frontend, pero por si acaso
+      const totalFinal = subtotal;
+      const cantidadParaPrecio = cantidadMl;
 
       // Registrar tratamiento realizado
       const insertTratamiento = await dbRun(
@@ -513,16 +571,12 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         if (recetas && recetas.length > 0) {
           usoReceta = true;
 
-          const factorCantidad =
-            parseFloat(b.dosis_unidades) > 0
-              ? parseFloat(b.dosis_unidades)
-              : parseFloat(b.cantidad) > 0
-                ? parseFloat(b.cantidad)
-                : 1;
+          // Usar cantidad (ml) directamente
+          const cantidadParaStock = parseFloat(b.cantidad) || 1;
 
           // Por cada ingrediente de la receta, aplicar FEFO y descontar lotes
           for (const receta of recetas) {
-            const cantidadNecesaria = receta.cantidad_unidades * factorCantidad;
+            const cantidadNecesaria = receta.cantidad_unidades * cantidadParaStock;
 
             // Crear cabecera de movimiento por cada ingrediente (mantiene trazabilidad clara)
             const movimiento = await dbRun(
@@ -550,17 +604,12 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         }
       }
 
-      // Consumir por producto seleccionado (variante_id) siempre que venga en el payload.
-      // Esto conecta directamente Comenzar Tratamiento -> Inventario.
+      // Consumir por producto seleccionado (variante_id) SOLO si no se usó receta.
+      // Esto evita descuento doble cuando hay receta Y variante seleccionada.
       const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
-      const cantidadElegida =
-        parseFloat(b.dosis_unidades) > 0
-          ? parseFloat(b.dosis_unidades)
-          : parseFloat(b.cantidad) > 0
-            ? parseFloat(b.cantidad)
-            : 0;
+      const cantidadElegida = parseFloat(b.cantidad) || 0;
 
-      if (varianteIdElegida && cantidadElegida > 0) {
+      if (!usoReceta && varianteIdElegida && cantidadElegida > 0) {
         const movimiento = await dbRun(
           `
             INSERT INTO movimientos_inventario
@@ -582,7 +631,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         if (!result.ok) {
           return res.status(result.status).json({ message: result.message });
         }
-      } else if (!usoReceta) {
+      } else if (!usoReceta && !varianteIdElegida) {
         // Compatibilidad con inventario clásico solo si no hay receta y no se eligió variante.
         await dbRun(
           `UPDATE inventario SET stock = stock - ? WHERE producto = ?`,
