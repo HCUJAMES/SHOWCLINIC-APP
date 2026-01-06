@@ -119,6 +119,8 @@ const HistorialClinico = () => {
   const [paquetesActivos, setPaquetesActivos] = useState([]);
   const [paquetesPaciente, setPaquetesPaciente] = useState([]);
   const [asignandoPaquete, setAsignandoPaquete] = useState(false);
+  const [presupuestosAsignados, setPresupuestosAsignados] = useState([]);
+  const [asignandoPresupuesto, setAsignandoPresupuesto] = useState(false);
   const [showOferta, setShowOferta] = useState(false);
   const [ofertaItems, setOfertaItems] = useState([]);
   const [guardandoOferta, setGuardandoOferta] = useState(false);
@@ -248,6 +250,17 @@ const HistorialClinico = () => {
         console.error("Error al obtener paquetes del paciente:", e);
         setPaquetesPaciente([]);
       }
+
+      // Cargar presupuestos asignados al paciente
+      try {
+        const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${id}`, {
+          headers: authHeaders,
+        });
+        setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      } catch (e) {
+        console.error("Error al obtener presupuestos asignados:", e);
+        setPresupuestosAsignados([]);
+      }
     } catch (error) {
       console.error("Error al obtener historial clínico:", error);
     }
@@ -349,6 +362,103 @@ const HistorialClinico = () => {
     } catch (error) {
       console.error("Error al eliminar paquete:", error);
       showToast({ severity: "error", message: error.response?.data?.message || "Error al eliminar paquete" });
+    }
+  };
+
+  // Asignar presupuesto al paciente
+  const asignarPresupuesto = async (oferta) => {
+    if (!pacienteSeleccionado?.id) return;
+    
+    setAsignandoPresupuesto(true);
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/paquetes/presupuesto/asignar`,
+        {
+          paciente_id: pacienteSeleccionado.id,
+          oferta_id: oferta.id,
+        },
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Presupuesto asignado exitosamente" });
+      
+      // Recargar presupuestos asignados
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+    } catch (error) {
+      console.error("Error al asignar presupuesto:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al asignar presupuesto" });
+    } finally {
+      setAsignandoPresupuesto(false);
+    }
+  };
+
+  // Completar sesión de presupuesto
+  const completarSesionPresupuesto = async (sesionId) => {
+    try {
+      await axios.patch(
+        `${API_BASE_URL}/api/paquetes/presupuesto/sesion/${sesionId}/completar`,
+        {},
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Tratamiento completado" });
+      
+      // Recargar presupuestos asignados
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+    } catch (error) {
+      console.error("Error al completar tratamiento:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al completar tratamiento" });
+    }
+  };
+
+  // Desmarcar sesión de presupuesto
+  const desmarcarSesionPresupuesto = async (sesionId) => {
+    try {
+      await axios.patch(
+        `${API_BASE_URL}/api/paquetes/presupuesto/sesion/${sesionId}/desmarcar`,
+        {},
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Tratamiento desmarcado" });
+      
+      // Recargar presupuestos asignados
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+    } catch (error) {
+      console.error("Error al desmarcar tratamiento:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al desmarcar tratamiento" });
+    }
+  };
+
+  // Eliminar presupuesto asignado
+  const eliminarPresupuestoAsignado = async (presupuestoAsignadoId) => {
+    if (!window.confirm("¿Estás seguro de eliminar este presupuesto asignado?")) return;
+    
+    try {
+      await axios.delete(
+        `${API_BASE_URL}/api/paquetes/presupuesto/paciente/${presupuestoAsignadoId}`,
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Presupuesto eliminado" });
+      
+      // Recargar presupuestos asignados
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+    } catch (error) {
+      console.error("Error al eliminar presupuesto:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al eliminar presupuesto" });
     }
   };
 
@@ -1508,7 +1618,7 @@ const HistorialClinico = () => {
                 )}
               </Paper>
 
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
                 <Typography
                   variant="h6"
                   sx={{ color: "#a36920", fontWeight: "bold" }}
@@ -1528,6 +1638,26 @@ const HistorialClinico = () => {
                   disabled={!pacienteSeleccionado}
                 >
                   {showOferta ? "Cerrar" : "Agregar nuevo presupuesto"}
+                </Button>
+                <Button
+                  variant="contained"
+                  sx={{
+                    backgroundColor: "#4caf50",
+                    color: "white",
+                    fontWeight: "bold",
+                    borderRadius: 3,
+                    "&:hover": { backgroundColor: "#388e3c" },
+                  }}
+                  onClick={() => {
+                    // Scroll hacia la sección de paquetes promocionales
+                    const paquetesSection = document.getElementById("paquetes-promocionales");
+                    if (paquetesSection) {
+                      paquetesSection.scrollIntoView({ behavior: "smooth" });
+                    }
+                  }}
+                  disabled={!pacienteSeleccionado}
+                >
+                  📦 Agregar Paquete
                 </Button>
               </Box>
 
@@ -1689,125 +1819,175 @@ const HistorialClinico = () => {
                     mb: 4,
                     p: 2.5,
                     borderRadius: 3,
-                    backgroundColor: "rgba(255,255,255,0.68)",
-                    border: "1px solid rgba(212,175,55,0.18)",
+                    backgroundColor: "rgba(163, 105, 32, 0.08)",
+                    border: "1px solid rgba(163, 105, 32, 0.3)",
                   }}
                 >
                   <Typography
-                    variant="subtitle2"
-                    sx={{ color: "rgba(0,0,0,0.70)", mb: 1, fontWeight: "bold" }}
+                    variant="h6"
+                    sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
                   >
-                    Historial de ofertas
+                    📋 Presupuestos del Paciente
                   </Typography>
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gap: 1.2,
-                      maxHeight: 260,
-                      overflowY: "auto",
-                      pr: 0.5,
-                    }}
-                  >
-                    {ofertas.map((o) => (
-                      <Paper
-                        key={o.id}
-                        elevation={0}
-                        sx={{
-                          p: 1.6,
-                          borderRadius: 2,
-                          backgroundColor: "rgba(255,255,255,0.78)",
-                          border: "1px solid rgba(163,105,32,0.16)",
-                        }}
-                      >
-                        <Box
+                  <Box sx={{ display: "grid", gap: 2 }}>
+                    {ofertas.map((o) => {
+                      const items = o.items || [];
+                      const totalItems = items.length;
+                      
+                      return (
+                        <Paper
+                          key={o.id}
+                          elevation={0}
                           sx={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            justifyContent: "space-between",
-                            gap: 2,
+                            p: 2,
+                            borderRadius: 2,
+                            backgroundColor: "white",
+                            border: "1px solid rgba(163, 105, 32, 0.2)",
                           }}
                         >
-                          <Box sx={{ flex: 1 }}>
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                display: "block",
-                                color: "rgba(0,0,0,0.58)",
-                                mb: 0.5,
-                              }}
-                            >
-                              {o.creado_en}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: "flex", gap: 1 }}>
-                            <Button
-                              size="small"
-                              variant="contained"
-                              startIcon={<Print />}
-                              sx={{
-                                backgroundColor: "#a36920",
-                                color: "white",
-                                borderRadius: 3,
-                                fontWeight: "bold",
-                                "&:hover": { backgroundColor: "#8a5619" },
-                              }}
-                              onClick={() => {
-                                setPresupuestoParaProforma(o);
-                                setDescuentoProforma(0);
-                                setModalDescuento(true);
-                              }}
-                            >
-                              Proforma
-                            </Button>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              sx={{
-                                borderColor: "#a36920",
-                                color: "#a36920",
-                                borderRadius: 3,
-                                fontWeight: "bold",
-                                "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
-                              }}
-                              onClick={() => {
-                                setOfertaEditId(o.id);
-                                setOfertaItems(
-                                  (o.items || []).map((it) => ({
-                                    tratamientoId: it.tratamientoId ?? it.tratamiento_id ?? null,
-                                    nombre: it.nombre,
-                                    precio: String(it.precio ?? ""),
-                                  }))
-                                );
-                                setShowOferta(true);
-                              }}
-                            >
-                              Editar
-                            </Button>
-                          </Box>
-                        </Box>
-                        <Box sx={{ display: "grid", gap: 0.5, mb: 1 }}>
-                          {(o.items || []).map((it, idx) => (
-                            <Box
-                              key={`${o.id}-${idx}`}
-                              sx={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                gap: 2,
-                              }}
-                            >
-                              <Typography>{it.nombre}</Typography>
-                              <Typography sx={{ fontWeight: "bold" }}>
-                                S/ {Number(it.precio || 0).toFixed(2)}
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+                            <Box>
+                              <Typography sx={{ fontWeight: "bold", color: "#333" }}>
+                                Presupuesto #{o.id}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Creado: {o.creado_en?.split(' ')[0] || o.creado_en}
                               </Typography>
                             </Box>
-                          ))}
-                        </Box>
-                        <Divider sx={{ my: 1 }} />
-                        <Typography sx={{ fontWeight: "bold" }}>
-                          Total: S/ {Number(o.total || 0).toFixed(2)}
-                        </Typography>
-                      </Paper>
-                    ))}
+                            <Box sx={{ 
+                              backgroundColor: "#a36920",
+                              color: "white", 
+                              px: 1.5, 
+                              py: 0.5, 
+                              borderRadius: 2,
+                              fontWeight: "bold",
+                              fontSize: "0.75rem",
+                              textTransform: "uppercase"
+                            }}>
+                              {totalItems} tratamiento{totalItems !== 1 ? 's' : ''}
+                            </Box>
+                          </Box>
+                          
+                          {/* Lista de tratamientos del presupuesto */}
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="caption" sx={{ fontWeight: "bold", color: "#666", mb: 1, display: "block" }}>
+                              Tratamientos:
+                            </Typography>
+                            <Box sx={{ display: "grid", gap: 0.5 }}>
+                              {items.map((it, idx) => (
+                                <Box
+                                  key={`${o.id}-${idx}`}
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    p: 1,
+                                    backgroundColor: "rgba(163, 105, 32, 0.05)",
+                                    borderRadius: 1,
+                                    border: "1px solid rgba(163, 105, 32, 0.1)",
+                                  }}
+                                >
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                    <Box sx={{
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: "50%",
+                                      backgroundColor: "#a36920",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: "0.7rem",
+                                      color: "white"
+                                    }}>
+                                      {idx + 1}
+                                    </Box>
+                                    <Typography variant="body2">
+                                      {it.nombre}
+                                    </Typography>
+                                  </Box>
+                                  <Typography variant="body2" sx={{ fontWeight: "bold", color: "#a36920" }}>
+                                    S/ {Number(it.precio || 0).toFixed(2)}
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Box>
+                          </Box>
+
+                          {/* Total del presupuesto y botones */}
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Total del presupuesto:
+                              </Typography>
+                              <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
+                                S/ {Number(o.total || 0).toFixed(2)}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                disabled={asignandoPresupuesto}
+                                onClick={() => asignarPresupuesto(o)}
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  py: 0.5,
+                                  borderRadius: 2,
+                                  backgroundColor: "#4caf50",
+                                  "&:hover": { backgroundColor: "#388e3c" }
+                                }}
+                              >
+                                {asignandoPresupuesto ? "Asignando..." : "✓ Asignar"}
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={<Print />}
+                                onClick={() => {
+                                  setPresupuestoParaProforma(o);
+                                  setDescuentoProforma(0);
+                                  setModalDescuento(true);
+                                }}
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  py: 0.5,
+                                  borderRadius: 2,
+                                  backgroundColor: "#a36920",
+                                  "&:hover": { backgroundColor: "#8a5619" }
+                                }}
+                              >
+                                Proforma
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  setOfertaEditId(o.id);
+                                  setOfertaItems(
+                                    (o.items || []).map((it) => ({
+                                      tratamientoId: it.tratamientoId ?? it.tratamiento_id ?? null,
+                                      nombre: it.nombre,
+                                      precio: String(it.precio ?? ""),
+                                    }))
+                                  );
+                                  setShowOferta(true);
+                                }}
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  py: 0.5,
+                                  borderRadius: 2,
+                                  borderColor: "#a36920",
+                                  color: "#a36920",
+                                  "&:hover": { backgroundColor: "rgba(163, 105, 32, 0.1)" }
+                                }}
+                              >
+                                Editar
+                              </Button>
+                            </Box>
+                          </Box>
+                        </Paper>
+                      );
+                    })}
                   </Box>
                 </Paper>
               )}
@@ -1817,6 +1997,7 @@ const HistorialClinico = () => {
               {/* Paquetes Promocionales Activos */}
               {paquetesActivos.length > 0 && (
                 <Paper
+                  id="paquetes-promocionales"
                   elevation={0}
                   sx={{
                     mb: 3,
@@ -1940,6 +2121,207 @@ const HistorialClinico = () => {
                                 {asignandoPaquete ? "Asignando..." : "Asignar"}
                               </Button>
                             </Box>
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                  </Box>
+                </Paper>
+              )}
+
+              {/* Presupuestos Asignados al Paciente */}
+              {presupuestosAsignados.length > 0 && (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mb: 3,
+                    p: 2.5,
+                    borderRadius: 3,
+                    backgroundColor: "rgba(163, 105, 32, 0.08)",
+                    border: "1px solid rgba(163, 105, 32, 0.3)",
+                  }}
+                >
+                  <Typography
+                    variant="h6"
+                    sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+                  >
+                    📋 Presupuestos Asignados
+                  </Typography>
+                  <Box sx={{ display: "grid", gap: 2 }}>
+                    {presupuestosAsignados.map((presupuesto) => {
+                      const progreso = presupuesto.sesiones_totales > 0 
+                        ? Math.round((presupuesto.sesiones_completadas / presupuesto.sesiones_totales) * 100) 
+                        : 0;
+                      
+                      return (
+                        <Paper
+                          key={presupuesto.id}
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            backgroundColor: "white",
+                            border: `1px solid ${presupuesto.estado === 'completado' ? '#4caf50' : presupuesto.estado === 'cancelado' ? '#f44336' : '#a36920'}`,
+                          }}
+                        >
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+                            <Box>
+                              <Typography sx={{ fontWeight: "bold", color: "#333" }}>
+                                Presupuesto #{presupuesto.oferta_id}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Asignado: {presupuesto.fecha_inicio?.split(' ')[0]}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ 
+                              backgroundColor: presupuesto.estado === 'completado' ? '#4caf50' : presupuesto.estado === 'cancelado' ? '#f44336' : '#a36920',
+                              color: "white", 
+                              px: 1.5, 
+                              py: 0.5, 
+                              borderRadius: 2,
+                              fontWeight: "bold",
+                              fontSize: "0.75rem",
+                              textTransform: "uppercase"
+                            }}>
+                              {presupuesto.estado}
+                            </Box>
+                          </Box>
+                          
+                          {/* Barra de progreso */}
+                          <Box sx={{ mb: 2 }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary">
+                                Progreso: {presupuesto.sesiones_completadas}/{presupuesto.sesiones_totales} tratamientos
+                              </Typography>
+                              <Typography variant="caption" sx={{ fontWeight: "bold", color: "#a36920" }}>
+                                {progreso}%
+                              </Typography>
+                            </Box>
+                            <Box sx={{ 
+                              height: 8, 
+                              backgroundColor: "#e0e0e0", 
+                              borderRadius: 4,
+                              overflow: "hidden"
+                            }}>
+                              <Box sx={{ 
+                                height: "100%", 
+                                width: `${progreso}%`,
+                                backgroundColor: presupuesto.estado === 'completado' ? '#4caf50' : '#a36920',
+                                borderRadius: 4,
+                                transition: "width 0.3s ease"
+                              }} />
+                            </Box>
+                          </Box>
+
+                          {/* Tratamientos del presupuesto */}
+                          {presupuesto.sesiones && presupuesto.sesiones.length > 0 && (
+                            <Box sx={{ mt: 1 }}>
+                              <Typography variant="caption" sx={{ fontWeight: "bold", color: "#666", mb: 1, display: "block" }}>
+                                Tratamientos:
+                              </Typography>
+                              <Box sx={{ display: "grid", gap: 0.5 }}>
+                                {presupuesto.sesiones.map((sesion) => (
+                                  <Box
+                                    key={sesion.id}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      p: 1,
+                                      backgroundColor: sesion.estado === 'completada' ? "rgba(76, 175, 80, 0.1)" : "rgba(0,0,0,0.02)",
+                                      borderRadius: 1,
+                                      border: `1px solid ${sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0'}`,
+                                    }}
+                                  >
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                      <Box sx={{
+                                        width: 20,
+                                        height: 20,
+                                        borderRadius: "50%",
+                                        backgroundColor: sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0',
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.7rem",
+                                        color: sesion.estado === 'completada' ? 'white' : '#666'
+                                      }}>
+                                        {sesion.estado === 'completada' ? '✓' : sesion.sesion_numero}
+                                      </Box>
+                                      <Typography variant="body2">
+                                        {sesion.tratamiento_nombre}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        (S/ {Number(sesion.precio_sesion || 0).toFixed(2)})
+                                      </Typography>
+                                    </Box>
+                                    {sesion.estado === 'pendiente' && presupuesto.estado === 'activo' && (
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        onClick={() => completarSesionPresupuesto(sesion.id)}
+                                        sx={{
+                                          fontSize: "0.7rem",
+                                          py: 0.25,
+                                          px: 1,
+                                          borderColor: "#4caf50",
+                                          color: "#4caf50",
+                                          "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" }
+                                        }}
+                                      >
+                                        Completar
+                                      </Button>
+                                    )}
+                                    {sesion.estado === 'completada' && (
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <Typography variant="caption" color="success.main">
+                                          {sesion.fecha_realizada?.split(' ')[0]}
+                                        </Typography>
+                                        <Button
+                                          size="small"
+                                          variant="text"
+                                          onClick={() => desmarcarSesionPresupuesto(sesion.id)}
+                                          sx={{
+                                            fontSize: "0.65rem",
+                                            py: 0,
+                                            px: 0.5,
+                                            minWidth: "auto",
+                                            color: "#f44336",
+                                            "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" }
+                                          }}
+                                        >
+                                          Deshacer
+                                        </Button>
+                                      </Box>
+                                    )}
+                                  </Box>
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
+
+                          {/* Total del presupuesto y botones */}
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">
+                                Total del presupuesto:
+                              </Typography>
+                              <Typography sx={{ fontWeight: "bold", color: "#a36920" }}>
+                                S/ {presupuesto.precio_total?.toFixed(2)}
+                              </Typography>
+                            </Box>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              onClick={() => eliminarPresupuestoAsignado(presupuesto.id)}
+                              sx={{
+                                fontSize: "0.7rem",
+                                py: 0.5,
+                                borderRadius: 2,
+                              }}
+                            >
+                              Eliminar
+                            </Button>
                           </Box>
                         </Paper>
                       );

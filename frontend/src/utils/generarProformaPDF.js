@@ -146,8 +146,10 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       `S/ ${Number(item.precio || 0).toFixed(2)}`,
     ]);
 
-    // Calcular total (suma de precios de cada tratamiento)
-    const total = items.reduce((sum, item) => sum + Number(item.precio || 0), 0);
+    // Calcular totales
+    const subtotal = items.reduce((sum, item) => sum + Number(item.precio || 0), 0);
+    const descuento = Number(presupuesto.descuento) || 0;
+    const total = subtotal - descuento;
 
     autoTable(doc, {
       startY: yPos,
@@ -191,13 +193,39 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     const boxWidth = 100;
     const boxX = pageWidth - boxWidth - 15;
 
+    // Altura del cuadro depende de si hay descuento
+    const boxHeight = descuento > 0 ? 50 : 30;
+
     // Fondo del cuadro de totales
     doc.setFillColor(248, 248, 248);
-    doc.roundedRect(boxX, finalY, boxWidth, 30, 3, 3, "F");
+    doc.roundedRect(boxX, finalY, boxWidth, boxHeight, 3, 3, "F");
 
-    let totalY = finalY + 12;
+    let totalY = finalY + 10;
 
-    // Total final (solo el total, sin subtotales ni descuentos)
+    if (descuento > 0) {
+      // Subtotal
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80, 80, 80);
+      doc.text("Subtotal:", boxX + 5, totalY);
+      doc.text(`S/ ${subtotal.toFixed(2)}`, boxX + boxWidth - 5, totalY, { align: "right" });
+
+      // Descuento
+      totalY += 8;
+      doc.setTextColor(46, 125, 50); // Verde
+      doc.text("Descuento:", boxX + 5, totalY);
+      doc.text(`- S/ ${descuento.toFixed(2)}`, boxX + boxWidth - 5, totalY, { align: "right" });
+
+      // Línea separadora
+      totalY += 5;
+      doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+      doc.setLineWidth(0.5);
+      doc.line(boxX + 5, totalY, boxX + boxWidth - 5, totalY);
+
+      totalY += 8;
+    }
+
+    // Total final
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(dorado[0], dorado[1], dorado[2]);

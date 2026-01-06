@@ -686,4 +686,232 @@ router.patch("/paciente/:paquete_paciente_id/cancelar", requirePaquetesAsignar, 
   }
 });
 
+/* ======================================================================
+   📋 PRESUPUESTOS ASIGNADOS - Similar a paquetes pero para ofertas/presupuestos
+====================================================================== */
+
+/* ==============================
+   🎁 ASIGNAR PRESUPUESTO A PACIENTE
+============================== */
+router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => {
+  const { paciente_id, oferta_id, notas } = req.body;
+
+  if (!paciente_id || !oferta_id) {
+    return res.status(400).json({ message: "paciente_id y oferta_id son requeridos" });
+  }
+
+  try {
+    // Obtener la oferta/presupuesto
+    const oferta = await dbGet(
+      `SELECT * FROM ofertas WHERE id = ?`,
+      [oferta_id]
+    );
+
+    if (!oferta) {
+      return res.status(404).json({ message: "Presupuesto no encontrado" });
+    }
+
+    // Obtener los items de la oferta
+    const items = await dbAll(
+      `SELECT * FROM oferta_items WHERE oferta_id = ?`,
+      [oferta_id]
+    );
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const username = req.user?.username || "sistema";
+
+    // Calcular precio total
+    const precioTotal = items.reduce((sum, it) => sum + Number(it.precio || 0), 0);
+
+    // Crear registro de presupuesto asignado
+    const result = await dbRun(
+      `INSERT INTO presupuestos_asignados (
+        paciente_id, oferta_id, tratamientos_json,
+        precio_total, estado, fecha_inicio, notas, creado_en, creado_por
+      ) VALUES (?, ?, ?, ?, 'activo', ?, ?, ?, ?)`,
+      [
+        paciente_id,
+        oferta_id,
+        JSON.stringify(items),
+        precioTotal,
+        ahora,
+        notas || null,
+        ahora,
+        username
+      ]
+    );
+
+    const presupuestoAsignadoId = result.lastID;
+
+    // Crear las sesiones individuales (1 sesión por tratamiento por defecto)
+    for (const item of items) {
+      await dbRun(
+        `INSERT INTO presupuestos_sesiones (
+          presupuesto_asignado_id, tratamiento_id, tratamiento_nombre,
+          sesion_numero, precio_sesion, estado, creado_en
+        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
+        [
+          presupuestoAsignadoId,
+          item.tratamiento_id || null,
+          item.nombre,
+          1,
+          item.precio || 0,
+          ahora
+        ]
+      );
+    }
+
+    res.json({ 
+      message: "✅ Presupuesto asignado exitosamente",
+      presupuesto_asignado_id: presupuestoAsignadoId
+    });
+  } catch (err) {
+    console.error("❌ Error al asignar presupuesto:", err.message);
+    res.status(500).json({ message: "Error al asignar presupuesto" });
+  }
+});
+
+/* ==============================
+   📋 OBTENER PRESUPUESTOS ASIGNADOS DE UN PACIENTE
+============================== */
+router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (req, res) => {
+  const { paciente_id } = req.params;
+
+  try {
+    const presupuestos = await dbAll(
+      `SELECT * FROM presupuestos_asignados WHERE paciente_id = ? ORDER BY creado_en DESC`,
+      [paciente_id]
+    );
+
+    // Para cada presupuesto, obtener sus sesiones
+    for (const p of presupuestos) {
+      const sesiones = await dbAll(
+        `SELECT * FROM presupuestos_sesiones WHERE presupuesto_asignado_id = ? ORDER BY id ASC`,
+        [p.id]
+      );
+      p.sesiones = sesiones;
+      p.sesiones_totales = sesiones.length;
+      p.sesiones_completadas = sesiones.filter(s => s.estado === 'completada').length;
+    }
+
+    res.json(presupuestos);
+  } catch (err) {
+    console.error("❌ Error al obtener presupuestos del paciente:", err.message);
+    res.status(500).json({ message: "Error al obtener presupuestos del paciente" });
+  }
+});
+
+/* ==============================
+   ✅ COMPLETAR SESIÓN DE PRESUPUESTO
+============================== */
+router.patch("/presupuesto/sesion/:sesion_id/completar", requirePaquetesAsignar, async (req, res) => {
+  const { sesion_id } = req.params;
+
+  try {
+    const sesion = await dbGet(
+      `SELECT ps.*, pa.id as presupuesto_id, pa.paciente_id 
+       FROM presupuestos_sesiones ps
+       JOIN presupuestos_asignados pa ON ps.presupuesto_asignado_id = pa.id
+       WHERE ps.id = ?`,
+      [sesion_id]
+    );
+
+    if (!sesion) {
+      return res.status(404).json({ message: "Sesión no encontrada" });
+    }
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const especialista = req.user?.username || "sistema";
+
+    await dbRun(
+      `UPDATE presupuestos_sesiones SET estado = 'completada', fecha_realizada = ?, especialista = ? WHERE id = ?`,
+      [ahora, especialista, sesion_id]
+    );
+
+    // Verificar si todas las sesiones están completadas
+    const sesionesPendientes = await dbGet(
+      `SELECT COUNT(*) as count FROM presupuestos_sesiones 
+       WHERE presupuesto_asignado_id = ? AND estado = 'pendiente'`,
+      [sesion.presupuesto_asignado_id]
+    );
+
+    if (sesionesPendientes.count === 0) {
+      await dbRun(
+        `UPDATE presupuestos_asignados SET estado = 'completado', fecha_fin = ? WHERE id = ?`,
+        [ahora, sesion.presupuesto_asignado_id]
+      );
+    }
+
+    res.json({ message: "✅ Sesión completada exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al completar sesión:", err.message);
+    res.status(500).json({ message: "Error al completar sesión" });
+  }
+});
+
+/* ==============================
+   ↩️ DESMARCAR SESIÓN DE PRESUPUESTO
+============================== */
+router.patch("/presupuesto/sesion/:sesion_id/desmarcar", requirePaquetesAsignar, async (req, res) => {
+  const { sesion_id } = req.params;
+
+  try {
+    const sesion = await dbGet(
+      `SELECT ps.*, pa.id as presupuesto_id
+       FROM presupuestos_sesiones ps
+       JOIN presupuestos_asignados pa ON ps.presupuesto_asignado_id = pa.id
+       WHERE ps.id = ?`,
+      [sesion_id]
+    );
+
+    if (!sesion) {
+      return res.status(404).json({ message: "Sesión no encontrada" });
+    }
+
+    await dbRun(
+      `UPDATE presupuestos_sesiones SET estado = 'pendiente', fecha_realizada = NULL, especialista = NULL WHERE id = ?`,
+      [sesion_id]
+    );
+
+    // Reactivar el presupuesto si estaba completado
+    await dbRun(
+      `UPDATE presupuestos_asignados SET estado = 'activo', fecha_fin = NULL WHERE id = ? AND estado = 'completado'`,
+      [sesion.presupuesto_asignado_id]
+    );
+
+    res.json({ message: "✅ Sesión desmarcada exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al desmarcar sesión:", err.message);
+    res.status(500).json({ message: "Error al desmarcar sesión" });
+  }
+});
+
+/* ==============================
+   🗑️ ELIMINAR PRESUPUESTO ASIGNADO
+============================== */
+router.delete("/presupuesto/paciente/:presupuesto_asignado_id", requirePaquetesAsignar, async (req, res) => {
+  const { presupuesto_asignado_id } = req.params;
+
+  try {
+    const presupuesto = await dbGet(
+      `SELECT * FROM presupuestos_asignados WHERE id = ?`,
+      [presupuesto_asignado_id]
+    );
+
+    if (!presupuesto) {
+      return res.status(404).json({ message: "Presupuesto asignado no encontrado" });
+    }
+
+    // Eliminar sesiones primero
+    await dbRun(`DELETE FROM presupuestos_sesiones WHERE presupuesto_asignado_id = ?`, [presupuesto_asignado_id]);
+    // Eliminar presupuesto asignado
+    await dbRun(`DELETE FROM presupuestos_asignados WHERE id = ?`, [presupuesto_asignado_id]);
+
+    res.json({ message: "✅ Presupuesto eliminado exitosamente" });
+  } catch (err) {
+    console.error("❌ Error al eliminar presupuesto:", err.message);
+    res.status(500).json({ message: "Error al eliminar presupuesto" });
+  }
+});
+
 export default router;

@@ -358,6 +358,45 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 
     console.log("✅ Tablas de paquetes de pacientes creadas");
 
+    // 📋 Tabla de presupuestos asignados a pacientes (similar a paquetes)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS presupuestos_asignados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        oferta_id INTEGER NOT NULL,
+        tratamientos_json TEXT NOT NULL,
+        precio_total REAL NOT NULL,
+        estado TEXT NOT NULL DEFAULT 'activo',
+        fecha_inicio TEXT DEFAULT CURRENT_TIMESTAMP,
+        fecha_fin TEXT,
+        notas TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        creado_por TEXT,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id),
+        FOREIGN KEY(oferta_id) REFERENCES ofertas(id)
+      )
+    `);
+
+    // 📋 Tabla de sesiones de presupuestos (tracking de cada tratamiento)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS presupuestos_sesiones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        presupuesto_asignado_id INTEGER NOT NULL,
+        tratamiento_id INTEGER,
+        tratamiento_nombre TEXT NOT NULL,
+        sesion_numero INTEGER NOT NULL DEFAULT 1,
+        precio_sesion REAL NOT NULL,
+        estado TEXT NOT NULL DEFAULT 'pendiente',
+        fecha_realizada TEXT,
+        especialista TEXT,
+        notas TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(presupuesto_asignado_id) REFERENCES presupuestos_asignados(id)
+      )
+    `);
+
+    console.log("✅ Tablas de presupuestos asignados creadas");
+
     db.all(
       `SELECT id, observaciones FROM patients WHERE observaciones IS NOT NULL AND TRIM(observaciones) != ''`,
       [],
