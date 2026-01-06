@@ -802,6 +802,7 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     descuento,
     pagoMetodo,
     tipoAtencion,
+    fecha,
   } = req.body;
 
   try {
@@ -822,6 +823,22 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     const descuentoNum = descuento != null ? Number(descuento) : tratamiento.descuento;
     const pagoMetodoStr = typeof pagoMetodo === "string" ? pagoMetodo.trim() : tratamiento.pagoMetodo;
     const tipoAtencionStr = typeof tipoAtencion === "string" ? tipoAtencion.trim() : tratamiento.tipoAtencion;
+    
+    // Validar y formatear fecha (zona horaria Perú GMT-5)
+    let fechaStr = tratamiento.fecha;
+    if (fecha && typeof fecha === "string") {
+      // Si viene solo la fecha (YYYY-MM-DD), agregar hora actual de Perú
+      if (fecha.length === 10) {
+        const ahora = new Date();
+        // Ajustar a hora de Perú (GMT-5)
+        const horasPeru = ahora.getUTCHours() - 5;
+        ahora.setUTCHours(horasPeru);
+        const hora = ahora.toTimeString().split(' ')[0];
+        fechaStr = `${fecha} ${hora}`;
+      } else {
+        fechaStr = fecha;
+      }
+    }
 
     if (!Number.isFinite(sesionNum) || sesionNum < 1) {
       return res.status(400).json({ message: "Sesión inválida" });
@@ -839,9 +856,9 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     await dbRun(
       `UPDATE tratamientos_realizados 
        SET especialista = ?, sesion = ?, precio_total = ?, descuento = ?, 
-           pagoMetodo = ?, tipoAtencion = ?
+           pagoMetodo = ?, tipoAtencion = ?, fecha = ?
        WHERE id = ?`,
-      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, tratamientoId]
+      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, tratamientoId]
     );
 
     // Si hay deuda asociada, actualizar el monto total

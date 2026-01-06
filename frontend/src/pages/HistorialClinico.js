@@ -144,6 +144,7 @@ const HistorialClinico = () => {
   const [editDescuento, setEditDescuento] = useState(0);
   const [editPagoMetodo, setEditPagoMetodo] = useState("Efectivo");
   const [editTipoAtencion, setEditTipoAtencion] = useState("Tratamiento");
+  const [editFecha, setEditFecha] = useState("");
 
   // Estados para confirmar cancelación
   const [openConfirmarCancelar, setOpenConfirmarCancelar] = useState(false);
@@ -939,6 +940,9 @@ const HistorialClinico = () => {
     setEditDescuento(tratamiento.descuento || 0);
     setEditPagoMetodo(tratamiento.pagoMetodo || "Efectivo");
     setEditTipoAtencion(tratamiento.tipoAtencion || "Tratamiento");
+    // Extraer solo la fecha (YYYY-MM-DD) del timestamp
+    const fechaSolo = tratamiento.fecha ? tratamiento.fecha.split(" ")[0] : "";
+    setEditFecha(fechaSolo);
     setOpenEditarModal(true);
   };
 
@@ -956,6 +960,7 @@ const HistorialClinico = () => {
           descuento: editDescuento,
           pagoMetodo: editPagoMetodo,
           tipoAtencion: editTipoAtencion,
+          fecha: editFecha,
         },
         { headers: authHeaders }
       );
@@ -2360,6 +2365,17 @@ const HistorialClinico = () => {
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Fecha del Tratamiento"
+                type="date"
+                value={editFecha}
+                onChange={(e) => setEditFecha(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                helperText="Puedes cambiar la fecha para registrar tratamientos históricos"
+              />
+            </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
