@@ -25,9 +25,10 @@ import {
   FormControl,
   InputLabel,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, Print } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProformaPDF";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useToast } from "../components/ToastProvider";
@@ -145,6 +146,9 @@ const HistorialClinico = () => {
   const [editPagoMetodo, setEditPagoMetodo] = useState("Efectivo");
   const [editTipoAtencion, setEditTipoAtencion] = useState("Tratamiento");
   const [editFecha, setEditFecha] = useState("");
+  const [modalDescuento, setModalDescuento] = useState(false);
+  const [descuentoProforma, setDescuentoProforma] = useState(0);
+  const [presupuestoParaProforma, setPresupuestoParaProforma] = useState(null);
 
   // Estados para confirmar cancelación
   const [openConfirmarCancelar, setOpenConfirmarCancelar] = useState(false);
@@ -1735,30 +1739,51 @@ const HistorialClinico = () => {
                               {o.creado_en}
                             </Typography>
                           </Box>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            sx={{
-                              borderColor: "#a36920",
-                              color: "#a36920",
-                              borderRadius: 3,
-                              fontWeight: "bold",
-                              "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
-                            }}
-                            onClick={() => {
-                              setOfertaEditId(o.id);
-                              setOfertaItems(
-                                (o.items || []).map((it) => ({
-                                  tratamientoId: it.tratamientoId ?? it.tratamiento_id ?? null,
-                                  nombre: it.nombre,
-                                  precio: String(it.precio ?? ""),
-                                }))
-                              );
-                              setShowOferta(true);
-                            }}
-                          >
-                            Editar
-                          </Button>
+                          <Box sx={{ display: "flex", gap: 1 }}>
+                            <Button
+                              size="small"
+                              variant="contained"
+                              startIcon={<Print />}
+                              sx={{
+                                backgroundColor: "#a36920",
+                                color: "white",
+                                borderRadius: 3,
+                                fontWeight: "bold",
+                                "&:hover": { backgroundColor: "#8a5619" },
+                              }}
+                              onClick={() => {
+                                setPresupuestoParaProforma(o);
+                                setDescuentoProforma(0);
+                                setModalDescuento(true);
+                              }}
+                            >
+                              Proforma
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              sx={{
+                                borderColor: "#a36920",
+                                color: "#a36920",
+                                borderRadius: 3,
+                                fontWeight: "bold",
+                                "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
+                              }}
+                              onClick={() => {
+                                setOfertaEditId(o.id);
+                                setOfertaItems(
+                                  (o.items || []).map((it) => ({
+                                    tratamientoId: it.tratamientoId ?? it.tratamiento_id ?? null,
+                                    nombre: it.nombre,
+                                    precio: String(it.precio ?? ""),
+                                  }))
+                                );
+                                setShowOferta(true);
+                              }}
+                            >
+                              Editar
+                            </Button>
+                          </Box>
                         </Box>
                         <Box sx={{ display: "grid", gap: 0.5, mb: 1 }}>
                           {(o.items || []).map((it, idx) => (
@@ -1878,20 +1903,43 @@ const HistorialClinico = () => {
                                 S/ {paquete.precio_paquete?.toFixed(2)}
                               </Typography>
                             </Box>
-                            <Button
-                              variant="contained"
-                              size="small"
-                              disabled={asignandoPaquete || !pacienteSeleccionado}
-                              onClick={() => asignarPaquete(paquete)}
-                              sx={{
-                                backgroundColor: "#4caf50",
-                                "&:hover": { backgroundColor: "#388e3c" },
-                                fontWeight: "bold",
-                                borderRadius: 2,
-                              }}
-                            >
-                              {asignandoPaquete ? "Asignando..." : "Asignar"}
-                            </Button>
+                            <Box sx={{ display: "flex", gap: 1 }}>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Print />}
+                                disabled={!pacienteSeleccionado}
+                                onClick={async () => {
+                                  if (pacienteSeleccionado) {
+                                    await generarProformaPaquete(paquete, pacienteSeleccionado, 0);
+                                    showToast({ severity: "success", message: "Proforma de paquete generada" });
+                                  }
+                                }}
+                                sx={{
+                                  borderColor: "#a36920",
+                                  color: "#a36920",
+                                  "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
+                                  fontWeight: "bold",
+                                  borderRadius: 2,
+                                }}
+                              >
+                                Proforma
+                              </Button>
+                              <Button
+                                variant="contained"
+                                size="small"
+                                disabled={asignandoPaquete || !pacienteSeleccionado}
+                                onClick={() => asignarPaquete(paquete)}
+                                sx={{
+                                  backgroundColor: "#4caf50",
+                                  "&:hover": { backgroundColor: "#388e3c" },
+                                  fontWeight: "bold",
+                                  borderRadius: 2,
+                                }}
+                              >
+                                {asignandoPaquete ? "Asignando..." : "Asignar"}
+                              </Button>
+                            </Box>
                           </Box>
                         </Paper>
                       );
@@ -2497,6 +2545,100 @@ const HistorialClinico = () => {
             }}
           >
             Sí, cancelar tratamiento
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Configurar Descuento en Proforma */}
+      <Dialog open={modalDescuento} onClose={() => setModalDescuento(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#a36920", color: "white" }}>
+          Generar Proforma
+        </DialogTitle>
+        <DialogContent sx={{ mt: 3 }}>
+          {presupuestoParaProforma && (
+            <>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
+                Presupuesto Seleccionado
+              </Typography>
+              <Box sx={{ mb: 3, p: 2, backgroundColor: "#f5f5f5", borderRadius: 2 }}>
+                {(presupuestoParaProforma.items || []).map((item, idx) => (
+                  <Box
+                    key={idx}
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography>{item.nombre}</Typography>
+                    <Typography sx={{ fontWeight: "bold" }}>
+                      S/ {Number(item.precio || 0).toFixed(2)}
+                    </Typography>
+                  </Box>
+                ))}
+                <Divider sx={{ my: 1.5 }} />
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography sx={{ fontWeight: "bold" }}>Subtotal:</Typography>
+                  <Typography sx={{ fontWeight: "bold" }}>
+                    S/ {(presupuestoParaProforma.items || []).reduce((sum, item) => sum + Number(item.precio || 0), 0).toFixed(2)}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <TextField
+                fullWidth
+                label="Descuento (S/)"
+                type="number"
+                value={descuentoProforma}
+                onChange={(e) => setDescuentoProforma(Number(e.target.value))}
+                inputProps={{ min: 0, step: 0.01 }}
+                helperText="Ingresa el monto de descuento a aplicar (opcional)"
+                sx={{ mb: 2 }}
+              />
+
+              <Box sx={{ p: 2, backgroundColor: "#e8f5e9", borderRadius: 2 }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <Typography variant="h6" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                    Total Final:
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                    S/ {(
+                      (presupuestoParaProforma.items || []).reduce((sum, item) => sum + Number(item.precio || 0), 0) - descuentoProforma
+                    ).toFixed(2)}
+                  </Typography>
+                </Box>
+                {descuentoProforma > 0 && (
+                  <Typography variant="caption" sx={{ color: "#666", mt: 1, display: "block" }}>
+                    Ahorro: S/ {descuentoProforma.toFixed(2)}
+                  </Typography>
+                )}
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalDescuento(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Print />}
+            onClick={async () => {
+              if (presupuestoParaProforma && pacienteSeleccionado) {
+                await generarProformaPDF(
+                  { ...presupuestoParaProforma, descuento: descuentoProforma },
+                  pacienteSeleccionado
+                );
+                setModalDescuento(false);
+                showToast({ severity: "success", message: "Proforma generada correctamente" });
+              }
+            }}
+            sx={{
+              backgroundColor: "#a36920",
+              "&:hover": { backgroundColor: "#8a5619" },
+            }}
+          >
+            Generar PDF
           </Button>
         </DialogActions>
       </Dialog>
