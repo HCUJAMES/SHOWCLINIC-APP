@@ -703,7 +703,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
   try {
     // Obtener la oferta/presupuesto
     const oferta = await dbGet(
-      `SELECT * FROM ofertas WHERE id = ?`,
+      `SELECT * FROM patient_ofertas WHERE id = ?`,
       [oferta_id]
     );
 
@@ -711,11 +711,13 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
       return res.status(404).json({ message: "Presupuesto no encontrado" });
     }
 
-    // Obtener los items de la oferta
-    const items = await dbAll(
-      `SELECT * FROM oferta_items WHERE oferta_id = ?`,
-      [oferta_id]
-    );
+    // Obtener los items de la oferta desde el JSON guardado
+    let items = [];
+    try {
+      items = oferta.items_json ? JSON.parse(oferta.items_json) : [];
+    } catch (e) {
+      items = [];
+    }
 
     const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
     const username = req.user?.username || "sistema";
@@ -752,7 +754,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
         ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
         [
           presupuestoAsignadoId,
-          item.tratamiento_id || null,
+          item.tratamientoId || item.tratamiento_id || null,
           item.nombre,
           1,
           item.precio || 0,
