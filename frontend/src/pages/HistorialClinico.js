@@ -156,6 +156,12 @@ const HistorialClinico = () => {
   const [openConfirmarCancelar, setOpenConfirmarCancelar] = useState(false);
   const [tratamientoCancelar, setTratamientoCancelar] = useState(null);
 
+  // Estados para modal de pago de presupuesto
+  const [modalPagoPresupuesto, setModalPagoPresupuesto] = useState(false);
+  const [presupuestoParaPago, setPresupuestoParaPago] = useState(null);
+  const [montoPago, setMontoPago] = useState(0);
+  const [metodoPago, setMetodoPago] = useState("efectivo");
+
   const token = localStorage.getItem("token");
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -459,6 +465,31 @@ const HistorialClinico = () => {
     } catch (error) {
       console.error("Error al eliminar presupuesto:", error);
       showToast({ severity: "error", message: error.response?.data?.message || "Error al eliminar presupuesto" });
+    }
+  };
+
+  // Registrar pago de presupuesto
+  const registrarPagoPresupuesto = async (presupuestoId, monto, metodoPago) => {
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/paquetes/presupuesto/${presupuestoId}/pago`,
+        {
+          monto: monto,
+          metodo_pago: metodoPago,
+        },
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Pago registrado exitosamente" });
+      
+      // Recargar presupuestos asignados
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+    } catch (error) {
+      console.error("Error al registrar pago:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al registrar pago" });
     }
   };
 
@@ -2300,7 +2331,7 @@ const HistorialClinico = () => {
                           )}
 
                           {/* Total del presupuesto y botones */}
-                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                             <Box>
                               <Typography variant="body2" color="text.secondary">
                                 Total del presupuesto:
@@ -2308,20 +2339,48 @@ const HistorialClinico = () => {
                               <Typography sx={{ fontWeight: "bold", color: "#a36920" }}>
                                 S/ {presupuesto.precio_total?.toFixed(2)}
                               </Typography>
+                              {presupuesto.pagado === 1 && (
+                                <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold", display: "flex", alignItems: "center", gap: 0.5 }}>
+                                  ✓ Pagado ({presupuesto.metodo_pago}) - {presupuesto.fecha_pago?.split(' ')[0]}
+                                </Typography>
+                              )}
                             </Box>
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="error"
-                              onClick={() => eliminarPresupuestoAsignado(presupuesto.id)}
-                              sx={{
-                                fontSize: "0.7rem",
-                                py: 0.5,
-                                borderRadius: 2,
-                              }}
-                            >
-                              Eliminar
-                            </Button>
+                            <Box sx={{ display: "flex", gap: 1 }}>
+                              {!presupuesto.pagado && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => {
+                                    setPresupuestoParaPago(presupuesto);
+                                    setMontoPago(presupuesto.precio_total || 0);
+                                    setMetodoPago("efectivo");
+                                    setModalPagoPresupuesto(true);
+                                  }}
+                                  sx={{
+                                    fontSize: "0.7rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    backgroundColor: "#4caf50",
+                                    "&:hover": { backgroundColor: "#388e3c" }
+                                  }}
+                                >
+                                  💰 Registrar Pago
+                                </Button>
+                              )}
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                color="error"
+                                onClick={() => eliminarPresupuestoAsignado(presupuesto.id)}
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  py: 0.5,
+                                  borderRadius: 2,
+                                }}
+                              >
+                                Eliminar
+                              </Button>
+                            </Box>
                           </Box>
                         </Paper>
                       );
@@ -3021,6 +3080,73 @@ const HistorialClinico = () => {
             }}
           >
             Generar PDF
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Registrar Pago de Presupuesto */}
+      <Dialog open={modalPagoPresupuesto} onClose={() => setModalPagoPresupuesto(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#4caf50", color: "white" }}>
+          💰 Registrar Pago
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {presupuestoParaPago && (
+            <>
+              <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
+                Presupuesto #{presupuestoParaPago.oferta_id}
+              </Typography>
+              <TextField
+                fullWidth
+                label="Monto a pagar (S/)"
+                type="number"
+                value={montoPago}
+                onChange={(e) => setMontoPago(Number(e.target.value))}
+                inputProps={{ min: 0, step: 0.01 }}
+                sx={{ mb: 2 }}
+              />
+              <FormControl fullWidth>
+                <InputLabel>Método de Pago</InputLabel>
+                <Select
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value)}
+                  label="Método de Pago"
+                >
+                  <MenuItem value="efectivo">Efectivo</MenuItem>
+                  <MenuItem value="tarjeta">Tarjeta</MenuItem>
+                  <MenuItem value="transferencia">Transferencia</MenuItem>
+                  <MenuItem value="yape">Yape</MenuItem>
+                  <MenuItem value="plin">Plin</MenuItem>
+                </Select>
+              </FormControl>
+              <Box sx={{ mt: 2, p: 1.5, backgroundColor: "rgba(76, 175, 80, 0.1)", borderRadius: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Total del presupuesto:
+                </Typography>
+                <Typography sx={{ fontWeight: "bold", color: "#4caf50", fontSize: "1.2rem" }}>
+                  S/ {presupuestoParaPago.precio_total?.toFixed(2)}
+                </Typography>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalPagoPresupuesto(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={async () => {
+              if (presupuestoParaPago) {
+                await registrarPagoPresupuesto(presupuestoParaPago.id, montoPago, metodoPago);
+                setModalPagoPresupuesto(false);
+              }
+            }}
+            sx={{
+              backgroundColor: "#4caf50",
+              "&:hover": { backgroundColor: "#388e3c" },
+            }}
+          >
+            Confirmar Pago
           </Button>
         </DialogActions>
       </Dialog>

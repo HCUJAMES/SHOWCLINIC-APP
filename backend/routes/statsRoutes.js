@@ -37,21 +37,48 @@ router.get("/overview", authMiddleware, requireRole("doctor", "admin"), async (r
 
     const { startStr, endStr } = range;
 
-    // KPIs del mes
-    const kpi = await dbGet(
+    // KPIs del mes - Tratamientos realizados
+    const kpiTratamientos = await dbGet(
       `
         SELECT
           COUNT(*) AS sesiones,
           COUNT(DISTINCT paciente_id) AS pacientes_unicos,
           COALESCE(SUM(precio_total), 0) AS ingresos_bruto,
           COALESCE(SUM(CASE WHEN lower(trim(pagoMetodo)) = 'tarjeta' THEN (precio_total * 0.96) ELSE precio_total END), 0) AS ingresos_neto,
-          COALESCE(SUM(CASE WHEN lower(trim(pagoMetodo)) = 'tarjeta' THEN (precio_total * 0.04) ELSE 0 END), 0) AS comision_pos,
-          COALESCE(AVG(CASE WHEN lower(trim(pagoMetodo)) = 'tarjeta' THEN (precio_total * 0.96) ELSE precio_total END), 0) AS ticket_promedio
+          COALESCE(SUM(CASE WHEN lower(trim(pagoMetodo)) = 'tarjeta' THEN (precio_total * 0.04) ELSE 0 END), 0) AS comision_pos
         FROM tratamientos_realizados
         WHERE date(fecha) BETWEEN date(?) AND date(?)
       `,
       [startStr, endStr]
     );
+
+    // KPIs del mes - Presupuestos pagados
+    const kpiPresupuestos = await dbGet(
+      `
+        SELECT
+          COUNT(*) AS cantidad,
+          COUNT(DISTINCT paciente_id) AS pacientes_unicos,
+          COALESCE(SUM(monto_pagado), 0) AS ingresos_bruto,
+          COALESCE(SUM(CASE WHEN lower(trim(metodo_pago)) = 'tarjeta' THEN (monto_pagado * 0.96) ELSE monto_pagado END), 0) AS ingresos_neto,
+          COALESCE(SUM(CASE WHEN lower(trim(metodo_pago)) = 'tarjeta' THEN (monto_pagado * 0.04) ELSE 0 END), 0) AS comision_pos
+        FROM presupuestos_asignados
+        WHERE pagado = 1 AND date(fecha_pago) BETWEEN date(?) AND date(?)
+      `,
+      [startStr, endStr]
+    );
+
+    // Combinar KPIs
+    const kpi = {
+      sesiones: Number(kpiTratamientos?.sesiones || 0) + Number(kpiPresupuestos?.cantidad || 0),
+      pacientes_unicos: Number(kpiTratamientos?.pacientes_unicos || 0),
+      ingresos_bruto: Number(kpiTratamientos?.ingresos_bruto || 0) + Number(kpiPresupuestos?.ingresos_bruto || 0),
+      ingresos_neto: Number(kpiTratamientos?.ingresos_neto || 0) + Number(kpiPresupuestos?.ingresos_neto || 0),
+      comision_pos: Number(kpiTratamientos?.comision_pos || 0) + Number(kpiPresupuestos?.comision_pos || 0),
+    };
+    
+    const totalIngresos = kpi.ingresos_neto;
+    const totalSesiones = kpi.sesiones;
+    kpi.ticket_promedio = totalSesiones > 0 ? totalIngresos / totalSesiones : 0;
 
     // Top tratamientos
     const topTratamientos = await dbAll(

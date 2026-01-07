@@ -916,4 +916,59 @@ router.delete("/presupuesto/paciente/:presupuesto_asignado_id", requirePaquetesA
   }
 });
 
+/* ==============================
+   💰 REGISTRAR PAGO DE PRESUPUESTO
+============================== */
+router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar, async (req, res) => {
+  const { presupuesto_asignado_id } = req.params;
+  const { monto, metodo_pago, descripcion } = req.body;
+
+  try {
+    const presupuesto = await dbGet(
+      `SELECT pa.*, p.nombre as paciente_nombre, p.dni as paciente_dni
+       FROM presupuestos_asignados pa
+       JOIN patients p ON pa.paciente_id = p.id
+       WHERE pa.id = ?`,
+      [presupuesto_asignado_id]
+    );
+
+    if (!presupuesto) {
+      return res.status(404).json({ message: "Presupuesto asignado no encontrado" });
+    }
+
+    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const montoAPagar = monto || presupuesto.precio_total;
+
+    // Actualizar presupuesto como pagado
+    await dbRun(
+      `UPDATE presupuestos_asignados 
+       SET pagado = 1, monto_pagado = ?, fecha_pago = ?, metodo_pago = ?
+       WHERE id = ?`,
+      [montoAPagar, ahora, metodo_pago || 'efectivo', presupuesto_asignado_id]
+    );
+
+    // Registrar en finanzas como ingreso
+    await dbRun(
+      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, creado_en)
+       VALUES ('ingreso', 'presupuesto', ?, ?, ?, ?, ?, ?)`,
+      [
+        montoAPagar,
+        descripcion || `Pago presupuesto #${presupuesto.oferta_id} - ${presupuesto.paciente_nombre}`,
+        ahora.split(' ')[0],
+        metodo_pago || 'efectivo',
+        presupuesto.paciente_id,
+        ahora
+      ]
+    );
+
+    res.json({ 
+      message: "✅ Pago registrado exitosamente",
+      monto_pagado: montoAPagar
+    });
+  } catch (err) {
+    console.error("❌ Error al registrar pago:", err.message);
+    res.status(500).json({ message: "Error al registrar pago" });
+  }
+});
+
 export default router;

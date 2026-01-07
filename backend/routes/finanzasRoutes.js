@@ -290,12 +290,107 @@ router.get("/reporte", (req, res) => {
       return acc;
     }, {});
 
-    res.json({
-      resultados: resultados,
-      totalGeneral,
-      totalBruto,
-      totalComision,
-      totalesPorMetodo,
+    // Obtener también los pagos de presupuestos asignados
+    let queryPresupuestos = `
+      SELECT 
+        pa.id,
+        p.nombre || ' ' || p.apellido AS paciente,
+        pa.tratamientos_json,
+        pa.fecha_pago AS fecha,
+        pa.monto_pagado AS precio_total,
+        0 AS descuento,
+        pa.metodo_pago AS pagoMetodo,
+        'presupuesto' AS tipo_registro
+      FROM presupuestos_asignados pa
+      JOIN patients p ON p.id = pa.paciente_id
+      WHERE pa.pagado = 1
+    `;
+    const paramsPresupuestos = [];
+
+    if (fechaInicio && fechaFin) {
+      queryPresupuestos += " AND DATE(datetime(pa.fecha_pago, '-5 hours')) BETWEEN ? AND ?";
+      paramsPresupuestos.push(fechaInicio, fechaFin);
+    } else if (fechaInicio) {
+      queryPresupuestos += " AND DATE(datetime(pa.fecha_pago, '-5 hours')) = ?";
+      paramsPresupuestos.push(fechaInicio);
+    }
+
+    if (paciente) {
+      queryPresupuestos += " AND p.nombre || ' ' || p.apellido LIKE ?";
+      paramsPresupuestos.push(`%${paciente}%`);
+    }
+
+    if (metodoPago) {
+      queryPresupuestos += " AND pa.metodo_pago = ?";
+      paramsPresupuestos.push(metodoPago);
+    }
+
+    db.all(queryPresupuestos, paramsPresupuestos, (errPres, rowsPresupuestos) => {
+      if (errPres) {
+        console.error("❌ Error al obtener presupuestos pagados:", errPres.message);
+      }
+      console.log("📋 Presupuestos pagados encontrados:", rowsPresupuestos?.length || 0);
+      console.log("📋 Tratamientos encontrados:", resultados?.length || 0);
+      
+      const presupuestosPagados = (rowsPresupuestos || []).map((r) => {
+        const monto = parseFloat(r.precio_total) || 0;
+        const metodo = r.pagoMetodo || "efectivo";
+        
+        // Extraer nombres de tratamientos del JSON
+        let tratamientoNombre = "Presupuesto";
+        try {
+          const tratamientos = r.tratamientos_json ? JSON.parse(r.tratamientos_json) : [];
+          if (tratamientos.length > 0) {
+            tratamientoNombre = tratamientos.map(t => t.nombre).join(", ");
+          }
+        } catch (e) {
+          tratamientoNombre = "Presupuesto";
+        }
+        
+        // Capitalizar método de pago
+        const metodoCapitalizado = metodo.charAt(0).toUpperCase() + metodo.slice(1).toLowerCase();
+        
+        return {
+          ...r,
+          tratamiento: tratamientoNombre,
+          monto_bruto: monto,
+          comision_pos: calcularComisionPOS(monto, metodoCapitalizado),
+          monto_cobrado: aplicarComisionPOS(monto, metodoCapitalizado),
+          deuda_pendiente: 0,
+          pagoMetodo: metodoCapitalizado,
+          pagoMetodo_mostrado: metodoCapitalizado,
+          tipo_registro: 'presupuesto'
+        };
+      });
+
+      // Combinar resultados
+      const todosResultados = [...resultados.map(r => ({...r, tipo_registro: 'tratamiento'})), ...presupuestosPagados];
+      
+      // Ordenar por fecha descendente
+      todosResultados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+      // Recalcular totales incluyendo presupuestos
+      const totalGeneralFinal = todosResultados.reduce((acc, r) => acc + (r.monto_cobrado || 0), 0);
+      const totalBrutoFinal = todosResultados.reduce((acc, r) => acc + (r.monto_bruto || 0), 0);
+      const totalComisionFinal = todosResultados.reduce((acc, r) => acc + (r.comision_pos || 0), 0);
+
+      // Agregar presupuestos a totales por método
+      presupuestosPagados.forEach((r) => {
+        // Capitalizar primera letra para que coincida con otros métodos (Efectivo, Tarjeta, etc.)
+        let metodo = r.pagoMetodo || "efectivo";
+        metodo = metodo.charAt(0).toUpperCase() + metodo.slice(1).toLowerCase();
+        const monto = parseFloat(r.precio_total) || 0;
+        if (!totalesPorMetodo[metodo]) totalesPorMetodo[metodo] = 0;
+        totalesPorMetodo[metodo] += aplicarComisionPOS(monto, metodo);
+      });
+
+      res.json({
+        resultados: todosResultados,
+        totalGeneral: totalGeneralFinal,
+        totalBruto: totalBrutoFinal,
+        totalComision: totalComisionFinal,
+        totalesPorMetodo,
+      });
     });
   });
 });

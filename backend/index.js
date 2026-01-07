@@ -397,6 +397,48 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 
     console.log("✅ Tablas de presupuestos asignados creadas");
 
+    // Agregar columnas de pago a presupuestos_asignados si no existen
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN pagado INTEGER DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna pagado:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN monto_pagado REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna monto_pagado:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN fecha_pago TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna fecha_pago:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN metodo_pago TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna metodo_pago:", err.message);
+      }
+    });
+
+    // 💰 Tabla de finanzas para registrar ingresos y egresos
+    db.run(`
+      CREATE TABLE IF NOT EXISTS finanzas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipo TEXT NOT NULL DEFAULT 'ingreso',
+        categoria TEXT,
+        monto REAL NOT NULL,
+        descripcion TEXT,
+        fecha TEXT,
+        metodo_pago TEXT,
+        paciente_id INTEGER,
+        referencia_id INTEGER,
+        referencia_tipo TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        creado_por TEXT,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id)
+      )
+    `);
+    console.log("✅ Tabla de finanzas creada");
+
     db.all(
       `SELECT id, observaciones FROM patients WHERE observaciones IS NOT NULL AND TRIM(observaciones) != ''`,
       [],
