@@ -290,93 +290,83 @@ router.get("/reporte", (req, res) => {
       return acc;
     }, {});
 
-    // Obtener también los pagos de presupuestos asignados
-    let queryPresupuestos = `
+    // Obtener pagos de la tabla finanzas (incluye adelantos de presupuestos y paquetes)
+    let queryFinanzas = `
       SELECT 
-        pa.id,
+        f.id,
         p.nombre || ' ' || p.apellido AS paciente,
-        pa.tratamientos_json,
-        pa.fecha_pago AS fecha,
-        pa.monto_pagado AS precio_total,
+        f.descripcion AS tratamiento,
+        f.fecha,
+        f.monto AS precio_total,
         0 AS descuento,
-        pa.metodo_pago AS pagoMetodo,
-        'presupuesto' AS tipo_registro
-      FROM presupuestos_asignados pa
-      JOIN patients p ON p.id = pa.paciente_id
-      WHERE pa.pagado = 1
+        f.metodo_pago AS pagoMetodo,
+        f.categoria AS tipo_registro,
+        f.referencia_tipo
+      FROM finanzas f
+      LEFT JOIN patients p ON p.id = f.paciente_id
+      WHERE f.tipo = 'ingreso'
+        AND f.categoria IN ('presupuesto', 'paquete', 'abono_deuda')
     `;
-    const paramsPresupuestos = [];
+    const paramsFinanzas = [];
 
     if (fechaInicio && fechaFin) {
-      queryPresupuestos += " AND DATE(datetime(pa.fecha_pago, '-5 hours')) BETWEEN ? AND ?";
-      paramsPresupuestos.push(fechaInicio, fechaFin);
+      queryFinanzas += " AND DATE(datetime(f.fecha, '-5 hours')) BETWEEN ? AND ?";
+      paramsFinanzas.push(fechaInicio, fechaFin);
     } else if (fechaInicio) {
-      queryPresupuestos += " AND DATE(datetime(pa.fecha_pago, '-5 hours')) = ?";
-      paramsPresupuestos.push(fechaInicio);
+      queryFinanzas += " AND DATE(datetime(f.fecha, '-5 hours')) = ?";
+      paramsFinanzas.push(fechaInicio);
     }
 
     if (paciente) {
-      queryPresupuestos += " AND p.nombre || ' ' || p.apellido LIKE ?";
-      paramsPresupuestos.push(`%${paciente}%`);
+      queryFinanzas += " AND p.nombre || ' ' || p.apellido LIKE ?";
+      paramsFinanzas.push(`%${paciente}%`);
     }
 
     if (metodoPago) {
-      queryPresupuestos += " AND pa.metodo_pago = ?";
-      paramsPresupuestos.push(metodoPago);
+      queryFinanzas += " AND f.metodo_pago = ?";
+      paramsFinanzas.push(metodoPago);
     }
 
-    db.all(queryPresupuestos, paramsPresupuestos, (errPres, rowsPresupuestos) => {
-      if (errPres) {
-        console.error("❌ Error al obtener presupuestos pagados:", errPres.message);
+    db.all(queryFinanzas, paramsFinanzas, (errFin, rowsFinanzas) => {
+      if (errFin) {
+        console.error("❌ Error al obtener finanzas:", errFin.message);
       }
-      console.log("📋 Presupuestos pagados encontrados:", rowsPresupuestos?.length || 0);
+      console.log("📋 Registros de finanzas encontrados:", rowsFinanzas?.length || 0);
       console.log("📋 Tratamientos encontrados:", resultados?.length || 0);
       
-      const presupuestosPagados = (rowsPresupuestos || []).map((r) => {
+      const pagosFinanzas = (rowsFinanzas || []).map((r) => {
         const monto = parseFloat(r.precio_total) || 0;
         const metodo = r.pagoMetodo || "efectivo";
-        
-        // Extraer nombres de tratamientos del JSON
-        let tratamientoNombre = "Presupuesto";
-        try {
-          const tratamientos = r.tratamientos_json ? JSON.parse(r.tratamientos_json) : [];
-          if (tratamientos.length > 0) {
-            tratamientoNombre = tratamientos.map(t => t.nombre).join(", ");
-          }
-        } catch (e) {
-          tratamientoNombre = "Presupuesto";
-        }
         
         // Capitalizar método de pago
         const metodoCapitalizado = metodo.charAt(0).toUpperCase() + metodo.slice(1).toLowerCase();
         
         return {
           ...r,
-          tratamiento: tratamientoNombre,
+          tratamiento: r.tratamiento || 'Pago',
           monto_bruto: monto,
           comision_pos: calcularComisionPOS(monto, metodoCapitalizado),
           monto_cobrado: aplicarComisionPOS(monto, metodoCapitalizado),
           deuda_pendiente: 0,
           pagoMetodo: metodoCapitalizado,
           pagoMetodo_mostrado: metodoCapitalizado,
-          tipo_registro: 'presupuesto'
+          tipo_registro: r.tipo_registro || 'otro'
         };
       });
 
       // Combinar resultados
-      const todosResultados = [...resultados.map(r => ({...r, tipo_registro: 'tratamiento'})), ...presupuestosPagados];
+      const todosResultados = [...resultados.map(r => ({...r, tipo_registro: 'tratamiento'})), ...pagosFinanzas];
       
       // Ordenar por fecha descendente
       todosResultados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
-      // Recalcular totales incluyendo presupuestos
+      // Recalcular totales incluyendo pagos de finanzas
       const totalGeneralFinal = todosResultados.reduce((acc, r) => acc + (r.monto_cobrado || 0), 0);
       const totalBrutoFinal = todosResultados.reduce((acc, r) => acc + (r.monto_bruto || 0), 0);
       const totalComisionFinal = todosResultados.reduce((acc, r) => acc + (r.comision_pos || 0), 0);
 
-      // Agregar presupuestos a totales por método
-      presupuestosPagados.forEach((r) => {
-        // Capitalizar primera letra para que coincida con otros métodos (Efectivo, Tarjeta, etc.)
+      // Agregar pagos de finanzas a totales por método
+      pagosFinanzas.forEach((r) => {
         let metodo = r.pagoMetodo || "efectivo";
         metodo = metodo.charAt(0).toUpperCase() + metodo.slice(1).toLowerCase();
         const monto = parseFloat(r.precio_total) || 0;

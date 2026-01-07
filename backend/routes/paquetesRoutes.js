@@ -4,6 +4,10 @@ import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// Función para obtener fecha/hora de Perú (GMT-5)
+const fechaLima = () =>
+  new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
+
 // Middleware para verificar permisos
 // Solo master puede crear/editar/eliminar paquetes base
 const requirePaquetesWrite = [authMiddleware, requireRole("master")];
@@ -38,7 +42,7 @@ router.get("/", authMiddleware, async (req, res) => {
 ============================== */
 router.get("/activos", authMiddleware, async (req, res) => {
   try {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = fechaLima().split(" ")[0];
     
     const paquetes = await dbAll(
       `SELECT 
@@ -151,7 +155,7 @@ router.post("/", requirePaquetesWrite, async (req, res) => {
       ? JSON.stringify(productos) 
       : null;
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const ahora = fechaLima();
     const username = req.user?.username || "sistema";
 
     const result = await dbRun(
@@ -258,7 +262,7 @@ router.put("/:id", requirePaquetesWrite, async (req, res) => {
       ? (productos && productos.length > 0 ? JSON.stringify(productos) : null)
       : paquete.productos_json;
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const ahora = fechaLima();
 
     await dbRun(
       `UPDATE paquetes_tratamientos SET
@@ -347,7 +351,7 @@ router.patch("/:id/estado", requirePaquetesWrite, async (req, res) => {
       return res.status(404).json({ message: "Paquete no encontrado" });
     }
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const ahora = fechaLima();
 
     await dbRun(
       `UPDATE paquetes_tratamientos SET estado = ?, actualizado_en = ? WHERE id = ?`,
@@ -388,7 +392,7 @@ router.post("/asignar", requirePaquetesAsignar, async (req, res) => {
       return res.status(400).json({ message: "El paquete no está activo" });
     }
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const ahora = fechaLima();
     const username = req.user?.username || "sistema";
 
     // Crear registro de paquete asignado
@@ -546,7 +550,7 @@ router.patch("/sesion/:sesion_id/completar", requirePaquetesAsignar, async (req,
       return res.status(400).json({ message: "La sesión ya está completada" });
     }
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const ahora = fechaLima();
 
     await dbRun(
       `UPDATE paquetes_sesiones SET 
@@ -672,7 +676,7 @@ router.patch("/paciente/:paquete_paciente_id/cancelar", requirePaquetesAsignar, 
       return res.status(404).json({ message: "Paquete del paciente no encontrado" });
     }
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const ahora = fechaLima();
 
     await dbRun(
       `UPDATE paquetes_pacientes SET estado = 'cancelado', fecha_fin = ? WHERE id = ?`,
@@ -683,6 +687,90 @@ router.patch("/paciente/:paquete_paciente_id/cancelar", requirePaquetesAsignar, 
   } catch (err) {
     console.error("❌ Error al cancelar paquete:", err.message);
     res.status(500).json({ message: "Error al cancelar paquete" });
+  }
+});
+
+/* ==============================
+   💰 REGISTRAR PAGO DE PAQUETE (Total o Adelanto)
+============================== */
+router.post("/paquete-paciente/:paquete_paciente_id/pago", requirePaquetesAsignar, async (req, res) => {
+  const { paquete_paciente_id } = req.params;
+  const { monto, metodo_pago, tipo_pago } = req.body;
+  // tipo_pago: 'total', 'adelanto', 'saldo'
+
+  try {
+    const paquete = await dbGet(
+      `SELECT pp.*, p.nombre as paciente_nombre, p.apellido as paciente_apellido
+       FROM paquetes_pacientes pp
+       JOIN patients p ON pp.paciente_id = p.id
+       WHERE pp.id = ?`,
+      [paquete_paciente_id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete asignado no encontrado" });
+    }
+
+    const ahora = fechaLima();
+    const montoRecibido = parseFloat(monto) || 0;
+    const precioTotal = parseFloat(paquete.precio_total) || 0;
+    const montoYaPagado = parseFloat(paquete.monto_pagado) || 0;
+    const adelantoAnterior = parseFloat(paquete.monto_adelanto) || 0;
+
+    let nuevoMontoPagado = montoYaPagado + montoRecibido;
+    let nuevoAdelanto = adelantoAnterior;
+    let nuevoSaldo = precioTotal - nuevoMontoPagado;
+    let estadoPago = 'pendiente_pago';
+    let pagadoFlag = 0;
+
+    if (tipo_pago === 'adelanto') {
+      nuevoAdelanto = adelantoAnterior + montoRecibido;
+      estadoPago = 'adelanto';
+      pagadoFlag = 0;
+    } else if (tipo_pago === 'saldo' || nuevoMontoPagado >= precioTotal) {
+      estadoPago = 'pagado';
+      pagadoFlag = 1;
+      nuevoSaldo = 0;
+    } else if (nuevoMontoPagado > 0) {
+      estadoPago = 'adelanto';
+      pagadoFlag = 0;
+    }
+
+    // Actualizar paquete
+    await dbRun(
+      `UPDATE paquetes_pacientes 
+       SET pagado = ?, monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, 
+           estado_pago = ?, fecha_pago = ?, metodo_pago = ?
+       WHERE id = ?`,
+      [pagadoFlag, nuevoMontoPagado, nuevoAdelanto, nuevoSaldo, estadoPago, ahora, metodo_pago || 'efectivo', paquete_paciente_id]
+    );
+
+    // Registrar en finanzas como ingreso
+    const tipoDesc = tipo_pago === 'adelanto' ? 'Adelanto' : tipo_pago === 'saldo' ? 'Saldo' : 'Pago';
+    const nombrePaciente = `${paquete.paciente_nombre} ${paquete.paciente_apellido || ''}`.trim();
+    await dbRun(
+      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+       VALUES ('ingreso', 'paquete', ?, ?, ?, ?, ?, ?, 'paquete_paciente', ?)`,
+      [
+        montoRecibido,
+        `${tipoDesc} paquete ${paquete.paquete_nombre} - ${nombrePaciente}`,
+        ahora.split(' ')[0],
+        metodo_pago || 'efectivo',
+        paquete.paciente_id,
+        paquete_paciente_id,
+        ahora
+      ]
+    );
+
+    res.json({ 
+      message: `✅ ${tipoDesc} registrado exitosamente`,
+      monto_pagado: nuevoMontoPagado,
+      saldo_pendiente: nuevoSaldo,
+      estado_pago: estadoPago
+    });
+  } catch (err) {
+    console.error("❌ Error al registrar pago de paquete:", err.message);
+    res.status(500).json({ message: "Error al registrar pago" });
   }
 });
 
@@ -719,7 +807,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
       items = [];
     }
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const ahora = fechaLima();
     const username = req.user?.username || "sistema";
 
     // Calcular precio total
@@ -822,7 +910,7 @@ router.patch("/presupuesto/sesion/:sesion_id/completar", requirePaquetesAsignar,
       return res.status(404).json({ message: "Sesión no encontrada" });
     }
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
+    const ahora = fechaLima();
     const especialista = req.user?.username || "sistema";
 
     await dbRun(
@@ -917,11 +1005,12 @@ router.delete("/presupuesto/paciente/:presupuesto_asignado_id", requirePaquetesA
 });
 
 /* ==============================
-   💰 REGISTRAR PAGO DE PRESUPUESTO
+   💰 REGISTRAR PAGO DE PRESUPUESTO (Total o Adelanto)
 ============================== */
 router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar, async (req, res) => {
   const { presupuesto_asignado_id } = req.params;
-  const { monto, metodo_pago, descripcion } = req.body;
+  const { monto, metodo_pago, descripcion, tipo_pago } = req.body;
+  // tipo_pago: 'total', 'adelanto', 'saldo'
 
   try {
     const presupuesto = await dbGet(
@@ -936,24 +1025,51 @@ router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar
       return res.status(404).json({ message: "Presupuesto asignado no encontrado" });
     }
 
-    const ahora = new Date().toISOString().replace("T", " ").slice(0, 19);
-    const montoAPagar = monto || presupuesto.precio_total;
+    const ahora = fechaLima();
+    const montoRecibido = parseFloat(monto) || 0;
+    const precioTotal = parseFloat(presupuesto.precio_total) || 0;
+    const montoYaPagado = parseFloat(presupuesto.monto_pagado) || 0;
+    const adelantoAnterior = parseFloat(presupuesto.monto_adelanto) || 0;
 
-    // Actualizar presupuesto como pagado
+    let nuevoMontoPagado = montoYaPagado + montoRecibido;
+    let nuevoAdelanto = adelantoAnterior;
+    let nuevoSaldo = precioTotal - nuevoMontoPagado;
+    let estadoPago = 'pendiente_pago';
+    let pagadoFlag = 0;
+
+    if (tipo_pago === 'adelanto') {
+      // Es un adelanto
+      nuevoAdelanto = adelantoAnterior + montoRecibido;
+      estadoPago = 'adelanto';
+      pagadoFlag = 0;
+    } else if (tipo_pago === 'saldo' || nuevoMontoPagado >= precioTotal) {
+      // Pago del saldo restante o pago total
+      estadoPago = 'pagado';
+      pagadoFlag = 1;
+      nuevoSaldo = 0;
+    } else if (nuevoMontoPagado > 0) {
+      // Pago parcial
+      estadoPago = 'adelanto';
+      pagadoFlag = 0;
+    }
+
+    // Actualizar presupuesto
     await dbRun(
       `UPDATE presupuestos_asignados 
-       SET pagado = 1, monto_pagado = ?, fecha_pago = ?, metodo_pago = ?
+       SET pagado = ?, monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, 
+           estado_pago = ?, fecha_pago = ?, metodo_pago = ?
        WHERE id = ?`,
-      [montoAPagar, ahora, metodo_pago || 'efectivo', presupuesto_asignado_id]
+      [pagadoFlag, nuevoMontoPagado, nuevoAdelanto, nuevoSaldo, estadoPago, ahora, metodo_pago || 'efectivo', presupuesto_asignado_id]
     );
 
     // Registrar en finanzas como ingreso
+    const tipoDesc = tipo_pago === 'adelanto' ? 'Adelanto' : tipo_pago === 'saldo' ? 'Saldo' : 'Pago';
     await dbRun(
       `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, creado_en)
        VALUES ('ingreso', 'presupuesto', ?, ?, ?, ?, ?, ?)`,
       [
-        montoAPagar,
-        descripcion || `Pago presupuesto #${presupuesto.oferta_id} - ${presupuesto.paciente_nombre}`,
+        montoRecibido,
+        descripcion || `${tipoDesc} presupuesto #${presupuesto.oferta_id} - ${presupuesto.paciente_nombre}`,
         ahora.split(' ')[0],
         metodo_pago || 'efectivo',
         presupuesto.paciente_id,
@@ -962,8 +1078,10 @@ router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar
     );
 
     res.json({ 
-      message: "✅ Pago registrado exitosamente",
-      monto_pagado: montoAPagar
+      message: `✅ ${tipoDesc} registrado exitosamente`,
+      monto_pagado: nuevoMontoPagado,
+      saldo_pendiente: nuevoSaldo,
+      estado_pago: estadoPago
     });
   } catch (err) {
     console.error("❌ Error al registrar pago:", err.message);

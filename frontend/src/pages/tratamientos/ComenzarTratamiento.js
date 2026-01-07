@@ -22,7 +22,7 @@ import {
   ListItemText,
 } from "@mui/material";
 import { ArrowBack, Receipt, Home } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "../../components/ToastProvider";
 
@@ -31,6 +31,7 @@ const API_BASE_URL =
 
 const ComenzarTratamiento = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const colorPrincipal = "#a36920";
   const { showToast } = useToast();
   const token = localStorage.getItem("token");
@@ -40,6 +41,7 @@ const ComenzarTratamiento = () => {
   const [variantesInv, setVariantesInv] = useState([]);
   const [especialistas, setEspecialistas] = useState([]);
   const [recetasPorTratamiento, setRecetasPorTratamiento] = useState({});
+  const [cargaInicial, setCargaInicial] = useState(false);
 
   // Estado para presupuestos/ofertas del paciente
   const [ofertasPaciente, setOfertasPaciente] = useState([]);
@@ -51,7 +53,7 @@ const ComenzarTratamiento = () => {
   const [tipoAtencion, setTipoAtencion] = useState("Tratamiento");
   const [paciente_id, setPaciente_id] = useState("");
   const [especialista, setEspecialista] = useState("");
-  const [pagoMetodo, setPagoMetodo] = useState("Efectivo");
+  // Pagos se manejan desde el historial del paciente
   const [sesion, setSesion] = useState(1);
   const [bloques, setBloques] = useState([
     {
@@ -61,63 +63,151 @@ const ComenzarTratamiento = () => {
       marca: "",
       cantidad: 1,
       dosis_unidades: "",
-      precio: 0,
-      descuento: 0,
-      total: 0,
-      pago_en_partes: false,
-      monto_adelanto: "",
     },
   ]);
 
-  const [totalGeneral, setTotalGeneral] = useState(0);
 
   // Cargar datos iniciales
   useEffect(() => {
-    axios
-      .get(`${API_BASE_URL}/api/pacientes/listar`, { headers: authHeaders })
-      .then((res) => setPacientes(res.data));
-    axios
-      .get(`${API_BASE_URL}/api/tratamientos/listar`, { headers: authHeaders })
-      .then((res) => setTratamientos(res.data));
-    axios
-      .get(`${API_BASE_URL}/api/inventario/variantes`, { headers: authHeaders })
-      .then((res) => setVariantesInv(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setVariantesInv([]));
-    axios
-      .get(`${API_BASE_URL}/api/especialistas/listar`, { headers: authHeaders })
-      .then((res) => setEspecialistas(res.data));
+    const cargarDatos = async () => {
+      try {
+        const [pacientesRes, tratamientosRes, variantesRes, especialistasRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/pacientes/listar`, { headers: authHeaders }),
+          axios.get(`${API_BASE_URL}/api/tratamientos/listar`, { headers: authHeaders }),
+          axios.get(`${API_BASE_URL}/api/inventario/variantes`, { headers: authHeaders }).catch(() => ({ data: [] })),
+          axios.get(`${API_BASE_URL}/api/especialistas/listar`, { headers: authHeaders }),
+        ]);
+        
+        setPacientes(pacientesRes.data);
+        setTratamientos(tratamientosRes.data);
+        setVariantesInv(Array.isArray(variantesRes.data) ? variantesRes.data : []);
+        setEspecialistas(especialistasRes.data);
+        setCargaInicial(true);
+      } catch (err) {
+        console.error("Error cargando datos iniciales:", err);
+        setCargaInicial(true);
+      }
+    };
+    cargarDatos();
   }, []);
 
-  // Calcular total general
+  // Cargar paciente y presupuesto/paquete desde URL
   useEffect(() => {
-    const total = bloques.reduce((sum, b) => sum + b.total, 0);
-    setTotalGeneral(total);
-  }, [bloques]);
+    if (!cargaInicial || tratamientos.length === 0) return;
+    
+    const pacienteParam = searchParams.get("paciente");
+    const presupuestoParam = searchParams.get("presupuesto");
+    const paqueteParam = searchParams.get("paquete");
+    
+    if (pacienteParam) {
+      setPaciente_id(pacienteParam);
+      
+      // Si viene con presupuesto asignado, cargarlo automáticamente
+      if (presupuestoParam) {
+        axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteParam}`, { headers: authHeaders })
+          .then((res) => {
+            const presupuestos = Array.isArray(res.data) ? res.data : [];
+            const presupuestoEncontrado = presupuestos.find(p => String(p.id) === String(presupuestoParam));
+            if (presupuestoEncontrado) {
+              // Parsear tratamientos del presupuesto asignado
+              let tratamientosPresupuesto = [];
+              try {
+                tratamientosPresupuesto = presupuestoEncontrado.tratamientos_json 
+                  ? JSON.parse(presupuestoEncontrado.tratamientos_json) 
+                  : [];
+              } catch (e) {
+                tratamientosPresupuesto = [];
+              }
+              
+              // Crear bloques a partir de los tratamientos del presupuesto
+              const nuevosBloques = tratamientosPresupuesto.map((item) => {
+                const nombreTratamiento = String(item.nombre || item.tratamiento || "").trim().toLowerCase();
+                const tratamientoIdGuardado = item.tratamiento_id || item.tratamientoId;
+                
+                let tratamientoEncontrado = null;
+                if (tratamientoIdGuardado) {
+                  tratamientoEncontrado = tratamientos.find(
+                    (t) => t.id === tratamientoIdGuardado || String(t.id) === String(tratamientoIdGuardado)
+                  );
+                }
+                if (!tratamientoEncontrado && nombreTratamiento) {
+                  tratamientoEncontrado = tratamientos.find(
+                    (t) => String(t.nombre || "").trim().toLowerCase() === nombreTratamiento
+                  );
+                }
+                
+                return {
+                  tratamiento_id: tratamientoEncontrado?.id || "",
+                  producto: "",
+                  variante_id: "",
+                  marca: "",
+                  cantidad: 1,
+                  dosis_unidades: "",
+                };
+              });
+              
+              if (nuevosBloques.length > 0) {
+                setBloques(nuevosBloques);
+                setPresupuestoAplicado(true);
+                showToast({ severity: "success", message: "Presupuesto cargado automáticamente" });
+              } else {
+                showToast({ severity: "warning", message: "El presupuesto no tiene tratamientos configurados" });
+              }
+            } else {
+              showToast({ severity: "warning", message: "Presupuesto no encontrado" });
+            }
+          })
+          .catch((err) => {
+            console.error("Error cargando presupuesto:", err);
+            showToast({ severity: "error", message: "Error al cargar el presupuesto" });
+          });
+      }
+      
+      // Si viene con paquete, cargarlo automáticamente
+      if (paqueteParam) {
+        axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteParam}`, { headers: authHeaders })
+          .then((res) => {
+            const paquetes = Array.isArray(res.data) ? res.data : [];
+            const paqueteEncontrado = paquetes.find(p => String(p.id) === String(paqueteParam));
+            if (paqueteEncontrado) {
+              const sesionesPendientes = (paqueteEncontrado.sesiones || []).filter(s => s.estado === 'pendiente');
+              
+              if (sesionesPendientes.length > 0) {
+                const nuevosBloques = sesionesPendientes.map((sesion) => {
+                  const tratamientoEncontrado = tratamientos.find(
+                    (t) => t.id === sesion.tratamiento_id || String(t.id) === String(sesion.tratamiento_id)
+                  );
+                  
+                  return {
+                    tratamiento_id: tratamientoEncontrado?.id || sesion.tratamiento_id,
+                    producto: "",
+                    variante_id: "",
+                    marca: "",
+                    cantidad: 1,
+                    dosis_unidades: "",
+                    sesion_paquete_id: sesion.id,
+                  };
+                });
+                
+                setBloques(nuevosBloques);
+                setPresupuestoAplicado(true);
+                setPaqueteAplicado(paqueteEncontrado);
+                showToast({ severity: "success", message: `Paquete "${paqueteEncontrado.paquete_nombre}" cargado - ${sesionesPendientes.length} sesión(es)` });
+              } else {
+                showToast({ severity: "warning", message: "No hay sesiones pendientes en este paquete" });
+              }
+            }
+          })
+          .catch((err) => console.error("Error cargando paquete:", err));
+      }
+    }
+  }, [cargaInicial, tratamientos, searchParams]);
 
-  // Recalcular totales cuando cambian los bloques
-  useEffect(() => {
-    setBloques((prev) =>
-      (prev || []).map((b) => {
-        const precio = parseFloat(b?.precio) || 0;
-        const cantidad = parseFloat(b?.cantidad) || 1;
-        const descuento = parseFloat(b?.descuento) || 0;
-
-        const subtotal = precio * cantidad;
-        const totalConDescuento = subtotal - subtotal * (descuento / 100);
-
-        return { ...b, total: totalConDescuento };
-      })
-    );
-  }, [recetasPorTratamiento]);
 
   // Actualizar bloque de tratamiento
   const actualizarBloque = (index, campo, valor) => {
     const nuevosBloques = [...bloques];
     nuevosBloques[index][campo] = valor;
-
-    if (campo === "pago_en_partes" && !valor) {
-      nuevosBloques[index].monto_adelanto = "";
-    }
 
     if (campo === "tratamiento_id") {
       const tratamientoId = valor;
@@ -134,40 +224,7 @@ const ComenzarTratamiento = () => {
             setRecetasPorTratamiento((prev) => ({ ...prev, [tratamientoId]: [] }));
           });
       }
-
-      // Si el tratamiento tiene receta, por defecto la dosis queda vacía para que el doctor la indique
-      // y la cantidad (venta) se mantiene para no romper precios.
     }
-
-    if (campo === "variante_id") {
-      const v = valor
-        ? variantesInv.find((x) => String(x.id) === String(valor))
-        : null;
-      
-      // Solo actualizar el precio si NO hay un precio manual ya establecido (presupuesto)
-      const precioActual = parseFloat(nuevosBloques[index].precio) || 0;
-      const tienePresupuesto = presupuestoAplicado && precioActual > 0;
-      
-      if (!tienePresupuesto) {
-        // Usar precio_cliente (precio de venta al paciente) si existe, sino precio_unitario
-        if (v && (v.precio_cliente != null || v.precio_unitario != null)) {
-          nuevosBloques[index].precio = Number(v.precio_cliente) || Number(v.precio_unitario) || 0;
-        } else {
-          nuevosBloques[index].precio = 0;
-        }
-      }
-    }
-
-    const precio = parseFloat(nuevosBloques[index].precio) || 0;
-    const cantidad = parseFloat(nuevosBloques[index].cantidad) || 1;
-    const descuento = parseFloat(nuevosBloques[index].descuento) || 0;
-
-    // Calcular subtotal: precio * cantidad (ml)
-    const subtotal = precio * cantidad;
-
-    const totalConDescuento = subtotal - subtotal * (descuento / 100);
-
-    nuevosBloques[index].total = totalConDescuento;
 
     setBloques(nuevosBloques);
   };
@@ -183,11 +240,6 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
-        precio: 0,
-        descuento: 0,
-        total: 0,
-        pago_en_partes: false,
-        monto_adelanto: "",
       },
     ]);
   };
@@ -281,11 +333,6 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
-        precio: Number(item.precio) || 0,
-        descuento: 0,
-        total: Number(item.precio) || 0,
-        pago_en_partes: false,
-        monto_adelanto: "",
       };
     });
 
@@ -333,11 +380,6 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
-        precio: Number(sesion.precio_sesion) || 0,
-        descuento: 0,
-        total: Number(sesion.precio_sesion) || 0,
-        pago_en_partes: false,
-        monto_adelanto: "",
         sesion_paquete_id: sesion.id, // Guardar referencia a la sesión del paquete
       };
     });
@@ -363,11 +405,6 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
-        precio: 0,
-        descuento: 0,
-        total: 0,
-        pago_en_partes: false,
-        monto_adelanto: "",
       },
     ]);
     setPresupuestoAplicado(false);
@@ -375,7 +412,7 @@ const ComenzarTratamiento = () => {
     showToast({ severity: "info", message: "Presupuesto cancelado" });
   };
 
-  // Guardar tratamiento
+  // Guardar tratamiento (solo registra en historial, sin pagos)
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -389,39 +426,19 @@ const ComenzarTratamiento = () => {
       return;
     }
 
-    // Validar que cada bloque tenga al menos un precio establecido (excepto si viene de un paquete)
-    const bloqueSinPrecio = (bloquesValidos || []).find((b) => {
-      // Si viene de un paquete, no validar precio (ya fue pagado)
-      if (b.sesion_paquete_id) return false;
-      
-      const tienePrecio = parseFloat(b?.precio) > 0;
-      const tieneTotal = parseFloat(b?.total) > 0;
-      
-      // Si tiene precio o total, está OK
-      return !tienePrecio && !tieneTotal;
-    });
-
-    if (bloqueSinPrecio) {
-      showToast({
-        severity: "warning",
-        message: "Establece un precio para cada tratamiento antes de guardar",
-      });
-      return;
-    }
-
     const data = new FormData();
     data.append("tipoAtencion", tipoAtencion);
     data.append("paciente_id", paciente_id);
     data.append("especialista", especialista);
-    data.append("pagoMetodo", pagoMetodo);
     data.append("sesion", sesion);
     data.append("productos", JSON.stringify(bloquesValidos));
+    data.append("sinPago", "true"); // Indicar que no hay pago en esta sesión
 
     try {
       const res = await axios.post(`${API_BASE_URL}/api/tratamientos/realizado`, data, {
         headers: authHeaders,
       });
-      showToast({ severity: "success", message: res.data.message || "Tratamiento registrado correctamente" });
+      showToast({ severity: "success", message: res.data.message || "Sesión registrada correctamente" });
       
       // Si hay sesiones de paquete, marcarlas como completadas
       const sesionesConPaquete = bloquesValidos.filter(b => b.sesion_paquete_id);
@@ -443,7 +460,6 @@ const ComenzarTratamiento = () => {
       // Limpiar formulario
       setPaciente_id("");
       setEspecialista("");
-      setPagoMetodo("Efectivo");
       setSesion(1);
       setBloques([
         {
@@ -453,14 +469,8 @@ const ComenzarTratamiento = () => {
           marca: "",
           cantidad: 1,
           dosis_unidades: "",
-          precio: 0,
-          descuento: 0,
-          total: 0,
-          pago_en_partes: false,
-          monto_adelanto: "",
         },
       ]);
-      setTotalGeneral(0);
       setPresupuestoAplicado(false);
       setPaqueteAplicado(null);
     } catch (err) {
@@ -469,7 +479,7 @@ const ComenzarTratamiento = () => {
       const msg = err?.response?.data?.message;
       showToast({
         severity: "error",
-        message: msg ? `Error al registrar tratamiento${status ? ` (${status})` : ""}: ${msg}` : "Error al registrar tratamiento",
+        message: msg ? `Error al registrar sesión${status ? ` (${status})` : ""}: ${msg}` : "Error al registrar sesión",
       });
     }
   };
@@ -709,21 +719,6 @@ const ComenzarTratamiento = () => {
                             Quitar
                           </Button>
                         )}
-                        <Box
-                          sx={{
-                            px: 1.5,
-                            py: 0.8,
-                            borderRadius: 999,
-                            backgroundColor: "rgba(255,246,234,0.95)",
-                            border: "1px solid rgba(224,195,155,0.9)",
-                          }}
-                        >
-                          <Typography
-                            sx={{ color: colorPrincipal, fontWeight: 800, fontSize: 13 }}
-                          >
-                            Total: S/ {b.total.toFixed(2)}
-                          </Typography>
-                        </Box>
                       </Box>
                     </Box>
 
@@ -731,7 +726,7 @@ const ComenzarTratamiento = () => {
                       variant="body2"
                       sx={{ color: "rgba(46,46,46,0.70)", mb: 2.5 }}
                     >
-                      Completa los campos para registrar el detalle de la venta.
+                      Completa los campos para registrar la sesión.
                     </Typography>
 
                     <Grid container spacing={2.2}>
@@ -864,78 +859,6 @@ const ComenzarTratamiento = () => {
                         />
                       </Grid>
 
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField
-                          label="Precio Unitario (S/)"
-                          type="number"
-                          value={b.precio}
-                          onChange={(e) => actualizarBloque(index, "precio", parseFloat(e.target.value) || 0)}
-                          fullWidth
-                          sx={{
-                            "& .MuiInputBase-root": {
-                              borderRadius: 3,
-                              backgroundColor: "rgba(255,255,255,0.95)",
-                              minHeight: "56px",
-                            },
-                          }}
-                        />
-                      </Grid>
-
-                      <Grid item xs={12} sm={6} md={4}>
-                        <FormControl fullWidth>
-                          <Select
-                            value={b.pago_en_partes ? "SI" : "NO"}
-                            onChange={(e) =>
-                              actualizarBloque(index, "pago_en_partes", e.target.value === "SI")
-                            }
-                            inputProps={{ "aria-label": "Pago en partes" }}
-                            sx={{
-                              minHeight: "56px",
-                              backgroundColor: "rgba(255,255,255,0.95)",
-                              borderRadius: 3,
-                            }}
-                          >
-                            <MenuItem value="NO">Pago completo</MenuItem>
-                            <MenuItem value="SI">Pago en partes</MenuItem>
-                          </Select>
-                        </FormControl>
-                      </Grid>
-
-                      {b.pago_en_partes && (
-                        <Grid item xs={12} sm={6} md={4}>
-                          <TextField
-                            label="Adelanto (S/)"
-                            type="number"
-                            fullWidth
-                            value={b.monto_adelanto}
-                            onChange={(e) => actualizarBloque(index, "monto_adelanto", e.target.value)}
-                            sx={{
-                              "& .MuiInputBase-root": {
-                                borderRadius: 3,
-                                backgroundColor: "rgba(255,255,255,0.95)",
-                                minHeight: "56px",
-                              },
-                            }}
-                            helperText="Se registrará como deuda pendiente."
-                          />
-                        </Grid>
-                      )}
-
-                      <Grid item xs={12} sm={6} md={4}>
-                        <TextField
-                          label="Descuento (%)"
-                          type="number"
-                          fullWidth
-                          value={b.descuento}
-                          onChange={(e) => actualizarBloque(index, "descuento", parseFloat(e.target.value))}
-                          sx={{
-                            "& .MuiInputBase-root": {
-                              borderRadius: 3,
-                              backgroundColor: "rgba(255,255,255,0.95)",
-                            },
-                          }}
-                        />
-                      </Grid>
                     </Grid>
                   </Paper>
                 </Grid>
@@ -1006,53 +929,18 @@ const ComenzarTratamiento = () => {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12}>
-                <FormControl fullWidth>
-                  <Select
-                    value={pagoMetodo}
-                    onChange={(e) => setPagoMetodo(e.target.value)}
-                    inputProps={{ "aria-label": "Método de Pago" }}
-                    sx={{
-                      minHeight: "56px",
-                      backgroundColor: "rgba(255,255,255,0.95)",
-                      borderRadius: 3,
-                    }}
-                  >
-                    <MenuItem value="Efectivo">Efectivo</MenuItem>
-                    <MenuItem value="Tarjeta">Tarjeta</MenuItem>
-                    <MenuItem value="Transferencia">Transferencia</MenuItem>
-                    <MenuItem value="Yape">Yape</MenuItem>
-                    <MenuItem value="Plin">Plin</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {/* Total general */}
+              {/* Mensaje informativo */}
               <Grid item xs={12}>
                 <Box
                   sx={{
-                    mt: 2,
-                    mb: 2,
                     p: 2,
-                    borderRadius: 4,
-                    border: "1px solid rgba(224,195,155,0.9)",
-                    background:
-                      "linear-gradient(90deg, rgba(255,246,234,0.92), rgba(255,255,255,0.85))",
-                    boxShadow: "0 10px 22px rgba(0,0,0,0.06)",
-                    textAlign: "center",
+                    borderRadius: 2,
+                    backgroundColor: "rgba(163,105,32,0.08)",
+                    border: "1px solid rgba(163,105,32,0.25)",
                   }}
                 >
-                  <Typography
-                    variant="overline"
-                    sx={{ color: "rgba(46,46,46,0.72)", letterSpacing: 1.2 }}
-                  >
-                    Total general
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    sx={{ color: colorPrincipal, fontWeight: 900, mt: 0.2 }}
-                  >
-                    S/ {totalGeneral.toFixed(2)}
+                  <Typography variant="body2" sx={{ color: "#a36920", fontWeight: 600 }}>
+                    💰 Los pagos se gestionan desde el historial del paciente (Presupuestos Asignados / Paquetes)
                   </Typography>
                 </Box>
               </Grid>

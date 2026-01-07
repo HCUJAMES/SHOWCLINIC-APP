@@ -78,6 +78,26 @@ const abonarDeuda = async ({ deudaIdNum, metodoStr, montoNum, fechaLocal }) => {
     [deudaIdNum, numeroPago, montoNum, metodoStr, fechaLocal]
   );
 
+  // 💰 Registrar abono en finanzas
+  const pacienteInfo = await dbGet(`SELECT nombre, apellido FROM patients WHERE id = ?`, [deuda.paciente_id]);
+  const nombrePaciente = pacienteInfo ? `${pacienteInfo.nombre} ${pacienteInfo.apellido || ''}`.trim() : `Paciente #${deuda.paciente_id}`;
+  const tratamientoInfo = await dbGet(`SELECT nombre FROM tratamientos WHERE id = ?`, [deuda.tratamiento_id]);
+  const nombreTratamiento = tratamientoInfo?.nombre || 'Tratamiento';
+  
+  await dbRun(
+    `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+     VALUES ('ingreso', 'abono_deuda', ?, ?, ?, ?, ?, ?, 'deuda_tratamiento', ?)`,
+    [
+      montoNum,
+      `Abono #${numeroPago} - ${nombreTratamiento} - ${nombrePaciente}`,
+      fechaLocal.split(' ')[0],
+      metodoStr || 'efectivo',
+      deuda.paciente_id,
+      deudaIdNum,
+      fechaLocal
+    ]
+  );
+
   const nuevoTotalPagado = totalPagado + montoNum;
   const nuevoSaldo = Math.max(0, montoTotal - nuevoTotalPagado);
 
@@ -159,7 +179,8 @@ router.get("/listar", async (req, res) => {
           p.apellido AS paciente_apellido,
           p.dni AS paciente_dni,
           t.nombre AS tratamiento_nombre,
-          tr.fecha AS fecha_tratamiento
+          tr.fecha AS fecha_tratamiento,
+          'tratamiento' AS tipo_deuda
         FROM deudas_tratamientos d
         LEFT JOIN patients p ON p.id = d.paciente_id
         LEFT JOIN tratamientos t ON t.id = d.tratamiento_id
@@ -170,7 +191,85 @@ router.get("/listar", async (req, res) => {
       params
     );
 
-    res.json(rows);
+    // Obtener saldos pendientes de presupuestos asignados
+    const presupuestosPendientes = await dbAll(
+      `
+        SELECT
+          pa.id,
+          pa.paciente_id,
+          p.nombre AS paciente_nombre,
+          p.apellido AS paciente_apellido,
+          p.dni AS paciente_dni,
+          pa.tratamientos_json,
+          pa.precio_total AS monto_total,
+          pa.monto_pagado AS monto_adelanto,
+          pa.saldo_pendiente AS monto_saldo,
+          pa.fecha_inicio AS fecha_tratamiento,
+          pa.estado_pago,
+          'presupuesto' AS tipo_deuda
+        FROM presupuestos_asignados pa
+        LEFT JOIN patients p ON p.id = pa.paciente_id
+        WHERE pa.estado_pago = 'adelanto' 
+          AND pa.pagado = 0
+          AND (pa.saldo_pendiente > 0 OR (pa.precio_total - COALESCE(pa.monto_pagado, 0)) > 0)
+      `
+    );
+
+    // Extraer nombre del tratamiento del JSON para presupuestos
+    const presupuestosFormateados = presupuestosPendientes.map(p => {
+      let tratamientoNombre = 'Presupuesto';
+      try {
+        const tratamientos = p.tratamientos_json ? JSON.parse(p.tratamientos_json) : [];
+        if (tratamientos.length > 0) {
+          tratamientoNombre = tratamientos.map(t => t.nombre).join(', ');
+        }
+      } catch (e) {}
+      return {
+        ...p,
+        tratamiento_nombre: tratamientoNombre,
+        monto_saldo: p.monto_saldo || (p.monto_total - (p.monto_adelanto || 0)),
+        estado: 'pendiente'
+      };
+    });
+
+    // Obtener saldos pendientes de paquetes asignados
+    const paquetesPendientes = await dbAll(
+      `
+        SELECT
+          pp.id,
+          pp.paciente_id,
+          p.nombre AS paciente_nombre,
+          p.apellido AS paciente_apellido,
+          p.dni AS paciente_dni,
+          pp.paquete_nombre AS tratamiento_nombre,
+          pp.precio_total AS monto_total,
+          pp.monto_pagado AS monto_adelanto,
+          pp.saldo_pendiente AS monto_saldo,
+          pp.fecha_inicio AS fecha_tratamiento,
+          pp.estado_pago,
+          'paquete' AS tipo_deuda
+        FROM paquetes_pacientes pp
+        LEFT JOIN patients p ON p.id = pp.paciente_id
+        WHERE pp.estado_pago = 'adelanto' 
+          AND pp.pagado = 0
+          AND (pp.saldo_pendiente > 0 OR (pp.precio_total - COALESCE(pp.monto_pagado, 0)) > 0)
+      `
+    );
+
+    // Formatear paquetes
+    const paquetesFormateados = paquetesPendientes.map(p => ({
+      ...p,
+      monto_saldo: p.monto_saldo || (p.monto_total - (p.monto_adelanto || 0)),
+      estado: 'pendiente'
+    }));
+
+    // Combinar todas las deudas
+    const todasDeudas = [...rows, ...presupuestosFormateados, ...paquetesFormateados];
+    
+    // Ordenar por fecha
+    todasDeudas.sort((a, b) => new Date(b.fecha_tratamiento || 0) - new Date(a.fecha_tratamiento || 0));
+
+    res.json(todasDeudas);
   } catch (err) {
     console.error("❌ Error al listar deudas:", err.message);
     res.status(500).json({ message: "Error al listar deudas" });
@@ -269,6 +368,195 @@ router.post("/:id/abonar", requireDoctor, async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error al registrar abono:", err.message);
+    res.status(500).json({ message: "Error al registrar abono" });
+  }
+});
+
+/* ==============================
+   💰 ABONAR DEUDA DE PRESUPUESTO
+============================== */
+router.post("/presupuesto/:id/abonar", requireDoctor, async (req, res) => {
+  const { id } = req.params;
+  const { metodo, monto } = req.body;
+
+  const metodoStr = typeof metodo === "string" ? metodo.trim() : "";
+  const montoNum = parseFloat(monto);
+
+  if (!metodoStr) {
+    return res.status(400).json({ message: "El método de pago es obligatorio" });
+  }
+
+  if (!(montoNum > 0)) {
+    return res.status(400).json({ message: "El monto debe ser mayor a 0" });
+  }
+
+  const presupuestoId = Number(id);
+  if (!Number.isFinite(presupuestoId) || presupuestoId <= 0) {
+    return res.status(400).json({ message: "Presupuesto inválido" });
+  }
+
+  const fechaLocal = fechaLima();
+
+  try {
+    const presupuesto = await dbGet(
+      `SELECT pa.*, p.nombre as paciente_nombre, p.apellido as paciente_apellido
+       FROM presupuestos_asignados pa
+       JOIN patients p ON pa.paciente_id = p.id
+       WHERE pa.id = ?`,
+      [presupuestoId]
+    );
+
+    if (!presupuesto) {
+      return res.status(404).json({ message: "Presupuesto no encontrado" });
+    }
+
+    const precioTotal = parseFloat(presupuesto.precio_total) || 0;
+    const montoYaPagado = parseFloat(presupuesto.monto_pagado) || 0;
+    const saldoActual = precioTotal - montoYaPagado;
+
+    if (saldoActual <= 0) {
+      return res.status(400).json({ message: "El presupuesto no tiene saldo pendiente" });
+    }
+
+    if (montoNum > saldoActual) {
+      return res.status(400).json({ message: "El monto no puede ser mayor al saldo" });
+    }
+
+    const nuevoMontoPagado = montoYaPagado + montoNum;
+    const nuevoSaldo = precioTotal - nuevoMontoPagado;
+    const estadoPago = nuevoSaldo <= 0 ? 'pagado' : 'adelanto';
+    const pagadoFlag = nuevoSaldo <= 0 ? 1 : 0;
+
+    // Actualizar presupuesto
+    await dbRun(
+      `UPDATE presupuestos_asignados 
+       SET pagado = ?, monto_pagado = ?, saldo_pendiente = ?, 
+           estado_pago = ?, fecha_pago = ?, metodo_pago = ?
+       WHERE id = ?`,
+      [pagadoFlag, nuevoMontoPagado, nuevoSaldo, estadoPago, fechaLocal, metodoStr, presupuestoId]
+    );
+
+    // Registrar en finanzas
+    const nombrePaciente = `${presupuesto.paciente_nombre} ${presupuesto.paciente_apellido || ''}`.trim();
+    let tratamientoNombre = 'Presupuesto';
+    try {
+      const tratamientos = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : [];
+      if (tratamientos.length > 0) {
+        tratamientoNombre = tratamientos.map(t => t.nombre).join(', ');
+      }
+    } catch (e) {}
+
+    await dbRun(
+      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+       VALUES ('ingreso', 'presupuesto', ?, ?, ?, ?, ?, ?, 'presupuesto_asignado', ?)`,
+      [
+        montoNum,
+        `Abono ${tratamientoNombre} - ${nombrePaciente}`,
+        fechaLocal.split(' ')[0],
+        metodoStr,
+        presupuesto.paciente_id,
+        presupuestoId,
+        fechaLocal
+      ]
+    );
+
+    res.json({
+      message: nuevoSaldo <= 0 ? "✅ Presupuesto pagado completamente" : "✅ Abono registrado",
+      saldo: nuevoSaldo
+    });
+  } catch (err) {
+    console.error("❌ Error al abonar presupuesto:", err.message);
+    res.status(500).json({ message: "Error al registrar abono" });
+  }
+});
+
+/* ==============================
+   💰 ABONAR DEUDA DE PAQUETE
+============================== */
+router.post("/paquete/:id/abonar", requireDoctor, async (req, res) => {
+  const { id } = req.params;
+  const { metodo, monto } = req.body;
+
+  const metodoStr = typeof metodo === "string" ? metodo.trim() : "";
+  const montoNum = parseFloat(monto);
+
+  if (!metodoStr) {
+    return res.status(400).json({ message: "El método de pago es obligatorio" });
+  }
+
+  if (!(montoNum > 0)) {
+    return res.status(400).json({ message: "El monto debe ser mayor a 0" });
+  }
+
+  const paqueteId = Number(id);
+  if (!Number.isFinite(paqueteId) || paqueteId <= 0) {
+    return res.status(400).json({ message: "Paquete inválido" });
+  }
+
+  const fechaLocal = fechaLima();
+
+  try {
+    const paquete = await dbGet(
+      `SELECT pp.*, p.nombre as paciente_nombre, p.apellido as paciente_apellido
+       FROM paquetes_pacientes pp
+       JOIN patients p ON pp.paciente_id = p.id
+       WHERE pp.id = ?`,
+      [paqueteId]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete no encontrado" });
+    }
+
+    const precioTotal = parseFloat(paquete.precio_total) || 0;
+    const montoYaPagado = parseFloat(paquete.monto_pagado) || 0;
+    const saldoActual = precioTotal - montoYaPagado;
+
+    if (saldoActual <= 0) {
+      return res.status(400).json({ message: "El paquete no tiene saldo pendiente" });
+    }
+
+    if (montoNum > saldoActual) {
+      return res.status(400).json({ message: "El monto no puede ser mayor al saldo" });
+    }
+
+    const nuevoMontoPagado = montoYaPagado + montoNum;
+    const nuevoSaldo = precioTotal - nuevoMontoPagado;
+    const estadoPago = nuevoSaldo <= 0 ? 'pagado' : 'adelanto';
+    const pagadoFlag = nuevoSaldo <= 0 ? 1 : 0;
+
+    // Actualizar paquete
+    await dbRun(
+      `UPDATE paquetes_pacientes 
+       SET pagado = ?, monto_pagado = ?, saldo_pendiente = ?, 
+           estado_pago = ?, fecha_pago = ?, metodo_pago = ?
+       WHERE id = ?`,
+      [pagadoFlag, nuevoMontoPagado, nuevoSaldo, estadoPago, fechaLocal, metodoStr, paqueteId]
+    );
+
+    // Registrar en finanzas
+    const nombrePaciente = `${paquete.paciente_nombre} ${paquete.paciente_apellido || ''}`.trim();
+
+    await dbRun(
+      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+       VALUES ('ingreso', 'paquete', ?, ?, ?, ?, ?, ?, 'paquete_paciente', ?)`,
+      [
+        montoNum,
+        `Abono paquete ${paquete.paquete_nombre} - ${nombrePaciente}`,
+        fechaLocal.split(' ')[0],
+        metodoStr,
+        paquete.paciente_id,
+        paqueteId,
+        fechaLocal
+      ]
+    );
+
+    res.json({
+      message: nuevoSaldo <= 0 ? "✅ Paquete pagado completamente" : "✅ Abono registrado",
+      saldo: nuevoSaldo
+    });
+  } catch (err) {
+    console.error("❌ Error al abonar paquete:", err.message);
     res.status(500).json({ message: "Error al registrar abono" });
   }
 });

@@ -358,6 +358,43 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 
     console.log("✅ Tablas de paquetes de pacientes creadas");
 
+    // Agregar columnas de pago a paquetes_pacientes si no existen
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN pagado INTEGER DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna pagado a paquetes:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN monto_pagado REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna monto_pagado a paquetes:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN monto_adelanto REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna monto_adelanto a paquetes:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN saldo_pendiente REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna saldo_pendiente a paquetes:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN estado_pago TEXT DEFAULT 'pendiente_pago'`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna estado_pago a paquetes:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN fecha_pago TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna fecha_pago a paquetes:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN metodo_pago TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna metodo_pago a paquetes:", err.message);
+      }
+    });
+
     // 📋 Tabla de presupuestos asignados a pacientes (similar a paquetes)
     db.run(`
       CREATE TABLE IF NOT EXISTS presupuestos_asignados (
@@ -416,6 +453,23 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN metodo_pago TEXT`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
         console.error("Error agregando columna metodo_pago:", err.message);
+      }
+    });
+    
+    // Columnas para adelantos y estado de pago
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN monto_adelanto REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna monto_adelanto:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN saldo_pendiente REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna saldo_pendiente:", err.message);
+      }
+    });
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN estado_pago TEXT DEFAULT 'pendiente_pago'`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna estado_pago:", err.message);
       }
     });
 

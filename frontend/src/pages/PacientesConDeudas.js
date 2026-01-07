@@ -117,7 +117,16 @@ export default function PacientesConDeudas() {
 
     try {
       setGuardandoCancelacion(true);
-      const res = await fetch(`${API_BASE_URL}/api/deudas/${cancelarRow.id}/abonar`, {
+      
+      // Determinar el endpoint según el tipo de deuda
+      let endpoint = `${API_BASE_URL}/api/deudas/${cancelarRow.id}/abonar`;
+      if (cancelarRow.tipo_deuda === 'presupuesto') {
+        endpoint = `${API_BASE_URL}/api/deudas/presupuesto/${cancelarRow.id}/abonar`;
+      } else if (cancelarRow.tipo_deuda === 'paquete') {
+        endpoint = `${API_BASE_URL}/api/deudas/paquete/${cancelarRow.id}/abonar`;
+      }
+      
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

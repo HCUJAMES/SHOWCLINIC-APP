@@ -151,7 +151,7 @@ const Paquetes = () => {
 
     setTratamientosSeleccionados([
       ...tratamientosSeleccionados,
-      { ...tratamiento, sesiones_tratamiento: 1, precio_unitario: tratamiento.precio || 0 },
+      { ...tratamiento, sesiones_tratamiento: 1 },
     ]);
   };
 
@@ -163,13 +163,6 @@ const Paquetes = () => {
     );
   };
 
-  const actualizarPrecioTratamiento = (tratamiento_id, precio) => {
-    setTratamientosSeleccionados(
-      tratamientosSeleccionados.map(t =>
-        t.id === tratamiento_id ? { ...t, precio_unitario: Number(precio) } : t
-      )
-    );
-  };
 
   const eliminarTratamiento = (tratamiento_id) => {
     setTratamientosSeleccionados(tratamientosSeleccionados.filter(t => t.id !== tratamiento_id));
@@ -177,9 +170,6 @@ const Paquetes = () => {
 
   // Calcular total de sesiones automáticamente
   const totalSesiones = tratamientosSeleccionados.reduce((sum, t) => sum + (t.sesiones_tratamiento || 1), 0);
-  
-  // Calcular precio total del paquete basado en precios individuales
-  const precioCalculado = tratamientosSeleccionados.reduce((sum, t) => sum + (t.precio_unitario || 0), 0);
 
   const guardarPaquete = async () => {
     if (!nombre.trim()) {
@@ -197,12 +187,12 @@ const Paquetes = () => {
       return;
     }
 
-    if (precioCalculado <= 0) {
-      showToast({ severity: "error", message: "Debes asignar precios a los tratamientos" });
+    if (precioPaquete <= 0) {
+      showToast({ severity: "error", message: "El precio del paquete debe ser mayor a 0" });
       return;
     }
 
-    if (precioCalculado >= precioRegular) {
+    if (precioPaquete >= precioRegular) {
       showToast({ severity: "error", message: "El precio del paquete debe ser menor al precio regular" });
       return;
     }
@@ -221,10 +211,9 @@ const Paquetes = () => {
         tratamiento_id: t.id,
         nombre: t.nombre,
         sesiones: t.sesiones_tratamiento || 1,
-        precio_unitario: t.precio_unitario || 0,
       })),
       precio_regular: precioRegular,
-      precio_paquete: precioCalculado,
+      precio_paquete: precioPaquete,
       sesiones: totalSesiones,
       vigencia_inicio: vigenciaInicio || null,
       vigencia_fin: vigenciaFin || null,
@@ -684,17 +673,8 @@ const Paquetes = () => {
                             value={tratamiento.sesiones_tratamiento}
                             onChange={(e) => actualizarSesionesTratamiento(tratamiento.id, e.target.value)}
                             size="small"
-                            sx={{ width: 80 }}
+                            sx={{ width: 100 }}
                             inputProps={{ min: 1 }}
-                          />
-                          <TextField
-                            type="number"
-                            label="Precio (S/)"
-                            value={tratamiento.precio_unitario || 0}
-                            onChange={(e) => actualizarPrecioTratamiento(tratamiento.id, e.target.value)}
-                            size="small"
-                            sx={{ width: 110 }}
-                            inputProps={{ min: 0, step: 0.01 }}
                           />
                           <IconButton
                             size="small"
@@ -706,23 +686,6 @@ const Paquetes = () => {
                         </Box>
                       ))}
                       
-                      {/* Resumen de precios */}
-                      <Box sx={{ 
-                        mt: 2, 
-                        pt: 2, 
-                        borderTop: "2px dashed #e0e0e0",
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        alignItems: "center",
-                        gap: 2
-                      }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Suma de tratamientos:
-                        </Typography>
-                        <Typography sx={{ fontWeight: "bold", color: "#2e7d32", fontSize: "1.1rem" }}>
-                          S/ {precioCalculado.toFixed(2)}
-                        </Typography>
-                      </Box>
                     </CardContent>
                   </Card>
                 )}
@@ -781,36 +744,35 @@ const Paquetes = () => {
                 </Grid>
 
                 <Grid item xs={12}>
-                  <Box sx={{ 
-                    p: 2, 
-                    borderRadius: 2, 
-                    backgroundColor: "#e8f5e9",
-                    border: "1px solid #4caf50",
-                  }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Precio del Paquete (suma de precios individuales):
-                    </Typography>
-                    <Typography variant="h4" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
-                      S/ {precioCalculado.toFixed(2)}
-                    </Typography>
-                  </Box>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Precio Total del Paquete (S/) *"
+                    value={precioPaquete}
+                    onChange={(e) => setPrecioPaquete(Number(e.target.value))}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    helperText="Precio promocional del paquete completo"
+                    InputProps={{
+                      sx: { borderRadius: 2, backgroundColor: "white" }
+                    }}
+                  />
                 </Grid>
 
                 <Grid item xs={12}>
                   <Box sx={{ 
                     p: 3, 
                     borderRadius: 3, 
-                    background: precioRegular > 0 && precioCalculado > 0 && precioCalculado < precioRegular
+                    background: precioRegular > 0 && precioPaquete > 0 && precioPaquete < precioRegular
                       ? "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)"
                       : "#e0e0e0",
                     color: "white",
                     textAlign: "center",
                   }}>
                     <Typography variant="h3" sx={{ fontWeight: "bold" }}>
-                      {precioRegular > 0 ? ((1 - precioCalculado / precioRegular) * 100).toFixed(0) : 0}% OFF
+                      {precioRegular > 0 && precioPaquete > 0 ? ((1 - precioPaquete / precioRegular) * 100).toFixed(0) : 0}% OFF
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Ahorro de S/ {(precioRegular - precioCalculado).toFixed(2)}
+                      Ahorro de S/ {(precioRegular - precioPaquete).toFixed(2)}
                     </Typography>
                   </Box>
                 </Grid>

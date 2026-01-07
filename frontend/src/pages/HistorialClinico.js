@@ -161,6 +161,11 @@ const HistorialClinico = () => {
   const [presupuestoParaPago, setPresupuestoParaPago] = useState(null);
   const [montoPago, setMontoPago] = useState(0);
   const [metodoPago, setMetodoPago] = useState("efectivo");
+  const [tipoPago, setTipoPago] = useState("total"); // 'total', 'adelanto', 'saldo'
+
+  // Estados para modal de pago de paquete
+  const [modalPagoPaquete, setModalPagoPaquete] = useState(false);
+  const [paqueteParaPago, setPaqueteParaPago] = useState(null);
 
   const token = localStorage.getItem("token");
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
@@ -468,28 +473,63 @@ const HistorialClinico = () => {
     }
   };
 
-  // Registrar pago de presupuesto
-  const registrarPagoPresupuesto = async (presupuestoId, monto, metodoPago) => {
+  // Registrar pago de presupuesto (total, adelanto o saldo)
+  const registrarPagoPresupuesto = async (presupuestoId, monto, metodoPago, tipoPago = 'total') => {
     try {
-      await axios.post(
+      const response = await axios.post(
         `${API_BASE_URL}/api/paquetes/presupuesto/${presupuestoId}/pago`,
         {
           monto: monto,
           metodo_pago: metodoPago,
+          tipo_pago: tipoPago, // 'total', 'adelanto', 'saldo'
         },
         { headers: authHeaders }
       );
       
-      showToast({ severity: "success", message: "Pago registrado exitosamente" });
+      const tipoMsg = tipoPago === 'adelanto' ? 'Adelanto' : tipoPago === 'saldo' ? 'Saldo' : 'Pago';
+      showToast({ severity: "success", message: `${tipoMsg} registrado exitosamente` });
       
       // Recargar presupuestos asignados
       const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
         headers: authHeaders,
       });
       setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      
+      return response.data;
     } catch (error) {
       console.error("Error al registrar pago:", error);
       showToast({ severity: "error", message: error.response?.data?.message || "Error al registrar pago" });
+      throw error;
+    }
+  };
+
+  // Registrar pago de paquete (total, adelanto o saldo)
+  const registrarPagoPaquete = async (paqueteId, monto, metodoPagoVal, tipoPagoVal = 'total') => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/paquetes/paquete-paciente/${paqueteId}/pago`,
+        {
+          monto: monto,
+          metodo_pago: metodoPagoVal,
+          tipo_pago: tipoPagoVal,
+        },
+        { headers: authHeaders }
+      );
+      
+      const tipoMsg = tipoPagoVal === 'adelanto' ? 'Adelanto' : tipoPagoVal === 'saldo' ? 'Saldo' : 'Pago';
+      showToast({ severity: "success", message: `${tipoMsg} registrado exitosamente` });
+      
+      // Recargar paquetes del paciente
+      const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error al registrar pago de paquete:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al registrar pago" });
+      throw error;
     }
   };
 
@@ -2330,41 +2370,116 @@ const HistorialClinico = () => {
                             </Box>
                           )}
 
-                          {/* Total del presupuesto y botones */}
-                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">
-                                Total del presupuesto:
-                              </Typography>
-                              <Typography sx={{ fontWeight: "bold", color: "#a36920" }}>
-                                S/ {presupuesto.precio_total?.toFixed(2)}
-                              </Typography>
-                              {presupuesto.pagado === 1 && (
-                                <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold", display: "flex", alignItems: "center", gap: 0.5 }}>
-                                  ✓ Pagado ({presupuesto.metodo_pago}) - {presupuesto.fecha_pago?.split(' ')[0]}
+                          {/* Total del presupuesto y estado de pago */}
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0" }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1 }}>
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                  Total del presupuesto:
                                 </Typography>
-                              )}
+                                <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
+                                  S/ {presupuesto.precio_total?.toFixed(2)}
+                                </Typography>
+                              </Box>
+                              
+                              {/* Estado de pago con colores */}
+                              <Box sx={{ 
+                                px: 1.5, 
+                                py: 0.5, 
+                                borderRadius: 2,
+                                backgroundColor: presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
+                                  ? '#e8f5e9' 
+                                  : presupuesto.estado_pago === 'adelanto' 
+                                    ? '#fff3e0' 
+                                    : '#ffebee',
+                                border: `1px solid ${presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
+                                  ? '#4caf50' 
+                                  : presupuesto.estado_pago === 'adelanto' 
+                                    ? '#ff9800' 
+                                    : '#f44336'}`
+                              }}>
+                                <Typography variant="caption" sx={{ 
+                                  fontWeight: "bold", 
+                                  color: presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
+                                    ? '#2e7d32' 
+                                    : presupuesto.estado_pago === 'adelanto' 
+                                      ? '#e65100' 
+                                      : '#c62828',
+                                  textTransform: "uppercase"
+                                }}>
+                                  {presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
+                                    ? '✓ PAGADO' 
+                                    : presupuesto.estado_pago === 'adelanto' 
+                                      ? '📝 ADELANTO' 
+                                      : '⏳ PENDIENTE PAGO'}
+                                </Typography>
+                              </Box>
                             </Box>
-                            <Box sx={{ display: "flex", gap: 1 }}>
-                              {!presupuesto.pagado && (
+                            
+                            {/* Detalles de pago */}
+                            {(presupuesto.monto_pagado > 0 || presupuesto.estado_pago === 'adelanto') && (
+                              <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(0,0,0,0.02)", borderRadius: 1 }}>
+                                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                  <Typography variant="caption" color="text.secondary">Pagado:</Typography>
+                                  <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
+                                    S/ {(presupuesto.monto_pagado || 0).toFixed(2)}
+                                  </Typography>
+                                </Box>
+                                {presupuesto.estado_pago !== 'pagado' && presupuesto.pagado !== 1 && (
+                                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                    <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
+                                    <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                                      S/ {(presupuesto.saldo_pendiente || (presupuesto.precio_total - (presupuesto.monto_pagado || 0))).toFixed(2)}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                {presupuesto.metodo_pago && (
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                                    Método: {presupuesto.metodo_pago} | {presupuesto.fecha_pago?.split(' ')[0]}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
+                            
+                            {/* Botones de acción */}
+                            <Box sx={{ display: "flex", gap: 1, mt: 1.5, justifyContent: "flex-end" }}>
+                              {presupuesto.estado_pago !== 'pagado' && presupuesto.pagado !== 1 && (
                                 <Button
                                   size="small"
                                   variant="contained"
                                   onClick={() => {
                                     setPresupuestoParaPago(presupuesto);
-                                    setMontoPago(presupuesto.precio_total || 0);
+                                    const saldoPendiente = presupuesto.saldo_pendiente || (presupuesto.precio_total - (presupuesto.monto_pagado || 0));
+                                    setMontoPago(saldoPendiente > 0 ? saldoPendiente : presupuesto.precio_total);
                                     setMetodoPago("efectivo");
+                                    setTipoPago(presupuesto.estado_pago === 'adelanto' ? 'saldo' : 'total');
                                     setModalPagoPresupuesto(true);
                                   }}
                                   sx={{
-                                    fontSize: "0.7rem",
+                                    fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    backgroundColor: "#4caf50",
-                                    "&:hover": { backgroundColor: "#388e3c" }
+                                    backgroundColor: presupuesto.estado_pago === 'adelanto' ? "#ff9800" : "#4caf50",
+                                    "&:hover": { backgroundColor: presupuesto.estado_pago === 'adelanto' ? "#f57c00" : "#388e3c" }
                                   }}
                                 >
-                                  💰 Registrar Pago
+                                  {presupuesto.estado_pago === 'adelanto' ? '💰 Pagar Saldo' : '💰 Registrar Pago'}
+                                </Button>
+                              )}
+                              {presupuesto.estado !== 'completado' && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => navigate(`/tratamientos/comenzar?paciente=${pacienteSeleccionado.id}&presupuesto=${presupuesto.id}`)}
+                                  sx={{
+                                    fontSize: "0.75rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    backgroundColor: "#7b1fa2",
+                                    "&:hover": { backgroundColor: "#6a1b9a" }
+                                  }}
+                                >
+                                  💉 Realizar Tratamiento
                                 </Button>
                               )}
                               <Button
@@ -2559,17 +2674,118 @@ const HistorialClinico = () => {
                             </Box>
                           )}
 
-                          {/* Total del paquete y botones */}
-                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Box>
-                              <Typography variant="body2" color="text.secondary">
-                                Total del paquete:
-                              </Typography>
-                              <Typography sx={{ fontWeight: "bold", color: "#1565c0" }}>
-                                S/ {paquete.precio_total?.toFixed(2)}
-                              </Typography>
+                          {/* Total del paquete y estado de pago */}
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0" }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1 }}>
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                  Total del paquete:
+                                </Typography>
+                                <Typography sx={{ fontWeight: "bold", color: "#1565c0", fontSize: "1.1rem" }}>
+                                  S/ {paquete.precio_total?.toFixed(2)}
+                                </Typography>
+                              </Box>
+                              
+                              {/* Estado de pago con colores */}
+                              <Box sx={{ 
+                                px: 1.5, 
+                                py: 0.5, 
+                                borderRadius: 2,
+                                backgroundColor: paquete.estado_pago === 'pagado' || paquete.pagado === 1 
+                                  ? '#e8f5e9' 
+                                  : paquete.estado_pago === 'adelanto' 
+                                    ? '#fff3e0' 
+                                    : '#ffebee',
+                                border: `1px solid ${paquete.estado_pago === 'pagado' || paquete.pagado === 1 
+                                  ? '#4caf50' 
+                                  : paquete.estado_pago === 'adelanto' 
+                                    ? '#ff9800' 
+                                    : '#f44336'}`
+                              }}>
+                                <Typography variant="caption" sx={{ 
+                                  fontWeight: "bold", 
+                                  color: paquete.estado_pago === 'pagado' || paquete.pagado === 1 
+                                    ? '#2e7d32' 
+                                    : paquete.estado_pago === 'adelanto' 
+                                      ? '#e65100' 
+                                      : '#c62828',
+                                  textTransform: "uppercase"
+                                }}>
+                                  {paquete.estado_pago === 'pagado' || paquete.pagado === 1 
+                                    ? '✓ PAGADO' 
+                                    : paquete.estado_pago === 'adelanto' 
+                                      ? '📝 ADELANTO' 
+                                      : '⏳ PENDIENTE PAGO'}
+                                </Typography>
+                              </Box>
                             </Box>
-                            <Box sx={{ display: "flex", gap: 1 }}>
+                            
+                            {/* Detalles de pago */}
+                            {(paquete.monto_pagado > 0 || paquete.estado_pago === 'adelanto') && (
+                              <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(0,0,0,0.02)", borderRadius: 1 }}>
+                                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                  <Typography variant="caption" color="text.secondary">Pagado:</Typography>
+                                  <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
+                                    S/ {(paquete.monto_pagado || 0).toFixed(2)}
+                                  </Typography>
+                                </Box>
+                                {paquete.estado_pago !== 'pagado' && paquete.pagado !== 1 && (
+                                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                    <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
+                                    <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                                      S/ {(paquete.saldo_pendiente || (paquete.precio_total - (paquete.monto_pagado || 0))).toFixed(2)}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                {paquete.metodo_pago && (
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                                    Método: {paquete.metodo_pago} | {paquete.fecha_pago?.split(' ')[0]}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
+                            
+                            {/* Botones de acción */}
+                            <Box sx={{ display: "flex", gap: 1, mt: 1.5, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                              {paquete.estado_pago !== 'pagado' && paquete.pagado !== 1 && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => {
+                                    setPaqueteParaPago(paquete);
+                                    const saldoPendiente = paquete.saldo_pendiente || (paquete.precio_total - (paquete.monto_pagado || 0));
+                                    setMontoPago(saldoPendiente > 0 ? saldoPendiente : paquete.precio_total);
+                                    setMetodoPago("efectivo");
+                                    setTipoPago(paquete.estado_pago === 'adelanto' ? 'saldo' : 'total');
+                                    setModalPagoPaquete(true);
+                                  }}
+                                  sx={{
+                                    fontSize: "0.75rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    backgroundColor: paquete.estado_pago === 'adelanto' ? "#ff9800" : "#4caf50",
+                                    "&:hover": { backgroundColor: paquete.estado_pago === 'adelanto' ? "#f57c00" : "#388e3c" }
+                                  }}
+                                >
+                                  {paquete.estado_pago === 'adelanto' ? '💰 Pagar Saldo' : '💰 Registrar Pago'}
+                                </Button>
+                              )}
+                              {paquete.estado === 'activo' && (
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => navigate(`/tratamientos/comenzar?paciente=${pacienteSeleccionado.id}&paquete=${paquete.id}`)}
+                                  sx={{
+                                    fontSize: "0.75rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    backgroundColor: "#7b1fa2",
+                                    "&:hover": { backgroundColor: "#6a1b9a" }
+                                  }}
+                                >
+                                  💉 Realizar Tratamiento
+                                </Button>
+                              )}
                               {paquete.estado === 'completado' && (
                                 <Button
                                   size="small"
@@ -2579,11 +2795,11 @@ const HistorialClinico = () => {
                                     fontSize: "0.7rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    backgroundColor: "#4caf50",
-                                    "&:hover": { backgroundColor: "#388e3c" }
+                                    backgroundColor: "#1565c0",
+                                    "&:hover": { backgroundColor: "#0d47a1" }
                                   }}
                                 >
-                                  🧾 Imprimir Recibo
+                                  🧾 Recibo
                                 </Button>
                               )}
                               <Button
@@ -3085,7 +3301,7 @@ const HistorialClinico = () => {
       </Dialog>
 
       {/* Modal para Registrar Pago de Presupuesto */}
-      <Dialog open={modalPagoPresupuesto} onClose={() => setModalPagoPresupuesto(false)} maxWidth="xs" fullWidth>
+      <Dialog open={modalPagoPresupuesto} onClose={() => setModalPagoPresupuesto(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ backgroundColor: "#4caf50", color: "white" }}>
           💰 Registrar Pago
         </DialogTitle>
@@ -3095,6 +3311,32 @@ const HistorialClinico = () => {
               <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
                 Presupuesto #{presupuestoParaPago.oferta_id}
               </Typography>
+              
+              {/* Tipo de Pago */}
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Tipo de Pago</InputLabel>
+                <Select
+                  value={tipoPago}
+                  onChange={(e) => {
+                    setTipoPago(e.target.value);
+                    // Ajustar monto según tipo
+                    if (e.target.value === 'total') {
+                      const saldo = (presupuestoParaPago.precio_total || 0) - (presupuestoParaPago.monto_pagado || 0);
+                      setMontoPago(saldo > 0 ? saldo : presupuestoParaPago.precio_total);
+                    } else if (e.target.value === 'saldo') {
+                      setMontoPago(presupuestoParaPago.saldo_pendiente || 0);
+                    }
+                  }}
+                  label="Tipo de Pago"
+                >
+                  <MenuItem value="total">💵 Pago Total</MenuItem>
+                  <MenuItem value="adelanto">📝 Adelanto</MenuItem>
+                  {(presupuestoParaPago.saldo_pendiente > 0 || presupuestoParaPago.estado_pago === 'adelanto') && (
+                    <MenuItem value="saldo">✅ Pagar Saldo Restante</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+
               <TextField
                 fullWidth
                 label="Monto a pagar (S/)"
@@ -3104,6 +3346,7 @@ const HistorialClinico = () => {
                 inputProps={{ min: 0, step: 0.01 }}
                 sx={{ mb: 2 }}
               />
+              
               <FormControl fullWidth>
                 <InputLabel>Método de Pago</InputLabel>
                 <Select
@@ -3118,13 +3361,27 @@ const HistorialClinico = () => {
                   <MenuItem value="plin">Plin</MenuItem>
                 </Select>
               </FormControl>
+              
+              {/* Resumen de pago */}
               <Box sx={{ mt: 2, p: 1.5, backgroundColor: "rgba(76, 175, 80, 0.1)", borderRadius: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Total del presupuesto:
-                </Typography>
-                <Typography sx={{ fontWeight: "bold", color: "#4caf50", fontSize: "1.2rem" }}>
-                  S/ {presupuestoParaPago.precio_total?.toFixed(2)}
-                </Typography>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Total del presupuesto:</Typography>
+                  <Typography sx={{ fontWeight: "bold" }}>S/ {presupuestoParaPago.precio_total?.toFixed(2)}</Typography>
+                </Box>
+                {(presupuestoParaPago.monto_pagado > 0) && (
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">Ya pagado:</Typography>
+                    <Typography sx={{ color: "#4caf50", fontWeight: "bold" }}>S/ {(presupuestoParaPago.monto_pagado || 0).toFixed(2)}</Typography>
+                  </Box>
+                )}
+                {(presupuestoParaPago.saldo_pendiente > 0 || (presupuestoParaPago.precio_total - (presupuestoParaPago.monto_pagado || 0)) > 0) && (
+                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <Typography variant="body2" color="text.secondary">Saldo pendiente:</Typography>
+                    <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                      S/ {(presupuestoParaPago.saldo_pendiente || (presupuestoParaPago.precio_total - (presupuestoParaPago.monto_pagado || 0))).toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </>
           )}
@@ -3135,9 +3392,10 @@ const HistorialClinico = () => {
           </Button>
           <Button
             variant="contained"
+            disabled={montoPago <= 0}
             onClick={async () => {
-              if (presupuestoParaPago) {
-                await registrarPagoPresupuesto(presupuestoParaPago.id, montoPago, metodoPago);
+              if (presupuestoParaPago && montoPago > 0) {
+                await registrarPagoPresupuesto(presupuestoParaPago.id, montoPago, metodoPago, tipoPago);
                 setModalPagoPresupuesto(false);
               }
             }}
@@ -3146,7 +3404,115 @@ const HistorialClinico = () => {
               "&:hover": { backgroundColor: "#388e3c" },
             }}
           >
-            Confirmar Pago
+            {tipoPago === 'adelanto' ? 'Registrar Adelanto' : tipoPago === 'saldo' ? 'Pagar Saldo' : 'Confirmar Pago'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Registrar Pago de Paquete */}
+      <Dialog open={modalPagoPaquete} onClose={() => setModalPagoPaquete(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#1565c0", color: "white" }}>
+          💰 Registrar Pago de Paquete
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {paqueteParaPago && (
+            <>
+              <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
+                {paqueteParaPago.paquete_nombre}
+              </Typography>
+              
+              {/* Tipo de Pago */}
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Tipo de Pago</InputLabel>
+                <Select
+                  value={tipoPago}
+                  onChange={(e) => {
+                    setTipoPago(e.target.value);
+                    if (e.target.value === 'total') {
+                      const saldo = (paqueteParaPago.precio_total || 0) - (paqueteParaPago.monto_pagado || 0);
+                      setMontoPago(saldo > 0 ? saldo : paqueteParaPago.precio_total);
+                    } else if (e.target.value === 'saldo') {
+                      setMontoPago(paqueteParaPago.saldo_pendiente || 0);
+                    }
+                  }}
+                  label="Tipo de Pago"
+                >
+                  <MenuItem value="total">💵 Pago Total</MenuItem>
+                  <MenuItem value="adelanto">📝 Adelanto</MenuItem>
+                  {(paqueteParaPago.saldo_pendiente > 0 || paqueteParaPago.estado_pago === 'adelanto') && (
+                    <MenuItem value="saldo">✅ Pagar Saldo Restante</MenuItem>
+                  )}
+                </Select>
+              </FormControl>
+
+              <TextField
+                fullWidth
+                label="Monto a pagar (S/)"
+                type="number"
+                value={montoPago}
+                onChange={(e) => setMontoPago(Number(e.target.value))}
+                inputProps={{ min: 0, step: 0.01 }}
+                sx={{ mb: 2 }}
+              />
+              
+              <FormControl fullWidth>
+                <InputLabel>Método de Pago</InputLabel>
+                <Select
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value)}
+                  label="Método de Pago"
+                >
+                  <MenuItem value="efectivo">Efectivo</MenuItem>
+                  <MenuItem value="tarjeta">Tarjeta</MenuItem>
+                  <MenuItem value="transferencia">Transferencia</MenuItem>
+                  <MenuItem value="yape">Yape</MenuItem>
+                  <MenuItem value="plin">Plin</MenuItem>
+                </Select>
+              </FormControl>
+              
+              {/* Resumen de pago */}
+              <Box sx={{ mt: 2, p: 1.5, backgroundColor: "rgba(33, 150, 243, 0.1)", borderRadius: 2 }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Total del paquete:</Typography>
+                  <Typography sx={{ fontWeight: "bold" }}>S/ {paqueteParaPago.precio_total?.toFixed(2)}</Typography>
+                </Box>
+                {(paqueteParaPago.monto_pagado > 0) && (
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                    <Typography variant="body2" color="text.secondary">Ya pagado:</Typography>
+                    <Typography sx={{ color: "#4caf50", fontWeight: "bold" }}>S/ {(paqueteParaPago.monto_pagado || 0).toFixed(2)}</Typography>
+                  </Box>
+                )}
+                {(paqueteParaPago.saldo_pendiente > 0 || (paqueteParaPago.precio_total - (paqueteParaPago.monto_pagado || 0)) > 0) && (
+                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <Typography variant="body2" color="text.secondary">Saldo pendiente:</Typography>
+                    <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                      S/ {(paqueteParaPago.saldo_pendiente || (paqueteParaPago.precio_total - (paqueteParaPago.monto_pagado || 0))).toFixed(2)}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalPagoPaquete(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            disabled={montoPago <= 0}
+            onClick={async () => {
+              if (paqueteParaPago && montoPago > 0) {
+                await registrarPagoPaquete(paqueteParaPago.id, montoPago, metodoPago, tipoPago);
+                setModalPagoPaquete(false);
+              }
+            }}
+            sx={{
+              backgroundColor: "#1565c0",
+              "&:hover": { backgroundColor: "#0d47a1" },
+            }}
+          >
+            {tipoPago === 'adelanto' ? 'Registrar Adelanto' : tipoPago === 'saldo' ? 'Pagar Saldo' : 'Confirmar Pago'}
           </Button>
         </DialogActions>
       </Dialog>

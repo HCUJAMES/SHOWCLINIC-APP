@@ -329,8 +329,11 @@ router.get("/marcas", (req, res) => {
 
 router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos", 6), async (req, res) => {
   try {
-    const { paciente_id, productos, pagoMetodo, sesion, especialista, tipoAtencion } = req.body;
+    const { paciente_id, productos, pagoMetodo, sesion, especialista, tipoAtencion, sinPago } = req.body;
     const productosData = JSON.parse(productos);
+    
+    // Si sinPago es true, no se registra en finanzas (pagos se manejan desde historial)
+    const esSinPago = sinPago === "true" || sinPago === true;
 
     if (!productosData || productosData.length === 0) {
       return res.status(400).json({ message: "No se enviaron tratamientos" });
@@ -468,8 +471,8 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         subtotal = precioVariante * cantidadMl;
       }
 
-      // Permitir precio 0 si viene de un paquete (sesion_paquete_id presente)
-      if (!(subtotal > 0) && !b.sesion_paquete_id) {
+      // Permitir precio 0 si viene de un paquete o si es sin pago
+      if (!(subtotal > 0) && !b.sesion_paquete_id && !esSinPago) {
         return res.status(400).json({ message: "No se pudo calcular el precio del tratamiento. Establece un precio o selecciona un producto." });
       }
 
@@ -511,51 +514,89 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         `✅ Tratamiento registrado correctamente (ID ${tratamientoRealizadoId})`
       );
 
-      const pagoEnPartes =
-        b.pago_en_partes === true ||
-        b.pago_en_partes === 1 ||
-        String(b.pago_en_partes || "").toLowerCase() === "true";
-      if (pagoEnPartes) {
-        const adelanto = parseFloat(b.monto_adelanto);
-        if (!(adelanto > 0)) {
-          return res.status(400).json({ message: "Monto de adelanto inválido" });
-        }
+      // Obtener nombre del paciente para descripción
+      const pacienteInfo = await dbGet(`SELECT nombre, apellido FROM patients WHERE id = ?`, [paciente_id]);
+      const nombrePaciente = pacienteInfo ? `${pacienteInfo.nombre} ${pacienteInfo.apellido || ''}`.trim() : `Paciente #${paciente_id}`;
+      const nombreTratamiento = b.producto || 'Tratamiento';
 
-        if (!(totalFinal > 0)) {
-          return res.status(400).json({ message: "Monto total inválido" });
-        }
+      // Solo procesar pagos si NO es sinPago
+      if (!esSinPago) {
+        const pagoEnPartes =
+          b.pago_en_partes === true ||
+          b.pago_en_partes === 1 ||
+          String(b.pago_en_partes || "").toLowerCase() === "true";
+        if (pagoEnPartes) {
+          const adelanto = parseFloat(b.monto_adelanto);
+          if (!(adelanto > 0)) {
+            return res.status(400).json({ message: "Monto de adelanto inválido" });
+          }
 
-        if (adelanto >= totalFinal) {
-          return res.status(400).json({ message: "El adelanto debe ser menor al total" });
-        }
+          if (!(totalFinal > 0)) {
+            return res.status(400).json({ message: "Monto total inválido" });
+          }
 
-        const saldo = totalFinal - adelanto;
+          if (adelanto >= totalFinal) {
+            return res.status(400).json({ message: "El adelanto debe ser menor al total" });
+          }
 
-        const deudaInsert = await dbRun(
-          `
-            INSERT INTO deudas_tratamientos
-            (paciente_id, tratamiento_realizado_id, tratamiento_id, monto_total, monto_adelanto, monto_saldo, estado, creado_en)
-            VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)
-          `,
-          [
-            paciente_id,
-            tratamientoRealizadoId,
-            b.tratamiento_id || null,
-            totalFinal,
-            adelanto,
-            saldo,
-            fechaLocal,
-          ]
-        );
+          const saldo = totalFinal - adelanto;
 
-        const deudaId = deudaInsert?.lastID;
-        if (deudaId) {
-          await dbRun(
+          const deudaInsert = await dbRun(
             `
-              INSERT INTO deudas_pagos (deuda_id, numero, monto, metodo, creado_en)
-              VALUES (?, 1, ?, ?, ?)
+              INSERT INTO deudas_tratamientos
+              (paciente_id, tratamiento_realizado_id, tratamiento_id, monto_total, monto_adelanto, monto_saldo, estado, creado_en)
+              VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)
             `,
-            [deudaId, adelanto, pagoMetodo || "Desconocido", fechaLocal]
+            [
+              paciente_id,
+              tratamientoRealizadoId,
+              b.tratamiento_id || null,
+              totalFinal,
+              adelanto,
+              saldo,
+              fechaLocal,
+            ]
+          );
+
+          const deudaId = deudaInsert?.lastID;
+          if (deudaId) {
+            await dbRun(
+              `
+                INSERT INTO deudas_pagos (deuda_id, numero, monto, metodo, creado_en)
+                VALUES (?, 1, ?, ?, ?)
+              `,
+              [deudaId, adelanto, pagoMetodo || "Desconocido", fechaLocal]
+            );
+          }
+
+          // 💰 Registrar adelanto en finanzas
+          await dbRun(
+            `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+             VALUES ('ingreso', 'tratamiento', ?, ?, ?, ?, ?, ?, 'tratamiento_realizado', ?)`,
+            [
+              adelanto,
+              `Adelanto - ${nombreTratamiento} - ${nombrePaciente}`,
+              fechaLocal.split(' ')[0],
+              pagoMetodo || 'efectivo',
+              paciente_id,
+              tratamientoRealizadoId,
+              fechaLocal
+            ]
+          );
+        } else if (totalFinal > 0) {
+          // 💰 Registrar pago completo en finanzas (solo si no es pago en partes y hay monto)
+          await dbRun(
+            `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+             VALUES ('ingreso', 'tratamiento', ?, ?, ?, ?, ?, ?, 'tratamiento_realizado', ?)`,
+            [
+              totalFinal,
+              `${nombreTratamiento} - ${nombrePaciente}`,
+              fechaLocal.split(' ')[0],
+              pagoMetodo || 'efectivo',
+              paciente_id,
+              tratamientoRealizadoId,
+              fechaLocal
+            ]
           );
         }
       }

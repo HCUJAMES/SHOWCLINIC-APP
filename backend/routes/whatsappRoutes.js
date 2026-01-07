@@ -5,6 +5,10 @@ import { enviarMensajeWhatsApp } from "../services/whatsappAPI.js";
 
 const router = express.Router();
 
+// Función para obtener fecha/hora de Perú (GMT-5)
+const fechaLima = () =>
+  new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
+
 /* ==============================
    🔐 WEBHOOK VERIFICATION (Meta)
 ============================== */
@@ -247,7 +251,7 @@ async function crearOActualizarLead(conversacionId, telefono, datosIA) {
 ============================== */
 async function actualizarEstadisticas(tipo) {
   try {
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = fechaLima().split(" ")[0];
 
     const estadistica = await dbGet(
       `SELECT * FROM whatsapp_estadisticas WHERE fecha = ?`,
@@ -464,7 +468,7 @@ router.put("/config", async (req, res) => {
 router.get("/estadisticas", async (req, res) => {
   try {
     const { desde, hasta } = req.query;
-    const hoy = new Date().toISOString().split("T")[0];
+    const hoy = fechaLima().split(" ")[0];
 
     let query = `SELECT * FROM whatsapp_estadisticas WHERE fecha >= ? AND fecha <= ? ORDER BY fecha DESC`;
     const params = [desde || hoy, hasta || hoy];

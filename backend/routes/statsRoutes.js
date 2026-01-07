@@ -4,6 +4,10 @@ import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// Función para obtener fecha/hora de Perú (GMT-5)
+const fechaLima = () =>
+  new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
+
 const getMonthRange = ({ year, month }) => {
   const y = Number(year);
   const m = Number(month); // 1-12
@@ -26,9 +30,10 @@ const getMonthRange = ({ year, month }) => {
 // Query params opcionales: ?year=2025&month=12
 router.get("/overview", authMiddleware, requireRole("doctor", "admin"), async (req, res) => {
   try {
-    const now = new Date();
-    const year = req.query.year ?? now.getFullYear();
-    const month = req.query.month ?? now.getMonth() + 1;
+    // Usar hora de Perú para determinar mes/año actual
+    const nowPeru = new Date(fechaLima());
+    const year = req.query.year ?? nowPeru.getFullYear();
+    const month = req.query.month ?? nowPeru.getMonth() + 1;
 
     const range = getMonthRange({ year, month });
     if (!range) {
