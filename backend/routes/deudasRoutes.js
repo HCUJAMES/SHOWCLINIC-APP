@@ -192,6 +192,22 @@ router.get("/listar", async (req, res) => {
     );
 
     // Obtener saldos pendientes de presupuestos asignados
+    const wherePresupuestos = [
+      "pa.estado_pago = 'adelanto'",
+      "pa.pagado = 0",
+      "(pa.saldo_pendiente > 0 OR (pa.precio_total - COALESCE(pa.monto_pagado, 0)) > 0)"
+    ];
+    const paramsPresupuestos = [];
+
+    if (fechaDesdeSql) {
+      wherePresupuestos.push("pa.fecha_inicio >= ?");
+      paramsPresupuestos.push(fechaDesdeSql);
+    }
+    if (fechaHastaSql) {
+      wherePresupuestos.push("pa.fecha_inicio <= ?");
+      paramsPresupuestos.push(fechaHastaSql);
+    }
+
     const presupuestosPendientes = await dbAll(
       `
         SELECT
@@ -202,6 +218,7 @@ router.get("/listar", async (req, res) => {
           p.dni AS paciente_dni,
           pa.tratamientos_json,
           pa.precio_total AS monto_total,
+          pa.descuento,
           pa.monto_pagado AS monto_adelanto,
           pa.saldo_pendiente AS monto_saldo,
           pa.fecha_inicio AS fecha_tratamiento,
@@ -209,10 +226,9 @@ router.get("/listar", async (req, res) => {
           'presupuesto' AS tipo_deuda
         FROM presupuestos_asignados pa
         LEFT JOIN patients p ON p.id = pa.paciente_id
-        WHERE pa.estado_pago = 'adelanto' 
-          AND pa.pagado = 0
-          AND (pa.saldo_pendiente > 0 OR (pa.precio_total - COALESCE(pa.monto_pagado, 0)) > 0)
-      `
+        WHERE ${wherePresupuestos.join(" AND ")}
+      `,
+      paramsPresupuestos
     );
 
     // Extraer nombre del tratamiento del JSON para presupuestos
@@ -224,15 +240,37 @@ router.get("/listar", async (req, res) => {
           tratamientoNombre = tratamientos.map(t => t.nombre).join(', ');
         }
       } catch (e) {}
+      // Calcular saldo considerando el descuento
+      const precioTotal = parseFloat(p.monto_total) || 0;
+      const descuento = parseFloat(p.descuento) || 0;
+      const montoPagado = parseFloat(p.monto_adelanto) || 0;
+      const saldoCalculado = (precioTotal - descuento) - montoPagado;
       return {
         ...p,
         tratamiento_nombre: tratamientoNombre,
-        monto_saldo: p.monto_saldo || (p.monto_total - (p.monto_adelanto || 0)),
+        monto_total: precioTotal - descuento, // Total con descuento
+        monto_saldo: saldoCalculado > 0 ? saldoCalculado : 0,
         estado: 'pendiente'
       };
     });
 
     // Obtener saldos pendientes de paquetes asignados
+    const wherePaquetes = [
+      "pp.estado_pago = 'adelanto'",
+      "pp.pagado = 0",
+      "(pp.saldo_pendiente > 0 OR (pp.precio_total - COALESCE(pp.monto_pagado, 0)) > 0)"
+    ];
+    const paramsPaquetes = [];
+
+    if (fechaDesdeSql) {
+      wherePaquetes.push("pp.fecha_inicio >= ?");
+      paramsPaquetes.push(fechaDesdeSql);
+    }
+    if (fechaHastaSql) {
+      wherePaquetes.push("pp.fecha_inicio <= ?");
+      paramsPaquetes.push(fechaHastaSql);
+    }
+
     const paquetesPendientes = await dbAll(
       `
         SELECT
@@ -250,10 +288,9 @@ router.get("/listar", async (req, res) => {
           'paquete' AS tipo_deuda
         FROM paquetes_pacientes pp
         LEFT JOIN patients p ON p.id = pp.paciente_id
-        WHERE pp.estado_pago = 'adelanto' 
-          AND pp.pagado = 0
-          AND (pp.saldo_pendiente > 0 OR (pp.precio_total - COALESCE(pp.monto_pagado, 0)) > 0)
-      `
+        WHERE ${wherePaquetes.join(" AND ")}
+      `,
+      paramsPaquetes
     );
 
     // Formatear paquetes

@@ -401,6 +401,24 @@ router.patch("/:id/ofertas/:ofertaId/descuento", requirePatientWrite, (req, res)
   });
 });
 
+// ✅ Eliminar una oferta/presupuesto
+router.delete("/:id/ofertas/:ofertaId", requirePatientWrite, (req, res) => {
+  const { id, ofertaId } = req.params;
+
+  const query = `DELETE FROM patient_ofertas WHERE id = ? AND paciente_id = ?`;
+
+  db.run(query, [ofertaId, id], function (err) {
+    if (err) {
+      console.error("❌ Error al eliminar oferta:", err.message);
+      return res.status(500).json({ message: "Error al eliminar oferta" });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ message: "Oferta no encontrada" });
+    }
+    res.json({ message: "Oferta eliminada correctamente" });
+  });
+});
+
 // ✅ Buscar pacientes por nombre o DNI
 router.get("/buscar", (req, res) => {
   const { term, tratamientoId, fechaDesde, fechaHasta } = req.query;

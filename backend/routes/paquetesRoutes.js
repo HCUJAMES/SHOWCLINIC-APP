@@ -875,7 +875,7 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
       [paciente_id]
     );
 
-    // Para cada presupuesto, obtener sus sesiones
+    // Para cada presupuesto, obtener sus sesiones y calcular saldo correctamente
     for (const p of presupuestos) {
       const sesiones = await dbAll(
         `SELECT * FROM presupuestos_sesiones WHERE presupuesto_asignado_id = ? ORDER BY id ASC`,
@@ -884,6 +884,13 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
       p.sesiones = sesiones;
       p.sesiones_totales = sesiones.length;
       p.sesiones_completadas = sesiones.filter(s => s.estado === 'completada').length;
+      
+      // Calcular saldo pendiente considerando el descuento
+      const precioTotal = parseFloat(p.precio_total) || 0;
+      const descuento = parseFloat(p.descuento) || 0;
+      const montoPagado = parseFloat(p.monto_pagado) || 0;
+      p.saldo_pendiente = (precioTotal - descuento) - montoPagado;
+      if (p.saldo_pendiente < 0) p.saldo_pendiente = 0;
     }
 
     res.json(presupuestos);
@@ -1030,12 +1037,14 @@ router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar
     const ahora = fechaLima();
     const montoRecibido = parseFloat(monto) || 0;
     const precioTotal = parseFloat(presupuesto.precio_total) || 0;
+    const descuento = parseFloat(presupuesto.descuento) || 0;
+    const precioConDescuento = precioTotal - descuento; // Total real a pagar
     const montoYaPagado = parseFloat(presupuesto.monto_pagado) || 0;
     const adelantoAnterior = parseFloat(presupuesto.monto_adelanto) || 0;
 
     let nuevoMontoPagado = montoYaPagado + montoRecibido;
     let nuevoAdelanto = adelantoAnterior;
-    let nuevoSaldo = precioTotal - nuevoMontoPagado;
+    let nuevoSaldo = precioConDescuento - nuevoMontoPagado; // Usar precio con descuento
     let estadoPago = 'pendiente_pago';
     let pagadoFlag = 0;
 
@@ -1044,8 +1053,8 @@ router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar
       nuevoAdelanto = adelantoAnterior + montoRecibido;
       estadoPago = 'adelanto';
       pagadoFlag = 0;
-    } else if (tipo_pago === 'saldo' || nuevoMontoPagado >= precioTotal) {
-      // Pago del saldo restante o pago total
+    } else if (tipo_pago === 'saldo' || nuevoMontoPagado >= precioConDescuento) {
+      // Pago del saldo restante o pago total (comparar con precio con descuento)
       estadoPago = 'pagado';
       pagadoFlag = 1;
       nuevoSaldo = 0;
@@ -1067,14 +1076,15 @@ router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar
     // Registrar en finanzas como ingreso
     const tipoDesc = tipo_pago === 'adelanto' ? 'Adelanto' : tipo_pago === 'saldo' ? 'Saldo' : 'Pago';
     await dbRun(
-      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, creado_en)
-       VALUES ('ingreso', 'presupuesto', ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+       VALUES ('ingreso', 'presupuesto', ?, ?, ?, ?, ?, ?, 'presupuesto_asignado', ?)`,
       [
         montoRecibido,
         descripcion || `${tipoDesc} presupuesto #${presupuesto.oferta_id} - ${presupuesto.paciente_nombre}`,
         ahora.split(' ')[0],
         metodo_pago || 'efectivo',
         presupuesto.paciente_id,
+        presupuesto_asignado_id,
         ahora
       ]
     );

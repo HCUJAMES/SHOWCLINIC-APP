@@ -25,7 +25,7 @@ import {
   FormControl,
   InputLabel,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, Print } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, Print, Close } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProformaPDF";
@@ -791,6 +791,30 @@ const HistorialClinico = () => {
       showToast({ severity: "error", message: "Error al guardar oferta" });
     } finally {
       setGuardandoOferta(false);
+    }
+  };
+
+  // Eliminar oferta/presupuesto
+  const eliminarOferta = async (ofertaId) => {
+    if (!pacienteSeleccionado?.id || !ofertaId) return;
+    
+    if (!window.confirm("¿Estás seguro de eliminar este presupuesto?")) return;
+    
+    try {
+      await axios.delete(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas/${ofertaId}`,
+        { headers: authHeaders }
+      );
+      
+      const ofertasRes = await axios.get(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas`,
+        { headers: authHeaders }
+      );
+      setOfertas(Array.isArray(ofertasRes.data) ? ofertasRes.data : []);
+      showToast({ severity: "success", message: "Presupuesto eliminado" });
+    } catch (e) {
+      console.error("Error al eliminar oferta:", e);
+      showToast({ severity: "error", message: "Error al eliminar presupuesto" });
     }
   };
 
@@ -1949,23 +1973,35 @@ const HistorialClinico = () => {
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
                             <Box>
                               <Typography sx={{ fontWeight: "bold", color: "#333" }}>
-                                Presupuesto #{o.id}
+                                Presupuesto
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
                                 Creado: {o.creado_en?.split(' ')[0] || o.creado_en}
                               </Typography>
                             </Box>
-                            <Box sx={{ 
-                              backgroundColor: "#a36920",
-                              color: "white", 
-                              px: 1.5, 
-                              py: 0.5, 
-                              borderRadius: 2,
-                              fontWeight: "bold",
-                              fontSize: "0.75rem",
-                              textTransform: "uppercase"
-                            }}>
-                              {totalItems} tratamiento{totalItems !== 1 ? 's' : ''}
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Box sx={{ 
+                                backgroundColor: "#a36920",
+                                color: "white", 
+                                px: 1.5, 
+                                py: 0.5, 
+                                borderRadius: 2,
+                                fontWeight: "bold",
+                                fontSize: "0.75rem",
+                                textTransform: "uppercase"
+                              }}>
+                                {totalItems} tratamiento{totalItems !== 1 ? 's' : ''}
+                              </Box>
+                              <IconButton
+                                size="small"
+                                onClick={() => eliminarOferta(o.id)}
+                                sx={{
+                                  color: "#f44336",
+                                  "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" }
+                                }}
+                              >
+                                <Close fontSize="small" />
+                              </IconButton>
                             </Box>
                           </Box>
                           
@@ -2512,7 +2548,7 @@ const HistorialClinico = () => {
                                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                     <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
                                     <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
-                                      S/ {(presupuesto.saldo_pendiente || (presupuesto.precio_total - (presupuesto.monto_pagado || 0))).toFixed(2)}
+                                      S/ {(presupuesto.saldo_pendiente || ((presupuesto.precio_total || 0) - (presupuesto.descuento || 0) - (presupuesto.monto_pagado || 0))).toFixed(2)}
                                     </Typography>
                                   </Box>
                                 )}
@@ -2532,8 +2568,10 @@ const HistorialClinico = () => {
                                   variant="contained"
                                   onClick={() => {
                                     setPresupuestoParaPago(presupuesto);
-                                    const saldoPendiente = presupuesto.saldo_pendiente || (presupuesto.precio_total - (presupuesto.monto_pagado || 0));
-                                    setMontoPago(saldoPendiente > 0 ? saldoPendiente : presupuesto.precio_total);
+                                    // Calcular precio con descuento
+                                    const precioConDescuento = (presupuesto.precio_total || 0) - (presupuesto.descuento || 0);
+                                    const saldoPendiente = presupuesto.saldo_pendiente || (precioConDescuento - (presupuesto.monto_pagado || 0));
+                                    setMontoPago(saldoPendiente > 0 ? saldoPendiente : precioConDescuento);
                                     setMetodoPago("efectivo");
                                     setTipoPago(presupuesto.estado_pago === 'adelanto' ? 'saldo' : 'total');
                                     setModalPagoPresupuesto(true);
@@ -3454,12 +3492,14 @@ const HistorialClinico = () => {
                   value={tipoPago}
                   onChange={(e) => {
                     setTipoPago(e.target.value);
-                    // Ajustar monto según tipo
+                    // Ajustar monto según tipo (considerando descuento)
+                    const precioConDescuento = (presupuestoParaPago.precio_total || 0) - (presupuestoParaPago.descuento || 0);
                     if (e.target.value === 'total') {
-                      const saldo = (presupuestoParaPago.precio_total || 0) - (presupuestoParaPago.monto_pagado || 0);
-                      setMontoPago(saldo > 0 ? saldo : presupuestoParaPago.precio_total);
+                      const saldo = precioConDescuento - (presupuestoParaPago.monto_pagado || 0);
+                      setMontoPago(saldo > 0 ? saldo : precioConDescuento);
                     } else if (e.target.value === 'saldo') {
-                      setMontoPago(presupuestoParaPago.saldo_pendiente || 0);
+                      const saldoPendiente = presupuestoParaPago.saldo_pendiente || (precioConDescuento - (presupuestoParaPago.monto_pagado || 0));
+                      setMontoPago(saldoPendiente);
                     }
                   }}
                   label="Tipo de Pago"
@@ -3500,8 +3540,20 @@ const HistorialClinico = () => {
               {/* Resumen de pago */}
               <Box sx={{ mt: 2, p: 1.5, backgroundColor: "rgba(76, 175, 80, 0.1)", borderRadius: 2 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                  <Typography variant="body2" color="text.secondary">Total del presupuesto:</Typography>
-                  <Typography sx={{ fontWeight: "bold" }}>S/ {presupuestoParaPago.precio_total?.toFixed(2)}</Typography>
+                  <Typography variant="body2" color="text.secondary">Subtotal:</Typography>
+                  <Typography sx={{ fontWeight: "bold" }}>S/ {Number(presupuestoParaPago.precio_total || 0).toFixed(2)}</Typography>
+                </Box>
+                {Number(presupuestoParaPago.descuento || 0) > 0 && (
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                    <Typography variant="body2" color="error">Descuento:</Typography>
+                    <Typography sx={{ color: "#f44336", fontWeight: "bold" }}>-S/ {Number(presupuestoParaPago.descuento).toFixed(2)}</Typography>
+                  </Box>
+                )}
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1, pt: 1, borderTop: "1px dashed #ccc" }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontWeight: "bold" }}>Total a pagar:</Typography>
+                  <Typography sx={{ fontWeight: "bold", color: "#a36920" }}>
+                    S/ {((presupuestoParaPago.precio_total || 0) - (presupuestoParaPago.descuento || 0)).toFixed(2)}
+                  </Typography>
                 </Box>
                 {(presupuestoParaPago.monto_pagado > 0) && (
                   <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
@@ -3509,14 +3561,18 @@ const HistorialClinico = () => {
                     <Typography sx={{ color: "#4caf50", fontWeight: "bold" }}>S/ {(presupuestoParaPago.monto_pagado || 0).toFixed(2)}</Typography>
                   </Box>
                 )}
-                {(presupuestoParaPago.saldo_pendiente > 0 || (presupuestoParaPago.precio_total - (presupuestoParaPago.monto_pagado || 0)) > 0) && (
-                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                    <Typography variant="body2" color="text.secondary">Saldo pendiente:</Typography>
-                    <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>
-                      S/ {(presupuestoParaPago.saldo_pendiente || (presupuestoParaPago.precio_total - (presupuestoParaPago.monto_pagado || 0))).toFixed(2)}
-                    </Typography>
-                  </Box>
-                )}
+                {(() => {
+                  const precioConDescuento = (presupuestoParaPago.precio_total || 0) - (presupuestoParaPago.descuento || 0);
+                  const saldoPendiente = presupuestoParaPago.saldo_pendiente || (precioConDescuento - (presupuestoParaPago.monto_pagado || 0));
+                  return saldoPendiente > 0 && (
+                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                      <Typography variant="body2" color="text.secondary">Saldo pendiente:</Typography>
+                      <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                        S/ {saldoPendiente.toFixed(2)}
+                      </Typography>
+                    </Box>
+                  );
+                })()}
               </Box>
             </>
           )}

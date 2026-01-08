@@ -73,13 +73,12 @@ router.get("/reporte", (req, res) => {
   `;
   const params = [];
 
-  // 🗓️ Filtros dinámicos
+  // 🗓️ Filtros dinámicos (la fecha ya está en hora Lima, no necesita conversión)
   if (fechaInicio && fechaFin) {
-  query += " AND DATE(datetime(fecha, '-5 hours')) BETWEEN ? AND ?";
-  params.push(fechaInicio, fechaFin);
-}
- else if (fechaInicio) {
-    query += " AND date(tr.fecha) = date(?)";
+    query += " AND DATE(tr.fecha) BETWEEN ? AND ?";
+    params.push(fechaInicio, fechaFin);
+  } else if (fechaInicio) {
+    query += " AND DATE(tr.fecha) = ?";
     params.push(fechaInicio);
   }
 
@@ -310,10 +309,10 @@ router.get("/reporte", (req, res) => {
     const paramsFinanzas = [];
 
     if (fechaInicio && fechaFin) {
-      queryFinanzas += " AND DATE(datetime(f.fecha, '-5 hours')) BETWEEN ? AND ?";
+      queryFinanzas += " AND DATE(f.fecha) BETWEEN ? AND ?";
       paramsFinanzas.push(fechaInicio, fechaFin);
     } else if (fechaInicio) {
-      queryFinanzas += " AND DATE(datetime(f.fecha, '-5 hours')) = ?";
+      queryFinanzas += " AND DATE(f.fecha) = ?";
       paramsFinanzas.push(fechaInicio);
     }
 
