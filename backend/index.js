@@ -280,10 +280,18 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
         paciente_id INTEGER NOT NULL,
         items_json TEXT NOT NULL,
         total REAL NOT NULL,
+        descuento REAL DEFAULT 0,
         creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(paciente_id) REFERENCES patients(id)
       )
     `);
+    
+    // Migración: agregar columna descuento si no existe
+    db.run(`ALTER TABLE patient_ofertas ADD COLUMN descuento REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Columna descuento ya existe o error:', err.message);
+      }
+    });
 
     // 🎁 Tabla de paquetes de tratamientos
     db.run(`
@@ -403,6 +411,7 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
         oferta_id INTEGER NOT NULL,
         tratamientos_json TEXT NOT NULL,
         precio_total REAL NOT NULL,
+        descuento REAL DEFAULT 0,
         estado TEXT NOT NULL DEFAULT 'activo',
         fecha_inicio TEXT DEFAULT CURRENT_TIMESTAMP,
         fecha_fin TEXT,
@@ -413,6 +422,13 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
         FOREIGN KEY(oferta_id) REFERENCES ofertas(id)
       )
     `);
+    
+    // Migración: agregar columna descuento si no existe
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN descuento REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log('Columna descuento en presupuestos_asignados ya existe o error:', err.message);
+      }
+    });
 
     // 📋 Tabla de sesiones de presupuestos (tracking de cada tratamiento)
     db.run(`

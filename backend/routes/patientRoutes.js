@@ -250,7 +250,7 @@ router.put("/:id/observaciones/:observacionId", requirePatientWrite, (req, res) 
 router.get("/:id/ofertas", (req, res) => {
   const { id } = req.params;
   const query = `
-    SELECT id, paciente_id, items_json, total, creado_en
+    SELECT id, paciente_id, items_json, total, descuento, creado_en
     FROM patient_ofertas
     WHERE paciente_id = ?
     ORDER BY creado_en DESC, id DESC
@@ -373,6 +373,31 @@ router.put("/:id/ofertas/:ofertaId", requirePatientWrite, (req, res) => {
       return res.status(404).json({ message: "Oferta no encontrada" });
     }
     res.json({ message: "Oferta actualizada correctamente" });
+  });
+});
+
+// ✅ Actualizar descuento de una oferta
+router.patch("/:id/ofertas/:ofertaId/descuento", requirePatientWrite, (req, res) => {
+  const { id, ofertaId } = req.params;
+  const { descuento } = req.body;
+
+  const descuentoNum = Number(descuento) || 0;
+
+  const query = `
+    UPDATE patient_ofertas
+    SET descuento = ?
+    WHERE id = ? AND paciente_id = ?
+  `;
+
+  db.run(query, [descuentoNum, ofertaId, id], function (err) {
+    if (err) {
+      console.error("❌ Error al actualizar descuento:", err.message);
+      return res.status(500).json({ message: "Error al actualizar descuento" });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ message: "Oferta no encontrada" });
+    }
+    res.json({ message: "Descuento actualizado correctamente", descuento: descuentoNum });
   });
 });
 

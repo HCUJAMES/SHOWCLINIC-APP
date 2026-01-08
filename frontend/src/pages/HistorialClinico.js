@@ -152,6 +152,11 @@ const HistorialClinico = () => {
   const [descuentoProforma, setDescuentoProforma] = useState(0);
   const [presupuestoParaProforma, setPresupuestoParaProforma] = useState(null);
 
+  // Estados para modal de descuento de presupuesto
+  const [modalDescuentoPresupuesto, setModalDescuentoPresupuesto] = useState(false);
+  const [presupuestoParaDescuento, setPresupuestoParaDescuento] = useState(null);
+  const [nuevoDescuento, setNuevoDescuento] = useState(0);
+
   // Estados para confirmar cancelación
   const [openConfirmarCancelar, setOpenConfirmarCancelar] = useState(false);
   const [tratamientoCancelar, setTratamientoCancelar] = useState(null);
@@ -500,6 +505,31 @@ const HistorialClinico = () => {
       console.error("Error al registrar pago:", error);
       showToast({ severity: "error", message: error.response?.data?.message || "Error al registrar pago" });
       throw error;
+    }
+  };
+
+  // Guardar descuento de presupuesto
+  const guardarDescuentoPresupuesto = async () => {
+    if (!presupuestoParaDescuento || !pacienteSeleccionado) return;
+    
+    try {
+      await axios.patch(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas/${presupuestoParaDescuento.id}/descuento`,
+        { descuento: nuevoDescuento },
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Descuento actualizado correctamente" });
+      setModalDescuentoPresupuesto(false);
+      
+      // Recargar ofertas
+      const ofertasRes = await axios.get(`${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas`, {
+        headers: authHeaders,
+      });
+      setOfertas(Array.isArray(ofertasRes.data) ? ofertasRes.data : []);
+    } catch (error) {
+      console.error("Error al guardar descuento:", error);
+      showToast({ severity: "error", message: "Error al guardar descuento" });
     }
   };
 
@@ -1988,13 +2018,47 @@ const HistorialClinico = () => {
                           <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                             <Box>
                               <Typography variant="body2" color="text.secondary">
-                                Total del presupuesto:
+                                Subtotal:
                               </Typography>
-                              <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
+                              <Typography sx={{ fontWeight: "bold", color: "#666", fontSize: "0.95rem" }}>
                                 S/ {Number(o.total || 0).toFixed(2)}
                               </Typography>
+                              {Number(o.descuento || 0) > 0 && (
+                                <Box sx={{ mt: 0.5 }}>
+                                  <Typography variant="body2" color="error" sx={{ fontSize: "0.85rem" }}>
+                                    Descuento: -S/ {Number(o.descuento).toFixed(2)}
+                                  </Typography>
+                                  <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
+                                    Total: S/ {(Number(o.total || 0) - Number(o.descuento || 0)).toFixed(2)}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {Number(o.descuento || 0) === 0 && (
+                                <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
+                                  Total: S/ {Number(o.total || 0).toFixed(2)}
+                                </Typography>
+                              )}
                             </Box>
                             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  setPresupuestoParaDescuento(o);
+                                  setNuevoDescuento(Number(o.descuento || 0));
+                                  setModalDescuentoPresupuesto(true);
+                                }}
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  py: 0.5,
+                                  borderRadius: 2,
+                                  borderColor: "#ff9800",
+                                  color: "#ff9800",
+                                  "&:hover": { backgroundColor: "rgba(255, 152, 0, 0.1)" }
+                                }}
+                              >
+                                {Number(o.descuento || 0) > 0 ? "✏️ Editar Dcto" : "➕ Agregar Dcto"}
+                              </Button>
                               <Button
                                 size="small"
                                 variant="contained"
@@ -2016,7 +2080,7 @@ const HistorialClinico = () => {
                                 startIcon={<Print />}
                                 onClick={() => {
                                   setPresupuestoParaProforma(o);
-                                  setDescuentoProforma(0);
+                                  setDescuentoProforma(Number(o.descuento || 0));
                                   setModalDescuento(true);
                                 }}
                                 sx={{
@@ -2374,12 +2438,31 @@ const HistorialClinico = () => {
                           <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0" }}>
                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1 }}>
                               <Box>
-                                <Typography variant="body2" color="text.secondary">
-                                  Total del presupuesto:
-                                </Typography>
-                                <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
-                                  S/ {presupuesto.precio_total?.toFixed(2)}
-                                </Typography>
+                                {Number(presupuesto.descuento || 0) > 0 ? (
+                                  <>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Subtotal:
+                                    </Typography>
+                                    <Typography sx={{ fontWeight: "bold", color: "#666", fontSize: "0.95rem" }}>
+                                      S/ {Number(presupuesto.precio_total || 0).toFixed(2)}
+                                    </Typography>
+                                    <Typography variant="body2" color="error" sx={{ fontSize: "0.85rem" }}>
+                                      Descuento: -S/ {Number(presupuesto.descuento).toFixed(2)}
+                                    </Typography>
+                                    <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
+                                      Total: S/ {(Number(presupuesto.precio_total || 0) - Number(presupuesto.descuento || 0)).toFixed(2)}
+                                    </Typography>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Total del presupuesto:
+                                    </Typography>
+                                    <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
+                                      S/ {Number(presupuesto.precio_total || 0).toFixed(2)}
+                                    </Typography>
+                                  </>
+                                )}
                               </Box>
                               
                               {/* Estado de pago con colores */}
@@ -3296,6 +3379,58 @@ const HistorialClinico = () => {
             }}
           >
             Generar PDF
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Agregar/Editar Descuento de Presupuesto */}
+      <Dialog open={modalDescuentoPresupuesto} onClose={() => setModalDescuentoPresupuesto(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#ff9800", color: "white" }}>
+          💰 {nuevoDescuento > 0 ? "Editar" : "Agregar"} Descuento
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {presupuestoParaDescuento && (
+            <>
+              <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
+                Presupuesto #{presupuestoParaDescuento.id} - Subtotal: S/ {Number(presupuestoParaDescuento.total || 0).toFixed(2)}
+              </Typography>
+              
+              <TextField
+                fullWidth
+                label="Monto de Descuento (S/)"
+                type="number"
+                value={nuevoDescuento}
+                onChange={(e) => setNuevoDescuento(Number(e.target.value))}
+                inputProps={{ min: 0, step: 0.01, max: presupuestoParaDescuento.total }}
+                sx={{ mb: 2 }}
+                helperText={`Máximo: S/ ${Number(presupuestoParaDescuento.total || 0).toFixed(2)}`}
+              />
+              
+              <Box sx={{ p: 2, backgroundColor: "#fff3e0", borderRadius: 2 }}>
+                <Typography variant="body2" color="text.secondary">
+                  Total con descuento:
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: "bold", color: "#ff9800" }}>
+                  S/ {(Number(presupuestoParaDescuento.total || 0) - nuevoDescuento).toFixed(2)}
+                </Typography>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalDescuentoPresupuesto(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={guardarDescuentoPresupuesto}
+            disabled={nuevoDescuento < 0 || nuevoDescuento > (presupuestoParaDescuento?.total || 0)}
+            sx={{
+              backgroundColor: "#ff9800",
+              "&:hover": { backgroundColor: "#f57c00" },
+            }}
+          >
+            Guardar Descuento
           </Button>
         </DialogActions>
       </Dialog>

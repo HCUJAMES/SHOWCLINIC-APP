@@ -789,7 +789,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
   }
 
   try {
-    // Obtener la oferta/presupuesto
+    // Obtener la oferta/presupuesto (incluyendo descuento)
     const oferta = await dbGet(
       `SELECT * FROM patient_ofertas WHERE id = ?`,
       [oferta_id]
@@ -810,20 +810,22 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
     const ahora = fechaLima();
     const username = req.user?.username || "sistema";
 
-    // Calcular precio total
+    // Calcular precio total y obtener descuento
     const precioTotal = items.reduce((sum, it) => sum + Number(it.precio || 0), 0);
+    const descuento = Number(oferta.descuento) || 0;
 
-    // Crear registro de presupuesto asignado
+    // Crear registro de presupuesto asignado (incluyendo descuento)
     const result = await dbRun(
       `INSERT INTO presupuestos_asignados (
         paciente_id, oferta_id, tratamientos_json,
-        precio_total, estado, fecha_inicio, notas, creado_en, creado_por
-      ) VALUES (?, ?, ?, ?, 'activo', ?, ?, ?, ?)`,
+        precio_total, descuento, estado, fecha_inicio, notas, creado_en, creado_por
+      ) VALUES (?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?)`,
       [
         paciente_id,
         oferta_id,
         JSON.stringify(items),
         precioTotal,
+        descuento,
         ahora,
         notas || null,
         ahora,
