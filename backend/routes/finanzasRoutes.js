@@ -69,7 +69,10 @@ router.get("/reporte", (req, res) => {
       )
       GROUP BY deuda_id
     ) dpm2 ON dpm2.deuda_id = d.id
-    WHERE 1 = 1
+    WHERE tr.precio_total > 0 
+      AND tr.pagoMetodo IS NOT NULL 
+      AND tr.pagoMetodo != '' 
+      AND LOWER(tr.pagoMetodo) != 'desconocido'
   `;
   const params = [];
 
@@ -326,6 +329,8 @@ router.get("/reporte", (req, res) => {
       paramsFinanzas.push(metodoPago);
     }
 
+    queryFinanzas += " ORDER BY f.creado_en DESC";
+
     db.all(queryFinanzas, paramsFinanzas, (errFin, rowsFinanzas) => {
       if (errFin) {
         console.error("❌ Error al obtener finanzas:", errFin.message);
@@ -356,8 +361,12 @@ router.get("/reporte", (req, res) => {
       // Combinar resultados
       const todosResultados = [...resultados.map(r => ({...r, tipo_registro: 'tratamiento'})), ...pagosFinanzas];
       
-      // Ordenar por fecha descendente
-      todosResultados.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      // Ordenar por fecha descendente (más reciente primero)
+      todosResultados.sort((a, b) => {
+        const fechaA = new Date(a.fecha || a.creado_en || 0);
+        const fechaB = new Date(b.fecha || b.creado_en || 0);
+        return fechaB - fechaA;
+      });
 
       // Recalcular totales incluyendo pagos de finanzas
       const totalGeneralFinal = todosResultados.reduce((acc, r) => acc + (r.monto_cobrado || 0), 0);

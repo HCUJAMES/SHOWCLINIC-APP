@@ -3005,9 +3005,6 @@ const HistorialClinico = () => {
                           <TableCell sx={{ fontWeight: "bold" }}>Tratamiento</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Tipo Atención</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Especialista</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Total (S/)</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Desc. (%)</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Pago</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Sesión</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Fotos</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Recibo</TableCell>
@@ -3027,9 +3024,6 @@ const HistorialClinico = () => {
                             <TableCell>{t.nombreTratamiento}</TableCell>
                             <TableCell>{t.tipoAtencion}</TableCell>
                             <TableCell>{t.especialista}</TableCell>
-                            <TableCell>S/ {(t.precio_total || 0).toFixed(2)}</TableCell>
-                            <TableCell>{t.descuento}</TableCell>
-                            <TableCell>{t.pagoMetodo}</TableCell>
                             <TableCell>{t.sesion}</TableCell>
 
                             <TableCell>
@@ -3157,12 +3151,6 @@ const HistorialClinico = () => {
                     </Table>
                   </TableContainer>
 
-                  <Typography
-                    align="right"
-                    sx={{ mt: 3, color: "#a36920", fontWeight: "bold" }}
-                  >
-                    Total General: S/ {totalGeneral.toFixed(2)}
-                  </Typography>
                 </>
               )}
             </>

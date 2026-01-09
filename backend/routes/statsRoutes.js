@@ -42,99 +42,88 @@ router.get("/overview", authMiddleware, requireRole("doctor", "admin"), async (r
 
     const { startStr, endStr } = range;
 
-    // KPIs del mes - Tratamientos realizados
-    const kpiTratamientos = await dbGet(
+    // KPIs del mes - Obtener de finanzas (ingresos reales)
+    const kpiFinanzas = await dbGet(
       `
         SELECT
           COUNT(*) AS sesiones,
           COUNT(DISTINCT paciente_id) AS pacientes_unicos,
-          COALESCE(SUM(precio_total), 0) AS ingresos_bruto,
-          COALESCE(SUM(CASE WHEN lower(trim(pagoMetodo)) = 'tarjeta' THEN (precio_total * 0.96) ELSE precio_total END), 0) AS ingresos_neto,
-          COALESCE(SUM(CASE WHEN lower(trim(pagoMetodo)) = 'tarjeta' THEN (precio_total * 0.04) ELSE 0 END), 0) AS comision_pos
-        FROM tratamientos_realizados
-        WHERE date(fecha) BETWEEN date(?) AND date(?)
+          COALESCE(SUM(monto), 0) AS ingresos_bruto,
+          COALESCE(SUM(CASE WHEN lower(trim(metodo_pago)) = 'tarjeta' THEN (monto * 0.96) ELSE monto END), 0) AS ingresos_neto,
+          COALESCE(SUM(CASE WHEN lower(trim(metodo_pago)) = 'tarjeta' THEN (monto * 0.04) ELSE 0 END), 0) AS comision_pos
+        FROM finanzas
+        WHERE tipo = 'ingreso' AND date(fecha) BETWEEN date(?) AND date(?)
       `,
       [startStr, endStr]
     );
 
-    // KPIs del mes - Presupuestos pagados
-    const kpiPresupuestos = await dbGet(
-      `
-        SELECT
-          COUNT(*) AS cantidad,
-          COUNT(DISTINCT paciente_id) AS pacientes_unicos,
-          COALESCE(SUM(monto_pagado), 0) AS ingresos_bruto,
-          COALESCE(SUM(CASE WHEN lower(trim(metodo_pago)) = 'tarjeta' THEN (monto_pagado * 0.96) ELSE monto_pagado END), 0) AS ingresos_neto,
-          COALESCE(SUM(CASE WHEN lower(trim(metodo_pago)) = 'tarjeta' THEN (monto_pagado * 0.04) ELSE 0 END), 0) AS comision_pos
-        FROM presupuestos_asignados
-        WHERE pagado = 1 AND date(fecha_pago) BETWEEN date(?) AND date(?)
-      `,
+    // Contar tratamientos realizados (sesiones) del mes
+    const sesionesRealizadas = await dbGet(
+      `SELECT COUNT(*) AS total FROM tratamientos_realizados WHERE date(fecha) BETWEEN date(?) AND date(?)`,
       [startStr, endStr]
     );
 
     // Combinar KPIs
     const kpi = {
-      sesiones: Number(kpiTratamientos?.sesiones || 0) + Number(kpiPresupuestos?.cantidad || 0),
-      pacientes_unicos: Number(kpiTratamientos?.pacientes_unicos || 0),
-      ingresos_bruto: Number(kpiTratamientos?.ingresos_bruto || 0) + Number(kpiPresupuestos?.ingresos_bruto || 0),
-      ingresos_neto: Number(kpiTratamientos?.ingresos_neto || 0) + Number(kpiPresupuestos?.ingresos_neto || 0),
-      comision_pos: Number(kpiTratamientos?.comision_pos || 0) + Number(kpiPresupuestos?.comision_pos || 0),
+      sesiones: Number(sesionesRealizadas?.total || 0),
+      pacientes_unicos: Number(kpiFinanzas?.pacientes_unicos || 0),
+      ingresos_bruto: Number(kpiFinanzas?.ingresos_bruto || 0),
+      ingresos_neto: Number(kpiFinanzas?.ingresos_neto || 0),
+      comision_pos: Number(kpiFinanzas?.comision_pos || 0),
     };
     
     const totalIngresos = kpi.ingresos_neto;
     const totalSesiones = kpi.sesiones;
     kpi.ticket_promedio = totalSesiones > 0 ? totalIngresos / totalSesiones : 0;
 
-    // Top tratamientos
+    // Top tratamientos - desde finanzas
     const topTratamientos = await dbAll(
       `
         SELECT
-          t.id AS tratamiento_id,
-          t.nombre AS tratamiento,
+          f.descripcion AS tratamiento,
           COUNT(*) AS cantidad,
-          COALESCE(SUM(tr.precio_total), 0) AS ingresos_bruto,
-          COALESCE(SUM(CASE WHEN lower(trim(tr.pagoMetodo)) = 'tarjeta' THEN (tr.precio_total * 0.96) ELSE tr.precio_total END), 0) AS ingresos_neto
-        FROM tratamientos_realizados tr
-        LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
-        WHERE date(tr.fecha) BETWEEN date(?) AND date(?)
-        GROUP BY tr.tratamiento_id
-        ORDER BY cantidad DESC, ingresos_neto DESC
+          COALESCE(SUM(f.monto), 0) AS ingresos_bruto,
+          COALESCE(SUM(CASE WHEN lower(trim(f.metodo_pago)) = 'tarjeta' THEN (f.monto * 0.96) ELSE f.monto END), 0) AS ingresos_neto
+        FROM finanzas f
+        WHERE f.tipo = 'ingreso' AND date(f.fecha) BETWEEN date(?) AND date(?)
+        GROUP BY f.descripcion
+        ORDER BY ingresos_neto DESC, cantidad DESC
         LIMIT 8
       `,
       [startStr, endStr]
     );
 
-    // Pacientes frecuentes
+    // Pacientes frecuentes - desde finanzas
     const pacientesFrecuentes = await dbAll(
       `
         SELECT
           p.id AS paciente_id,
           (p.nombre || ' ' || p.apellido) AS paciente,
           COUNT(*) AS sesiones,
-          COALESCE(SUM(tr.precio_total), 0) AS ingresos_bruto,
-          COALESCE(SUM(CASE WHEN lower(trim(tr.pagoMetodo)) = 'tarjeta' THEN (tr.precio_total * 0.96) ELSE tr.precio_total END), 0) AS ingresos_neto
-        FROM tratamientos_realizados tr
-        LEFT JOIN patients p ON p.id = tr.paciente_id
-        WHERE date(tr.fecha) BETWEEN date(?) AND date(?)
-        GROUP BY tr.paciente_id
-        ORDER BY sesiones DESC, ingresos_neto DESC
+          COALESCE(SUM(f.monto), 0) AS ingresos_bruto,
+          COALESCE(SUM(CASE WHEN lower(trim(f.metodo_pago)) = 'tarjeta' THEN (f.monto * 0.96) ELSE f.monto END), 0) AS ingresos_neto
+        FROM finanzas f
+        LEFT JOIN patients p ON p.id = f.paciente_id
+        WHERE f.tipo = 'ingreso' AND date(f.fecha) BETWEEN date(?) AND date(?)
+        GROUP BY f.paciente_id
+        ORDER BY ingresos_neto DESC, sesiones DESC
         LIMIT 8
       `,
       [startStr, endStr]
     );
 
-    // Sesiones por día (tendencia simple)
+    // Sesiones por día - desde finanzas
     const sesionesPorDia = await dbAll(
       `
         SELECT
-          date(tr.fecha) AS fecha,
+          date(f.fecha) AS fecha,
           COUNT(*) AS sesiones,
-          COALESCE(SUM(tr.precio_total), 0) AS ingresos_bruto,
-          COALESCE(SUM(CASE WHEN lower(trim(tr.pagoMetodo)) = 'tarjeta' THEN (tr.precio_total * 0.96) ELSE tr.precio_total END), 0) AS ingresos_neto
-        FROM tratamientos_realizados tr
-        WHERE date(tr.fecha) BETWEEN date(?) AND date(?)
-        GROUP BY date(tr.fecha)
-        ORDER BY date(tr.fecha) ASC
+          COALESCE(SUM(f.monto), 0) AS ingresos_bruto,
+          COALESCE(SUM(CASE WHEN lower(trim(f.metodo_pago)) = 'tarjeta' THEN (f.monto * 0.96) ELSE f.monto END), 0) AS ingresos_neto
+        FROM finanzas f
+        WHERE f.tipo = 'ingreso' AND date(f.fecha) BETWEEN date(?) AND date(?)
+        GROUP BY date(f.fecha)
+        ORDER BY date(f.fecha) ASC
       `,
       [startStr, endStr]
     );

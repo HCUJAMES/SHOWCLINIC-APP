@@ -745,15 +745,25 @@ router.post("/paquete-paciente/:paquete_paciente_id/pago", requirePaquetesAsigna
       [pagadoFlag, nuevoMontoPagado, nuevoAdelanto, nuevoSaldo, estadoPago, ahora, metodo_pago || 'efectivo', paquete_paciente_id]
     );
 
-    // Registrar en finanzas como ingreso
+    // Registrar en finanzas como ingreso - extraer nombres de tratamientos del paquete
     const tipoDesc = tipo_pago === 'adelanto' ? 'Adelanto' : tipo_pago === 'saldo' ? 'Saldo' : 'Pago';
     const nombrePaciente = `${paquete.paciente_nombre} ${paquete.paciente_apellido || ''}`.trim();
+    
+    // Obtener nombres de tratamientos del paquete
+    let nombresTratamientos = paquete.paquete_nombre || 'Paquete';
+    try {
+      const tratamientosPaquete = paquete.tratamientos_json ? JSON.parse(paquete.tratamientos_json) : [];
+      if (tratamientosPaquete.length > 0) {
+        nombresTratamientos = tratamientosPaquete.map(t => t.nombre || t.tratamiento_nombre).join(', ');
+      }
+    } catch (e) {}
+    
     await dbRun(
       `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
        VALUES ('ingreso', 'paquete', ?, ?, ?, ?, ?, ?, 'paquete_paciente', ?)`,
       [
         montoRecibido,
-        `${tipoDesc} paquete ${paquete.paquete_nombre} - ${nombrePaciente}`,
+        `${nombresTratamientos} - ${nombrePaciente}`,
         ahora.split(' ')[0],
         metodo_pago || 'efectivo',
         paquete.paciente_id,
@@ -1073,14 +1083,22 @@ router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar
       [pagadoFlag, nuevoMontoPagado, nuevoAdelanto, nuevoSaldo, estadoPago, ahora, metodo_pago || 'efectivo', presupuesto_asignado_id]
     );
 
-    // Registrar en finanzas como ingreso
+    // Registrar en finanzas como ingreso - extraer nombres de tratamientos
     const tipoDesc = tipo_pago === 'adelanto' ? 'Adelanto' : tipo_pago === 'saldo' ? 'Saldo' : 'Pago';
+    let nombresTratamientos = '';
+    try {
+      const tratamientos = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : [];
+      nombresTratamientos = tratamientos.map(t => t.nombre).join(', ');
+    } catch (e) {
+      nombresTratamientos = 'Presupuesto';
+    }
+    
     await dbRun(
       `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
        VALUES ('ingreso', 'presupuesto', ?, ?, ?, ?, ?, ?, 'presupuesto_asignado', ?)`,
       [
         montoRecibido,
-        descripcion || `${tipoDesc} presupuesto #${presupuesto.oferta_id} - ${presupuesto.paciente_nombre}`,
+        descripcion || `${nombresTratamientos} - ${presupuesto.paciente_nombre}`,
         ahora.split(' ')[0],
         metodo_pago || 'efectivo',
         presupuesto.paciente_id,
