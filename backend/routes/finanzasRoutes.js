@@ -220,6 +220,17 @@ router.get("/reporte", (req, res) => {
             : metodoAdelantoLegacy
           : metodoAdelantoLegacy;
 
+      // Determinar estado de pago
+      const estadoPago = (() => {
+        if (String(r.deuda_estado || "").toLowerCase() === "pendiente") {
+          return "Deuda";
+        }
+        if (tienePagoEnPartesLegacy && saldo > 0) {
+          return "Deuda";
+        }
+        return "Pagado";
+      })();
+
       return {
         ...r,
         monto_bruto: montoBruto,
@@ -227,6 +238,7 @@ router.get("/reporte", (req, res) => {
         monto_cobrado: montoCobrado,
         deuda_pendiente: deudaPendiente,
         pagoMetodo_mostrado: pagoMetodoMostrado,
+        estado_pago: estadoPago,
       };
     });
 
@@ -345,6 +357,14 @@ router.get("/reporte", (req, res) => {
         // Capitalizar método de pago
         const metodoCapitalizado = metodo.charAt(0).toUpperCase() + metodo.slice(1).toLowerCase();
         
+        // Determinar estado de pago para registros de finanzas
+        // Si es un adelanto de presupuesto/paquete, verificar si hay deuda pendiente
+        let estadoPago = "Pagado";
+        if (r.referencia_tipo === 'presupuesto_asignado' || r.referencia_tipo === 'paquete_paciente') {
+          // Por defecto "Pagado" para pagos de finanzas, ya que son ingresos registrados
+          estadoPago = "Pagado";
+        }
+        
         return {
           ...r,
           tratamiento: r.tratamiento || 'Pago',
@@ -354,7 +374,8 @@ router.get("/reporte", (req, res) => {
           deuda_pendiente: 0,
           pagoMetodo: metodoCapitalizado,
           pagoMetodo_mostrado: metodoCapitalizado,
-          tipo_registro: r.tipo_registro || 'otro'
+          tipo_registro: r.tipo_registro || 'otro',
+          estado_pago: estadoPago
         };
       });
 

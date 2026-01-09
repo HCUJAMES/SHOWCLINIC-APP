@@ -395,6 +395,7 @@ const Finanzas = () => {
                     <TableCell>Método de Pago</TableCell>
                     <TableCell sx={{ minWidth: 130, textAlign: "right" }}>Monto bruto (S/)</TableCell>
                     <TableCell sx={{ minWidth: 110, textAlign: "center" }}>Descuento (%)</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: "center" }}>Estado</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -418,6 +419,22 @@ const Finanzas = () => {
                         {Number(r.monto_bruto ?? r.precio_total ?? 0).toFixed(2)}
                       </TableCell>
                       <TableCell sx={{ textAlign: "center" }}>{r.descuento}</TableCell>
+                      <TableCell sx={{ textAlign: "center" }}>
+                        <Box
+                          sx={{
+                            display: "inline-block",
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: 1,
+                            backgroundColor: r.estado_pago === "Deuda" ? "#ffebee" : "#e8f5e9",
+                            color: r.estado_pago === "Deuda" ? "#c62828" : "#2e7d32",
+                            fontWeight: "bold",
+                            fontSize: "0.75rem"
+                          }}
+                        >
+                          {r.estado_pago || "Pagado"}
+                        </Box>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
