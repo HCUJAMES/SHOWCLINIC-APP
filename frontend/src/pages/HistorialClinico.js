@@ -25,10 +25,11 @@ import {
   FormControl,
   InputLabel,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, Print, Close } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, Print, Close, Description } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProformaPDF";
+import generarConsentimientoPDF from "../utils/generarConsentimientoPDF";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useToast } from "../components/ToastProvider";
@@ -1395,18 +1396,37 @@ const HistorialClinico = () => {
                   >
                     Volver
                   </Button>
-                  <Button
-                    variant="contained"
-                    sx={{
-                      backgroundColor: "#a36920",
-                      "&:hover": { backgroundColor: "#8b581b" },
-                      borderRadius: 3,
-                      fontWeight: "bold",
-                    }}
-                    onClick={generarPDF}
-                  >
-                    Exportar PDF
-                  </Button>
+                  <Box sx={{ textAlign: { xs: "left", sm: "left" }, display: "flex", gap: 2, flexWrap: "wrap" }}>
+                    <Button
+                      variant="contained"
+                      sx={{
+                        backgroundColor: "#a36920",
+                        "&:hover": { backgroundColor: "#8b581b" },
+                        borderRadius: 3,
+                        fontWeight: "bold",
+                      }}
+                      onClick={generarPDF}
+                    >
+                      Exportar PDF
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Description />}
+                      sx={{
+                        borderColor: "#a36920",
+                        color: "#a36920",
+                        "&:hover": { 
+                          borderColor: "#8b581b",
+                          backgroundColor: "rgba(163, 105, 32, 0.04)"
+                        },
+                        borderRadius: 3,
+                        fontWeight: "bold",
+                      }}
+                      onClick={() => generarConsentimientoPDF(pacienteSeleccionado)}
+                    >
+                      Consentimiento Informado
+                    </Button>
+                  </Box>
                 </Box>
 
                 <Box sx={{ textAlign: { xs: "left", sm: "right" } }}>
