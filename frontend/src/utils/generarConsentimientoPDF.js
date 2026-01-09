@@ -204,9 +204,13 @@ const generarConsentimientoPDF = async (paciente) => {
   yPos += 8;
 
   // FIRMA DEL PACIENTE
-  doc.text(`Paciente: _________________________________________________________`, margin, yPos);
+  doc.setFont("times", "normal");
+  doc.text(`Paciente: `, margin, yPos);
+  doc.setFont("times", "bold");
+  doc.text(nombreCompleto || "_________________________________________________________", margin + 20, yPos);
   yPos += 10;
 
+  doc.setFont("times", "normal");
   doc.text(`(DNI/FIRMA)`, pageWidth / 2, yPos, { align: "center" });
   yPos += 12;
 
@@ -216,7 +220,7 @@ const generarConsentimientoPDF = async (paciente) => {
 
   doc.text(`_______________________`, pageWidth / 2 - 30, yPos, { align: "center" });
   yPos += 4;
-  doc.text(`(DNI)`, pageWidth / 2 - 30, yPos, { align: "center" });
+  doc.text(`(DNI/FIRMA)`, pageWidth / 2 - 30, yPos, { align: "center" });
 
   // Guardar PDF
   const nombreArchivo = `Consentimiento_${nombreCompleto.replace(/\s+/g, "_")}_${new Date().getTime()}.pdf`;
