@@ -39,7 +39,7 @@ const generarConsentimientoPDF = async (paciente) => {
   }
 
   // Función para agregar texto con wrap y justificación
-  const addWrappedText = (text, x, y, maxWidth, lineHeight = 4.8, align = "justify") => {
+  const addWrappedText = (text, x, y, maxWidth, lineHeight = 5.2, align = "justify") => {
     const lines = doc.splitTextToSize(text, maxWidth);
     lines.forEach((line, index) => {
       doc.text(line, x, y + (index * lineHeight), { align: align === "justify" ? "left" : align });
@@ -47,21 +47,18 @@ const generarConsentimientoPDF = async (paciente) => {
     return y + lines.length * lineHeight;
   };
 
-  // Calcular edad
-  const calcularEdad = (fechaNacimiento) => {
-    if (!fechaNacimiento) return "";
-    const hoy = new Date();
-    const nacimiento = new Date(fechaNacimiento);
-    let edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const mes = hoy.getMonth() - nacimiento.getMonth();
-    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
-      edad--;
-    }
-    return edad;
-  };
-
   const nombreCompleto = `${paciente.nombre || ""} ${paciente.apellido || ""}`.trim();
-  const edad = calcularEdad(paciente.fecha_nacimiento);
+  // La edad ya viene calculada desde el backend
+  const edad = paciente.edad;
+  
+  // Debug temporal
+  console.log("DEBUGGING CONSENTIMIENTO:");
+  console.log("Paciente:", paciente);
+  console.log("Edad del paciente:", edad);
+  console.log("Tipo de edad:", typeof edad);
+  console.log("Edad es null?", edad === null);
+  console.log("Edad es undefined?", edad === undefined);
+  console.log("Edad es string vacío?", edad === "");
 
   // ENCABEZADO - Fecha y N° H.C.
   doc.setFontSize(10);
@@ -81,81 +78,122 @@ const generarConsentimientoPDF = async (paciente) => {
   doc.setFontSize(10);
   doc.setFont("times", "normal");
   
-  // Construir el párrafo con partes en negrita
+  // Construir el texto con espacios adicionales alrededor de los datos
   let xPos = margin;
+  
+  // Yo,
   doc.text("Yo, ", xPos, yPos);
   xPos += doc.getTextWidth("Yo, ");
   
   // Nombre en negrita
-  doc.setFont("times", "bold");
-  const nombreTexto = nombreCompleto || "______________________________";
-  doc.text(nombreTexto, xPos, yPos);
-  xPos += doc.getTextWidth(nombreTexto);
+  if (nombreCompleto) {
+    doc.setFont("times", "bold");
+    doc.text(nombreCompleto, xPos, yPos);
+    xPos += doc.getTextWidth(nombreCompleto);
+    doc.setFont("times", "normal");
+  } else {
+    doc.text("______________________________", xPos, yPos);
+    xPos += doc.getTextWidth("______________________________");
+  }
   
-  doc.setFont("times", "normal");
+  // de
   doc.text(" de ", xPos, yPos);
   xPos += doc.getTextWidth(" de ");
   
   // Edad en negrita
-  doc.setFont("times", "bold");
-  const edadTexto = edad ? `${edad}` : "____";
-  doc.text(edadTexto, xPos, yPos);
-  xPos += doc.getTextWidth(edadTexto);
+  if (edad !== null && edad !== undefined && edad !== "" && edad !== 0) {
+    doc.setFont("times", "bold");
+    const edadTexto = String(edad);
+    console.log("Mostrando edad en PDF:", edadTexto);
+    doc.text(edadTexto, xPos, yPos);
+    xPos += doc.getTextWidth(edadTexto);
+    doc.setFont("times", "normal");
+  } else {
+    console.log("Edad no válida, mostrando guiones. Valor de edad:", edad);
+    doc.text("____", xPos, yPos);
+    xPos += doc.getTextWidth("____");
+  }
   
-  doc.setFont("times", "normal");
-  const resto1 = " años de edad, de sexo ";
-  doc.text(resto1, xPos, yPos);
-  xPos += doc.getTextWidth(resto1);
+  // años de edad, de sexo
+  doc.text(" años de edad, de sexo ", xPos, yPos);
+  xPos += doc.getTextWidth(" años de edad, de sexo ");
   
   // Sexo en negrita
-  doc.setFont("times", "bold");
-  const sexoTexto = paciente.sexo || "____________";
-  doc.text(sexoTexto, xPos, yPos);
-  xPos += doc.getTextWidth(sexoTexto);
+  if (paciente.sexo) {
+    doc.setFont("times", "bold");
+    doc.text(paciente.sexo, xPos, yPos);
+    xPos += doc.getTextWidth(paciente.sexo);
+    doc.setFont("times", "normal");
+  } else {
+    doc.text("____________", xPos, yPos);
+    xPos += doc.getTextWidth("____________");
+  }
   
-  doc.setFont("times", "normal");
-  yPos += 5;
+  // , de ocupación
+  if (xPos + doc.getTextWidth(", de ocupación ") > pageWidth - margin) {
+    yPos += 5.5;
+    xPos = margin;
+  }
+  doc.text(", de ocupación ", xPos, yPos);
+  xPos += doc.getTextWidth(", de ocupación ");
   
-  const parrafoResto = `con grado de instrucción _________________ y de ocupación ${paciente.ocupacion ? "**" + paciente.ocupacion + "**" : "_________________"} identificado con DNI N°. ${paciente.dni ? "**" + paciente.dni + "**" : "_________________"} en mi calidad de paciente y en pleno uso de mis facultades mentales y de mis derechos de salud, en cumplimiento de la Ley N° 26842 - Ley General de Salud, declaro haber recibido y entendido la información brindada en forma respetuosa y con claridad.`;
-  
-  // Procesar el resto del texto con negritas
-  const partes = parrafoResto.split("**");
-  xPos = margin;
-  let currentY = yPos;
-  
-  partes.forEach((parte, index) => {
-    if (index % 2 === 0) {
-      doc.setFont("times", "normal");
-    } else {
-      doc.setFont("times", "bold");
+  // Ocupación en negrita
+  if (paciente.ocupacion) {
+    doc.setFont("times", "bold");
+    const ocupacionTexto = paciente.ocupacion;
+    if (xPos + doc.getTextWidth(ocupacionTexto) > pageWidth - margin) {
+      yPos += 5.5;
+      xPos = margin;
     }
-    
-    const palabras = parte.split(" ");
-    palabras.forEach((palabra, i) => {
-      const palabraConEspacio = i < palabras.length - 1 ? palabra + " " : palabra;
-      const anchoTexto = doc.getTextWidth(palabraConEspacio);
-      
-      if (xPos + anchoTexto > pageWidth - margin) {
-        currentY += 4.8;
-        xPos = margin;
-      }
-      
-      doc.text(palabraConEspacio, xPos, currentY);
-      xPos += anchoTexto;
-    });
-  });
+    doc.text(ocupacionTexto, xPos, yPos);
+    xPos += doc.getTextWidth(ocupacionTexto);
+    doc.setFont("times", "normal");
+  } else {
+    doc.text("_________________", xPos, yPos);
+    xPos += doc.getTextWidth("_________________");
+  }
   
-  yPos = currentY + 6;
+  // identificado con DNI N°.
+  const textoIdentificado = " identificado con DNI N°. ";
+  if (xPos + doc.getTextWidth(textoIdentificado) > pageWidth - margin) {
+    yPos += 5.5;
+    xPos = margin;
+  }
+  doc.text(textoIdentificado, xPos, yPos);
+  xPos += doc.getTextWidth(textoIdentificado);
+  
+  // DNI en negrita
+  if (paciente.dni) {
+    doc.setFont("times", "bold");
+    const dniTexto = paciente.dni;
+    if (xPos + doc.getTextWidth(dniTexto) > pageWidth - margin) {
+      yPos += 5.5;
+      xPos = margin;
+    }
+    doc.text(dniTexto, xPos, yPos);
+    xPos += doc.getTextWidth(dniTexto);
+    doc.setFont("times", "normal");
+  } else {
+    doc.text("_________________", xPos, yPos);
+    xPos += doc.getTextWidth("_________________");
+  }
+  
+  // Resto del párrafo
+  yPos += 5.5;
+  const restoParrafo = "en mi calidad de paciente y en pleno uso de mis facultades mentales y de mis derechos de salud, en cumplimiento de la Ley N° 26842 - Ley General de Salud, declaro haber recibido y entendido la información brindada en forma respetuosa y con claridad.";
+  yPos = addWrappedText(restoParrafo, margin, yPos, contentWidth, 5.2);
+  
+  yPos += 8;
 
   // Por lo que, Doy mi autorización...
   const autorizacion = `Por lo que, Doy mi autorización y conformidad en forma libre y voluntaria:`;
-  yPos = addWrappedText(autorizacion, margin, yPos, contentWidth, 4.8);
-  yPos += 6;
+  yPos = addWrappedText(autorizacion, margin, yPos, contentWidth, 5.2);
+  yPos += 7;
 
   // Que el/la Doctor(a)...
   const doctor = `Que el/la Doctor(a): .................................................... .....me realice el PROCEDIMIENTO ESTÉTICO que me ha explicado que:`;
-  yPos = addWrappedText(doctor, margin, yPos, contentWidth, 4.8);
-  yPos += 6;
+  yPos = addWrappedText(doctor, margin, yPos, contentWidth, 5.2);
+  yPos += 7;
 
   // PUNTOS NUMERADOS
   doc.setFontSize(10);
@@ -174,15 +212,15 @@ const generarConsentimientoPDF = async (paciente) => {
   ];
 
   puntos.forEach(punto => {
-    yPos = addWrappedText(punto, margin, yPos, contentWidth, 4.8);
-    yPos += 5;
+    yPos = addWrappedText(punto, margin, yPos, contentWidth, 5.2);
+    yPos += 6;
   });
 
   // PÁRRAFO FINAL (con resaltado amarillo)
   doc.setFont("times", "normal");
   
   const parte1 = `Estoy satisfecho(a) con la información proporcionada y entiendo los beneficios, riesgos y posibles complicaciones del tratamiento. Además, comprendo que `;
-  yPos = addWrappedText(parte1, margin, yPos, contentWidth, 4.8);
+  yPos = addWrappedText(parte1, margin, yPos, contentWidth, 5.2);
   
   // Texto resaltado en amarillo
   const textoResaltado = `no se aceptan cambios ni devoluciones DE ADELANTOS, CONSULTAS, PAGO PARCIAL O TOTAL DEL TRATAMIENTO`;
@@ -192,16 +230,16 @@ const generarConsentimientoPDF = async (paciente) => {
     const anchoLinea = doc.getTextWidth(linea);
     // Dibujar rectángulo amarillo de fondo
     doc.setFillColor(255, 255, 0); // Amarillo
-    doc.rect(margin, yPos - 3, anchoLinea, 5, 'F');
+    doc.rect(margin, yPos - 3, anchoLinea, 5.5, 'F');
     // Escribir texto encima
     doc.setTextColor(0, 0, 0);
     doc.text(linea, margin, yPos);
-    yPos += 4.8;
+    yPos += 5.2;
   });
   
   const parte2 = `, pero estoy dispuesto(a) a discutir cualquier preocupación para llegar a un acuerdo, y comprendo que este es un documento MÉDICO LEGAL, según la LEY N° 29414 en el cual bajo todo el completo uso de mis facultades acepto el o los tratamientos que estoy tomando y sus resultados finales.`;
-  yPos = addWrappedText(parte2, margin, yPos, contentWidth, 4.8);
-  yPos += 8;
+  yPos = addWrappedText(parte2, margin, yPos, contentWidth, 5.2);
+  yPos += 10;
 
   // FIRMA DEL PACIENTE
   doc.setFont("times", "normal");
