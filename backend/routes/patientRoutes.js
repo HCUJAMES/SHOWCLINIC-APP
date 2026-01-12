@@ -24,6 +24,7 @@ const uploadPerfil = multer({ storage: storagePerfil });
 // ✅ Editar paciente
 router.put("/editar/:id", requirePatientWrite, (req, res) => {
   const {
+    tipoDocumento,
     dni,
     nombre,
     apellido,
@@ -44,6 +45,7 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     tabaco,
     alcohol,
     referencia,
+    referenciaDetalle,
     numeroHijos,
   } = req.body;
 
@@ -59,7 +61,8 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     });
   }
 
-  if (!/^\d{8}$/.test(dniStr)) {
+  // Validación flexible según tipo de documento
+  if (tipoDocumento === 'DNI' && !/^\d{8}$/.test(dniStr)) {
     return res.status(400).json({ message: "El DNI debe tener exactamente 8 dígitos" });
   }
 
@@ -71,15 +74,16 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
 
   const query = `
     UPDATE patients
-    SET dni=?, nombre=?, apellido=?, edad=?, sexo=?, direccion=?, ocupacion=?,
+    SET tipoDocumento=?, dni=?, nombre=?, apellido=?, edad=?, sexo=?, direccion=?, ocupacion=?,
         fechaNacimiento=?, ciudadNacimiento=?, ciudadResidencia=?, alergias=?, enfermedad=?,
-        correo=?, celular=?, cirugiaEstetica=?, embarazada=?, drogas=?, tabaco=?, alcohol=?, referencia=?, numeroHijos=?
+        correo=?, celular=?, cirugiaEstetica=?, embarazada=?, drogas=?, tabaco=?, alcohol=?, referencia=?, referenciaDetalle=?, numeroHijos=?
     WHERE id=?
   `;
 
   db.run(
     query,
     [
+      tipoDocumento || 'DNI',
       dni,
       nombre,
       apellido,
@@ -100,6 +104,7 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
       tabaco,
       alcohol,
       referencia,
+      referenciaDetalle,
       numeroHijos,
       id,
     ],
@@ -138,6 +143,7 @@ router.post("/:id/foto-perfil", requirePatientWrite, uploadPerfil.single("foto")
 // ✅ Registrar paciente
 router.post("/registrar", requirePatientWrite, (req, res) => {
   const {
+    tipoDocumento,
     dni,
     nombre,
     apellido,
@@ -158,21 +164,23 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
     tabaco,
     alcohol,
     referencia,
+    referenciaDetalle,
     numeroHijos,
   } = req.body;
 
   const query = `
     INSERT INTO patients (
-      dni, nombre, apellido, edad, sexo, direccion, ocupacion,
+      tipoDocumento, dni, nombre, apellido, edad, sexo, direccion, ocupacion,
       fechaNacimiento, ciudadNacimiento, ciudadResidencia,
       alergias, enfermedad, correo, celular,
-      cirugiaEstetica, embarazada, drogas, tabaco, alcohol, referencia, numeroHijos
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      cirugiaEstetica, embarazada, drogas, tabaco, alcohol, referencia, referenciaDetalle, numeroHijos
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `;
 
   db.run(
     query,
     [
+      tipoDocumento || 'DNI',
       dni,
       nombre,
       apellido,
@@ -193,6 +201,7 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
       tabaco,
       alcohol,
       referencia,
+      referenciaDetalle,
       numeroHijos,
     ],
     function (err) {

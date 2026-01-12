@@ -9,12 +9,12 @@ const fechaLima = () =>
   new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
 
 // Middleware para verificar permisos
-// Solo master puede crear/editar/eliminar paquetes base
-const requirePaquetesWrite = [authMiddleware, requireRole("master")];
+// Todos los roles pueden crear/editar/eliminar paquetes base
+const requirePaquetesWrite = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica")];
 // Todos pueden leer paquetes (para ver en historial, nueva sesión, etc.)
-const requirePaquetesRead = [authMiddleware, requireRole("doctor", "master", "asistente", "admin")];
-// Doctor, asistente y master pueden asignar paquetes a pacientes y gestionar sesiones
-const requirePaquetesAsignar = [authMiddleware, requireRole("doctor", "master", "asistente")];
+const requirePaquetesRead = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica")];
+// Todos los roles pueden asignar paquetes a pacientes y gestionar sesiones
+const requirePaquetesAsignar = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica")];
 
 /* ==============================
    📋 LISTAR TODOS LOS PAQUETES

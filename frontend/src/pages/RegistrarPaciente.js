@@ -42,6 +42,7 @@ export default function RegistrarPaciente() {
     tabaco: "",
     alcohol: "",
     referencia: "",
+    referenciaDetalle: "",
     numeroHijos: "",
   });
 
@@ -393,7 +394,7 @@ export default function RegistrarPaciente() {
           <Grid item xs={12} sm={6} md={3}>
             <TextField
               select
-              label="Tipo de referencia"
+              label="¿Cómo se enteró?"
               name="referencia"
               value={formData.referencia}
               onChange={handleChange}
@@ -407,10 +408,31 @@ export default function RegistrarPaciente() {
             >
               <MenuItem value="TikTok">TikTok</MenuItem>
               <MenuItem value="Instagram">Instagram</MenuItem>
+              <MenuItem value="Facebook">Facebook</MenuItem>
+              <MenuItem value="Influencer">Influencer</MenuItem>
               <MenuItem value="Boca a boca">Boca a boca</MenuItem>
               <MenuItem value="Otro">Otro</MenuItem>
             </TextField>
           </Grid>
+
+          {(formData.referencia === "Influencer" || formData.referencia === "Otro") && (
+            <Grid item xs={12} sm={6} md={3}>
+              <TextField
+                label={formData.referencia === "Influencer" ? "Nombre del influencer" : "Especificar"}
+                name="referenciaDetalle"
+                value={formData.referenciaDetalle}
+                onChange={handleChange}
+                fullWidth
+                placeholder={formData.referencia === "Influencer" ? "Ingrese el nombre del influencer" : "Especifique cómo se enteró"}
+                sx={{
+                  "& .MuiInputBase-root": {
+                    backgroundColor: "rgba(255,255,255,0.72)",
+                    borderRadius: 2,
+                  },
+                }}
+              />
+            </Grid>
+          )}
 
           <Grid item xs={12} sm={6} md={3}>
             <TextField
@@ -480,6 +502,7 @@ export default function RegistrarPaciente() {
                     tabaco: "",
                     alcohol: "",
                     referencia: "",
+                    referenciaDetalle: "",
                     numeroHijos: "",
                   });
                   setErrors({});

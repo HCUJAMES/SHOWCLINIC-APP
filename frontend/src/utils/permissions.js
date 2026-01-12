@@ -33,6 +33,10 @@ export const hasPermission = (role, action) => {
     // Permisos de gestión
     manageSystem: [ROLES.MASTER],
     createBackup: [ROLES.MASTER],
+
+    // Permisos de paquetes
+    writePackages: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER],
+    deletePackages: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER],
   };
 
   return permissions[action]?.includes(role) || false;
@@ -79,3 +83,17 @@ export const canModifyDebts = (role) => hasPermission(role, "modifyDebts");
  * @returns {boolean}
  */
 export const isDoctor = (role) => role === ROLES.DOCTOR || role === ROLES.MASTER;
+
+/**
+ * Verifica si el usuario puede crear/editar paquetes
+ * @param {string} role - Rol del usuario
+ * @returns {boolean}
+ */
+export const canWritePackages = (role) => hasPermission(role, "writePackages");
+
+/**
+ * Verifica si el usuario puede eliminar paquetes
+ * @param {string} role - Rol del usuario
+ * @returns {boolean}
+ */
+export const canDeletePackages = (role) => hasPermission(role, "deletePackages");

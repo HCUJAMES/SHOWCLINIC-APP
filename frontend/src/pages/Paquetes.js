@@ -36,12 +36,19 @@ import {
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "../components/ToastProvider";
+import { useAuth } from "../hooks/useAuth";
+import { canWritePackages, canDeletePackages } from "../utils/permissions";
+import { COLORS } from "../constants";
 
 const API_BASE_URL = `http://${window.location.hostname}:4000`;
 
 const Paquetes = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { token, role } = useAuth();
+  
+  const canWrite = canWritePackages(role);
+  const canDelete = canDeletePackages(role);
 
   const [paquetes, setPaquetes] = useState([]);
   const [tratamientos, setTratamientos] = useState([]);
@@ -62,7 +69,6 @@ const Paquetes = () => {
   const [openConfirmarEliminar, setOpenConfirmarEliminar] = useState(false);
   const [paqueteEliminar, setPaqueteEliminar] = useState(null);
 
-  const token = localStorage.getItem("token");
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   useEffect(() => {
@@ -270,7 +276,13 @@ const Paquetes = () => {
   };
 
   const cambiarEstado = async (paquete) => {
-    const nuevoEstado = paquete.estado === "activo" ? "inactivo" : "activo";
+    if (!paquete || !paquete.id) {
+      showToast({ severity: "error", message: "Paquete no válido" });
+      return;
+    }
+
+    const estadoActual = paquete.estado || "activo";
+    const nuevoEstado = estadoActual === "activo" ? "inactivo" : "activo";
 
     try {
       await axios.patch(
@@ -372,177 +384,150 @@ const Paquetes = () => {
               label={`${paquetes.length} paquete${paquetes.length !== 1 ? 's' : ''} registrado${paquetes.length !== 1 ? 's' : ''}`}
               sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold" }}
             />
-            <Chip
-              label={`${paquetes.filter(p => p.estado === 'activo').length} activo${paquetes.filter(p => p.estado === 'activo').length !== 1 ? 's' : ''}`}
-              sx={{ backgroundColor: "#e3f2fd", color: "#1976d2", fontWeight: "bold" }}
-            />
           </Box>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={abrirModalNuevo}
-            size="large"
-            sx={{
-              backgroundColor: "#a36920",
-              "&:hover": { backgroundColor: "#8a5a1a" },
-              px: 4,
-              py: 1.5,
-              borderRadius: 2,
-              fontWeight: "bold",
-              boxShadow: "0 4px 12px rgba(163, 105, 32, 0.3)",
-            }}
-          >
-            Nuevo Paquete
-          </Button>
+          {canWrite && (
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={abrirModalNuevo}
+              size="large"
+              sx={{
+                backgroundColor: "#a36920",
+                "&:hover": { backgroundColor: "#8a5a1a" },
+              }}
+            >
+              NUEVO PAQUETE
+            </Button>
+          )}
         </Paper>
 
         {/* Tabla de paquetes */}
-        <TableContainer component={Paper} elevation={2} sx={{ borderRadius: 2 }}>
-        <Table>
-          <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: "bold" }}>Nombre</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Tratamientos Incluidos</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Precio Regular</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Precio Paquete</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Descuento</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Sesiones</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Vigencia</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Estado</TableCell>
-              <TableCell sx={{ fontWeight: "bold" }}>Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paquetes.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                  <Typography color="text.secondary">
-                    No hay paquetes registrados
-                  </Typography>
-                </TableCell>
+        <TableContainer component={Paper} elevation={1} sx={{ borderRadius: 2 }}>
+          <Table>
+            <TableHead>
+              <TableRow sx={{ backgroundColor: "#a36920" }}>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Nombre</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Tratamientos</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Sesiones</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Precio Regular</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Precio Paquete</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Descuento</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Vigencia</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Estado</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Acciones</TableCell>
               </TableRow>
-            ) : (
-              paquetes.map((paquete) => {
-                // Parsear tratamientos del JSON
-                let tratamientosIncluidos = [];
-                try {
-                  tratamientosIncluidos = paquete.tratamientos_json ? JSON.parse(paquete.tratamientos_json) : [];
-                } catch (e) {
-                  tratamientosIncluidos = [];
-                }
-                
-                return (
-                <TableRow key={paquete.id} hover>
-                  <TableCell>
-                    <Typography sx={{ fontWeight: "bold" }}>{paquete.nombre}</Typography>
-                    {paquete.descripcion && (
-                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                        {paquete.descripcion}
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {tratamientosIncluidos.length > 0 ? (
-                      <Box>
-                        {tratamientosIncluidos.map((t, idx) => (
-                          <Chip
-                            key={idx}
-                            label={`${t.nombre} (${t.sesiones} ses.)`}
-                            size="small"
-                            sx={{ 
-                              mr: 0.5, 
-                              mb: 0.5, 
-                              backgroundColor: "#e3f2fd",
-                              color: "#1565c0",
-                              fontSize: "0.75rem"
-                            }}
-                          />
-                        ))}
-                      </Box>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        Sin tratamientos
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>S/ {paquete.precio_regular.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Typography sx={{ fontWeight: "bold", color: "#2e7d32" }}>
-                      S/ {paquete.precio_paquete.toFixed(2)}
+            </TableHead>
+            <TableBody>
+              {paquetes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                    <Typography color="text.secondary">
+                      No hay paquetes registrados
                     </Typography>
                   </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={`${paquete.descuento_porcentaje.toFixed(1)}%`}
-                      size="small"
-                      sx={{ backgroundColor: "#ff9800", color: "white" }}
-                    />
-                  </TableCell>
-                  <TableCell>{paquete.sesiones}</TableCell>
-                  <TableCell>
-                    {paquete.vigencia_inicio || paquete.vigencia_fin ? (
+                </TableRow>
+              ) : (
+                paquetes.map((paquete) => (
+                  <TableRow key={paquete.id} hover>
+                    <TableCell>
                       <Box>
-                        {paquete.vigencia_inicio && (
-                          <Typography variant="caption">
-                            Desde: {paquete.vigencia_inicio}
+                        <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
+                          {paquete.nombre}
+                        </Typography>
+                        {paquete.descripcion && (
+                          <Typography variant="caption" color="text.secondary">
+                            {paquete.descripcion}
                           </Typography>
-                        )}
-                        <br />
-                        {paquete.vigencia_fin && (
-                          <Typography variant="caption">
-                            Hasta: {paquete.vigencia_fin}
-                          </Typography>
-                        )}
-                        <br />
-                        {estaVigente(paquete) ? (
-                          <Chip label="Vigente" size="small" color="success" />
-                        ) : (
-                          <Chip label="No vigente" size="small" color="error" />
                         )}
                       </Box>
-                    ) : (
-                      <Typography variant="caption" color="text.secondary">
-                        Sin límite
+                    </TableCell>
+                    <TableCell>
+                      {paquete.tratamientos?.map((t, index) => (
+                        <Chip
+                          key={index}
+                          label={t.nombre}
+                          size="small"
+                          sx={{ mr: 0.5, mb: 0.5 }}
+                        />
+                      ))}
+                    </TableCell>
+                    <TableCell>{paquete.sesiones}</TableCell>
+                    <TableCell>S/ {paquete.precio_regular?.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                        S/ {paquete.precio_paquete?.toFixed(2)}
                       </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={paquete.estado === "activo" ? "Activo" : "Inactivo"}
-                      size="small"
-                      color={paquete.estado === "activo" ? "success" : "default"}
-                      icon={paquete.estado === "activo" ? <CheckCircle /> : <Cancel />}
-                      onClick={() => cambiarEstado(paquete)}
-                      sx={{ cursor: "pointer" }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: "flex", gap: 0.5 }}>
-                      <IconButton
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={`${((paquete.precio_regular - paquete.precio_paquete) / paquete.precio_regular * 100).toFixed(1)}%`}
                         size="small"
-                        sx={{ color: "#1976d2" }}
-                        onClick={() => abrirModalEditar(paquete)}
-                        title="Editar paquete"
-                      >
-                        <Edit />
-                      </IconButton>
-                      <IconButton
+                        sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="caption">
+                        {paquete.vigencia_inicio && paquete.vigencia_fin
+                          ? `${paquete.vigencia_inicio} al ${paquete.vigencia_fin}`
+                          : "Sin límite"
+                        }
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Button
                         size="small"
-                        sx={{ color: "#d32f2f" }}
-                        onClick={() => abrirConfirmarEliminar(paquete)}
-                        title="Eliminar paquete"
+                        variant="outlined"
+                        onClick={() => cambiarEstado(paquete)}
+                        disabled={!paquete || !paquete.id}
+                        sx={{
+                          backgroundColor: (paquete?.estado || "activo") === "activo" ? "#e8f5e9" : "#ffebee",
+                          color: (paquete?.estado || "activo") === "activo" ? "#2e7d32" : "#c62828",
+                          borderColor: (paquete?.estado || "activo") === "activo" ? "#4caf50" : "#f44336",
+                          "&:hover": {
+                            backgroundColor: (paquete?.estado || "activo") === "activo" ? "#c8e6c9" : "#ffcdd2",
+                          },
+                          "&:disabled": {
+                            backgroundColor: "#f5f5f5",
+                            color: "#999",
+                            borderColor: "#ccc",
+                          },
+                          textTransform: "none",
+                          fontWeight: "bold",
+                        }}
                       >
-                        <Delete />
-                      </IconButton>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                        {(paquete?.estado || "activo") === "activo" ? "✓ Activo" : "✗ Inactivo"}
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: "flex", gap: 1 }}>
+                        {canWrite && (
+                          <IconButton
+                            size="small"
+                            sx={{ color: "#1976d2", mr: 1 }}
+                            onClick={() => abrirModalEditar(paquete)}
+                            title="Editar paquete"
+                          >
+                            <Edit />
+                          </IconButton>
+                        )}
+                        {canDelete && (
+                          <IconButton
+                            size="small"
+                            sx={{ color: "#d32f2f" }}
+                            onClick={() => abrirConfirmarEliminar(paquete)}
+                            title="Eliminar paquete"
+                          >
+                            <Delete />
+                          </IconButton>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
       {/* Modal para crear/editar paquete */}
       <Dialog 
@@ -920,6 +905,33 @@ const Paquetes = () => {
               backgroundColor: "#d32f2f",
               "&:hover": { backgroundColor: "#b71c1c" },
             }}
+          >
+            Eliminar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de confirmación para eliminar */}
+      <Dialog open={openConfirmarEliminar} onClose={() => setOpenConfirmarEliminar(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white" }}>
+          Confirmar Eliminación
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Typography>
+            ¿Estás seguro de que deseas eliminar el paquete "{paqueteEliminar?.nombre}"?
+          </Typography>
+          <Typography sx={{ mt: 2, color: "#d32f2f", fontWeight: "bold" }}>
+            Esta acción no se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenConfirmarEliminar(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={eliminarPaquete}
+            variant="contained"
+            color="error"
           >
             Eliminar
           </Button>

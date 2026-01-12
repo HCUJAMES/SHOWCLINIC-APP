@@ -171,6 +171,28 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
             }
           });
         }
+
+        const tieneReferenciaDetalle = rows.some((col) => col.name === "referenciaDetalle");
+        if (!tieneReferenciaDetalle) {
+          db.run("ALTER TABLE patients ADD COLUMN referenciaDetalle TEXT", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna referenciaDetalle:", alterErr.message);
+            } else {
+              console.log("✅ Columna referenciaDetalle agregada a patients");
+            }
+          });
+        }
+
+        const tieneTipoDocumento = rows.some((col) => col.name === "tipoDocumento");
+        if (!tieneTipoDocumento) {
+          db.run("ALTER TABLE patients ADD COLUMN tipoDocumento TEXT DEFAULT 'DNI'", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna tipoDocumento:", alterErr.message);
+            } else {
+              console.log("✅ Columna tipoDocumento agregada a patients");
+            }
+          });
+        }
       }
     });
 
