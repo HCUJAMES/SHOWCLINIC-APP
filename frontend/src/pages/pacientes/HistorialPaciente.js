@@ -64,7 +64,7 @@ const HistorialPaciente = () => {
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <Typography><strong>Nombre:</strong> {paciente.nombre} {paciente.apellido}</Typography>
-              <Typography><strong>DNI:</strong> {paciente.dni}</Typography>
+              <Typography><strong>Documento:</strong> {paciente.tipoDocumento || 'DNI'}: {paciente.dni}</Typography>
               <Typography><strong>Edad:</strong> {paciente.edad}</Typography>
               <Typography><strong>Sexo:</strong> {paciente.sexo}</Typography>
               <Typography><strong>Embarazada:</strong> {paciente.embarazada || "No especifica"}</Typography>

@@ -21,6 +21,7 @@ export default function RegistrarPaciente() {
   const { showToast } = useToast();
   const { token } = useAuth();
   const [formData, setFormData] = useState({
+    tipoDocumento: "DNI",
     dni: "",
     nombre: "",
     apellido: "",
@@ -50,15 +51,13 @@ export default function RegistrarPaciente() {
     const { name, value } = e.target;
 
     if (name === "dni") {
-      const onlyDigits = value.replace(/\D/g, "").slice(0, 8);
-      setFormData({ ...formData, [name]: onlyDigits });
+      setFormData({ ...formData, [name]: value });
       setErrors((prev) => ({ ...prev, dni: "" }));
       return;
     }
 
     if (name === "celular") {
-      const onlyDigits = value.replace(/\D/g, "").slice(0, 9);
-      setFormData({ ...formData, [name]: onlyDigits });
+      setFormData({ ...formData, [name]: value });
       setErrors((prev) => ({ ...prev, celular: "" }));
       return;
     }
@@ -70,20 +69,19 @@ export default function RegistrarPaciente() {
   };
 
   const validar = () => {
+    const tipoDocumento = String(formData.tipoDocumento || "").trim();
     const dni = String(formData.dni || "").trim();
     const nombre = String(formData.nombre || "").trim();
     const apellido = String(formData.apellido || "").trim();
     const celular = String(formData.celular || "").trim();
 
     const next = {};
-    if (!dni) next.dni = "El DNI es obligatorio";
-    else if (!/^\d{8}$/.test(dni)) next.dni = "El DNI debe tener 8 dígitos";
-
+    if (!dni) next.dni = "El documento es obligatorio";
+    
     if (!nombre) next.nombre = "El nombre es obligatorio";
     if (!apellido) next.apellido = "El apellido es obligatorio";
 
     if (!celular) next.celular = "El celular es obligatorio";
-    else if (!/^\d{9}$/.test(celular)) next.celular = "El celular debe tener 9 dígitos";
 
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -144,16 +142,35 @@ export default function RegistrarPaciente() {
 
         <Grid container spacing={2}>
           {/* Primera fila */}
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2}>
             <TextField
-              label="DNI"
+              select
+              label="Tipo Documento"
+              name="tipoDocumento"
+              value={formData.tipoDocumento}
+              onChange={handleChange}
+              fullWidth
+              sx={{
+                "& .MuiInputBase-root": {
+                  backgroundColor: "rgba(255,255,255,0.72)",
+                  borderRadius: 2,
+                },
+              }}
+            >
+              <MenuItem value="DNI">DNI</MenuItem>
+              <MenuItem value="PASAPORTE">PASAPORTE</MenuItem>
+              <MenuItem value="C.E.">C.E.</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <TextField
+              label="Número de Documento"
               name="dni"
               value={formData.dni}
               onChange={handleChange}
               required
               error={Boolean(errors.dni)}
               helperText={errors.dni || ""}
-              inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 8 }}
               fullWidth
               sx={{
                 "& .MuiInputBase-root": {
@@ -163,7 +180,7 @@ export default function RegistrarPaciente() {
               }}
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2}>
             <TextField
               label="Nombre"
               name="nombre"
@@ -181,7 +198,7 @@ export default function RegistrarPaciente() {
               }}
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2}>
             <TextField
               label="Apellido"
               name="apellido"
@@ -199,7 +216,7 @@ export default function RegistrarPaciente() {
               }}
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2}>
             <TextField
               label="Edad"
               name="edad"
@@ -326,7 +343,6 @@ export default function RegistrarPaciente() {
               required
               error={Boolean(errors.celular)}
               helperText={errors.celular || ""}
-              inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 9 }}
               fullWidth
             />
           </Grid>
@@ -443,6 +459,7 @@ export default function RegistrarPaciente() {
                 if (response.ok) {
                   showToast({ severity: "success", message: "Paciente registrado exitosamente" });
                   setFormData({
+                    tipoDocumento: "DNI",
                     dni: "",
                     nombre: "",
                     apellido: "",

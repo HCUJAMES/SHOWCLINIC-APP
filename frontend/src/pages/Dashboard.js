@@ -42,6 +42,7 @@ export default function Dashboard() {
     doctor: [
       { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
       { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
+      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
       { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
       { title: "Especialistas", image: "/images/especialista.png", path: "/especialistas", description: "Equipo médico" },
@@ -50,6 +51,7 @@ export default function Dashboard() {
     admin: [
       { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
       { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
+      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
       { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
       { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },
@@ -57,12 +59,14 @@ export default function Dashboard() {
     logistica: [
       { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
       { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
+      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
       { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
     ],
     asistente: [
       { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
       { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
+      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
       { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
     ],

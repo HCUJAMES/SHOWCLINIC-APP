@@ -76,8 +76,8 @@ router.get("/overview", authMiddleware, requireRole("doctor", "admin"), async (r
     const totalSesiones = kpi.sesiones;
     kpi.ticket_promedio = totalSesiones > 0 ? totalIngresos / totalSesiones : 0;
 
-    // Top tratamientos - desde finanzas
-    const topTratamientos = await dbAll(
+    // Top tratamientos - desde finanzas, pero separando tratamientos concatenados
+    const topTratamientosRaw = await dbAll(
       `
         SELECT
           f.descripcion AS tratamiento,
@@ -88,10 +88,64 @@ router.get("/overview", authMiddleware, requireRole("doctor", "admin"), async (r
         WHERE f.tipo = 'ingreso' AND date(f.fecha) BETWEEN date(?) AND date(?)
         GROUP BY f.descripcion
         ORDER BY ingresos_neto DESC, cantidad DESC
-        LIMIT 8
       `,
       [startStr, endStr]
     );
+
+    // Separar tratamientos concatenados (separados por comas o guiones)
+    const tratamientosMap = new Map();
+    
+    topTratamientosRaw.forEach(row => {
+      const descripcion = row.tratamiento || '';
+      
+      // Debug: mostrar descripción original
+      console.log("🔍 Procesando descripción:", descripcion);
+      
+      // Separar por " - " primero (para casos como "Botox - Paciente")
+      const partes = descripcion.split(' - ');
+      const tratamientosParte = partes[0]; // Tomar solo la parte de tratamientos
+      
+      // Separar por comas
+      const tratamientos = tratamientosParte.split(',').map(t => t.trim()).filter(Boolean);
+      
+      console.log("📋 Tratamientos separados:", tratamientos);
+      
+      if (tratamientos.length === 0) {
+        tratamientos.push(descripcion.trim() || '(No especificado)');
+      }
+      
+      // Distribuir los ingresos proporcionalmente entre los tratamientos
+      const ingresosPorTratamiento = row.ingresos_neto / tratamientos.length;
+      const ingresosBrutoPorTratamiento = row.ingresos_bruto / tratamientos.length;
+      
+      tratamientos.forEach(tratamiento => {
+        if (!tratamientosMap.has(tratamiento)) {
+          tratamientosMap.set(tratamiento, {
+            tratamiento,
+            cantidad: 0,
+            ingresos_bruto: 0,
+            ingresos_neto: 0
+          });
+        }
+        
+        const existing = tratamientosMap.get(tratamiento);
+        existing.cantidad += row.cantidad;
+        existing.ingresos_bruto += ingresosBrutoPorTratamiento;
+        existing.ingresos_neto += ingresosPorTratamiento;
+        
+        console.log(`💰 Agregando a "${tratamiento}": +${row.cantidad} sesiones, +S/ ${ingresosPorTratamiento.toFixed(2)}`);
+      });
+    });
+    
+    // Convertir a array y ordenar
+    const topTratamientos = Array.from(tratamientosMap.values())
+      .sort((a, b) => b.ingresos_neto - a.ingresos_neto)
+      .slice(0, 8);
+    
+    console.log("📊 Resultado final de tratamientos separados:");
+    topTratamientos.forEach((t, idx) => {
+      console.log(`${idx + 1}. ${t.tratamiento}: ${t.cantidad} sesiones, S/ ${t.ingresos_neto.toFixed(2)}`);
+    });
 
     // Pacientes frecuentes - desde finanzas
     const pacientesFrecuentes = await dbAll(

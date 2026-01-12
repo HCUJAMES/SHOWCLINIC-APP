@@ -172,6 +172,12 @@ const HistorialClinico = () => {
   // Estados para modal de pago de paquete
   const [modalPagoPaquete, setModalPagoPaquete] = useState(false);
   const [paqueteParaPago, setPaqueteParaPago] = useState(null);
+  
+  // Estado para controlar qué presupuestos están colapsados
+  const [presupuestosColapsados, setPresupuestosColapsados] = useState({});
+  
+  // Estado para controlar qué paquetes están colapsados
+  const [paquetesColapsados, setPaquetesColapsados] = useState({});
 
   const token = localStorage.getItem("token");
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
@@ -663,7 +669,7 @@ const HistorialClinico = () => {
     const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
     doc.text(`Cliente: ${nombrePaciente}`, 5, y);
     y += 4;
-    doc.text(`DNI: ${pacienteSeleccionado.dni || "-"}`, 5, y);
+    doc.text(`Documento: ${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 5, y);
     y += 4;
     doc.text(`Fecha: ${new Date().toLocaleDateString("es-PE")}`, 5, y);
     y += 6;
@@ -920,7 +926,7 @@ const HistorialClinico = () => {
 
     const p = pacienteSeleccionado;
     const datosPaciente = [
-      ["DNI", p.dni || "-"],
+      ["Documento", `${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`],
       ["Nombre", `${p.nombre || ""} ${p.apellido || ""}`.trim()],
       ["Edad", p.edad ?? "-"],
       ["Sexo", p.sexo || "-"],
@@ -1348,7 +1354,7 @@ const HistorialClinico = () => {
                           variant="body2"
                           sx={{ color: "rgba(0,0,0,0.60)", mt: 0.4 }}
                         >
-                          DNI: {pac.dni}
+                          Documento: {pac.tipoDocumento || 'DNI'}: {pac.dni}
                         </Typography>
                       </Box>
                       <Button
@@ -1437,7 +1443,7 @@ const HistorialClinico = () => {
                     {pacienteSeleccionado.nombre} {pacienteSeleccionado.apellido}
                   </Typography>
                   <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.52)" }}>
-                    DNI: {pacienteSeleccionado.dni}
+                    Documento: {pacienteSeleccionado.tipoDocumento || 'DNI'}: {pacienteSeleccionado.dni}
                   </Typography>
 
                   {Number(resumenDeuda?.total_pendiente || 0) > 0 ? (
@@ -1551,7 +1557,7 @@ const HistorialClinico = () => {
                     <Grid container spacing={2.2}>
                       <Grid item xs={12} md={6}>
                         <Box sx={{ display: "grid", gap: 0.8 }}>
-                          <Typography><strong>DNI:</strong> {pacienteSeleccionado.dni}</Typography>
+                          <Typography><strong>Documento:</strong> {pacienteSeleccionado.tipoDocumento || 'DNI'}: {pacienteSeleccionado.dni}</Typography>
                           <Typography><strong>Nombre:</strong> {pacienteSeleccionado.nombre}</Typography>
                           <Typography><strong>Apellido:</strong> {pacienteSeleccionado.apellido}</Typography>
                           <Typography><strong>Edad:</strong> {pacienteSeleccionado.edad}</Typography>
@@ -2364,20 +2370,49 @@ const HistorialClinico = () => {
                                 Asignado: {presupuesto.fecha_inicio?.split(' ')[0]}
                               </Typography>
                             </Box>
-                            <Box sx={{ 
-                              backgroundColor: presupuesto.estado === 'completado' ? '#4caf50' : presupuesto.estado === 'cancelado' ? '#f44336' : '#a36920',
-                              color: "white", 
-                              px: 1.5, 
-                              py: 0.5, 
-                              borderRadius: 2,
-                              fontWeight: "bold",
-                              fontSize: "0.75rem",
-                              textTransform: "uppercase"
-                            }}>
-                              {presupuesto.estado}
+                            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                              <Box sx={{ 
+                                backgroundColor: presupuesto.estado === 'completado' ? '#4caf50' : presupuesto.estado === 'cancelado' ? '#f44336' : '#a36920',
+                                color: "white", 
+                                px: 1.5, 
+                                py: 0.5, 
+                                borderRadius: 2,
+                                fontWeight: "bold",
+                                fontSize: "0.75rem",
+                                textTransform: "uppercase"
+                              }}>
+                                {presupuesto.estado}
+                              </Box>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  setPresupuestosColapsados(prev => ({
+                                    ...prev,
+                                    [presupuesto.id]: !prev[presupuesto.id]
+                                  }));
+                                }}
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  py: 0.25,
+                                  px: 1,
+                                  minWidth: "auto",
+                                  borderColor: "#a36920",
+                                  color: "#a36920",
+                                  "&:hover": { 
+                                    backgroundColor: "rgba(163, 105, 32, 0.08)",
+                                    borderColor: "#8a541a"
+                                  }
+                                }}
+                              >
+                                {presupuestosColapsados[presupuesto.id] ? "Abrir" : "Guardar"}
+                              </Button>
                             </Box>
                           </Box>
                           
+                          {/* Contenido colapsable del presupuesto */}
+                          {!presupuestosColapsados[presupuesto.id] && (
+                          <>
                           {/* Barra de progreso */}
                           <Box sx={{ mb: 2 }}>
                             <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
@@ -2638,6 +2673,8 @@ const HistorialClinico = () => {
                               </Button>
                             </Box>
                           </Box>
+                          </>
+                          )}
                         </Paper>
                       );
                     })}
@@ -2689,20 +2726,49 @@ const HistorialClinico = () => {
                                 Asignado: {paquete.fecha_inicio?.split(' ')[0]}
                               </Typography>
                             </Box>
-                            <Box sx={{ 
-                              backgroundColor: paquete.estado === 'completado' ? '#4caf50' : paquete.estado === 'cancelado' ? '#f44336' : '#2196f3',
-                              color: "white", 
-                              px: 1.5, 
-                              py: 0.5, 
-                              borderRadius: 2,
-                              fontWeight: "bold",
-                              fontSize: "0.75rem",
-                              textTransform: "uppercase"
-                            }}>
-                              {paquete.estado}
+                            <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                              <Box sx={{ 
+                                backgroundColor: paquete.estado === 'completado' ? '#4caf50' : paquete.estado === 'cancelado' ? '#f44336' : '#2196f3',
+                                color: "white", 
+                                px: 1.5, 
+                                py: 0.5, 
+                                borderRadius: 2,
+                                fontWeight: "bold",
+                                fontSize: "0.75rem",
+                                textTransform: "uppercase"
+                              }}>
+                                {paquete.estado}
+                              </Box>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => {
+                                  setPaquetesColapsados(prev => ({
+                                    ...prev,
+                                    [paquete.id]: !prev[paquete.id]
+                                  }));
+                                }}
+                                sx={{
+                                  fontSize: "0.7rem",
+                                  py: 0.25,
+                                  px: 1,
+                                  minWidth: "auto",
+                                  borderColor: "#2196f3",
+                                  color: "#2196f3",
+                                  "&:hover": { 
+                                    backgroundColor: "rgba(33, 150, 243, 0.08)",
+                                    borderColor: "#1565c0"
+                                  }
+                                }}
+                              >
+                                {paquetesColapsados[paquete.id] ? "Abrir" : "Guardar"}
+                              </Button>
                             </Box>
                           </Box>
                           
+                          {/* Contenido colapsable del paquete */}
+                          {!paquetesColapsados[paquete.id] && (
+                          <>
                           {/* Barra de progreso */}
                           <Box sx={{ mb: 2 }}>
                             <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
@@ -2958,6 +3024,8 @@ const HistorialClinico = () => {
                               </Button>
                             </Box>
                           </Box>
+                          </>
+                          )}
                         </Paper>
                       );
                     })}

@@ -222,12 +222,39 @@ router.get("/reporte", (req, res) => {
 
       // Determinar estado de pago
       const estadoPago = (() => {
+        // Si tiene tabla de pagos, comparar total pagado vs precio total
+        if (tieneTablaPagos) {
+          const totalPagado = pagosTotalPagado || 0;
+          const precioConDescuento = precioTotal - (parseFloat(r.descuento) || 0);
+          // Si lo pagado es menor que el precio (con un margen de 0.01 para errores de redondeo)
+          if (totalPagado < precioConDescuento - 0.01) {
+            return "Deuda";
+          }
+          return "Pagado";
+        }
+        
+        // Si tiene deuda_estado explícito
         if (String(r.deuda_estado || "").toLowerCase() === "pendiente") {
           return "Deuda";
         }
+        
+        // Si tiene pago en partes legacy y hay saldo pendiente
         if (tienePagoEnPartesLegacy && saldo > 0) {
           return "Deuda";
         }
+        
+        // Si no tiene ningún pago registrado pero tiene precio, es deuda
+        if (!tieneTablaPagos && !tienePagoEnPartesLegacy && precioTotal > 0) {
+          const adelanto = parseFloat(r.monto_adelanto) || 0;
+          const cancelado = parseFloat(r.cancelado_monto) || 0;
+          const totalPagadoLegacy = adelanto + cancelado;
+          const precioConDescuento = precioTotal - (parseFloat(r.descuento) || 0);
+          
+          if (totalPagadoLegacy < precioConDescuento - 0.01) {
+            return "Deuda";
+          }
+        }
+        
         return "Pagado";
       })();
 

@@ -153,8 +153,8 @@ const generarConsentimientoPDF = async (paciente) => {
     xPos += doc.getTextWidth("_________________");
   }
   
-  // identificado con DNI N°.
-  const textoIdentificado = " identificado con DNI N°. ";
+  // identificado con Documento N°.
+  const textoIdentificado = " identificado con Documento N°. ";
   if (xPos + doc.getTextWidth(textoIdentificado) > pageWidth - margin) {
     yPos += 5.5;
     xPos = margin;
@@ -162,16 +162,16 @@ const generarConsentimientoPDF = async (paciente) => {
   doc.text(textoIdentificado, xPos, yPos);
   xPos += doc.getTextWidth(textoIdentificado);
   
-  // DNI en negrita
+  // Documento en negrita
   if (paciente.dni) {
     doc.setFont("times", "bold");
-    const dniTexto = paciente.dni;
-    if (xPos + doc.getTextWidth(dniTexto) > pageWidth - margin) {
+    const documentoTexto = `${paciente.tipoDocumento || 'DNI'}: ${paciente.dni}`;
+    if (xPos + doc.getTextWidth(documentoTexto) > pageWidth - margin) {
       yPos += 5.5;
       xPos = margin;
     }
-    doc.text(dniTexto, xPos, yPos);
-    xPos += doc.getTextWidth(dniTexto);
+    doc.text(documentoTexto, xPos, yPos);
+    xPos += doc.getTextWidth(documentoTexto);
     doc.setFont("times", "normal");
   } else {
     doc.text("_________________", xPos, yPos);
@@ -249,7 +249,7 @@ const generarConsentimientoPDF = async (paciente) => {
   yPos += 10;
 
   doc.setFont("times", "normal");
-  doc.text(`(DNI/FIRMA)`, pageWidth / 2, yPos, { align: "center" });
+  doc.text(`(DOCUMENTO/FIRMA)`, pageWidth / 2, yPos, { align: "center" });
   yPos += 12;
 
   // FIRMA DEL ESPECIALISTA
@@ -258,7 +258,7 @@ const generarConsentimientoPDF = async (paciente) => {
 
   doc.text(`_______________________`, pageWidth / 2 - 30, yPos, { align: "center" });
   yPos += 4;
-  doc.text(`(DNI/FIRMA)`, pageWidth / 2 - 30, yPos, { align: "center" });
+  doc.text(`(DOCUMENTO/FIRMA)`, pageWidth / 2 - 30, yPos, { align: "center" });
 
   // Guardar PDF
   const nombreArchivo = `Consentimiento_${nombreCompleto.replace(/\s+/g, "_")}_${new Date().getTime()}.pdf`;

@@ -18,6 +18,7 @@ import statsRoutes from "./routes/statsRoutes.js";
 import backupRoutes from "./routes/backupRoutes.js";
 import paquetesRoutes from "./routes/paquetesRoutes.js";
 import whatsappRoutes from "./routes/whatsappRoutes.js";
+import n8nIntegrationRoutes from "./routes/n8nIntegrationRoutes.js";
 import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -732,6 +733,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/backup", backupRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/n8n", n8nIntegrationRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
 
 // ✅ Servir frontend (React build) para acceso remoto (ej. iPad/iPhone)

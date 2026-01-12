@@ -76,7 +76,7 @@ export const generarPDFPaciente = async (paciente, historial) => {
 
   const datosPaciente = [
     ["Nombre", `${paciente.nombre || ""} ${paciente.apellido || ""}`.trim()],
-    ["DNI", paciente.dni || "-"],
+    ["Documento", `${paciente.tipoDocumento || 'DNI'}: ${paciente.dni || "-"}`],
     ["Edad", paciente.edad ?? "-"],
     ["Sexo", paciente.sexo || "-"],
     ["Embarazada", paciente.embarazada || "No especifica"],

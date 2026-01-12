@@ -143,7 +143,7 @@ function App() {
         <Route
           path="/paquetes"
           element={
-            <ProtectedRoute requiredRole="master">
+            <ProtectedRoute>
               <Paquetes />
             </ProtectedRoute>
           }

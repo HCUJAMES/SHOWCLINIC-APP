@@ -105,7 +105,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     doc.text(`Nombre: ${nombreCompleto}`, colIzquierda + 5, yPos + 16);
     
     if (paciente.dni) {
-      doc.text(`DNI: ${paciente.dni}`, colIzquierda + 5, yPos + 22);
+      doc.text(`Documento: ${paciente.tipoDocumento || 'DNI'}: ${paciente.dni}`, colIzquierda + 5, yPos + 22);
     }
     if (paciente.telefono) {
       doc.text(`Teléfono: ${paciente.telefono}`, colIzquierda + 5, yPos + 28);

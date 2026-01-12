@@ -421,7 +421,7 @@ export default function BuscarPaciente() {
           <Table>
             <TableHead>
               <TableRow sx={{ backgroundColor: colorPrincipal }}>
-                <TableCell sx={{ color: "white", fontWeight: "bold" }}>DNI</TableCell>
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>Documento</TableCell>
                 <TableCell sx={{ color: "white", fontWeight: "bold" }}>Nombre</TableCell>
                 <TableCell sx={{ color: "white", fontWeight: "bold" }}>Apellido</TableCell>
                 <TableCell sx={{ color: "white", fontWeight: "bold" }}>Edad</TableCell>
@@ -440,7 +440,7 @@ export default function BuscarPaciente() {
               ) : (
                 pacientes.map((p) => (
                   <TableRow key={p.id} hover>
-                    <TableCell>{p.dni}</TableCell>
+                    <TableCell>{p.tipoDocumento || 'DNI'}: {p.dni}</TableCell>
                     <TableCell>{p.nombre}</TableCell>
                     <TableCell>{p.apellido}</TableCell>
                     <TableCell>{p.edad}</TableCell>
