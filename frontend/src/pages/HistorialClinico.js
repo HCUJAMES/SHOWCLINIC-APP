@@ -27,6 +27,7 @@ import {
 } from "@mui/material";
 import { ArrowBack, Home, Receipt, Edit, Delete, Print, Close, Description } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { calcularEdad } from "../utils/dateUtils";
 import axios from "axios";
 import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProformaPDF";
 import generarConsentimientoPDF from "../utils/generarConsentimientoPDF";
@@ -1560,7 +1561,7 @@ const HistorialClinico = () => {
                           <Typography><strong>Documento:</strong> {pacienteSeleccionado.tipoDocumento || 'DNI'}: {pacienteSeleccionado.dni}</Typography>
                           <Typography><strong>Nombre:</strong> {pacienteSeleccionado.nombre}</Typography>
                           <Typography><strong>Apellido:</strong> {pacienteSeleccionado.apellido}</Typography>
-                          <Typography><strong>Edad:</strong> {pacienteSeleccionado.edad}</Typography>
+                          <Typography><strong>Edad:</strong> {calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || 'N/A'} años</Typography>
                           <Typography><strong>Sexo:</strong> {pacienteSeleccionado.sexo}</Typography>
                           <Typography><strong>Embarazada:</strong> {pacienteSeleccionado.embarazada || "No especifica"}</Typography>
                           <Typography><strong>Ocupación:</strong> {pacienteSeleccionado.ocupacion}</Typography>

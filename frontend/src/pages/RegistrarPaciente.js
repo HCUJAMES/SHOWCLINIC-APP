@@ -14,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { useAuth } from "../hooks/useAuth";
 import { COLORS, API_BASE_URL } from "../constants";
+import { calcularEdad } from "../utils/dateUtils";
 
 export default function RegistrarPaciente() {
   const navigate = useNavigate();
@@ -60,6 +61,13 @@ export default function RegistrarPaciente() {
     if (name === "celular") {
       setFormData({ ...formData, [name]: value });
       setErrors((prev) => ({ ...prev, celular: "" }));
+      return;
+    }
+
+    // Si cambia la fecha de nacimiento, calcular automáticamente la edad
+    if (name === "fechaNacimiento") {
+      const edad = calcularEdad(value);
+      setFormData({ ...formData, [name]: value, edad: edad || "" });
       return;
     }
 
@@ -224,9 +232,12 @@ export default function RegistrarPaciente() {
               value={formData.edad}
               onChange={handleChange}
               fullWidth
+              disabled
+              placeholder="Se calcula automáticamente"
+              helperText="Se calcula desde la fecha de nacimiento"
               sx={{
                 "& .MuiInputBase-root": {
-                  backgroundColor: "rgba(255,255,255,0.72)",
+                  backgroundColor: "rgba(255,255,255,0.9)",
                   borderRadius: 2,
                 },
               }}

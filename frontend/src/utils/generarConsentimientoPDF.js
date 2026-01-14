@@ -1,4 +1,6 @@
 import jsPDF from "jspdf";
+import "jspdf-autotable";
+import { calcularEdad } from "./dateUtils";
 
 const loadImage = (src) =>
   new Promise((resolve) => {
@@ -48,8 +50,8 @@ const generarConsentimientoPDF = async (paciente) => {
   };
 
   const nombreCompleto = `${paciente.nombre || ""} ${paciente.apellido || ""}`.trim();
-  // La edad ya viene calculada desde el backend
-  const edad = paciente.edad;
+  // Calcular edad dinámicamente desde fechaNacimiento
+  const edad = calcularEdad(paciente.fechaNacimiento) || paciente.edad;
   
   // Debug temporal
   console.log("DEBUGGING CONSENTIMIENTO:");

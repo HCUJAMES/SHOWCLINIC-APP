@@ -1,5 +1,6 @@
-import { jsPDF } from "jspdf";
+import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatearFecha, obtenerFechaSoloPerú } from "./dateUtils";
 
 // Logo de ShowClinic en base64 (se cargará dinámicamente)
 const LOGO_URL = "/logo-showclinic.png";
@@ -124,12 +125,8 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     doc.setFont("helvetica", "normal");
     doc.setTextColor(negro[0], negro[1], negro[2]);
 
-    const fecha = presupuesto.creado_en || new Date().toISOString().split("T")[0];
-    const fechaFormateada = new Date(fecha).toLocaleDateString("es-PE", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    const fecha = presupuesto.creado_en || obtenerFechaSoloPerú();
+    const fechaFormateada = formatearFecha(fecha);
     doc.text(`Fecha: ${fechaFormateada}`, pageWidth - 130, yPos + 16);
     doc.text(`N° Proforma: ${Date.now().toString().slice(-8)}`, pageWidth - 130, yPos + 23);
 
@@ -293,7 +290,7 @@ export const generarProformaPaquete = async (paquete, paciente) => {
     // Crear estructura de presupuesto desde el paquete
     // Usar precio_unitario directamente como el precio del tratamiento (ya incluye todo)
     const presupuestoFromPaquete = {
-      creado_en: paquete.creado_en || new Date().toISOString(),
+      creado_en: paquete.creado_en || obtenerFechaSoloPerú(),
       items: tratamientos.map(t => ({
         nombre: t.nombre || t.tratamiento || "Tratamiento",
         sesiones: t.sesiones || 1,

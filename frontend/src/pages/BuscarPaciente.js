@@ -28,6 +28,7 @@ import {
 import { ArrowBack, Home, ExpandMore, ExpandLess } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
+import { calcularEdad } from "../utils/dateUtils";
 import { useAuth } from "../hooks/useAuth";
 import { canWritePatients } from "../utils/permissions";
 import { COLORS, API_BASE_URL } from "../constants";
@@ -443,7 +444,7 @@ export default function BuscarPaciente() {
                     <TableCell>{p.tipoDocumento || 'DNI'}: {p.dni}</TableCell>
                     <TableCell>{p.nombre}</TableCell>
                     <TableCell>{p.apellido}</TableCell>
-                    <TableCell>{p.edad}</TableCell>
+                    <TableCell>{calcularEdad(p.fechaNacimiento) || p.edad || 'N/A'}</TableCell>
                     <TableCell>{p.sexo}</TableCell>
                     <TableCell>{p.ciudadResidencia}</TableCell>
                     <TableCell>

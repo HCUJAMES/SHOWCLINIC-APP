@@ -15,6 +15,7 @@ import {
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { generarPDFPaciente } from "../../utils/generarPDF";
+import { calcularEdad } from "../../utils/dateUtils";
 
 const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -65,7 +66,7 @@ const HistorialPaciente = () => {
             <Grid item xs={12} sm={6}>
               <Typography><strong>Nombre:</strong> {paciente.nombre} {paciente.apellido}</Typography>
               <Typography><strong>Documento:</strong> {paciente.tipoDocumento || 'DNI'}: {paciente.dni}</Typography>
-              <Typography><strong>Edad:</strong> {paciente.edad}</Typography>
+              <Typography><strong>Edad:</strong> {calcularEdad(paciente.fechaNacimiento) || paciente.edad || 'N/A'} años</Typography>
               <Typography><strong>Sexo:</strong> {paciente.sexo}</Typography>
               <Typography><strong>Embarazada:</strong> {paciente.embarazada || "No especifica"}</Typography>
             </Grid>

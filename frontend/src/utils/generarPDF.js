@@ -1,5 +1,5 @@
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import { calcularEdad, formatearFecha, obtenerFechaSoloPerú } from "./dateUtils";
 
 const loadImage = (src) =>
   new Promise((resolve) => {
@@ -77,7 +77,7 @@ export const generarPDFPaciente = async (paciente, historial) => {
   const datosPaciente = [
     ["Nombre", `${paciente.nombre || ""} ${paciente.apellido || ""}`.trim()],
     ["Documento", `${paciente.tipoDocumento || 'DNI'}: ${paciente.dni || "-"}`],
-    ["Edad", paciente.edad ?? "-"],
+    ["Edad", calcularEdad(paciente.fechaNacimiento) || paciente.edad || "-"],
     ["Sexo", paciente.sexo || "-"],
     ["Embarazada", paciente.embarazada || "No especifica"],
     ["Teléfono", paciente.celular || "-"],
@@ -111,7 +111,7 @@ export const generarPDFPaciente = async (paciente, historial) => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text(
-      `Emitido: ${new Date().toLocaleDateString()}`,
+      `Emitido: ${formatearFecha(obtenerFechaSoloPerú())}`,
       pageWidth - margenX,
       64,
       { align: "right" }
