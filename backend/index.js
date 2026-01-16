@@ -26,7 +26,8 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // ✅ Servir imágenes de forma pública (📸 importante para ver las fotos)
 app.use("/uploads", express.static("uploads"));
@@ -346,6 +347,15 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
+    // Agregar columna imagen_promocional si no existe (migración)
+    db.run(`ALTER TABLE paquetes_tratamientos ADD COLUMN imagen_promocional TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna imagen_promocional ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna imagen_promocional agregada a paquetes_tratamientos");
+      }
+    });
+
     console.log("✅ Tabla de paquetes de tratamientos creada");
 
     // 🎁 Tabla de paquetes asignados a pacientes
@@ -367,6 +377,15 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
         FOREIGN KEY(paquete_id) REFERENCES paquetes_tratamientos(id)
       )
     `);
+
+    // Agregar columna imagen_promocional a paquetes_pacientes si no existe
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN imagen_promocional TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna imagen_promocional en paquetes_pacientes ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna imagen_promocional agregada a paquetes_pacientes");
+      }
+    });
 
     // 🎁 Tabla de sesiones de paquetes (tracking de cada sesión realizada)
     db.run(`

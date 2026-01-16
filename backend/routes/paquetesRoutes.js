@@ -115,6 +115,7 @@ router.post("/", requirePaquetesWrite, async (req, res) => {
     sesiones,
     vigencia_inicio,
     vigencia_fin,
+    imagen_promocional,
   } = req.body;
 
   // Validaciones
@@ -163,8 +164,8 @@ router.post("/", requirePaquetesWrite, async (req, res) => {
         nombre, descripcion, tratamientos_json, productos_json,
         precio_regular, precio_paquete, descuento_porcentaje,
         sesiones, vigencia_inicio, vigencia_fin,
-        estado, creado_en, creado_por
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?, ?)`,
+        imagen_promocional, estado, creado_en, creado_por
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'activo', ?, ?)`,
       [
         nombre.trim(),
         descripcion?.trim() || null,
@@ -176,6 +177,7 @@ router.post("/", requirePaquetesWrite, async (req, res) => {
         sesiones,
         vigencia_inicio || null,
         vigencia_fin || null,
+        imagen_promocional || null,
         ahora,
         username,
       ]
@@ -207,6 +209,7 @@ router.put("/:id", requirePaquetesWrite, async (req, res) => {
     vigencia_inicio,
     vigencia_fin,
     estado,
+    imagen_promocional,
   } = req.body;
 
   try {
@@ -277,6 +280,7 @@ router.put("/:id", requirePaquetesWrite, async (req, res) => {
         vigencia_inicio = ?,
         vigencia_fin = ?,
         estado = ?,
+        imagen_promocional = ?,
         actualizado_en = ?
        WHERE id = ?`,
       [
@@ -291,6 +295,7 @@ router.put("/:id", requirePaquetesWrite, async (req, res) => {
         inicio,
         fin,
         estado !== undefined ? estado : paquete.estado,
+        imagen_promocional !== undefined ? imagen_promocional : paquete.imagen_promocional,
         ahora,
         id,
       ]
@@ -399,8 +404,8 @@ router.post("/asignar", requirePaquetesAsignar, async (req, res) => {
     const result = await dbRun(
       `INSERT INTO paquetes_pacientes (
         paciente_id, paquete_id, paquete_nombre, tratamientos_json,
-        precio_total, estado, fecha_inicio, notas, creado_en, creado_por
-      ) VALUES (?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?)`,
+        precio_total, estado, fecha_inicio, notas, imagen_promocional, creado_en, creado_por
+      ) VALUES (?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?, ?)`,
       [
         paciente_id,
         paquete_id,
@@ -409,6 +414,7 @@ router.post("/asignar", requirePaquetesAsignar, async (req, res) => {
         paquete.precio_paquete,
         ahora,
         notas || null,
+        paquete.imagen_promocional || null,
         ahora,
         username
       ]

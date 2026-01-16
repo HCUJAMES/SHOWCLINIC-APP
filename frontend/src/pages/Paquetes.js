@@ -65,6 +65,8 @@ const Paquetes = () => {
   const [precioPaquete, setPrecioPaquete] = useState(0);
   const [vigenciaInicio, setVigenciaInicio] = useState("");
   const [vigenciaFin, setVigenciaFin] = useState("");
+  const [imagenPromocional, setImagenPromocional] = useState("");
+  const [imagenPreview, setImagenPreview] = useState(null);
 
   const [openConfirmarEliminar, setOpenConfirmarEliminar] = useState(false);
   const [paqueteEliminar, setPaqueteEliminar] = useState(null);
@@ -130,6 +132,8 @@ const Paquetes = () => {
     setPrecioPaquete(paquete.precio_paquete);
     setVigenciaInicio(paquete.vigencia_inicio || "");
     setVigenciaFin(paquete.vigencia_fin || "");
+    setImagenPromocional(paquete.imagen_promocional || "");
+    setImagenPreview(paquete.imagen_promocional || null);
 
     setModoEdicion(true);
     setOpenModal(true);
@@ -144,6 +148,38 @@ const Paquetes = () => {
     setPrecioPaquete(0);
     setVigenciaInicio("");
     setVigenciaFin("");
+    setImagenPromocional("");
+    setImagenPreview(null);
+  };
+
+  const handleImagenChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validar tipo de archivo
+    if (!file.type.startsWith('image/')) {
+      showToast({ severity: "error", message: "Por favor selecciona una imagen válida" });
+      return;
+    }
+
+    // Validar tamaño (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast({ severity: "error", message: "La imagen no debe superar los 5MB" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result;
+      setImagenPromocional(base64String);
+      setImagenPreview(base64String);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const eliminarImagen = () => {
+    setImagenPromocional("");
+    setImagenPreview(null);
   };
 
   const agregarTratamiento = (tratamiento) => {
@@ -223,6 +259,7 @@ const Paquetes = () => {
       sesiones: totalSesiones,
       vigencia_inicio: vigenciaInicio || null,
       vigencia_fin: vigenciaFin || null,
+      imagen_promocional: imagenPromocional || null,
     };
 
     try {
@@ -588,6 +625,68 @@ const Paquetes = () => {
                   sx: { borderRadius: 2 }
                 }}
               />
+
+              {/* Sección de Imagen Promocional */}
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: "bold", color: "#333" }}>
+                  🖼️ Imagen Promocional
+                </Typography>
+                
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    sx={{
+                      borderRadius: 2,
+                      borderColor: "#a36920",
+                      color: "#a36920",
+                      "&:hover": {
+                        borderColor: "#8a541a",
+                        backgroundColor: "rgba(163, 105, 32, 0.04)"
+                      }
+                    }}
+                  >
+                    {imagenPreview ? "Cambiar Imagen" : "Subir Imagen"}
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={handleImagenChange}
+                    />
+                  </Button>
+
+                  {imagenPreview && (
+                    <Box sx={{ position: "relative", borderRadius: 2, overflow: "hidden", border: "2px solid #e0e0e0" }}>
+                      <img
+                        src={imagenPreview}
+                        alt="Preview"
+                        style={{
+                          width: "100%",
+                          maxHeight: "200px",
+                          objectFit: "cover",
+                          display: "block"
+                        }}
+                      />
+                      <IconButton
+                        onClick={eliminarImagen}
+                        sx={{
+                          position: "absolute",
+                          top: 8,
+                          right: 8,
+                          backgroundColor: "rgba(211, 47, 47, 0.9)",
+                          color: "white",
+                          "&:hover": {
+                            backgroundColor: "rgba(211, 47, 47, 1)"
+                          }
+                        }}
+                        size="small"
+                      >
+                        <Delete />
+                      </IconButton>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
 
               {/* Sección de Tratamientos */}
               <Box sx={{ mb: 3 }}>

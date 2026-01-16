@@ -2237,6 +2237,22 @@ const HistorialClinico = () => {
                             border: "1px solid rgba(76, 175, 80, 0.2)",
                           }}
                         >
+                          {/* Imagen Promocional */}
+                          {paquete.imagen_promocional && (
+                            <Box sx={{ mb: 2, borderRadius: 2, overflow: "hidden" }}>
+                              <img
+                                src={paquete.imagen_promocional}
+                                alt={paquete.nombre}
+                                style={{
+                                  width: "100%",
+                                  height: "180px",
+                                  objectFit: "cover",
+                                  display: "block"
+                                }}
+                              />
+                            </Box>
+                          )}
+
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
                             <Typography sx={{ fontWeight: "bold", color: "#333" }}>
                               {paquete.nombre}
