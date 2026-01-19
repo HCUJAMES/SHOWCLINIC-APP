@@ -174,6 +174,18 @@ const HistorialClinico = () => {
   const [modalPagoPaquete, setModalPagoPaquete] = useState(false);
   const [paqueteParaPago, setPaqueteParaPago] = useState(null);
   
+  // Estados para modal de pago de consulta (paquetes)
+  const [modalPagoConsulta, setModalPagoConsulta] = useState(false);
+  const [paqueteParaConsulta, setPaqueteParaConsulta] = useState(null);
+  const [montoConsulta, setMontoConsulta] = useState(0);
+  const [metodoPagoConsulta, setMetodoPagoConsulta] = useState("efectivo");
+  
+  // Estados para modal de pago de consulta (presupuestos)
+  const [modalPagoConsultaPresupuesto, setModalPagoConsultaPresupuesto] = useState(false);
+  const [presupuestoParaConsulta, setPresupuestoParaConsulta] = useState(null);
+  const [montoConsultaPresupuesto, setMontoConsultaPresupuesto] = useState(0);
+  const [metodoPagoConsultaPresupuesto, setMetodoPagoConsultaPresupuesto] = useState("efectivo");
+  
   // Estado para controlar qué presupuestos están colapsados
   const [presupuestosColapsados, setPresupuestosColapsados] = useState({});
   
@@ -571,6 +583,62 @@ const HistorialClinico = () => {
     }
   };
 
+  // Registrar pago de consulta (paquetes)
+  const registrarPagoConsulta = async (paqueteId, monto, metodoPagoVal) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/paquetes/paquete-paciente/${paqueteId}/consulta`,
+        {
+          monto_consulta: monto,
+          metodo_pago: metodoPagoVal,
+        },
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Pago de consulta registrado exitosamente" });
+      
+      // Recargar paquetes del paciente
+      const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error al registrar pago de consulta:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al registrar pago de consulta" });
+      throw error;
+    }
+  };
+
+  // Registrar pago de consulta (presupuestos)
+  const registrarPagoConsultaPresupuesto = async (presupuestoId, monto, metodoPagoVal) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/paquetes/presupuesto/${presupuestoId}/consulta`,
+        {
+          monto_consulta: monto,
+          metodo_pago: metodoPagoVal,
+        },
+        { headers: authHeaders }
+      );
+      
+      showToast({ severity: "success", message: "Pago de consulta registrado exitosamente" });
+      
+      // Recargar presupuestos del paciente
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error al registrar pago de consulta en presupuesto:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al registrar pago de consulta" });
+      throw error;
+    }
+  };
+
   const subirFotoPerfil = async (file) => {
     if (!pacienteSeleccionado?.id || !file) return;
     try {
@@ -634,24 +702,49 @@ const HistorialClinico = () => {
     }
   };
 
-  // Generar recibo PDF del paquete completado
+  // Generar recibo PDF del paquete
   const generarReciboPaquete = (paquete) => {
     if (!pacienteSeleccionado || !paquete) return;
 
-    const doc = new jsPDF("p", "mm", [80, 200]);
+    const doc = new jsPDF("p", "mm", [80, 250]);
     const pageWidth = 80;
-    let y = 10;
+    let y = 8;
 
-    // Logo y encabezado
-    doc.setFontSize(14);
+    // Logo
+    try {
+      const logoImg = new Image();
+      logoImg.src = '/logo-showclinic.png';
+      // Logo más grande y proporcionado (mantener aspecto circular)
+      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 12, y, 24, 24);
+      y += 26;
+    } catch (e) {
+      // Si no se puede cargar el logo, continuar sin él
+      y += 2;
+    }
+
+    // Encabezado
+    doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
     y += 6;
 
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text("Centro de Estética", pageWidth / 2, y, { align: "center" });
-    y += 8;
+    doc.text("Centro de Estética Avanzada", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    
+    // Dirección
+    doc.setFontSize(7);
+    doc.text("Av. Ejército 616, Centro de Negocios", pageWidth / 2, y, { align: "center" });
+    y += 3;
+    doc.text("Yanahuara, Perú", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    
+    // Teléfono
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Tel: 974 212 114", pageWidth / 2, y, { align: "center" });
+    y += 7;
 
     // Línea separadora
     doc.setDrawColor(200);
@@ -682,22 +775,75 @@ const HistorialClinico = () => {
     // Nombre del paquete
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text(paquete.paquete_nombre, pageWidth / 2, y, { align: "center" });
+    doc.text(paquete.paquete_nombre || "Paquete", pageWidth / 2, y, { align: "center" });
     y += 6;
 
-    // Sesiones realizadas
+    // Tratamientos incluidos
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("TRATAMIENTOS INCLUIDOS:", 5, y);
+    y += 4;
+    
+    doc.setFont("helvetica", "normal");
+    try {
+      const tratamientos = paquete.tratamientos_json ? JSON.parse(paquete.tratamientos_json) : [];
+      if (tratamientos.length > 0) {
+        tratamientos.forEach((trat) => {
+          const nombreTrat = trat.nombre || trat.tratamiento_nombre || 'Tratamiento';
+          const sesiones = trat.sesiones || trat.cantidad || 1;
+          doc.text(`• ${nombreTrat} (${sesiones} sesión${sesiones > 1 ? 'es' : ''})`, 7, y);
+          y += 3.5;
+        });
+      }
+    } catch (e) {
+      doc.text("• Tratamientos del paquete", 7, y);
+      y += 3.5;
+    }
+
+    y += 2;
+    // Línea separadora
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Detalles de precio
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     
-    if (paquete.sesiones && paquete.sesiones.length > 0) {
-      paquete.sesiones.forEach((sesion) => {
-        const estado = sesion.estado === 'completada' ? '✓' : '○';
-        const fecha = sesion.fecha_realizada ? sesion.fecha_realizada.split(' ')[0] : '-';
-        doc.text(`${estado} ${sesion.tratamiento_nombre}`, 5, y);
-        y += 3.5;
-        doc.text(`   Sesión ${sesion.sesion_numero} - ${fecha}`, 5, y);
-        y += 4;
-      });
+    const precioOriginal = parseFloat(paquete.precio_total) || 0;
+    const montoConsulta = parseFloat(paquete.monto_consulta) || 0;
+    const precioFinal = precioOriginal;
+    
+    doc.text("Precio del paquete:", 5, y);
+    doc.text(`S/ ${precioOriginal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    y += 4;
+
+    // Mostrar consulta si fue pagada
+    if (paquete.consulta_pagada === 1 && montoConsulta > 0) {
+      doc.text("Consulta pagada:", 5, y);
+      doc.text(`- S/ ${montoConsulta.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 4;
+      
+      doc.setFont("helvetica", "bold");
+      doc.text("Precio ajustado:", 5, y);
+      doc.text(`S/ ${precioFinal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 5;
+      doc.setFont("helvetica", "normal");
+    }
+
+    // Información de pagos
+    const montoPagado = parseFloat(paquete.monto_pagado) || 0;
+    const saldoPendiente = parseFloat(paquete.saldo_pendiente) || (precioFinal - montoPagado);
+
+    if (montoPagado > 0) {
+      doc.text("Pagado:", 5, y);
+      doc.text(`S/ ${montoPagado.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 4;
+    }
+
+    if (saldoPendiente > 0 && paquete.estado_pago !== 'pagado') {
+      doc.text("Saldo pendiente:", 5, y);
+      doc.text(`S/ ${saldoPendiente.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 4;
     }
 
     y += 2;
@@ -708,14 +854,197 @@ const HistorialClinico = () => {
     // Total
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("TOTAL PAQUETE:", 5, y);
-    doc.text(`S/ ${(paquete.precio_total || 0).toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    doc.text("TOTAL:", 5, y);
+    doc.text(`S/ ${precioFinal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
     y += 6;
 
-    // Estado
+    // Estado de pago
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.text(`Estado: ${paquete.estado.toUpperCase()}`, pageWidth / 2, y, { align: "center" });
+    const estadoPago = paquete.estado_pago === 'pagado' || paquete.pagado === 1 ? 'PAGADO' : 
+                       paquete.estado_pago === 'adelanto' ? 'ADELANTO' : 'PENDIENTE';
+    doc.text(`Estado de pago: ${estadoPago}`, pageWidth / 2, y, { align: "center" });
+    y += 4;
+    doc.text(`Estado del paquete: ${(paquete.estado || 'activo').toUpperCase()}`, pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    // Línea separadora
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Mensaje de agradecimiento
+    doc.setFontSize(7);
+    doc.text("¡Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    doc.text("ShowClinic - Tu belleza, nuestra pasión", pageWidth / 2, y, { align: "center" });
+
+    // Abrir en nueva ventana para imprimir
+    const pdfBlob = doc.output("blob");
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, "_blank");
+  };
+
+  // Generar recibo PDF del presupuesto
+  const generarReciboPresupuesto = (presupuesto) => {
+    if (!pacienteSeleccionado || !presupuesto) return;
+
+    const doc = new jsPDF("p", "mm", [80, 250]);
+    const pageWidth = 80;
+    let y = 8;
+
+    // Logo
+    try {
+      const logoImg = new Image();
+      logoImg.src = '/logo-showclinic.png';
+      // Logo más grande y proporcionado (mantener aspecto circular)
+      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 12, y, 24, 24);
+      y += 26;
+    } catch (e) {
+      // Si no se puede cargar el logo, continuar sin él
+      y += 2;
+    }
+
+    // Encabezado
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Centro de Estética Avanzada", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    
+    // Dirección
+    doc.setFontSize(7);
+    doc.text("Av. Ejército 616, Centro de Negocios", pageWidth / 2, y, { align: "center" });
+    y += 3;
+    doc.text("Yanahuara, Perú", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    
+    // Teléfono
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Tel: 974 212 114", pageWidth / 2, y, { align: "center" });
+    y += 7;
+
+    // Línea separadora
+    doc.setDrawColor(200);
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Título del recibo
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("RECIBO DE PRESUPUESTO", pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    // Datos del paciente
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
+    doc.text(`Cliente: ${nombrePaciente}`, 5, y);
+    y += 4;
+    doc.text(`Documento: ${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 5, y);
+    y += 4;
+    doc.text(`Fecha: ${new Date().toLocaleDateString("es-PE")}`, 5, y);
+    y += 6;
+
+    // Línea separadora
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Tratamientos incluidos
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("TRATAMIENTOS INCLUIDOS:", 5, y);
+    y += 4;
+    
+    doc.setFont("helvetica", "normal");
+    try {
+      const tratamientos = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : [];
+      if (tratamientos.length > 0) {
+        tratamientos.forEach((trat) => {
+          const nombreTrat = trat.nombre || trat.tratamiento || 'Tratamiento';
+          const precio = parseFloat(trat.precio) || 0;
+          doc.text(`• ${nombreTrat}`, 7, y);
+          y += 3;
+          doc.text(`  S/ ${precio.toFixed(2)}`, 7, y);
+          y += 4;
+        });
+      }
+    } catch (e) {
+      doc.text("• Tratamientos del presupuesto", 7, y);
+      y += 3.5;
+    }
+
+    y += 2;
+    // Línea separadora
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Detalles de precio
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    
+    const subtotal = parseFloat(presupuesto.precio_total) || 0;
+    const descuento = parseFloat(presupuesto.descuento) || 0;
+    const montoConsulta = parseFloat(presupuesto.monto_consulta) || 0;
+    const total = subtotal - descuento;
+    
+    doc.text("Subtotal:", 5, y);
+    doc.text(`S/ ${subtotal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    y += 4;
+
+    if (descuento > 0) {
+      doc.text("Descuento:", 5, y);
+      doc.text(`- S/ ${descuento.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 4;
+    }
+
+    // Mostrar consulta si fue pagada
+    if (presupuesto.consulta_pagada === 1 && montoConsulta > 0) {
+      doc.text("(Incluye consulta):", 5, y);
+      doc.text(`S/ ${montoConsulta.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 5;
+    }
+
+    // Información de pagos
+    const montoPagado = parseFloat(presupuesto.monto_pagado) || 0;
+    const saldoPendiente = parseFloat(presupuesto.saldo_pendiente) || (total - montoPagado);
+
+    if (montoPagado > 0) {
+      doc.text("Pagado:", 5, y);
+      doc.text(`S/ ${montoPagado.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 4;
+    }
+
+    if (saldoPendiente > 0 && presupuesto.estado_pago !== 'pagado') {
+      doc.text("Saldo pendiente:", 5, y);
+      doc.text(`S/ ${saldoPendiente.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 4;
+    }
+
+    y += 2;
+    // Línea separadora
+    doc.line(5, y, pageWidth - 5, y);
+    y += 5;
+
+    // Total
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("TOTAL:", 5, y);
+    doc.text(`S/ ${total.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    y += 6;
+
+    // Estado de pago
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    const estadoPago = presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 ? 'PAGADO' : 
+                       presupuesto.estado_pago === 'adelanto' ? 'ADELANTO' : 'PENDIENTE';
+    doc.text(`Estado de pago: ${estadoPago}`, pageWidth / 2, y, { align: "center" });
+    y += 4;
+    doc.text(`Estado: ${(presupuesto.estado || 'activo').toUpperCase()}`, pageWidth / 2, y, { align: "center" });
     y += 6;
 
     // Línea separadora
@@ -2400,6 +2729,17 @@ const HistorialClinico = () => {
                               }}>
                                 {presupuesto.estado}
                               </Box>
+                              <IconButton
+                                size="small"
+                                onClick={() => generarReciboPresupuesto(presupuesto)}
+                                sx={{
+                                  color: "#d4af37",
+                                  "&:hover": { backgroundColor: "rgba(212,175,55,0.1)" }
+                                }}
+                                title="Imprimir recibo"
+                              >
+                                <Receipt />
+                              </IconButton>
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -2607,6 +2947,25 @@ const HistorialClinico = () => {
                               </Box>
                             </Box>
                             
+                            {/* Información de Consulta Pagada */}
+                            {presupuesto.consulta_pagada === 1 && (
+                              <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 1, border: "1px solid rgba(156, 39, 176, 0.3)" }}>
+                                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: "bold" }}>
+                                    💊 Consulta Pagada
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: "bold" }}>
+                                    S/ {(presupuesto.monto_consulta || 0).toFixed(2)}
+                                  </Typography>
+                                </Box>
+                                {presupuesto.metodo_pago_consulta && (
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                                    Método: {presupuesto.metodo_pago_consulta} | {presupuesto.fecha_pago_consulta?.split(' ')[0]}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
+
                             {/* Detalles de pago */}
                             {(presupuesto.monto_pagado > 0 || presupuesto.estado_pago === 'adelanto') && (
                               <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(0,0,0,0.02)", borderRadius: 1 }}>
@@ -2633,7 +2992,33 @@ const HistorialClinico = () => {
                             )}
                             
                             {/* Botones de acción */}
-                            <Box sx={{ display: "flex", gap: 1, mt: 1.5, justifyContent: "flex-end" }}>
+                            <Box sx={{ display: "flex", gap: 1, mt: 1.5, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                              {/* Botón de Pago de Consulta */}
+                              {presupuesto.consulta_pagada !== 1 && presupuesto.estado_pago !== 'pagado' && presupuesto.pagado !== 1 && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => {
+                                    setPresupuestoParaConsulta(presupuesto);
+                                    setMontoConsultaPresupuesto(100);
+                                    setMetodoPagoConsultaPresupuesto("efectivo");
+                                    setModalPagoConsultaPresupuesto(true);
+                                  }}
+                                  sx={{
+                                    fontSize: "0.75rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    borderColor: "#9c27b0",
+                                    color: "#9c27b0",
+                                    "&:hover": { 
+                                      backgroundColor: "rgba(156, 39, 176, 0.08)",
+                                      borderColor: "#7b1fa2"
+                                    }
+                                  }}
+                                >
+                                  💊 Pagar Consulta
+                                </Button>
+                              )}
                               {presupuesto.estado_pago !== 'pagado' && presupuesto.pagado !== 1 && (
                                 <Button
                                   size="small"
@@ -2756,6 +3141,17 @@ const HistorialClinico = () => {
                               }}>
                                 {paquete.estado}
                               </Box>
+                              <IconButton
+                                size="small"
+                                onClick={() => generarReciboPaquete(paquete)}
+                                sx={{
+                                  color: "#d4af37",
+                                  "&:hover": { backgroundColor: "rgba(212,175,55,0.1)" }
+                                }}
+                                title="Imprimir recibo"
+                              >
+                                <Receipt />
+                              </IconButton>
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -2944,6 +3340,25 @@ const HistorialClinico = () => {
                               </Box>
                             </Box>
                             
+                            {/* Información de Consulta Pagada */}
+                            {paquete.consulta_pagada === 1 && (
+                              <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 1, border: "1px solid rgba(156, 39, 176, 0.3)" }}>
+                                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: "bold" }}>
+                                    💊 Consulta Pagada
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: "bold" }}>
+                                    S/ {(paquete.monto_consulta || 0).toFixed(2)}
+                                  </Typography>
+                                </Box>
+                                {paquete.metodo_pago_consulta && (
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                                    Método: {paquete.metodo_pago_consulta} | {paquete.fecha_pago_consulta?.split(' ')[0]}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
+
                             {/* Detalles de pago */}
                             {(paquete.monto_pagado > 0 || paquete.estado_pago === 'adelanto') && (
                               <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(0,0,0,0.02)", borderRadius: 1 }}>
@@ -2971,6 +3386,32 @@ const HistorialClinico = () => {
                             
                             {/* Botones de acción */}
                             <Box sx={{ display: "flex", gap: 1, mt: 1.5, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                              {/* Botón de Pago de Consulta */}
+                              {paquete.consulta_pagada !== 1 && paquete.estado_pago !== 'pagado' && paquete.pagado !== 1 && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => {
+                                    setPaqueteParaConsulta(paquete);
+                                    setMontoConsulta(100);
+                                    setMetodoPagoConsulta("efectivo");
+                                    setModalPagoConsulta(true);
+                                  }}
+                                  sx={{
+                                    fontSize: "0.75rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    borderColor: "#9c27b0",
+                                    color: "#9c27b0",
+                                    "&:hover": { 
+                                      backgroundColor: "rgba(156, 39, 176, 0.08)",
+                                      borderColor: "#7b1fa2"
+                                    }
+                                  }}
+                                >
+                                  💊 Pagar Consulta
+                                </Button>
+                              )}
                               {paquete.estado_pago !== 'pagado' && paquete.pagado !== 1 && (
                                 <Button
                                   size="small"
@@ -3797,6 +4238,188 @@ const HistorialClinico = () => {
             }}
           >
             {tipoPago === 'adelanto' ? 'Registrar Adelanto' : tipoPago === 'saldo' ? 'Pagar Saldo' : 'Confirmar Pago'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Registrar Pago de Consulta */}
+      <Dialog open={modalPagoConsulta} onClose={() => setModalPagoConsulta(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#9c27b0", color: "white" }}>
+          💊 Pagar Consulta
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {paqueteParaConsulta && (
+            <>
+              <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
+                {paqueteParaConsulta.paquete_nombre}
+              </Typography>
+              
+              <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
+                ℹ️ El monto de la consulta se descontará automáticamente del precio total del paquete.
+              </Typography>
+
+              <TextField
+                fullWidth
+                label="Monto de Consulta (S/)"
+                type="number"
+                value={montoConsulta}
+                onChange={(e) => setMontoConsulta(Number(e.target.value))}
+                inputProps={{ min: 0, step: 0.01 }}
+                sx={{ mb: 2 }}
+                helperText="Ingrese el monto que el paciente pagó por la consulta"
+              />
+              
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Método de Pago</InputLabel>
+                <Select
+                  value={metodoPagoConsulta}
+                  onChange={(e) => setMetodoPagoConsulta(e.target.value)}
+                  label="Método de Pago"
+                >
+                  <MenuItem value="efectivo">Efectivo</MenuItem>
+                  <MenuItem value="tarjeta">Tarjeta</MenuItem>
+                  <MenuItem value="transferencia">Transferencia</MenuItem>
+                  <MenuItem value="yape">Yape</MenuItem>
+                  <MenuItem value="plin">Plin</MenuItem>
+                </Select>
+              </FormControl>
+              
+              {/* Resumen de descuento */}
+              <Box sx={{ p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#7b1fa2", mb: 1 }}>
+                  📊 Resumen del Descuento
+                </Typography>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">Precio original del paquete:</Typography>
+                  <Typography sx={{ fontWeight: "bold" }}>S/ {paqueteParaConsulta.precio_total?.toFixed(2)}</Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">Monto de consulta:</Typography>
+                  <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {montoConsulta.toFixed(2)}</Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body2" sx={{ fontWeight: "bold" }}>Nuevo precio del paquete:</Typography>
+                  <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
+                    S/ {(paqueteParaConsulta.precio_total - montoConsulta).toFixed(2)}
+                  </Typography>
+                </Box>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalPagoConsulta(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            disabled={montoConsulta <= 0 || (paqueteParaConsulta && montoConsulta > paqueteParaConsulta.precio_total)}
+            onClick={async () => {
+              if (paqueteParaConsulta && montoConsulta > 0) {
+                await registrarPagoConsulta(paqueteParaConsulta.id, montoConsulta, metodoPagoConsulta);
+                setModalPagoConsulta(false);
+              }
+            }}
+            sx={{
+              backgroundColor: "#9c27b0",
+              "&:hover": { backgroundColor: "#7b1fa2" },
+            }}
+          >
+            Confirmar Pago de Consulta
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Registrar Pago de Consulta en Presupuesto */}
+      <Dialog open={modalPagoConsultaPresupuesto} onClose={() => setModalPagoConsultaPresupuesto(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#9c27b0", color: "white" }}>
+          💊 Pagar Consulta
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {presupuestoParaConsulta && (
+            <>
+              <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
+                Presupuesto del paciente
+              </Typography>
+              
+              <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
+                ℹ️ El monto de la consulta se sumará al descuento del presupuesto.
+              </Typography>
+
+              <TextField
+                fullWidth
+                label="Monto de Consulta (S/)"
+                type="number"
+                value={montoConsultaPresupuesto}
+                onChange={(e) => setMontoConsultaPresupuesto(Number(e.target.value))}
+                inputProps={{ min: 0, step: 0.01 }}
+                sx={{ mb: 2 }}
+                helperText="Ingrese el monto que el paciente pagó por la consulta"
+              />
+              
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Método de Pago</InputLabel>
+                <Select
+                  value={metodoPagoConsultaPresupuesto}
+                  onChange={(e) => setMetodoPagoConsultaPresupuesto(e.target.value)}
+                  label="Método de Pago"
+                >
+                  <MenuItem value="efectivo">Efectivo</MenuItem>
+                  <MenuItem value="tarjeta">Tarjeta</MenuItem>
+                  <MenuItem value="transferencia">Transferencia</MenuItem>
+                  <MenuItem value="yape">Yape</MenuItem>
+                  <MenuItem value="plin">Plin</MenuItem>
+                </Select>
+              </FormControl>
+              
+              {/* Resumen de descuento */}
+              <Box sx={{ p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#7b1fa2", mb: 1 }}>
+                  📊 Resumen del Descuento
+                </Typography>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">Subtotal:</Typography>
+                  <Typography sx={{ fontWeight: "bold" }}>S/ {presupuestoParaConsulta.precio_total?.toFixed(2)}</Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">Descuento anterior:</Typography>
+                  <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>- S/ {(presupuestoParaConsulta.descuento || 0).toFixed(2)}</Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">Consulta:</Typography>
+                  <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {montoConsultaPresupuesto.toFixed(2)}</Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body2" sx={{ fontWeight: "bold" }}>Total a pagar:</Typography>
+                  <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
+                    S/ {(presupuestoParaConsulta.precio_total - (presupuestoParaConsulta.descuento || 0) - montoConsultaPresupuesto).toFixed(2)}
+                  </Typography>
+                </Box>
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalPagoConsultaPresupuesto(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            disabled={montoConsultaPresupuesto <= 0 || (presupuestoParaConsulta && (montoConsultaPresupuesto + (presupuestoParaConsulta.descuento || 0)) > presupuestoParaConsulta.precio_total)}
+            onClick={async () => {
+              if (presupuestoParaConsulta && montoConsultaPresupuesto > 0) {
+                await registrarPagoConsultaPresupuesto(presupuestoParaConsulta.id, montoConsultaPresupuesto, metodoPagoConsultaPresupuesto);
+                setModalPagoConsultaPresupuesto(false);
+              }
+            }}
+            sx={{
+              backgroundColor: "#9c27b0",
+              "&:hover": { backgroundColor: "#7b1fa2" },
+            }}
+          >
+            Confirmar Pago de Consulta
           </Button>
         </DialogActions>
       </Dialog>

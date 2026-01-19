@@ -790,6 +790,98 @@ router.post("/paquete-paciente/:paquete_paciente_id/pago", requirePaquetesAsigna
   }
 });
 
+/* ==============================
+   💊 REGISTRAR PAGO DE CONSULTA
+============================== */
+router.post("/paquete-paciente/:paquete_paciente_id/consulta", requirePaquetesAsignar, async (req, res) => {
+  const { paquete_paciente_id } = req.params;
+  const { monto_consulta, metodo_pago } = req.body;
+
+  if (!monto_consulta || monto_consulta <= 0) {
+    return res.status(400).json({ message: "El monto de consulta debe ser mayor a 0" });
+  }
+
+  try {
+    const paquete = await dbGet(
+      `SELECT pp.*, p.nombre as paciente_nombre, p.apellido as paciente_apellido
+       FROM paquetes_pacientes pp
+       JOIN patients p ON pp.paciente_id = p.id
+       WHERE pp.id = ?`,
+      [paquete_paciente_id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete asignado no encontrado" });
+    }
+
+    // Verificar si ya se pagó la consulta
+    if (paquete.consulta_pagada === 1) {
+      return res.status(400).json({ message: "La consulta ya fue pagada anteriormente" });
+    }
+
+    const ahora = fechaLima();
+    const montoConsulta = parseFloat(monto_consulta);
+    const precioTotal = parseFloat(paquete.precio_total) || 0;
+
+    // Calcular nuevo precio total (precio original - monto de consulta)
+    const nuevoPrecioTotal = precioTotal - montoConsulta;
+
+    if (nuevoPrecioTotal < 0) {
+      return res.status(400).json({ message: "El monto de consulta no puede ser mayor al precio del paquete" });
+    }
+
+    // Actualizar paquete con datos de consulta y nuevo precio total
+    await dbRun(
+      `UPDATE paquetes_pacientes 
+       SET consulta_pagada = 1, 
+           monto_consulta = ?, 
+           metodo_pago_consulta = ?, 
+           fecha_pago_consulta = ?,
+           precio_total = ?,
+           saldo_pendiente = ?
+       WHERE id = ?`,
+      [montoConsulta, metodo_pago || 'efectivo', ahora, nuevoPrecioTotal, nuevoPrecioTotal, paquete_paciente_id]
+    );
+
+    // Registrar en finanzas como ingreso por consulta
+    const nombrePaciente = `${paquete.paciente_nombre} ${paquete.paciente_apellido || ''}`.trim();
+    
+    // Obtener nombres de tratamientos del paquete
+    let nombresTratamientos = paquete.paquete_nombre || 'Paquete';
+    try {
+      const tratamientosPaquete = paquete.tratamientos_json ? JSON.parse(paquete.tratamientos_json) : [];
+      if (tratamientosPaquete.length > 0) {
+        nombresTratamientos = tratamientosPaquete.map(t => t.nombre || t.tratamiento_nombre).join(', ');
+      }
+    } catch (e) {}
+    
+    await dbRun(
+      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+       VALUES ('ingreso', 'consulta', ?, ?, ?, ?, ?, ?, 'paquete_consulta', ?)`,
+      [
+        montoConsulta,
+        `Consulta - ${nombresTratamientos} - ${nombrePaciente}`,
+        ahora.split(' ')[0],
+        metodo_pago || 'efectivo',
+        paquete.paciente_id,
+        paquete_paciente_id,
+        ahora
+      ]
+    );
+
+    res.json({ 
+      message: `✅ Pago de consulta registrado exitosamente`,
+      monto_consulta: montoConsulta,
+      precio_total_anterior: precioTotal,
+      precio_total_nuevo: nuevoPrecioTotal,
+      descuento_aplicado: montoConsulta
+    });
+  } catch (err) {
+    console.error("❌ Error al registrar pago de consulta:", err.message);
+    res.status(500).json({ message: "Error al registrar pago de consulta" });
+  }
+});
+
 /* ======================================================================
    📋 PRESUPUESTOS ASIGNADOS - Similar a paquetes pero para ofertas/presupuestos
 ====================================================================== */
@@ -1026,6 +1118,98 @@ router.delete("/presupuesto/paciente/:presupuesto_asignado_id", requirePaquetesA
   } catch (err) {
     console.error("❌ Error al eliminar presupuesto:", err.message);
     res.status(500).json({ message: "Error al eliminar presupuesto" });
+  }
+});
+
+/* ==============================
+   💊 REGISTRAR PAGO DE CONSULTA EN PRESUPUESTO
+============================== */
+router.post("/presupuesto/:presupuesto_asignado_id/consulta", requirePaquetesAsignar, async (req, res) => {
+  const { presupuesto_asignado_id } = req.params;
+  const { monto_consulta, metodo_pago } = req.body;
+
+  if (!monto_consulta || monto_consulta <= 0) {
+    return res.status(400).json({ message: "El monto de consulta debe ser mayor a 0" });
+  }
+
+  try {
+    const presupuesto = await dbGet(
+      `SELECT pa.*, p.nombre as paciente_nombre, p.apellido as paciente_apellido
+       FROM presupuestos_asignados pa
+       JOIN patients p ON pa.paciente_id = p.id
+       WHERE pa.id = ?`,
+      [presupuesto_asignado_id]
+    );
+
+    if (!presupuesto) {
+      return res.status(404).json({ message: "Presupuesto asignado no encontrado" });
+    }
+
+    // Verificar si ya se pagó la consulta
+    if (presupuesto.consulta_pagada === 1) {
+      return res.status(400).json({ message: "La consulta ya fue pagada anteriormente" });
+    }
+
+    const ahora = fechaLima();
+    const montoConsulta = parseFloat(monto_consulta);
+    const precioTotal = parseFloat(presupuesto.precio_total) || 0;
+    const descuentoActual = parseFloat(presupuesto.descuento) || 0;
+
+    // Calcular nuevo descuento (descuento anterior + monto de consulta)
+    const nuevoDescuento = descuentoActual + montoConsulta;
+
+    if (nuevoDescuento > precioTotal) {
+      return res.status(400).json({ message: "El monto de consulta no puede ser mayor al precio del presupuesto" });
+    }
+
+    // Actualizar presupuesto con datos de consulta y nuevo descuento
+    await dbRun(
+      `UPDATE presupuestos_asignados 
+       SET consulta_pagada = 1, 
+           monto_consulta = ?, 
+           metodo_pago_consulta = ?, 
+           fecha_pago_consulta = ?,
+           descuento = ?
+       WHERE id = ?`,
+      [montoConsulta, metodo_pago || 'efectivo', ahora, nuevoDescuento, presupuesto_asignado_id]
+    );
+
+    // Registrar en finanzas como ingreso por consulta
+    const nombrePaciente = `${presupuesto.paciente_nombre} ${presupuesto.paciente_apellido || ''}`.trim();
+    
+    // Obtener nombres de tratamientos del presupuesto
+    let nombresTratamientos = 'Presupuesto';
+    try {
+      const tratamientosPresupuesto = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : [];
+      if (tratamientosPresupuesto.length > 0) {
+        nombresTratamientos = tratamientosPresupuesto.map(t => t.nombre || t.tratamiento).join(', ');
+      }
+    } catch (e) {}
+    
+    await dbRun(
+      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo, creado_en)
+       VALUES ('ingreso', 'consulta', ?, ?, ?, ?, ?, ?, 'presupuesto_consulta', ?)`,
+      [
+        montoConsulta,
+        `Consulta - ${nombresTratamientos} - ${nombrePaciente}`,
+        ahora.split(' ')[0],
+        metodo_pago || 'efectivo',
+        presupuesto.paciente_id,
+        presupuesto_asignado_id,
+        ahora
+      ]
+    );
+
+    res.json({ 
+      message: `✅ Pago de consulta registrado exitosamente`,
+      monto_consulta: montoConsulta,
+      descuento_anterior: descuentoActual,
+      descuento_nuevo: nuevoDescuento,
+      descuento_aplicado: montoConsulta
+    });
+  } catch (err) {
+    console.error("❌ Error al registrar pago de consulta en presupuesto:", err.message);
+    res.status(500).json({ message: "Error al registrar pago de consulta" });
   }
 });
 

@@ -387,6 +387,39 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
+    // Agregar campos para pago de consulta
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN consulta_pagada INTEGER DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna consulta_pagada ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna consulta_pagada agregada a paquetes_pacientes");
+      }
+    });
+
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN monto_consulta REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna monto_consulta ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna monto_consulta agregada a paquetes_pacientes");
+      }
+    });
+
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN metodo_pago_consulta TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna metodo_pago_consulta ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna metodo_pago_consulta agregada a paquetes_pacientes");
+      }
+    });
+
+    db.run(`ALTER TABLE paquetes_pacientes ADD COLUMN fecha_pago_consulta TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna fecha_pago_consulta ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna fecha_pago_consulta agregada a paquetes_pacientes");
+      }
+    });
+
     // 🎁 Tabla de sesiones de paquetes (tracking de cada sesión realizada)
     db.run(`
       CREATE TABLE IF NOT EXISTS paquetes_sesiones (
@@ -469,6 +502,39 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN descuento REAL DEFAULT 0`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
         console.log('Columna descuento en presupuestos_asignados ya existe o error:', err.message);
+      }
+    });
+
+    // Agregar campos para pago de consulta en presupuestos
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN consulta_pagada INTEGER DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna consulta_pagada ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna consulta_pagada agregada a presupuestos_asignados");
+      }
+    });
+
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN monto_consulta REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna monto_consulta ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna monto_consulta agregada a presupuestos_asignados");
+      }
+    });
+
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN metodo_pago_consulta TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna metodo_pago_consulta ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna metodo_pago_consulta agregada a presupuestos_asignados");
+      }
+    });
+
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN fecha_pago_consulta TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna fecha_pago_consulta ya existe o error:", err.message);
+      } else {
+        console.log("✅ Columna fecha_pago_consulta agregada a presupuestos_asignados");
       }
     });
 

@@ -331,7 +331,7 @@ router.get("/reporte", (req, res) => {
       return acc;
     }, {});
 
-    // Obtener pagos de la tabla finanzas (incluye adelantos de presupuestos y paquetes)
+    // Obtener pagos de la tabla finanzas (incluye adelantos de presupuestos, paquetes y consultas)
     let queryFinanzas = `
       SELECT 
         f.id,
@@ -346,7 +346,7 @@ router.get("/reporte", (req, res) => {
       FROM finanzas f
       LEFT JOIN patients p ON p.id = f.paciente_id
       WHERE f.tipo = 'ingreso'
-        AND f.categoria IN ('presupuesto', 'paquete', 'abono_deuda')
+        AND f.categoria IN ('presupuesto', 'paquete', 'abono_deuda', 'consulta')
     `;
     const paramsFinanzas = [];
 
