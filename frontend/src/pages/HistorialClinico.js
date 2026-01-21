@@ -882,7 +882,7 @@ const HistorialClinico = () => {
     // Total destacado con fondo
     doc.setFillColor(250, 245, 230);
     doc.rect(5, y - 3, pageWidth - 10, 7, 'F');
-    doc.setTextColor(...colorDorado);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL:", 7, y + 1);
@@ -1081,7 +1081,7 @@ const HistorialClinico = () => {
     // Total destacado con fondo
     doc.setFillColor(250, 245, 230);
     doc.rect(5, y - 3, pageWidth - 10, 7, 'F');
-    doc.setTextColor(...colorDorado);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text("TOTAL:", 7, y + 1);
