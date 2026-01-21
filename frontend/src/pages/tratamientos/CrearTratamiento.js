@@ -50,7 +50,10 @@ export default function CrearTratamiento() {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     const data = await res.json();
-    setTratamientos(data);
+    const tratamientosOrdenados = Array.isArray(data) ? data.sort((a, b) => {
+      return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+    }) : [];
+    setTratamientos(tratamientosOrdenados);
   };
 
   const cargarVariantes = async () => {

@@ -85,8 +85,14 @@ const Paquetes = () => {
         axios.get(`${API_BASE_URL}/api/tratamientos/listar`, { headers: authHeaders }),
       ]);
 
-      setPaquetes(paquetesRes.data);
-      setTratamientos(tratamientosRes.data);
+      const paquetesOrdenados = Array.isArray(paquetesRes.data) ? paquetesRes.data.sort((a, b) => {
+        return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+      }) : [];
+      const tratamientosOrdenados = Array.isArray(tratamientosRes.data) ? tratamientosRes.data.sort((a, b) => {
+        return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+      }) : [];
+      setPaquetes(paquetesOrdenados);
+      setTratamientos(tratamientosOrdenados);
     } catch (error) {
       console.error("Error al cargar datos:", error);
       showToast({ severity: "error", message: "Error al cargar datos" });
@@ -656,15 +662,17 @@ const Paquetes = () => {
                   </Button>
 
                   {imagenPreview && (
-                    <Box sx={{ position: "relative", borderRadius: 2, overflow: "hidden", border: "2px solid #e0e0e0" }}>
+                    <Box sx={{ position: "relative", borderRadius: 2, overflow: "hidden", border: "2px solid #e0e0e0", maxWidth: "400px" }}>
                       <img
                         src={imagenPreview}
                         alt="Preview"
                         style={{
                           width: "100%",
-                          maxHeight: "200px",
-                          objectFit: "cover",
-                          display: "block"
+                          height: "auto",
+                          maxHeight: "300px",
+                          objectFit: "contain",
+                          display: "block",
+                          backgroundColor: "#f5f5f5"
                         }}
                       />
                       <IconButton

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Typography,
   Box,
@@ -8,6 +8,11 @@ import {
   CardContent,
   Fade,
   Grow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import {
   People,
@@ -18,6 +23,7 @@ import {
   Insights,
   Settings,
   CardGiftcard,
+  Lock,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
@@ -36,6 +42,8 @@ const moduleIcons = {
 export default function Dashboard() {
   const role = localStorage.getItem("role");
   const navigate = useNavigate();
+  const [openAccessDenied, setOpenAccessDenied] = useState(false);
+  const [deniedModule, setDeniedModule] = useState("");
 
   // Menú según rol
   const menuItemsByRole = {
@@ -78,6 +86,15 @@ export default function Dashboard() {
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
       { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },
       { title: "Gestionar", image: "/images/inventario.jpeg", path: "/gestion", description: "Administración del sistema" },
+    ],
+    doctora: [
+      { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes", hasAccess: true },
+      { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos", hasAccess: true },
+      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales", hasAccess: false },
+      { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos", hasAccess: false },
+      { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos", hasAccess: false },
+      { title: "Especialistas", image: "/images/especialista.png", path: "/especialistas", description: "Equipo médico", hasAccess: false },
+      { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes", hasAccess: false },
     ],
   };
 
@@ -198,9 +215,10 @@ export default function Dashboard() {
                           borderRadius: 4,
                           position: "relative",
                           overflow: "hidden",
-                          backgroundColor: "rgba(255,255,255,0.95)",
-                          border: "1px solid rgba(163,105,32,0.12)",
+                          backgroundColor: item.hasAccess === false ? "rgba(200,200,200,0.3)" : "rgba(255,255,255,0.95)",
+                          border: item.hasAccess === false ? "1px solid rgba(150,150,150,0.3)" : "1px solid rgba(163,105,32,0.12)",
                           boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
+                          opacity: item.hasAccess === false ? 0.6 : 1,
                           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                           "&:hover": {
                             transform: "translateY(-8px)",
@@ -221,7 +239,14 @@ export default function Dashboard() {
                         }}
                       >
                         <CardActionArea
-                          onClick={() => navigate(item.path)}
+                          onClick={() => {
+                            if (item.hasAccess === false) {
+                              setDeniedModule(item.title);
+                              setOpenAccessDenied(true);
+                            } else {
+                              navigate(item.path);
+                            }
+                          }}
                           sx={{
                             height: "100%",
                             textAlign: "center",
@@ -247,6 +272,7 @@ export default function Dashboard() {
                               justifyContent: "center",
                               mb: 2.5,
                               transition: "all 0.3s ease",
+                              position: "relative",
                             }}
                           >
                             {IconComponent && (
@@ -257,6 +283,25 @@ export default function Dashboard() {
                                   transition: "color 0.3s ease",
                                 }}
                               />
+                            )}
+                            {item.hasAccess === false && (
+                              <Box
+                                sx={{
+                                  position: "absolute",
+                                  top: -5,
+                                  right: -5,
+                                  backgroundColor: "#d32f2f",
+                                  borderRadius: "50%",
+                                  width: 35,
+                                  height: 35,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                                }}
+                              >
+                                <Lock sx={{ fontSize: 18, color: "white" }} />
+                              </Box>
                             )}
                           </Box>
 
@@ -393,6 +438,44 @@ export default function Dashboard() {
           </Typography>
         </Box>
       </Box>
+
+      {/* Modal de Acceso Denegado */}
+      <Dialog 
+        open={openAccessDenied} 
+        onClose={() => setOpenAccessDenied(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white", textAlign: "center" }}>
+          🚫 Acceso Denegado
+        </DialogTitle>
+        <DialogContent sx={{ mt: 3, textAlign: "center" }}>
+          <Typography variant="h6" sx={{ mb: 2, color: "#333", fontWeight: "bold" }}>
+            {deniedModule}
+          </Typography>
+          <Typography variant="body1" sx={{ color: "#666" }}>
+            Este usuario no tiene acceso a este módulo.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 2, color: "#999" }}>
+            Contacta al administrador si necesitas permisos adicionales.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: "center" }}>
+          <Button 
+            onClick={() => setOpenAccessDenied(false)}
+            variant="contained"
+            sx={{
+              backgroundColor: "#a36920",
+              "&:hover": { backgroundColor: "#8a541a" },
+              px: 4,
+              py: 1,
+              borderRadius: 2,
+            }}
+          >
+            Entendido
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

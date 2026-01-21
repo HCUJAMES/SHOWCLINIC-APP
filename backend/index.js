@@ -96,6 +96,7 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
      ensureUser("logistica", "1234", "logistica");
      ensureUser("asistente", "1234", "asistente");
      ensureUser("master", "2006", "master");
+     ensureUser("doctora", "1234", "doctora");
 
     // 🧱 Tabla de pacientes
     db.run(`

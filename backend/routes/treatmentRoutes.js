@@ -129,7 +129,7 @@ router.get("/recetas/:tratamiento_id", async (req, res) => {
 });
 
 // Agregar producto a la receta de un tratamiento
-router.post("/recetas/:tratamiento_id", requireRole("doctor", "master"), async (req, res) => {
+router.post("/recetas/:tratamiento_id", requireRole("doctor", "master", "doctora"), async (req, res) => {
   try {
     const { tratamiento_id } = req.params;
     const { variante_id, cantidad_unidades, unidad_mostrada, obligatorio } = req.body;
@@ -167,7 +167,7 @@ router.post("/recetas/:tratamiento_id", requireRole("doctor", "master"), async (
 });
 
 // Eliminar producto de la receta de un tratamiento
-router.delete("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "master"), async (req, res) => {
+router.delete("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "master", "doctora"), async (req, res) => {
   try {
     const { tratamiento_id, variante_id } = req.params;
 
@@ -184,7 +184,7 @@ router.delete("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "ma
 });
 
 // Actualizar cantidad de producto en receta
-router.put("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "master"), async (req, res) => {
+router.put("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "master", "doctora"), async (req, res) => {
   try {
     const { tratamiento_id, variante_id } = req.params;
     const { cantidad_unidades, unidad_mostrada, obligatorio } = req.body;

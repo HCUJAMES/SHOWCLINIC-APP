@@ -24,6 +24,7 @@ export const ROLES = {
   LOGISTICA: "logistica",
   ADMIN: "admin",
   MASTER: "master",
+  DOCTORA: "doctora",
 };
 
 // Métodos de pago

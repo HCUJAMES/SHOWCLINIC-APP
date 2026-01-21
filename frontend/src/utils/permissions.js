@@ -14,12 +14,12 @@ import { ROLES } from "../constants";
 export const hasPermission = (role, action) => {
   const permissions = {
     // Permisos de pacientes
-    writePatients: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER],
-    readPatients: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.LOGISTICA, ROLES.MASTER],
+    writePatients: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER, ROLES.DOCTORA],
+    readPatients: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.LOGISTICA, ROLES.MASTER, ROLES.DOCTORA],
 
     // Permisos de tratamientos
-    writeTreatments: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.MASTER],
-    createTreatmentBase: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.MASTER],
+    writeTreatments: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.MASTER, ROLES.DOCTORA],
+    createTreatmentBase: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.MASTER, ROLES.DOCTORA],
     deleteTreatments: [ROLES.DOCTOR, ROLES.MASTER],
 
     // Permisos de inventario
@@ -28,15 +28,15 @@ export const hasPermission = (role, action) => {
 
     // Permisos de finanzas
     viewStats: [ROLES.DOCTOR, ROLES.ADMIN, ROLES.MASTER],
-    modifyDebts: [ROLES.DOCTOR, ROLES.MASTER],
+    modifyDebts: [ROLES.DOCTOR, ROLES.MASTER, ROLES.DOCTORA],
 
     // Permisos de gestión
     manageSystem: [ROLES.MASTER],
     createBackup: [ROLES.MASTER],
 
     // Permisos de paquetes
-    writePackages: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER],
-    deletePackages: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER],
+    writePackages: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER, ROLES.DOCTORA],
+    deletePackages: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER, ROLES.DOCTORA],
   };
 
   return permissions[action]?.includes(role) || false;

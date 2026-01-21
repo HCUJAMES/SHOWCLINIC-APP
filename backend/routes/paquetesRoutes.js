@@ -10,11 +10,11 @@ const fechaLima = () =>
 
 // Middleware para verificar permisos
 // Todos los roles pueden crear/editar/eliminar paquetes base
-const requirePaquetesWrite = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica")];
+const requirePaquetesWrite = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica", "doctora")];
 // Todos pueden leer paquetes (para ver en historial, nueva sesión, etc.)
-const requirePaquetesRead = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica")];
+const requirePaquetesRead = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica", "doctora")];
 // Todos los roles pueden asignar paquetes a pacientes y gestionar sesiones
-const requirePaquetesAsignar = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica")];
+const requirePaquetesAsignar = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica", "doctora")];
 
 /* ==============================
    📋 LISTAR TODOS LOS PAQUETES

@@ -60,7 +60,12 @@ export default function BuscarPaciente() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/pacientes/listar`, { headers: authHeaders });
       const data = await res.json();
-      setPacientes(Array.isArray(data) ? data : []);
+      const pacientesOrdenados = Array.isArray(data) ? data.sort((a, b) => {
+        const nombreA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
+        const nombreB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
+        return nombreA.localeCompare(nombreB);
+      }) : [];
+      setPacientes(pacientesOrdenados);
       setPacienteTratamientos([]);
       setPacienteTratamientosOwner(null);
     } catch (error) {
@@ -77,7 +82,10 @@ export default function BuscarPaciente() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       const data = await res.json();
-      setTratamientosBase(Array.isArray(data) ? data : []);
+      const tratamientosOrdenados = Array.isArray(data) ? data.sort((a, b) => {
+        return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+      }) : [];
+      setTratamientosBase(tratamientosOrdenados);
     } catch (error) {
       console.error("Error al cargar tratamientos base:", error);
       setTratamientosBase([]);
@@ -100,7 +108,12 @@ export default function BuscarPaciente() {
       
       const data = await res.json();
       console.log("Pacientes en tratamiento recibidos:", data);
-      setPacientesEnTratamiento(Array.isArray(data) ? data : []);
+      const pacientesOrdenados = Array.isArray(data) ? data.sort((a, b) => {
+        const nombreA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
+        const nombreB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
+        return nombreA.localeCompare(nombreB);
+      }) : [];
+      setPacientesEnTratamiento(pacientesOrdenados);
     } catch (error) {
       console.error("Error al cargar pacientes en tratamiento:", error);
       setPacientesEnTratamiento([]);

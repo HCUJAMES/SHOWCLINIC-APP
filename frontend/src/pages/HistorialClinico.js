@@ -24,6 +24,8 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Autocomplete,
+  Chip,
 } from "@mui/material";
 import { ArrowBack, Home, Receipt, Edit, Delete, Print, Close, Description } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -205,7 +207,12 @@ const HistorialClinico = () => {
       .get(`${API_BASE_URL}/api/tratamientos/listar`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
-      .then((res) => setTratamientosBase(Array.isArray(res.data) ? res.data : []))
+      .then((res) => {
+        const tratamientosOrdenados = Array.isArray(res.data) ? res.data.sort((a, b) => {
+          return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+        }) : [];
+        setTratamientosBase(tratamientosOrdenados);
+      })
       .catch((err) => {
         console.error("Error al obtener tratamientos base:", err);
         setTratamientosBase([]);
@@ -218,7 +225,10 @@ const HistorialClinico = () => {
       })
       .then((res) => {
         const activos = (res.data || []).filter(p => p.estado === 'activo');
-        setPaquetesActivos(activos);
+        const paquetesOrdenados = activos.sort((a, b) => {
+          return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+        });
+        setPaquetesActivos(paquetesOrdenados);
       })
       .catch((err) => {
         console.error("Error al obtener paquetes:", err);
@@ -708,82 +718,100 @@ const HistorialClinico = () => {
 
     const doc = new jsPDF("p", "mm", [80, 250]);
     const pageWidth = 80;
-    let y = 8;
+    let y = 5;
 
-    // Logo
+    // Color dorado para elementos destacados
+    const colorDorado = [163, 105, 32];
+
+    // Logo más grande y centrado
     try {
       const logoImg = new Image();
       logoImg.src = '/logo-showclinic.png';
-      // Logo más grande y proporcionado (mantener aspecto circular)
-      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 12, y, 24, 24);
-      y += 26;
+      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 15, y, 30, 30);
+      y += 32;
     } catch (e) {
-      // Si no se puede cargar el logo, continuar sin él
       y += 2;
     }
 
-    // Encabezado
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
+    // Encabezado con mejor tipografía
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(18);
+    doc.setFont("times", "bold");
     doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
     y += 6;
 
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
     doc.text("Centro de Estética Avanzada", pageWidth / 2, y, { align: "center" });
-    y += 4;
+    y += 5;
     
-    // Dirección
-    doc.setFontSize(7);
+    // Dirección con mejor espaciado
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
     doc.text("Av. Ejército 616, Centro de Negocios", pageWidth / 2, y, { align: "center" });
-    y += 3;
-    doc.text("Yanahuara, Perú", pageWidth / 2, y, { align: "center" });
-    y += 4;
+    y += 3.5;
+    doc.text("Yanahuara, Arequipa - Perú", pageWidth / 2, y, { align: "center" });
+    y += 4.5;
     
-    // Teléfono
-    doc.setFontSize(8);
+    // Teléfono destacado y centrado
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text("Tel: 974 212 114", pageWidth / 2, y, { align: "center" });
+    const telText = "Tel: 974 212 114";
+    const telWidth = doc.getTextWidth(telText);
+    doc.text(telText, (pageWidth - telWidth) / 2, y);
     y += 7;
 
     // Línea separadora
-    doc.setDrawColor(200);
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Título del recibo
-    doc.setFontSize(10);
+    // Datos del paciente con mejor formato
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
-    doc.text("RECIBO DE PAQUETE", pageWidth / 2, y, { align: "center" });
-    y += 6;
-
-    // Datos del paciente
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
     const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
-    doc.text(`Cliente: ${nombrePaciente}`, 5, y);
-    y += 4;
-    doc.text(`Documento: ${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 5, y);
-    y += 4;
-    doc.text(`Fecha: ${new Date().toLocaleDateString("es-PE")}`, 5, y);
+    doc.text("Cliente:", 5, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(nombrePaciente, 20, y);
+    y += 4.5;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Documento:", 5, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 25, y);
+    y += 4.5;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Fecha:", 5, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(new Date().toLocaleDateString("es-PE", { year: 'numeric', month: 'long', day: 'numeric' }), 18, y);
     y += 6;
 
     // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Nombre del paquete
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
+    // Nombre del paquete destacado
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(10);
+    doc.setFont("times", "bold");
     doc.text(paquete.paquete_nombre || "Paquete", pageWidth / 2, y, { align: "center" });
     y += 6;
 
-    // Tratamientos incluidos
-    doc.setFontSize(8);
+    // Tratamientos incluidos con mejor diseño
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
     doc.text("TRATAMIENTOS INCLUIDOS:", 5, y);
-    y += 4;
+    y += 5;
     
+    doc.setTextColor(60, 60, 60);
     doc.setFont("helvetica", "normal");
     try {
       const tratamientos = paquete.tratamientos_json ? JSON.parse(paquete.tratamientos_json) : [];
@@ -791,8 +819,9 @@ const HistorialClinico = () => {
         tratamientos.forEach((trat) => {
           const nombreTrat = trat.nombre || trat.tratamiento_nombre || 'Tratamiento';
           const sesiones = trat.sesiones || trat.cantidad || 1;
-          doc.text(`• ${nombreTrat} (${sesiones} sesión${sesiones > 1 ? 'es' : ''})`, 7, y);
-          y += 3.5;
+          doc.setTextColor(60, 60, 60);
+          doc.text(`- ${nombreTrat} (${sesiones} sesión${sesiones > 1 ? 'es' : ''})`, 7, y);
+          y += 4;
         });
       }
     } catch (e) {
@@ -802,11 +831,14 @@ const HistorialClinico = () => {
 
     y += 2;
     // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Detalles de precio
-    doc.setFontSize(8);
+    // Detalles de precio con mejor formato
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "normal");
     
     const precioOriginal = parseFloat(paquete.precio_total) || 0;
@@ -847,35 +879,42 @@ const HistorialClinico = () => {
     }
 
     y += 2;
-    // Línea separadora
+    // Línea separadora doble
+    doc.setDrawColor(...colorDorado);
+    doc.setLineWidth(0.5);
+    doc.line(5, y, pageWidth - 5, y);
+    y += 1;
+    doc.setLineWidth(0.2);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Total
-    doc.setFontSize(10);
+    // Total destacado con fondo
+    doc.setFillColor(250, 245, 230);
+    doc.rect(5, y - 3, pageWidth - 10, 7, 'F');
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("TOTAL:", 5, y);
-    doc.text(`S/ ${precioFinal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    y += 6;
+    doc.text("TOTAL:", 7, y + 1);
+    doc.text(`S/ ${precioFinal.toFixed(2)}`, pageWidth - 7, y + 1, { align: "right" });
+    y += 8;
 
-    // Estado de pago
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    const estadoPago = paquete.estado_pago === 'pagado' || paquete.pagado === 1 ? 'PAGADO' : 
-                       paquete.estado_pago === 'adelanto' ? 'ADELANTO' : 'PENDIENTE';
-    doc.text(`Estado de pago: ${estadoPago}`, pageWidth / 2, y, { align: "center" });
-    y += 4;
-    doc.text(`Estado del paquete: ${(paquete.estado || 'activo').toUpperCase()}`, pageWidth / 2, y, { align: "center" });
-    y += 6;
+    y += 2;
 
     // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Mensaje de agradecimiento
-    doc.setFontSize(7);
+    // Mensaje de agradecimiento elegante
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(8);
+    doc.setFont("times", "italic");
     doc.text("¡Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
-    y += 4;
+    y += 4.5;
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
     doc.text("ShowClinic - Tu belleza, nuestra pasión", pageWidth / 2, y, { align: "center" });
 
     // Abrir en nueva ventana para imprimir
@@ -890,76 +929,93 @@ const HistorialClinico = () => {
 
     const doc = new jsPDF("p", "mm", [80, 250]);
     const pageWidth = 80;
-    let y = 8;
+    let y = 5;
 
-    // Logo
+    // Color dorado para elementos destacados
+    const colorDorado = [163, 105, 32];
+
+    // Logo más grande y centrado
     try {
       const logoImg = new Image();
       logoImg.src = '/logo-showclinic.png';
-      // Logo más grande y proporcionado (mantener aspecto circular)
-      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 12, y, 24, 24);
-      y += 26;
+      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 15, y, 30, 30);
+      y += 32;
     } catch (e) {
-      // Si no se puede cargar el logo, continuar sin él
       y += 2;
     }
 
-    // Encabezado
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
+    // Encabezado con mejor tipografía
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(18);
+    doc.setFont("times", "bold");
     doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
     y += 6;
 
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "italic");
     doc.text("Centro de Estética Avanzada", pageWidth / 2, y, { align: "center" });
-    y += 4;
+    y += 5;
     
-    // Dirección
-    doc.setFontSize(7);
+    // Dirección con mejor espaciado
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
     doc.text("Av. Ejército 616, Centro de Negocios", pageWidth / 2, y, { align: "center" });
-    y += 3;
-    doc.text("Yanahuara, Perú", pageWidth / 2, y, { align: "center" });
-    y += 4;
+    y += 3.5;
+    doc.text("Yanahuara, Arequipa - Perú", pageWidth / 2, y, { align: "center" });
+    y += 4.5;
     
-    // Teléfono
-    doc.setFontSize(8);
+    // Teléfono destacado y centrado
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text("Tel: 974 212 114", pageWidth / 2, y, { align: "center" });
+    const telText2 = "Tel: 974 212 114";
+    const telWidth2 = doc.getTextWidth(telText2);
+    doc.text(telText2, (pageWidth - telWidth2) / 2, y);
     y += 7;
 
     // Línea separadora
-    doc.setDrawColor(200);
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Título del recibo
-    doc.setFontSize(10);
+    // Datos del paciente con mejor formato
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
-    doc.text("RECIBO DE PRESUPUESTO", pageWidth / 2, y, { align: "center" });
-    y += 6;
-
-    // Datos del paciente
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
     const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
-    doc.text(`Cliente: ${nombrePaciente}`, 5, y);
-    y += 4;
-    doc.text(`Documento: ${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 5, y);
-    y += 4;
-    doc.text(`Fecha: ${new Date().toLocaleDateString("es-PE")}`, 5, y);
+    doc.text("Cliente:", 5, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(nombrePaciente, 20, y);
+    y += 4.5;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Documento:", 5, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 25, y);
+    y += 4.5;
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Fecha:", 5, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(new Date().toLocaleDateString("es-PE", { year: 'numeric', month: 'long', day: 'numeric' }), 18, y);
     y += 6;
 
     // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Tratamientos incluidos
-    doc.setFontSize(8);
+    // Tratamientos incluidos con mejor diseño
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
     doc.text("TRATAMIENTOS INCLUIDOS:", 5, y);
-    y += 4;
+    y += 5;
     
+    doc.setTextColor(60, 60, 60);
     doc.setFont("helvetica", "normal");
     try {
       const tratamientos = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : [];
@@ -967,9 +1023,11 @@ const HistorialClinico = () => {
         tratamientos.forEach((trat) => {
           const nombreTrat = trat.nombre || trat.tratamiento || 'Tratamiento';
           const precio = parseFloat(trat.precio) || 0;
-          doc.text(`• ${nombreTrat}`, 7, y);
-          y += 3;
-          doc.text(`  S/ ${precio.toFixed(2)}`, 7, y);
+          doc.setTextColor(60, 60, 60);
+          doc.text(`- ${nombreTrat}`, 7, y);
+          y += 3.5;
+          doc.setTextColor(80, 80, 80);
+          doc.text(`S/ ${precio.toFixed(2)}`, 9, y);
           y += 4;
         });
       }
@@ -980,11 +1038,14 @@ const HistorialClinico = () => {
 
     y += 2;
     // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Detalles de precio
-    doc.setFontSize(8);
+    // Detalles de precio con mejor formato
+    doc.setTextColor(60, 60, 60);
+    doc.setFontSize(8.5);
     doc.setFont("helvetica", "normal");
     
     const subtotal = parseFloat(presupuesto.precio_total) || 0;
@@ -1026,35 +1087,42 @@ const HistorialClinico = () => {
     }
 
     y += 2;
-    // Línea separadora
+    // Línea separadora doble
+    doc.setDrawColor(...colorDorado);
+    doc.setLineWidth(0.5);
+    doc.line(5, y, pageWidth - 5, y);
+    y += 1;
+    doc.setLineWidth(0.2);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Total
-    doc.setFontSize(10);
+    // Total destacado con fondo
+    doc.setFillColor(250, 245, 230);
+    doc.rect(5, y - 3, pageWidth - 10, 7, 'F');
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("TOTAL:", 5, y);
-    doc.text(`S/ ${total.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    y += 6;
+    doc.text("TOTAL:", 7, y + 1);
+    doc.text(`S/ ${total.toFixed(2)}`, pageWidth - 7, y + 1, { align: "right" });
+    y += 8;
 
-    // Estado de pago
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    const estadoPago = presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 ? 'PAGADO' : 
-                       presupuesto.estado_pago === 'adelanto' ? 'ADELANTO' : 'PENDIENTE';
-    doc.text(`Estado de pago: ${estadoPago}`, pageWidth / 2, y, { align: "center" });
-    y += 4;
-    doc.text(`Estado: ${(presupuesto.estado || 'activo').toUpperCase()}`, pageWidth / 2, y, { align: "center" });
-    y += 6;
+    y += 2;
 
     // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
     doc.line(5, y, pageWidth - 5, y);
     y += 5;
 
-    // Mensaje de agradecimiento
-    doc.setFontSize(7);
+    // Mensaje de agradecimiento elegante
+    doc.setTextColor(...colorDorado);
+    doc.setFontSize(8);
+    doc.setFont("times", "italic");
     doc.text("¡Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
-    y += 4;
+    y += 4.5;
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
     doc.text("ShowClinic - Tu belleza, nuestra pasión", pageWidth / 2, y, { align: "center" });
 
     // Abrir en nueva ventana para imprimir
@@ -2159,6 +2227,59 @@ const HistorialClinico = () => {
                       : "Selecciona tratamientos y asigna precio especial"}
                   </Typography>
 
+                  {/* Buscador de tratamientos con Autocomplete */}
+                  <Autocomplete
+                    options={tratamientosBase || []}
+                    getOptionLabel={(option) => option?.nombre || ""}
+                    onChange={(e, newValue) => {
+                      if (newValue) {
+                        toggleOfertaItem(newValue);
+                      }
+                    }}
+                    value={null}
+                    isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Buscar y agregar tratamiento"
+                        placeholder="Ej: Botox, Peeling, Diseño de Labios..."
+                        sx={{ mb: 2 }}
+                      />
+                    )}
+                  />
+
+                  {/* Tratamientos seleccionados */}
+                  {ofertaItems.length > 0 && (
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: "bold", color: "#666" }}>
+                        Tratamientos seleccionados:
+                      </Typography>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
+                        {ofertaItems.map((item) => {
+                          const tratamiento = tratamientosBase.find(t => t.id === item.tratamientoId);
+                          return (
+                            <Chip
+                              key={item.tratamientoId}
+                              label={tratamiento?.nombre || "Tratamiento"}
+                              onDelete={() => toggleOfertaItem(tratamiento)}
+                              sx={{
+                                backgroundColor: "rgba(163,105,32,0.15)",
+                                color: "#a36920",
+                                fontWeight: "bold",
+                                "& .MuiChip-deleteIcon": {
+                                  color: "#a36920",
+                                  "&:hover": {
+                                    color: "#8b581b"
+                                  }
+                                }
+                              }}
+                            />
+                          );
+                        })}
+                      </Box>
+                    </Box>
+                  )}
+
                   <Box
                     sx={{
                       display: "grid",
@@ -2170,13 +2291,9 @@ const HistorialClinico = () => {
                       pr: 0.5,
                     }}
                   >
-                    {tratamientosBase.map((t) => {
-                      const selected = ofertaItems.some(
-                        (x) => x.tratamientoId === t.id
-                      );
-                      const item = ofertaItems.find(
-                        (x) => x.tratamientoId === t.id
-                      );
+                    {ofertaItems.map((item) => {
+                      const t = tratamientosBase.find(x => x.id === item.tratamientoId);
+                      if (!t) return null;
                       return (
                         <Paper
                           key={t.id}
@@ -2184,9 +2301,7 @@ const HistorialClinico = () => {
                           sx={{
                             p: 1.6,
                             borderRadius: 2,
-                            backgroundColor: selected
-                              ? "rgba(163,105,32,0.10)"
-                              : "rgba(255,255,255,0.78)",
+                            backgroundColor: "rgba(163,105,32,0.10)",
                             border: "1px solid rgba(163,105,32,0.16)",
                           }}
                         >
@@ -2202,44 +2317,35 @@ const HistorialClinico = () => {
                             <Typography sx={{ fontWeight: "bold" }}>
                               {t.nombre}
                             </Typography>
-                            <Button
+                            <IconButton
                               size="small"
-                              variant={selected ? "contained" : "outlined"}
-                              sx={{
-                                backgroundColor: selected ? "#a36920" : "transparent",
-                                borderColor: "#a36920",
-                                color: selected ? "white" : "#a36920",
-                                "&:hover": {
-                                  backgroundColor: selected
-                                    ? "#8b581b"
-                                    : "rgba(163,105,32,0.08)",
-                                },
-                                borderRadius: 3,
-                                fontWeight: "bold",
-                              }}
                               onClick={() => toggleOfertaItem(t)}
+                              sx={{
+                                color: "#d32f2f",
+                                "&:hover": {
+                                  backgroundColor: "rgba(211, 47, 47, 0.1)"
+                                }
+                              }}
                             >
-                              {selected ? "Quitar" : "Agregar"}
-                            </Button>
+                              <Delete />
+                            </IconButton>
                           </Box>
 
-                          {selected && (
-                            <TextField
-                              fullWidth
-                              label="Precio especial (S/)"
-                              type="number"
-                              value={item?.precio ?? ""}
-                              onChange={(e) =>
-                                setOfertaPrecio(t.id, e.target.value)
-                              }
-                              sx={{
-                                "& .MuiInputBase-root": {
-                                  backgroundColor: "rgba(255,255,255,0.72)",
-                                  borderRadius: 2,
-                                },
-                              }}
-                            />
-                          )}
+                          <TextField
+                            fullWidth
+                            label="Precio especial (S/)"
+                            type="number"
+                            value={item?.precio ?? ""}
+                            onChange={(e) =>
+                              setOfertaPrecio(t.id, e.target.value)
+                            }
+                            sx={{
+                              "& .MuiInputBase-root": {
+                                backgroundColor: "rgba(255,255,255,0.72)",
+                                borderRadius: 2,
+                              },
+                            }}
+                          />
                         </Paper>
                       );
                     })}
@@ -2568,14 +2674,14 @@ const HistorialClinico = () => {
                         >
                           {/* Imagen Promocional */}
                           {paquete.imagen_promocional && (
-                            <Box sx={{ mb: 2, borderRadius: 2, overflow: "hidden" }}>
+                            <Box sx={{ mb: 2, borderRadius: 2, overflow: "hidden", backgroundColor: "#f5f5f5" }}>
                               <img
                                 src={paquete.imagen_promocional}
                                 alt={paquete.nombre}
                                 style={{
                                   width: "100%",
-                                  height: "180px",
-                                  objectFit: "cover",
+                                  height: "200px",
+                                  objectFit: "contain",
                                   display: "block"
                                 }}
                               />

@@ -57,11 +57,11 @@ export const requireInventoryWrite = (req, res, next) => {
 };
 
 /**
- * Middleware para escritura de pacientes (doctor, asistente, admin o master)
+ * Middleware para escritura de pacientes (doctor, asistente, admin, master o doctora)
  */
 export const requirePatientWrite = (req, res, next) => {
   const role = req.user?.role;
-  if (role !== "doctor" && role !== "asistente" && role !== "admin" && role !== "master") {
+  if (role !== "doctor" && role !== "asistente" && role !== "admin" && role !== "master" && role !== "doctora") {
     return res.status(403).json({ message: "No tienes permisos para modificar pacientes" });
   }
   next();

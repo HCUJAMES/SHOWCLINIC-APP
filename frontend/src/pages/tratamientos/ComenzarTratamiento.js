@@ -78,10 +78,24 @@ const ComenzarTratamiento = () => {
           axios.get(`${API_BASE_URL}/api/especialistas/listar`, { headers: authHeaders }),
         ]);
         
-        setPacientes(pacientesRes.data);
-        setTratamientos(tratamientosRes.data);
+        const pacientesOrdenados = Array.isArray(pacientesRes.data) ? pacientesRes.data.sort((a, b) => {
+          const nombreA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
+          const nombreB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
+          return nombreA.localeCompare(nombreB);
+        }) : [];
+        const tratamientosOrdenados = Array.isArray(tratamientosRes.data) ? tratamientosRes.data.sort((a, b) => {
+          return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+        }) : [];
+        const especialistasOrdenados = Array.isArray(especialistasRes.data) ? especialistasRes.data.sort((a, b) => {
+          const nombreA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
+          const nombreB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
+          return nombreA.localeCompare(nombreB);
+        }) : [];
+        
+        setPacientes(pacientesOrdenados);
+        setTratamientos(tratamientosOrdenados);
         setVariantesInv(Array.isArray(variantesRes.data) ? variantesRes.data : []);
-        setEspecialistas(especialistasRes.data);
+        setEspecialistas(especialistasOrdenados);
         setCargaInicial(true);
       } catch (err) {
         console.error("Error cargando datos iniciales:", err);
