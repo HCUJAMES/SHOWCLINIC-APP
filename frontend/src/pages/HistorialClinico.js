@@ -740,22 +740,22 @@ const HistorialClinico = () => {
     doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
     y += 6;
 
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(9);
-    doc.setFont("helvetica", "italic");
+    doc.setFont("helvetica", "bold");
     doc.text("Centro de Estética Avanzada", pageWidth / 2, y, { align: "center" });
     y += 5;
     
     // Dirección con mejor espaciado
     doc.setFontSize(7.5);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     doc.text("Av. Ejército 616, Centro de Negocios", pageWidth / 2, y, { align: "center" });
     y += 3.5;
     doc.text("Yanahuara, Arequipa - Perú", pageWidth / 2, y, { align: "center" });
     y += 4.5;
     
     // Teléfono destacado y centrado
-    doc.setTextColor(...colorDorado);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     const telText = "Tel: 974 212 114";
@@ -770,24 +770,19 @@ const HistorialClinico = () => {
     y += 5;
 
     // Datos del paciente con mejor formato
-    doc.setTextColor(60, 60, 60);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
     const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
     doc.text("Cliente:", 5, y);
-    doc.setFont("helvetica", "normal");
     doc.text(nombrePaciente, 20, y);
     y += 4.5;
     
-    doc.setFont("helvetica", "bold");
     doc.text("Documento:", 5, y);
-    doc.setFont("helvetica", "normal");
     doc.text(`${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 25, y);
     y += 4.5;
     
-    doc.setFont("helvetica", "bold");
     doc.text("Fecha:", 5, y);
-    doc.setFont("helvetica", "normal");
     doc.text(new Date().toLocaleDateString("es-PE", { year: 'numeric', month: 'long', day: 'numeric' }), 18, y);
     y += 6;
 
@@ -805,27 +800,25 @@ const HistorialClinico = () => {
     y += 6;
 
     // Tratamientos incluidos con mejor diseño
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
     doc.text("TRATAMIENTOS INCLUIDOS:", 5, y);
     y += 5;
     
-    doc.setTextColor(60, 60, 60);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     try {
       const tratamientos = paquete.tratamientos_json ? JSON.parse(paquete.tratamientos_json) : [];
       if (tratamientos.length > 0) {
         tratamientos.forEach((trat) => {
           const nombreTrat = trat.nombre || trat.tratamiento_nombre || 'Tratamiento';
           const sesiones = trat.sesiones || trat.cantidad || 1;
-          doc.setTextColor(60, 60, 60);
           doc.text(`- ${nombreTrat} (${sesiones} sesión${sesiones > 1 ? 'es' : ''})`, 7, y);
           y += 4;
         });
       }
     } catch (e) {
-      doc.text("• Tratamientos del paquete", 7, y);
+      doc.text("- Tratamientos del paquete", 7, y);
       y += 3.5;
     }
 
@@ -837,9 +830,9 @@ const HistorialClinico = () => {
     y += 5;
 
     // Detalles de precio con mejor formato
-    doc.setTextColor(60, 60, 60);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8.5);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     
     const precioOriginal = parseFloat(paquete.precio_total) || 0;
     const montoConsulta = parseFloat(paquete.monto_consulta) || 0;
@@ -855,11 +848,9 @@ const HistorialClinico = () => {
       doc.text(`- S/ ${montoConsulta.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
       y += 4;
       
-      doc.setFont("helvetica", "bold");
       doc.text("Precio ajustado:", 5, y);
       doc.text(`S/ ${precioFinal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
       y += 5;
-      doc.setFont("helvetica", "normal");
     }
 
     // Información de pagos
@@ -907,14 +898,13 @@ const HistorialClinico = () => {
     y += 5;
 
     // Mensaje de agradecimiento elegante
-    doc.setTextColor(...colorDorado);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8);
-    doc.setFont("times", "italic");
+    doc.setFont("helvetica", "bold");
     doc.text("¡Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
     y += 4.5;
-    doc.setTextColor(100, 100, 100);
     doc.setFontSize(7);
-    doc.setFont("helvetica", "italic");
+    doc.setFont("helvetica", "bold");
     doc.text("ShowClinic - Tu belleza, nuestra pasión", pageWidth / 2, y, { align: "center" });
 
     // Abrir en nueva ventana para imprimir
@@ -951,22 +941,22 @@ const HistorialClinico = () => {
     doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
     y += 6;
 
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(9);
-    doc.setFont("helvetica", "italic");
+    doc.setFont("helvetica", "bold");
     doc.text("Centro de Estética Avanzada", pageWidth / 2, y, { align: "center" });
     y += 5;
     
     // Dirección con mejor espaciado
     doc.setFontSize(7.5);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     doc.text("Av. Ejército 616, Centro de Negocios", pageWidth / 2, y, { align: "center" });
     y += 3.5;
     doc.text("Yanahuara, Arequipa - Perú", pageWidth / 2, y, { align: "center" });
     y += 4.5;
     
     // Teléfono destacado y centrado
-    doc.setTextColor(...colorDorado);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     const telText2 = "Tel: 974 212 114";
@@ -981,24 +971,19 @@ const HistorialClinico = () => {
     y += 5;
 
     // Datos del paciente con mejor formato
-    doc.setTextColor(60, 60, 60);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
     const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
     doc.text("Cliente:", 5, y);
-    doc.setFont("helvetica", "normal");
     doc.text(nombrePaciente, 20, y);
     y += 4.5;
     
-    doc.setFont("helvetica", "bold");
     doc.text("Documento:", 5, y);
-    doc.setFont("helvetica", "normal");
     doc.text(`${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 25, y);
     y += 4.5;
     
-    doc.setFont("helvetica", "bold");
     doc.text("Fecha:", 5, y);
-    doc.setFont("helvetica", "normal");
     doc.text(new Date().toLocaleDateString("es-PE", { year: 'numeric', month: 'long', day: 'numeric' }), 18, y);
     y += 6;
 
@@ -1009,30 +994,27 @@ const HistorialClinico = () => {
     y += 5;
 
     // Tratamientos incluidos con mejor diseño
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8.5);
     doc.setFont("helvetica", "bold");
     doc.text("TRATAMIENTOS INCLUIDOS:", 5, y);
     y += 5;
     
-    doc.setTextColor(60, 60, 60);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     try {
       const tratamientos = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : [];
       if (tratamientos.length > 0) {
         tratamientos.forEach((trat) => {
           const nombreTrat = trat.nombre || trat.tratamiento || 'Tratamiento';
           const precio = parseFloat(trat.precio) || 0;
-          doc.setTextColor(60, 60, 60);
           doc.text(`- ${nombreTrat}`, 7, y);
           y += 3.5;
-          doc.setTextColor(80, 80, 80);
           doc.text(`S/ ${precio.toFixed(2)}`, 9, y);
           y += 4;
         });
       }
     } catch (e) {
-      doc.text("• Tratamientos del presupuesto", 7, y);
+      doc.text("- Tratamientos del presupuesto", 7, y);
       y += 3.5;
     }
 
@@ -1044,9 +1026,9 @@ const HistorialClinico = () => {
     y += 5;
 
     // Detalles de precio con mejor formato
-    doc.setTextColor(60, 60, 60);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8.5);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     
     const subtotal = parseFloat(presupuesto.precio_total) || 0;
     const descuento = parseFloat(presupuesto.descuento) || 0;
@@ -1115,14 +1097,13 @@ const HistorialClinico = () => {
     y += 5;
 
     // Mensaje de agradecimiento elegante
-    doc.setTextColor(...colorDorado);
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8);
-    doc.setFont("times", "italic");
+    doc.setFont("helvetica", "bold");
     doc.text("¡Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
     y += 4.5;
-    doc.setTextColor(100, 100, 100);
     doc.setFontSize(7);
-    doc.setFont("helvetica", "italic");
+    doc.setFont("helvetica", "bold");
     doc.text("ShowClinic - Tu belleza, nuestra pasión", pageWidth / 2, y, { align: "center" });
 
     // Abrir en nueva ventana para imprimir
