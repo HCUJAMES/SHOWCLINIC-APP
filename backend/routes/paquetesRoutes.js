@@ -540,7 +540,7 @@ router.get("/paciente/:paciente_id", requirePaquetesRead, async (req, res) => {
 ============================== */
 router.patch("/sesion/:sesion_id/completar", requirePaquetesAsignar, async (req, res) => {
   const { sesion_id } = req.params;
-  const { especialista, notas } = req.body;
+  const { especialista_id, notas } = req.body;
 
   try {
     const sesion = await dbGet(
@@ -562,10 +562,10 @@ router.patch("/sesion/:sesion_id/completar", requirePaquetesAsignar, async (req,
       `UPDATE paquetes_sesiones SET 
         estado = 'completada', 
         fecha_realizada = ?, 
-        especialista = ?,
+        especialista_id = ?,
         notas = ?
        WHERE id = ?`,
-      [ahora, especialista || null, notas || null, sesion_id]
+      [ahora, especialista_id || null, notas || null, sesion_id]
     );
 
     // Verificar si todas las sesiones del paquete están completadas
@@ -1013,6 +1013,7 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
 ============================== */
 router.patch("/presupuesto/sesion/:sesion_id/completar", requirePaquetesAsignar, async (req, res) => {
   const { sesion_id } = req.params;
+  const { especialista_id } = req.body;
 
   try {
     const sesion = await dbGet(
@@ -1028,11 +1029,10 @@ router.patch("/presupuesto/sesion/:sesion_id/completar", requirePaquetesAsignar,
     }
 
     const ahora = fechaLima();
-    const especialista = req.user?.username || "sistema";
 
     await dbRun(
-      `UPDATE presupuestos_sesiones SET estado = 'completada', fecha_realizada = ?, especialista = ? WHERE id = ?`,
-      [ahora, especialista, sesion_id]
+      `UPDATE presupuestos_sesiones SET estado = 'completada', fecha_realizada = ?, especialista_id = ? WHERE id = ?`,
+      [ahora, especialista_id || null, sesion_id]
     );
 
     // Verificar si todas las sesiones están completadas

@@ -19,6 +19,7 @@ import backupRoutes from "./routes/backupRoutes.js";
 import paquetesRoutes from "./routes/paquetesRoutes.js";
 import whatsappRoutes from "./routes/whatsappRoutes.js";
 import n8nIntegrationRoutes from "./routes/n8nIntegrationRoutes.js";
+import gestionClinicaRoutes from "./routes/gestionClinicaRoutes.js";
 import bcrypt from "bcryptjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -479,6 +480,15 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
+    // Agregar columna especialista_id a paquetes_sesiones
+    db.run(`ALTER TABLE paquetes_sesiones ADD COLUMN especialista_id INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna especialista_id a paquetes_sesiones:", err.message);
+      } else {
+        console.log("✅ Columna especialista_id agregada a paquetes_sesiones");
+      }
+    });
+
     // 📋 Tabla de presupuestos asignados a pacientes (similar a paquetes)
     db.run(`
       CREATE TABLE IF NOT EXISTS presupuestos_asignados (
@@ -595,6 +605,15 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN estado_pago TEXT DEFAULT 'pendiente_pago'`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
         console.error("Error agregando columna estado_pago:", err.message);
+      }
+    });
+
+    // Agregar columna especialista_id a presupuestos_sesiones
+    db.run(`ALTER TABLE presupuestos_sesiones ADD COLUMN especialista_id INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna especialista_id a presupuestos_sesiones:", err.message);
+      } else {
+        console.log("✅ Columna especialista_id agregada a presupuestos_sesiones");
       }
     });
 
@@ -842,6 +861,7 @@ app.use("/api/stats", statsRoutes);
 app.use("/api/backup", backupRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/n8n", n8nIntegrationRoutes);
+app.use("/api/gestion-clinica", gestionClinicaRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
 
 // ✅ Servir frontend (React build) para acceso remoto (ej. iPad/iPhone)

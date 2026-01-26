@@ -24,6 +24,7 @@ import {
   Settings,
   CardGiftcard,
   Lock,
+  LocalHospital,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
@@ -37,6 +38,7 @@ const moduleIcons = {
   Especialistas: Badge,
   Estadísticas: Insights,
   Gestionar: Settings,
+  "Gestión Clínica": LocalHospital,
 };
 
 export default function Dashboard() {
@@ -54,6 +56,7 @@ export default function Dashboard() {
       { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
       { title: "Especialistas", image: "/images/especialista.png", path: "/especialistas", description: "Equipo médico" },
+      { title: "Gestión Clínica", image: "/images/finanzas.jpeg", path: "/gestion-clinica", description: "Gestión de atenciones" },
       { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },
     ],
     admin: [

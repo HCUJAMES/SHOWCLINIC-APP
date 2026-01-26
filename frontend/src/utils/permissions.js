@@ -37,6 +37,9 @@ export const hasPermission = (role, action) => {
     // Permisos de paquetes
     writePackages: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER, ROLES.DOCTORA],
     deletePackages: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER, ROLES.DOCTORA],
+
+    // Permisos de gestión clínica
+    viewClinicalManagement: [ROLES.DOCTOR, ROLES.ADMIN, ROLES.MASTER],
   };
 
   return permissions[action]?.includes(role) || false;

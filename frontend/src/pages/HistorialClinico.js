@@ -194,6 +194,10 @@ const HistorialClinico = () => {
   // Estado para controlar qué paquetes están colapsados
   const [paquetesColapsados, setPaquetesColapsados] = useState({});
 
+  // Estados para especialistas
+  const [especialistas, setEspecialistas] = useState([]);
+  const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
+
   const token = localStorage.getItem("token");
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -217,6 +221,12 @@ const HistorialClinico = () => {
         console.error("Error al obtener tratamientos base:", err);
         setTratamientosBase([]);
       });
+
+    // Cargar especialistas
+    axios
+      .get(`${API_BASE_URL}/api/especialistas/listar`)
+      .then((res) => setEspecialistas(res.data || []))
+      .catch((err) => console.error("Error al obtener especialistas:", err));
 
     // Cargar paquetes activos
     axios
@@ -344,14 +354,28 @@ const HistorialClinico = () => {
 
   // Marcar sesión como completada
   const completarSesion = async (sesionId) => {
+    const especialistaId = especialistasPorSesion[`paquete_${sesionId}`];
+    
+    if (!especialistaId) {
+      showToast({ severity: "warning", message: "Por favor selecciona un especialista" });
+      return;
+    }
+
     try {
       await axios.patch(
         `${API_BASE_URL}/api/paquetes/sesion/${sesionId}/completar`,
-        {},
+        { especialista_id: especialistaId },
         { headers: authHeaders }
       );
       
       showToast({ severity: "success", message: "Sesión completada" });
+      
+      // Limpiar especialista seleccionado
+      setEspecialistasPorSesion(prev => {
+        const newState = { ...prev };
+        delete newState[`paquete_${sesionId}`];
+        return newState;
+      });
       
       // Recargar paquetes del paciente
       const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteSeleccionado.id}`, {
@@ -443,14 +467,28 @@ const HistorialClinico = () => {
 
   // Completar sesión de presupuesto
   const completarSesionPresupuesto = async (sesionId) => {
+    const especialistaId = especialistasPorSesion[`presupuesto_${sesionId}`];
+    
+    if (!especialistaId) {
+      showToast({ severity: "warning", message: "Por favor selecciona un especialista" });
+      return;
+    }
+
     try {
       await axios.patch(
         `${API_BASE_URL}/api/paquetes/presupuesto/sesion/${sesionId}/completar`,
-        {},
+        { especialista_id: especialistaId },
         { headers: authHeaders }
       );
       
       showToast({ severity: "success", message: "Tratamiento completado" });
+      
+      // Limpiar especialista seleccionado
+      setEspecialistasPorSesion(prev => {
+        const newState = { ...prev };
+        delete newState[`presupuesto_${sesionId}`];
+        return newState;
+      });
       
       // Recargar presupuestos asignados
       const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
@@ -2925,21 +2963,46 @@ const HistorialClinico = () => {
                                       </Typography>
                                     </Box>
                                     {sesion.estado === 'pendiente' && presupuesto.estado === 'activo' && (
-                                      <Button
-                                        size="small"
-                                        variant="outlined"
-                                        onClick={() => completarSesionPresupuesto(sesion.id)}
-                                        sx={{
-                                          fontSize: "0.7rem",
-                                          py: 0.25,
-                                          px: 1,
-                                          borderColor: "#4caf50",
-                                          color: "#4caf50",
-                                          "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" }
-                                        }}
-                                      >
-                                        Completar
-                                      </Button>
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <Select
+                                          size="small"
+                                          value={especialistasPorSesion[`presupuesto_${sesion.id}`] || ''}
+                                          onChange={(e) => setEspecialistasPorSesion(prev => ({
+                                            ...prev,
+                                            [`presupuesto_${sesion.id}`]: e.target.value
+                                          }))}
+                                          displayEmpty
+                                          sx={{
+                                            fontSize: "0.7rem",
+                                            minWidth: 120,
+                                            height: 28
+                                          }}
+                                        >
+                                          <MenuItem value="" disabled>
+                                            <em>Especialista</em>
+                                          </MenuItem>
+                                          {especialistas.map((esp) => (
+                                            <MenuItem key={esp.id} value={esp.id}>
+                                              {esp.nombre}
+                                            </MenuItem>
+                                          ))}
+                                        </Select>
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          onClick={() => completarSesionPresupuesto(sesion.id)}
+                                          sx={{
+                                            fontSize: "0.7rem",
+                                            py: 0.25,
+                                            px: 1,
+                                            borderColor: "#4caf50",
+                                            color: "#4caf50",
+                                            "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" }
+                                          }}
+                                        >
+                                          Completar
+                                        </Button>
+                                      </Box>
                                     )}
                                     {sesion.estado === 'completada' && (
                                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -3337,21 +3400,46 @@ const HistorialClinico = () => {
                                       </Typography>
                                     </Box>
                                     {sesion.estado === 'pendiente' && paquete.estado === 'activo' && (
-                                      <Button
-                                        size="small"
-                                        variant="outlined"
-                                        onClick={() => completarSesion(sesion.id)}
-                                        sx={{
-                                          fontSize: "0.7rem",
-                                          py: 0.25,
-                                          px: 1,
-                                          borderColor: "#4caf50",
-                                          color: "#4caf50",
-                                          "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" }
-                                        }}
-                                      >
-                                        Completar
-                                      </Button>
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <Select
+                                          size="small"
+                                          value={especialistasPorSesion[`paquete_${sesion.id}`] || ''}
+                                          onChange={(e) => setEspecialistasPorSesion(prev => ({
+                                            ...prev,
+                                            [`paquete_${sesion.id}`]: e.target.value
+                                          }))}
+                                          displayEmpty
+                                          sx={{
+                                            fontSize: "0.7rem",
+                                            minWidth: 120,
+                                            height: 28
+                                          }}
+                                        >
+                                          <MenuItem value="" disabled>
+                                            <em>Especialista</em>
+                                          </MenuItem>
+                                          {especialistas.map((esp) => (
+                                            <MenuItem key={esp.id} value={esp.id}>
+                                              {esp.nombre}
+                                            </MenuItem>
+                                          ))}
+                                        </Select>
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          onClick={() => completarSesion(sesion.id)}
+                                          sx={{
+                                            fontSize: "0.7rem",
+                                            py: 0.25,
+                                            px: 1,
+                                            borderColor: "#4caf50",
+                                            color: "#4caf50",
+                                            "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" }
+                                          }}
+                                        >
+                                          Completar
+                                        </Button>
+                                      </Box>
                                     )}
                                     {sesion.estado === 'completada' && (
                                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
