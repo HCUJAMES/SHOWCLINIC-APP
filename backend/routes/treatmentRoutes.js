@@ -480,6 +480,25 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       const totalFinal = subtotal;
       const cantidadParaPrecio = cantidadMl;
 
+      // Obtener información completa del producto/variante para guardar
+      let nombreProducto = b.producto || "Producto";
+      let varianteNombre = null;
+      
+      if (b.variante_id) {
+        const varianteInfo = await dbGet(
+          `SELECT v.nombre as variante_nombre, pb.nombre as producto_base_nombre
+           FROM variantes v
+           LEFT JOIN productos_base pb ON v.producto_base_id = pb.id
+           WHERE v.id = ?`,
+          [b.variante_id]
+        );
+        
+        if (varianteInfo) {
+          nombreProducto = varianteInfo.producto_base_nombre || nombreProducto;
+          varianteNombre = varianteInfo.variante_nombre;
+        }
+      }
+
       // Registrar tratamiento realizado
       const insertTratamiento = await dbRun(
         `
@@ -492,6 +511,8 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           b.tratamiento_id || null,
           JSON.stringify([
             {
+              nombre: nombreProducto,
+              variante_nombre: varianteNombre,
               producto: b.producto,
               cantidad: cantidadParaPrecio,
               precio: precioUnitario,
@@ -678,6 +699,111 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           `UPDATE inventario SET stock = stock - ? WHERE producto = ?`,
           [b.cantidad, b.producto]
         );
+      }
+    }
+
+    // 3) MARCAR AUTOMÁTICAMENTE LAS SESIONES DE PAQUETES/PRESUPUESTOS COMO COMPLETADAS
+    console.log("🔍 Buscando sesiones de paquetes/presupuestos para marcar como completadas...");
+    
+    for (const b of productosData) {
+      const tratamientoId = b.tratamiento_id;
+      if (!tratamientoId) continue;
+
+      // Buscar sesiones pendientes de paquetes para este paciente y tratamiento
+      const sesionesPaquete = await dbAll(
+        `SELECT ps.id, ps.paquete_paciente_id
+         FROM paquetes_sesiones ps
+         LEFT JOIN paquetes_pacientes pp ON ps.paquete_paciente_id = pp.id
+         WHERE pp.paciente_id = ?
+           AND ps.tratamiento_id = ?
+           AND ps.estado = 'pendiente'
+         ORDER BY ps.sesion_numero ASC
+         LIMIT 1`,
+        [paciente_id, tratamientoId]
+      );
+
+      if (sesionesPaquete.length > 0) {
+        const sesionPaquete = sesionesPaquete[0];
+        console.log(`✅ Marcando sesión de paquete ${sesionPaquete.id} como completada`);
+        
+        await dbRun(
+          `UPDATE paquetes_sesiones 
+           SET estado = 'completada', 
+               fecha_realizada = datetime('now', 'localtime'),
+               especialista = ?,
+               notas = ?
+           WHERE id = ?`,
+          [especialista || "No especificado", `Sesión ${sesion || 1}`, sesionPaquete.id]
+        );
+
+        // Verificar si todas las sesiones del paquete están completadas
+        const paquetePaciente = await dbGet(
+          `SELECT pp.*, 
+            (SELECT COUNT(*) FROM paquetes_sesiones ps WHERE ps.paquete_paciente_id = pp.id AND ps.estado = 'completada') as completadas,
+            (SELECT COUNT(*) FROM paquetes_sesiones ps WHERE ps.paquete_paciente_id = pp.id) as total
+           FROM paquetes_pacientes pp
+           WHERE pp.id = ?`,
+          [sesionPaquete.paquete_paciente_id]
+        );
+
+        if (paquetePaciente && paquetePaciente.completadas >= paquetePaciente.total) {
+          console.log(`✅ Todas las sesiones del paquete ${sesionPaquete.paquete_paciente_id} completadas. Marcando paquete como completado.`);
+          await dbRun(
+            `UPDATE paquetes_pacientes 
+             SET estado = 'completado', 
+                 fecha_fin = datetime('now', 'localtime')
+             WHERE id = ?`,
+            [sesionPaquete.paquete_paciente_id]
+          );
+        }
+      }
+
+      // Buscar sesiones pendientes de presupuestos
+      const sesionesPresupuesto = await dbAll(
+        `SELECT prs.id, prs.presupuesto_asignado_id
+         FROM presupuestos_sesiones prs
+         LEFT JOIN presupuestos_asignados pa ON prs.presupuesto_asignado_id = pa.id
+         WHERE pa.paciente_id = ?
+           AND prs.tratamiento_id = ?
+           AND prs.estado = 'pendiente'
+         ORDER BY prs.sesion_numero ASC
+         LIMIT 1`,
+        [paciente_id, tratamientoId]
+      );
+
+      if (sesionesPresupuesto.length > 0) {
+        const sesionPresupuesto = sesionesPresupuesto[0];
+        console.log(`✅ Marcando sesión de presupuesto ${sesionPresupuesto.id} como completada`);
+        
+        await dbRun(
+          `UPDATE presupuestos_sesiones 
+           SET estado = 'completada', 
+               fecha_realizada = datetime('now', 'localtime'),
+               especialista = ?,
+               notas = ?
+           WHERE id = ?`,
+          [especialista || "No especificado", `Sesión ${sesion || 1}`, sesionPresupuesto.id]
+        );
+
+        // Verificar si todas las sesiones del presupuesto están completadas
+        const presupuestoAsignado = await dbGet(
+          `SELECT pa.*, 
+            (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id AND ps.estado = 'completada') as completadas,
+            (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id) as total
+           FROM presupuestos_asignados pa
+           WHERE pa.id = ?`,
+          [sesionPresupuesto.presupuesto_asignado_id]
+        );
+
+        if (presupuestoAsignado && presupuestoAsignado.completadas >= presupuestoAsignado.total) {
+          console.log(`✅ Todas las sesiones del presupuesto ${sesionPresupuesto.presupuesto_asignado_id} completadas. Marcando presupuesto como completado.`);
+          await dbRun(
+            `UPDATE presupuestos_asignados 
+             SET estado = 'completado'
+             WHERE id = ?`,
+            [sesionPresupuesto.presupuesto_asignado_id]
+          );
+        }
       }
     }
 
