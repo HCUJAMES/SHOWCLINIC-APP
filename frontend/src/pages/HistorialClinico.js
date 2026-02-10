@@ -3724,6 +3724,7 @@ const HistorialClinico = () => {
                         <TableRow>
                           <TableCell sx={{ fontWeight: "bold" }}>Fecha</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Tratamiento</TableCell>
+                          <TableCell sx={{ fontWeight: "bold" }}>Cantidad (ml)</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Tipo Atención</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Especialista</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Sesión</TableCell>
@@ -3743,6 +3744,7 @@ const HistorialClinico = () => {
                           <TableRow key={t.id}>
                             <TableCell>{t.fecha?.split(" ")[0]}</TableCell>
                             <TableCell>{t.nombreTratamiento}</TableCell>
+                            <TableCell>{t.cantidad_total || "-"}</TableCell>
                             <TableCell>{t.tipoAtencion}</TableCell>
                             <TableCell>{t.especialista}</TableCell>
                             <TableCell>{t.sesion}</TableCell>
