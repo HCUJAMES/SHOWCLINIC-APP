@@ -147,19 +147,19 @@ const HistorialClinico = () => {
   const [tratamientoEditar, setTratamientoEditar] = useState(null);
   const [editEspecialista, setEditEspecialista] = useState("");
   const [editSesion, setEditSesion] = useState(1);
-  const [editPrecio, setEditPrecio] = useState(0);
-  const [editDescuento, setEditDescuento] = useState(0);
+  const [editPrecio, setEditPrecio] = useState("");
+  const [editDescuento, setEditDescuento] = useState("");
   const [editPagoMetodo, setEditPagoMetodo] = useState("Efectivo");
   const [editTipoAtencion, setEditTipoAtencion] = useState("Tratamiento");
   const [editFecha, setEditFecha] = useState("");
   const [modalDescuento, setModalDescuento] = useState(false);
-  const [descuentoProforma, setDescuentoProforma] = useState(0);
+  const [descuentoProforma, setDescuentoProforma] = useState("");
   const [presupuestoParaProforma, setPresupuestoParaProforma] = useState(null);
 
   // Estados para modal de descuento de presupuesto
   const [modalDescuentoPresupuesto, setModalDescuentoPresupuesto] = useState(false);
   const [presupuestoParaDescuento, setPresupuestoParaDescuento] = useState(null);
-  const [nuevoDescuento, setNuevoDescuento] = useState(0);
+  const [nuevoDescuento, setNuevoDescuento] = useState("");
 
   // Estados para confirmar cancelación
   const [openConfirmarCancelar, setOpenConfirmarCancelar] = useState(false);
@@ -168,7 +168,7 @@ const HistorialClinico = () => {
   // Estados para modal de pago de presupuesto
   const [modalPagoPresupuesto, setModalPagoPresupuesto] = useState(false);
   const [presupuestoParaPago, setPresupuestoParaPago] = useState(null);
-  const [montoPago, setMontoPago] = useState(0);
+  const [montoPago, setMontoPago] = useState("");
   const [metodoPago, setMetodoPago] = useState("efectivo");
   const [tipoPago, setTipoPago] = useState("total"); // 'total', 'adelanto', 'saldo'
 
@@ -179,13 +179,13 @@ const HistorialClinico = () => {
   // Estados para modal de pago de consulta (paquetes)
   const [modalPagoConsulta, setModalPagoConsulta] = useState(false);
   const [paqueteParaConsulta, setPaqueteParaConsulta] = useState(null);
-  const [montoConsulta, setMontoConsulta] = useState(0);
+  const [montoConsulta, setMontoConsulta] = useState("");
   const [metodoPagoConsulta, setMetodoPagoConsulta] = useState("efectivo");
   
   // Estados para modal de pago de consulta (presupuestos)
   const [modalPagoConsultaPresupuesto, setModalPagoConsultaPresupuesto] = useState(false);
   const [presupuestoParaConsulta, setPresupuestoParaConsulta] = useState(null);
-  const [montoConsultaPresupuesto, setMontoConsultaPresupuesto] = useState(0);
+  const [montoConsultaPresupuesto, setMontoConsultaPresupuesto] = useState("");
   const [metodoPagoConsultaPresupuesto, setMetodoPagoConsultaPresupuesto] = useState("efectivo");
   
   // Estado para controlar qué presupuestos están colapsados
@@ -583,7 +583,7 @@ const HistorialClinico = () => {
     try {
       await axios.patch(
         `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas/${presupuestoParaDescuento.id}/descuento`,
-        { descuento: nuevoDescuento },
+        { descuento: Number(nuevoDescuento) || 0 },
         { headers: authHeaders }
       );
       
@@ -1154,7 +1154,7 @@ const HistorialClinico = () => {
     setOfertaItems((prev) => {
       const exists = prev.some((x) => x.tratamientoId === t.id);
       if (exists) return prev.filter((x) => x.tratamientoId !== t.id);
-      return [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: "" }];
+      return [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: "", sesiones: "1" }];
     });
   };
 
@@ -1162,6 +1162,14 @@ const HistorialClinico = () => {
     setOfertaItems((prev) =>
       prev.map((x) =>
         x.tratamientoId === tratamientoId ? { ...x, precio: value } : x
+      )
+    );
+  };
+
+  const setOfertaSesiones = (tratamientoId, value) => {
+    setOfertaItems((prev) =>
+      prev.map((x) =>
+        x.tratamientoId === tratamientoId ? { ...x, sesiones: value } : x
       )
     );
   };
@@ -1184,6 +1192,7 @@ const HistorialClinico = () => {
           tratamientoId: it.tratamientoId,
           nombre: it.nombre,
           precio: it.precio,
+          sesiones: Number(it.sesiones) || 1,
         })),
       };
 
@@ -1599,8 +1608,8 @@ const HistorialClinico = () => {
     setTratamientoEditar(tratamiento);
     setEditEspecialista(tratamiento.especialista || "");
     setEditSesion(tratamiento.sesion || 1);
-    setEditPrecio(tratamiento.precio_total || 0);
-    setEditDescuento(tratamiento.descuento || 0);
+    setEditPrecio(tratamiento.precio_total || "");
+    setEditDescuento(tratamiento.descuento || "");
     setEditPagoMetodo(tratamiento.pagoMetodo || "Efectivo");
     setEditTipoAtencion(tratamiento.tipoAtencion || "Tratamiento");
     // Extraer solo la fecha (YYYY-MM-DD) del timestamp
@@ -1619,8 +1628,8 @@ const HistorialClinico = () => {
         {
           especialista: editEspecialista,
           sesion: editSesion,
-          precio_total: editPrecio,
-          descuento: editDescuento,
+          precio_total: Number(editPrecio) || 0,
+          descuento: Number(editDescuento) || 0,
           pagoMetodo: editPagoMetodo,
           tipoAtencion: editTipoAtencion,
           fecha: editFecha,
@@ -2350,21 +2359,40 @@ const HistorialClinico = () => {
                             </IconButton>
                           </Box>
 
-                          <TextField
-                            fullWidth
-                            label="Precio especial (S/)"
-                            type="number"
-                            value={item?.precio ?? ""}
-                            onChange={(e) =>
-                              setOfertaPrecio(t.id, e.target.value)
-                            }
-                            sx={{
-                              "& .MuiInputBase-root": {
-                                backgroundColor: "rgba(255,255,255,0.72)",
-                                borderRadius: 2,
-                              },
-                            }}
-                          />
+                          <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
+                            <TextField
+                              label="Precio total (S/)"
+                              type="number"
+                              value={item?.precio ?? ""}
+                              onChange={(e) =>
+                                setOfertaPrecio(t.id, e.target.value)
+                              }
+                              sx={{
+                                flex: 1,
+                                "& .MuiInputBase-root": {
+                                  backgroundColor: "rgba(255,255,255,0.72)",
+                                  borderRadius: 2,
+                                },
+                              }}
+                              helperText=""
+                            />
+                            <TextField
+                              label="Sesiones"
+                              type="number"
+                              value={item?.sesiones ?? "1"}
+                              onChange={(e) =>
+                                setOfertaSesiones(t.id, e.target.value)
+                              }
+                              inputProps={{ min: 1, step: 1 }}
+                              sx={{
+                                width: 100,
+                                "& .MuiInputBase-root": {
+                                  backgroundColor: "rgba(255,255,255,0.72)",
+                                  borderRadius: 2,
+                                },
+                              }}
+                            />
+                          </Box>
                         </Paper>
                       );
                     })}
@@ -2521,6 +2549,11 @@ const HistorialClinico = () => {
                                     </Box>
                                     <Typography variant="body2">
                                       {it.nombre}
+                                      {Number(it.sesiones) > 1 && (
+                                        <Typography component="span" variant="caption" sx={{ ml: 0.5, color: "#888", fontWeight: 600 }}>
+                                          ({it.sesiones} sesiones)
+                                        </Typography>
+                                      )}
                                     </Typography>
                                   </Box>
                                   <Typography variant="body2" sx={{ fontWeight: "bold", color: "#a36920" }}>
@@ -2620,6 +2653,7 @@ const HistorialClinico = () => {
                                       tratamientoId: it.tratamientoId ?? it.tratamiento_id ?? null,
                                       nombre: it.nombre,
                                       precio: String(it.precio ?? ""),
+                                      sesiones: String(it.sesiones ?? "1"),
                                     }))
                                   );
                                   setShowOferta(true);
@@ -3951,7 +3985,7 @@ const HistorialClinico = () => {
                 label="Precio Total (S/)"
                 type="number"
                 value={editPrecio}
-                onChange={(e) => setEditPrecio(Number(e.target.value))}
+                onChange={(e) => setEditPrecio(e.target.value)}
                 inputProps={{ min: 0, step: 0.01 }}
               />
             </Grid>
@@ -3961,7 +3995,7 @@ const HistorialClinico = () => {
                 label="Descuento (%)"
                 type="number"
                 value={editDescuento}
-                onChange={(e) => setEditDescuento(Number(e.target.value))}
+                onChange={(e) => setEditDescuento(e.target.value)}
                 inputProps={{ min: 0, max: 100 }}
               />
             </Grid>
@@ -4079,7 +4113,7 @@ const HistorialClinico = () => {
                 label="Descuento (S/)"
                 type="number"
                 value={descuentoProforma}
-                onChange={(e) => setDescuentoProforma(Number(e.target.value))}
+                onChange={(e) => setDescuentoProforma(e.target.value)}
                 inputProps={{ min: 0, step: 0.01 }}
                 helperText="Ingresa el monto de descuento a aplicar (opcional)"
                 sx={{ mb: 2 }}
@@ -4092,13 +4126,13 @@ const HistorialClinico = () => {
                   </Typography>
                   <Typography variant="h5" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
                     S/ {(
-                      (presupuestoParaProforma.items || []).reduce((sum, item) => sum + Number(item.precio || 0), 0) - descuentoProforma
+                      (presupuestoParaProforma.items || []).reduce((sum, item) => sum + Number(item.precio || 0), 0) - Number(descuentoProforma || 0)
                     ).toFixed(2)}
                   </Typography>
                 </Box>
-                {descuentoProforma > 0 && (
+                {Number(descuentoProforma) > 0 && (
                   <Typography variant="caption" sx={{ color: "#666", mt: 1, display: "block" }}>
-                    Ahorro: S/ {descuentoProforma.toFixed(2)}
+                    Ahorro: S/ {Number(descuentoProforma).toFixed(2)}
                   </Typography>
                 )}
               </Box>
@@ -4115,7 +4149,7 @@ const HistorialClinico = () => {
             onClick={async () => {
               if (presupuestoParaProforma && pacienteSeleccionado) {
                 await generarProformaPDF(
-                  { ...presupuestoParaProforma, descuento: descuentoProforma },
+                  { ...presupuestoParaProforma, descuento: Number(descuentoProforma) || 0 },
                   pacienteSeleccionado
                 );
                 setModalDescuento(false);
@@ -4135,7 +4169,7 @@ const HistorialClinico = () => {
       {/* Modal para Agregar/Editar Descuento de Presupuesto */}
       <Dialog open={modalDescuentoPresupuesto} onClose={() => setModalDescuentoPresupuesto(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ backgroundColor: "#ff9800", color: "white" }}>
-          💰 {nuevoDescuento > 0 ? "Editar" : "Agregar"} Descuento
+          💰 {Number(nuevoDescuento) > 0 ? "Editar" : "Agregar"} Descuento
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {presupuestoParaDescuento && (
@@ -4149,7 +4183,7 @@ const HistorialClinico = () => {
                 label="Monto de Descuento (S/)"
                 type="number"
                 value={nuevoDescuento}
-                onChange={(e) => setNuevoDescuento(Number(e.target.value))}
+                onChange={(e) => setNuevoDescuento(e.target.value)}
                 inputProps={{ min: 0, step: 0.01, max: presupuestoParaDescuento.total }}
                 sx={{ mb: 2 }}
                 helperText={`Máximo: S/ ${Number(presupuestoParaDescuento.total || 0).toFixed(2)}`}
@@ -4160,7 +4194,7 @@ const HistorialClinico = () => {
                   Total con descuento:
                 </Typography>
                 <Typography variant="h5" sx={{ fontWeight: "bold", color: "#ff9800" }}>
-                  S/ {(Number(presupuestoParaDescuento.total || 0) - nuevoDescuento).toFixed(2)}
+                  S/ {(Number(presupuestoParaDescuento.total || 0) - Number(nuevoDescuento || 0)).toFixed(2)}
                 </Typography>
               </Box>
             </>
@@ -4173,7 +4207,7 @@ const HistorialClinico = () => {
           <Button
             variant="contained"
             onClick={guardarDescuentoPresupuesto}
-            disabled={nuevoDescuento < 0 || nuevoDescuento > (presupuestoParaDescuento?.total || 0)}
+            disabled={Number(nuevoDescuento) < 0 || Number(nuevoDescuento) > (presupuestoParaDescuento?.total || 0)}
             sx={{
               backgroundColor: "#ff9800",
               "&:hover": { backgroundColor: "#f57c00" },
@@ -4228,7 +4262,7 @@ const HistorialClinico = () => {
                 label="Monto a pagar (S/)"
                 type="number"
                 value={montoPago}
-                onChange={(e) => setMontoPago(Number(e.target.value))}
+                onChange={(e) => setMontoPago(e.target.value)}
                 inputProps={{ min: 0, step: 0.01 }}
                 sx={{ mb: 2 }}
               />
@@ -4294,10 +4328,10 @@ const HistorialClinico = () => {
           </Button>
           <Button
             variant="contained"
-            disabled={montoPago <= 0}
+            disabled={Number(montoPago) <= 0}
             onClick={async () => {
-              if (presupuestoParaPago && montoPago > 0) {
-                await registrarPagoPresupuesto(presupuestoParaPago.id, montoPago, metodoPago, tipoPago);
+              if (presupuestoParaPago && Number(montoPago) > 0) {
+                await registrarPagoPresupuesto(presupuestoParaPago.id, Number(montoPago), metodoPago, tipoPago);
                 setModalPagoPresupuesto(false);
               }
             }}
@@ -4352,7 +4386,7 @@ const HistorialClinico = () => {
                 label="Monto a pagar (S/)"
                 type="number"
                 value={montoPago}
-                onChange={(e) => setMontoPago(Number(e.target.value))}
+                onChange={(e) => setMontoPago(e.target.value)}
                 inputProps={{ min: 0, step: 0.01 }}
                 sx={{ mb: 2 }}
               />
@@ -4402,10 +4436,10 @@ const HistorialClinico = () => {
           </Button>
           <Button
             variant="contained"
-            disabled={montoPago <= 0}
+            disabled={Number(montoPago) <= 0}
             onClick={async () => {
-              if (paqueteParaPago && montoPago > 0) {
-                await registrarPagoPaquete(paqueteParaPago.id, montoPago, metodoPago, tipoPago);
+              if (paqueteParaPago && Number(montoPago) > 0) {
+                await registrarPagoPaquete(paqueteParaPago.id, Number(montoPago), metodoPago, tipoPago);
                 setModalPagoPaquete(false);
               }
             }}
@@ -4440,7 +4474,7 @@ const HistorialClinico = () => {
                 label="Monto de Consulta (S/)"
                 type="number"
                 value={montoConsulta}
-                onChange={(e) => setMontoConsulta(Number(e.target.value))}
+                onChange={(e) => setMontoConsulta(e.target.value)}
                 inputProps={{ min: 0, step: 0.01 }}
                 sx={{ mb: 2 }}
                 helperText="Ingrese el monto que el paciente pagó por la consulta"
@@ -4472,13 +4506,13 @@ const HistorialClinico = () => {
                 </Box>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">Monto de consulta:</Typography>
-                  <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {montoConsulta.toFixed(2)}</Typography>
+                  <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {Number(montoConsulta).toFixed(2)}</Typography>
                 </Box>
                 <Divider sx={{ my: 1 }} />
                 <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                   <Typography variant="body2" sx={{ fontWeight: "bold" }}>Nuevo precio del paquete:</Typography>
                   <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
-                    S/ {(paqueteParaConsulta.precio_total - montoConsulta).toFixed(2)}
+                    S/ {(paqueteParaConsulta.precio_total - Number(montoConsulta)).toFixed(2)}
                   </Typography>
                 </Box>
               </Box>
@@ -4491,10 +4525,10 @@ const HistorialClinico = () => {
           </Button>
           <Button
             variant="contained"
-            disabled={montoConsulta <= 0 || (paqueteParaConsulta && montoConsulta > paqueteParaConsulta.precio_total)}
+            disabled={Number(montoConsulta) <= 0 || (paqueteParaConsulta && Number(montoConsulta) > paqueteParaConsulta.precio_total)}
             onClick={async () => {
-              if (paqueteParaConsulta && montoConsulta > 0) {
-                await registrarPagoConsulta(paqueteParaConsulta.id, montoConsulta, metodoPagoConsulta);
+              if (paqueteParaConsulta && Number(montoConsulta) > 0) {
+                await registrarPagoConsulta(paqueteParaConsulta.id, Number(montoConsulta), metodoPagoConsulta);
                 setModalPagoConsulta(false);
               }
             }}
@@ -4529,7 +4563,7 @@ const HistorialClinico = () => {
                 label="Monto de Consulta (S/)"
                 type="number"
                 value={montoConsultaPresupuesto}
-                onChange={(e) => setMontoConsultaPresupuesto(Number(e.target.value))}
+                onChange={(e) => setMontoConsultaPresupuesto(e.target.value)}
                 inputProps={{ min: 0, step: 0.01 }}
                 sx={{ mb: 2 }}
                 helperText="Ingrese el monto que el paciente pagó por la consulta"
@@ -4565,13 +4599,13 @@ const HistorialClinico = () => {
                 </Box>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">Consulta:</Typography>
-                  <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {montoConsultaPresupuesto.toFixed(2)}</Typography>
+                  <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {Number(montoConsultaPresupuesto).toFixed(2)}</Typography>
                 </Box>
                 <Divider sx={{ my: 1 }} />
                 <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                   <Typography variant="body2" sx={{ fontWeight: "bold" }}>Total a pagar:</Typography>
                   <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
-                    S/ {(presupuestoParaConsulta.precio_total - (presupuestoParaConsulta.descuento || 0) - montoConsultaPresupuesto).toFixed(2)}
+                    S/ {(presupuestoParaConsulta.precio_total - (presupuestoParaConsulta.descuento || 0) - Number(montoConsultaPresupuesto)).toFixed(2)}
                   </Typography>
                 </Box>
               </Box>
@@ -4584,10 +4618,10 @@ const HistorialClinico = () => {
           </Button>
           <Button
             variant="contained"
-            disabled={montoConsultaPresupuesto <= 0 || (presupuestoParaConsulta && (montoConsultaPresupuesto + (presupuestoParaConsulta.descuento || 0)) > presupuestoParaConsulta.precio_total)}
+            disabled={Number(montoConsultaPresupuesto) <= 0 || (presupuestoParaConsulta && (Number(montoConsultaPresupuesto) + (presupuestoParaConsulta.descuento || 0)) > presupuestoParaConsulta.precio_total)}
             onClick={async () => {
-              if (presupuestoParaConsulta && montoConsultaPresupuesto > 0) {
-                await registrarPagoConsultaPresupuesto(presupuestoParaConsulta.id, montoConsultaPresupuesto, metodoPagoConsultaPresupuesto);
+              if (presupuestoParaConsulta && Number(montoConsultaPresupuesto) > 0) {
+                await registrarPagoConsultaPresupuesto(presupuestoParaConsulta.id, Number(montoConsultaPresupuesto), metodoPagoConsultaPresupuesto);
                 setModalPagoConsultaPresupuesto(false);
               }
             }}

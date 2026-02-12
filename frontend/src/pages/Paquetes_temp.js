@@ -61,8 +61,8 @@ const Paquetes = () => {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [tratamientosSeleccionados, setTratamientosSeleccionados] = useState([]);
-  const [precioRegular, setPrecioRegular] = useState(0);
-  const [precioPaquete, setPrecioPaquete] = useState(0);
+  const [precioRegular, setPrecioRegular] = useState("");
+  const [precioPaquete, setPrecioPaquete] = useState("");
   const [vigenciaInicio, setVigenciaInicio] = useState("");
   const [vigenciaFin, setVigenciaFin] = useState("");
 
@@ -116,8 +116,8 @@ const Paquetes = () => {
     setNombre("");
     setDescripcion("");
     setTratamientosSeleccionados([]);
-    setPrecioRegular(0);
-    setPrecioPaquete(0);
+    setPrecioRegular("");
+    setPrecioPaquete("");
     setVigenciaInicio("");
     setVigenciaFin("");
     setPaqueteEditar(null);
@@ -156,17 +156,17 @@ const Paquetes = () => {
       return;
     }
 
-    if (precioRegular <= 0) {
+    if (Number(precioRegular) <= 0) {
       showToast({ severity: "error", message: "El precio regular debe ser mayor a 0" });
       return;
     }
 
-    if (precioPaquete <= 0) {
+    if (Number(precioPaquete) <= 0) {
       showToast({ severity: "error", message: "El precio del paquete debe ser mayor a 0" });
       return;
     }
 
-    if (precioPaquete >= precioRegular) {
+    if (Number(precioPaquete) >= Number(precioRegular)) {
       showToast({ severity: "error", message: "El precio del paquete debe ser menor al precio regular" });
       return;
     }
@@ -186,8 +186,8 @@ const Paquetes = () => {
         nombre: t.nombre,
         sesiones: t.sesiones_tratamiento || 1,
       })),
-      precio_regular: precioRegular,
-      precio_paquete: precioPaquete,
+      precio_regular: Number(precioRegular),
+      precio_paquete: Number(precioPaquete),
       sesiones: totalSesiones,
       vigencia_inicio: vigenciaInicio || null,
       vigencia_fin: vigenciaFin || null,
@@ -266,8 +266,8 @@ const Paquetes = () => {
   };
 
   const calcularDescuento = () => {
-    if (precioRegular > 0 && precioPaquete > 0) {
-      return ((precioRegular - precioPaquete) / precioRegular * 100).toFixed(1);
+    if (Number(precioRegular) > 0 && Number(precioPaquete) > 0) {
+      return ((Number(precioRegular) - Number(precioPaquete)) / Number(precioRegular) * 100).toFixed(1);
     }
     return 0;
   };
@@ -651,7 +651,7 @@ const Paquetes = () => {
                       type="number"
                       label="Precio Regular (S/) - Sin descuento"
                       value={precioRegular}
-                      onChange={(e) => setPrecioRegular(Number(e.target.value))}
+                      onChange={(e) => setPrecioRegular(e.target.value)}
                       inputProps={{ min: 0, step: 0.01 }}
                       helperText="Precio normal si se compraran los tratamientos por separado"
                       InputProps={{
@@ -666,7 +666,7 @@ const Paquetes = () => {
                       type="number"
                       label="Precio del Paquete (S/) - Con descuento"
                       value={precioPaquete}
-                      onChange={(e) => setPrecioPaquete(Number(e.target.value))}
+                      onChange={(e) => setPrecioPaquete(e.target.value)}
                       inputProps={{ min: 0, step: 0.01 }}
                       helperText="Precio especial para el paquete promocional"
                       InputProps={{
@@ -705,14 +705,14 @@ const Paquetes = () => {
                 </Grid>
 
                 {/* Resumen del descuento */}
-                {precioRegular > 0 && precioPaquete > 0 && (
+                {Number(precioRegular) > 0 && Number(precioPaquete) > 0 && (
                   <Card sx={{ mt: 3, backgroundColor: "#e8f5e9", border: "1px solid #4caf50" }}>
                     <CardContent sx={{ textAlign: "center", py: 2 }}>
                       <Typography variant="h6" sx={{ color: "#2e7d32", fontWeight: "bold", mb: 1 }}>
                         🎉 Descuento: {calcularDescuento()}%
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Ahorro total: S/ {(precioRegular - precioPaquete).toFixed(2)}
+                        Ahorro total: S/ {(Number(precioRegular) - Number(precioPaquete)).toFixed(2)}
                       </Typography>
                     </CardContent>
                   </Card>

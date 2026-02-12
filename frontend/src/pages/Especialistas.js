@@ -27,6 +27,24 @@ const API_BASE =
   process.env.REACT_APP_API_URL ||
   `${window.location.protocol}//${window.location.hostname}:4000`;
 
+// Función para formatear nombre: "ERICK SPETIA" -> "Erick Spetia", "dr. erick" -> "Dr. Erick"
+function formatNombreEspecialista(nombre) {
+  if (!nombre) return nombre;
+  const trimmed = nombre.trim().replace(/\s+/g, ' ');
+  const palabras = trimmed.split(' ');
+  const prefijos = ['dr.', 'dra.', 'dr', 'dra', 'lic.', 'lic', 'ing.', 'ing'];
+  return palabras.map((palabra, index) => {
+    const lower = palabra.toLowerCase();
+    if (index === 0 && prefijos.includes(lower)) {
+      let prefijo = lower.charAt(0).toUpperCase() + lower.slice(1);
+      if (!prefijo.endsWith('.')) prefijo += '.';
+      return prefijo;
+    }
+    if (palabra.length === 0) return palabra;
+    return palabra.charAt(0).toUpperCase() + palabra.slice(1).toLowerCase();
+  }).join(' ');
+}
+
 export default function Especialistas() {
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -139,19 +157,50 @@ export default function Especialistas() {
 
         {/* Botón agregar */}
         <Box sx={{ mb: 3 }}>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setDialogOpen(true)}
-            sx={{
-              backgroundColor: "#a36920",
-              "&:hover": { backgroundColor: "#8a5a1a" },
-              textTransform: "none",
-              fontWeight: 600,
-            }}
-          >
-            Agregar Especialista
-          </Button>
+          <Box sx={{ display: "flex", gap: 2 }}>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => setDialogOpen(true)}
+              sx={{
+                backgroundColor: "#a36920",
+                "&:hover": { backgroundColor: "#8a5a1a" },
+                textTransform: "none",
+                fontWeight: 600,
+              }}
+            >
+              Agregar Especialista
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={async () => {
+                try {
+                  const res = await axios.post(
+                    `${API_BASE}/api/especialistas/normalizar`,
+                    {},
+                    { headers: authHeaders }
+                  );
+                  showToast({
+                    severity: "success",
+                    message: `Normalización completada: ${res.data.actualizados} nombres corregidos de ${res.data.total} total`,
+                  });
+                  cargarEspecialistas();
+                } catch (err) {
+                  console.error("Error normalizando:", err);
+                  showToast({ severity: "error", message: "Error al normalizar nombres" });
+                }
+              }}
+              sx={{
+                borderColor: "#a36920",
+                color: "#a36920",
+                "&:hover": { backgroundColor: "rgba(163, 105, 32, 0.08)", borderColor: "#8a5a1a" },
+                textTransform: "none",
+                fontWeight: 600,
+              }}
+            >
+              Normalizar Nombres
+            </Button>
+          </Box>
         </Box>
 
         {/* Tabla de especialistas */}
@@ -225,6 +274,10 @@ export default function Especialistas() {
                   onChange={(e) =>
                     setNuevoEspecialista({ ...nuevoEspecialista, nombre: e.target.value })
                   }
+                  onBlur={(e) =>
+                    setNuevoEspecialista({ ...nuevoEspecialista, nombre: formatNombreEspecialista(e.target.value) })
+                  }
+                  helperText="Formato: Dr. Nombre Apellido"
                 />
               </Grid>
               <Grid item xs={12}>

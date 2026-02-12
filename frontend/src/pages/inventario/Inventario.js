@@ -47,6 +47,8 @@ export default function Inventario() {
     lote: "",
     cantidad: "",
   });
+  const [unidadNuevaVariante, setUnidadNuevaVariante] = useState("ml");
+  const [contenidoNuevaVariante, setContenidoNuevaVariante] = useState("");
   const [pdfIngreso, setPdfIngreso] = useState(null);
   const [pdfIngresoKey, setPdfIngresoKey] = useState(0);
   const [guardandoIngreso, setGuardandoIngreso] = useState(false);
@@ -368,7 +370,7 @@ export default function Inventario() {
     return { id: created.id, nombre: created.nombre };
   };
 
-  const ensureVariante = async ({ productoBaseId, nombreVariante, laboratorio }) => {
+  const ensureVariante = async ({ productoBaseId, nombreVariante, laboratorio, unidadBase, contenidoPorPresentacion }) => {
     const nombre = normalizar(nombreVariante);
     const lab = normalizar(laboratorio);
     if (!nombre) throw new Error("Variante vacía");
@@ -381,6 +383,9 @@ export default function Inventario() {
     );
     if (existente) return existente;
 
+    const unidad = unidadBase || "ml";
+    const contenido = parseFloat(contenidoPorPresentacion) || 1;
+
     const res = await fetch(`${API_BASE}/api/inventario/variantes`, {
       method: "POST",
       headers: {
@@ -392,8 +397,8 @@ export default function Inventario() {
         nombre,
         laboratorio: lab || null,
         sku: null,
-        unidad_base: "U",
-        contenido_por_presentacion: 1,
+        unidad_base: unidad,
+        contenido_por_presentacion: contenido,
         es_medico: false,
         costo_unitario: null,
         precio_unitario: null,
@@ -407,7 +412,8 @@ export default function Inventario() {
       producto_base_id: productoBaseId,
       nombre,
       laboratorio: lab || null,
-      unidad_base: "U",
+      unidad_base: unidad,
+      contenido_por_presentacion: contenido,
       stock_minimo_unidades: 3,
     };
   };
@@ -557,6 +563,8 @@ export default function Inventario() {
           productoBaseId,
           nombreVariante: varianteTexto,
           laboratorio: laboratorioTexto,
+          unidadBase: unidadNuevaVariante,
+          contenidoPorPresentacion: contenidoNuevaVariante,
         });
         varianteId = Number(v.id);
         await obtenerVariantes();
@@ -617,6 +625,8 @@ export default function Inventario() {
       setSelectedVarianteId("");
       setModoMarca("select");
       setModoVariante("select");
+      setUnidadNuevaVariante("ml");
+      setContenidoNuevaVariante("");
       await Promise.all([obtenerProductosBase(), obtenerVariantes(), obtenerStockLotes()]);
       showToast({ severity: "success", message: "Stock actualizado" });
     } catch (e) {
@@ -734,7 +744,6 @@ export default function Inventario() {
               <TableCell>Marca</TableCell>
               <TableCell>Variante</TableCell>
               <TableCell>Laboratorio</TableCell>
-              <TableCell>Precio Cliente (S/)</TableCell>
               <TableCell>Disponible</TableCell>
               <TableCell>Mínimo</TableCell>
               <TableCell>Estado</TableCell>
@@ -753,64 +762,6 @@ export default function Inventario() {
                 <TableCell>{r.producto_base_nombre}</TableCell>
                 <TableCell>{r.variante_nombre}</TableCell>
                 <TableCell>{r.laboratorio || "—"}</TableCell>
-                <TableCell>
-                  {editPrecioVarianteId === r.variante_id ? (
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={editPrecioCliente}
-                        onChange={(e) => setEditPrecioCliente(e.target.value)}
-                        sx={{ width: 100 }}
-                        placeholder="0.00"
-                        disabled={guardandoPrecio}
-                      />
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={() => guardarPrecioCliente(r.variante_id)}
-                        disabled={guardandoPrecio}
-                        sx={{ minWidth: 40, backgroundColor: colorPrincipal }}
-                      >
-                        ✓
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => {
-                          setEditPrecioVarianteId(null);
-                          setEditPrecioCliente("");
-                        }}
-                        disabled={guardandoPrecio}
-                        sx={{ minWidth: 40 }}
-                      >
-                        ✕
-                      </Button>
-                    </Box>
-                  ) : (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        cursor: canWriteInventory ? "pointer" : "default",
-                      }}
-                      onClick={() => {
-                        if (canWriteInventory) {
-                          setEditPrecioVarianteId(r.variante_id);
-                          setEditPrecioCliente(r.precio_cliente != null ? String(r.precio_cliente) : "");
-                        }
-                      }}
-                    >
-                      <strong style={{ color: r.precio_cliente != null ? "#2e7d32" : "#999" }}>
-                        {r.precio_cliente != null ? `S/ ${Number(r.precio_cliente).toFixed(2)}` : "Sin precio"}
-                      </strong>
-                      {canWriteInventory && (
-                        <span style={{ fontSize: 12, color: "#888" }}>✏️</span>
-                      )}
-                    </Box>
-                  )}
-                </TableCell>
                 <TableCell>
                   <strong>
                     {Number(r.disponible_efectivo || 0).toFixed(2)} {r.unidad_base}
@@ -973,17 +924,43 @@ export default function Inventario() {
               </Grid>
 
               {modoVariante === "new" && (
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="Nueva variante"
-                    fullWidth
-                    size="small"
-                    value={formIngresoSimple.variante}
-                    onChange={(e) =>
-                      setFormIngresoSimple((p) => ({ ...p, variante: e.target.value }))
-                    }
-                  />
-                </Grid>
+                <>
+                  <Grid item xs={12} md={3}>
+                    <TextField
+                      label="Nueva variante"
+                      fullWidth
+                      size="small"
+                      value={formIngresoSimple.variante}
+                      onChange={(e) =>
+                        setFormIngresoSimple((p) => ({ ...p, variante: e.target.value }))
+                      }
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={unidadNuevaVariante}
+                        onChange={(e) => setUnidadNuevaVariante(e.target.value)}
+                        displayEmpty
+                      >
+                        <MenuItem value="ml">ml (mililitros)</MenuItem>
+                        <MenuItem value="U">U (unidades)</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <TextField
+                      label={unidadNuevaVariante === "U" ? "Unidades por frasco" : "ml por presentación"}
+                      type="number"
+                      fullWidth
+                      size="small"
+                      value={contenidoNuevaVariante}
+                      onChange={(e) => setContenidoNuevaVariante(e.target.value)}
+                      inputProps={{ min: 0.1, step: unidadNuevaVariante === "U" ? 1 : 0.1 }}
+                      helperText={unidadNuevaVariante === "U" ? "Ej: Botox = 100" : "Ej: Juvederm = 1"}
+                    />
+                  </Grid>
+                </>
               )}
 
               <Grid item xs={12} md={3}>
@@ -1011,7 +988,13 @@ export default function Inventario() {
               </Grid>
               <Grid item xs={12} md={3}>
                 <TextField
-                  label="Cantidad (ml)"
+                  label={`Cantidad (${
+                    modoVariante === "select" && varianteSeleccionada
+                      ? varianteSeleccionada.unidad_base || "ml"
+                      : modoVariante === "new"
+                        ? unidadNuevaVariante
+                        : "ml"
+                  })`}
                   type="number"
                   fullWidth
                   size="small"
@@ -1019,8 +1002,12 @@ export default function Inventario() {
                   onChange={(e) =>
                     setFormIngresoSimple((p) => ({ ...p, cantidad: e.target.value }))
                   }
-                  inputProps={{ min: 0.1, step: 0.1 }}
-                  helperText="Ej: caja 2x1ml = 2 ml"
+                  inputProps={{ min: 0.1, step: (modoVariante === "select" && varianteSeleccionada?.unidad_base === "U") || (modoVariante === "new" && unidadNuevaVariante === "U") ? 1 : 0.1 }}
+                  helperText={
+                    (modoVariante === "select" && varianteSeleccionada?.unidad_base === "U") || (modoVariante === "new" && unidadNuevaVariante === "U")
+                      ? "Ej: 1 frasco de 100U = 100"
+                      : "Ej: caja 2x1ml = 2"
+                  }
                 />
               </Grid>
               <Grid item xs={12} md={3}>
@@ -1157,7 +1144,7 @@ export default function Inventario() {
                           onChange={(e) => setEditCantidad(e.target.value)}
                         />
                       ) : (
-                        Number(l.cantidad_unidades || 0).toFixed(2)
+                        `${Number(l.cantidad_unidades || 0).toFixed(2)} ${l.unidad_base || "ml"}`
                       )}
                     </TableCell>
                     <TableCell>

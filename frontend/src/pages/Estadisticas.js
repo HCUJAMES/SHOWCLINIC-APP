@@ -17,7 +17,8 @@ import {
   MenuItem,
   Button,
   CircularProgress,
-  Container
+  Container,
+  Chip,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -28,7 +29,10 @@ import {
   Refresh,
   AccountBalanceWallet,
   CreditCard,
-  Home
+  Home,
+  CalendarMonth,
+  EmojiEvents,
+  PersonOutline,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
@@ -43,6 +47,8 @@ const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+
+const rankColors = ["#D4AF37", "#A0A0A0", "#CD7F32"];
 
 export default function Estadisticas() {
   const navigate = useNavigate();
@@ -88,7 +94,6 @@ export default function Estadisticas() {
   if (!canViewStats) return null;
 
   const kpi = data?.kpi;
-  const ingresosNeto = kpi?.ingresos_neto ?? 0;
   const ingresosBruto = kpi?.ingresos_bruto ?? 0;
   const comisionPos = kpi?.comision_pos ?? 0;
 
@@ -96,6 +101,30 @@ export default function Estadisticas() {
   for (let y = currentYear; y >= currentYear - 5; y--) yearOptions.push(y);
 
   const colorPrincipal = "#A36920";
+
+  const kpiCardStyle = {
+    p: { xs: 2, sm: 2.5 },
+    borderRadius: 3,
+    border: "1px solid rgba(163,105,32,0.10)",
+    background: "rgba(255,255,255,0.95)",
+    height: "100%",
+    transition: "transform 0.2s, box-shadow 0.2s",
+    "&:hover": {
+      transform: "translateY(-2px)",
+      boxShadow: "0 8px 24px rgba(163,105,32,0.12)",
+    },
+  };
+
+  const kpiIconBox = (bgColor) => ({
+    width: 44,
+    height: 44,
+    borderRadius: 2.5,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: bgColor,
+    flexShrink: 0,
+  });
 
   return (
     <Box
@@ -106,8 +135,8 @@ export default function Estadisticas() {
         backgroundSize: "cover",
         backgroundPosition: "center",
         position: "relative",
-        px: { xs: 2, sm: 4 },
-        py: { xs: 3, sm: 5 },
+        px: { xs: 1.5, sm: 3, md: 4 },
+        py: { xs: 3, sm: 4 },
         "&::before": {
           content: '""',
           position: "absolute",
@@ -122,91 +151,88 @@ export default function Estadisticas() {
 
         {/* ========== HEADER ========== */}
         <Paper
-          elevation={4}
+          elevation={0}
           sx={{
-            p: { xs: 2, sm: 3 },
+            p: { xs: 2, sm: 2.5 },
             mb: 3,
             borderRadius: 4,
-            backgroundColor: "rgba(255,255,255,0.92)",
-            border: "1px solid rgba(163,105,32,0.15)",
+            background: "linear-gradient(135deg, rgba(163,105,32,0.95), rgba(139,84,10,0.95))",
+            border: "1px solid rgba(212,175,55,0.25)",
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
+            gap: 2,
+            boxShadow: "0 8px 32px rgba(163,105,32,0.20)",
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: "rgba(255,255,255,0.85)", "&:hover": { color: "#fff" } }}>
               <ArrowBack />
             </IconButton>
-            <Typography
-              variant="h5"
-              sx={{ color: colorPrincipal, fontWeight: "bold", flex: 1, textAlign: "center" }}
-            >
-              Estadísticas del Mes
-            </Typography>
-            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
+            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: "rgba(255,255,255,0.85)", "&:hover": { color: "#fff" } }} title="Inicio">
               <Home />
             </IconButton>
           </Box>
 
-          <Box sx={{ flex: 1, minWidth: 180 }}>
+          <Box sx={{ flex: 1, minWidth: 160 }}>
             <Typography
               variant="h5"
               sx={{
                 fontFamily: "'Playfair Display', serif",
                 fontWeight: 700,
-                color: colorPrincipal,
+                color: "#fff",
+                letterSpacing: 0.5,
               }}
             >
               Estadísticas
             </Typography>
-            <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.70)" }}>
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.70)", mt: 0.25 }}>
               Resumen mensual de la clínica
             </Typography>
           </Box>
 
-          {/* Selectores de Mes y Año */}
           <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
-            <FormControl size="small" sx={{ minWidth: 130 }}>
-              <Select
-                value={month}
-                onChange={(e) => setMonth(Number(e.target.value))}
-                sx={{
-                  backgroundColor: "rgba(255,255,255,0.95)",
-                  borderRadius: 2,
-                  fontWeight: 700,
-                  color: colorPrincipal,
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "rgba(163,105,32,0.3)",
-                  },
-                }}
-              >
-                {MONTH_NAMES.map((name, idx) => (
-                  <MenuItem key={idx + 1} value={idx + 1}>
-                    {name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <CalendarMonth sx={{ color: "rgba(255,255,255,0.70)", fontSize: 20 }} />
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <Select
+                  value={month}
+                  onChange={(e) => setMonth(Number(e.target.value))}
+                  sx={{
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    color: "#fff",
+                    fontSize: 14,
+                    "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.25)" },
+                    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.45)" },
+                    "& .MuiSvgIcon-root": { color: "rgba(255,255,255,0.70)" },
+                  }}
+                >
+                  {MONTH_NAMES.map((name, idx) => (
+                    <MenuItem key={idx + 1} value={idx + 1}>{name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
 
-            <FormControl size="small" sx={{ minWidth: 100 }}>
+            <FormControl size="small" sx={{ minWidth: 85 }}>
               <Select
                 value={year}
                 onChange={(e) => setYear(Number(e.target.value))}
                 sx={{
-                  backgroundColor: "rgba(255,255,255,0.95)",
+                  backgroundColor: "rgba(255,255,255,0.15)",
                   borderRadius: 2,
-                  fontWeight: 700,
-                  color: colorPrincipal,
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "rgba(163,105,32,0.3)",
-                  },
+                  fontWeight: 600,
+                  color: "#fff",
+                  fontSize: 14,
+                  "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.25)" },
+                  "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.45)" },
+                  "& .MuiSvgIcon-root": { color: "rgba(255,255,255,0.70)" },
                 }}
               >
                 {yearOptions.map((y) => (
-                  <MenuItem key={y} value={y}>
-                    {y}
-                  </MenuItem>
+                  <MenuItem key={y} value={y}>{y}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -214,15 +240,20 @@ export default function Estadisticas() {
             <Button
               variant="contained"
               size="small"
-              startIcon={loading ? <CircularProgress size={16} color="inherit" /> : <Refresh />}
+              startIcon={loading ? <CircularProgress size={14} sx={{ color: colorPrincipal }} /> : <Refresh />}
               onClick={cargar}
               disabled={loading}
               sx={{
-                backgroundColor: colorPrincipal,
+                backgroundColor: "#fff",
+                color: colorPrincipal,
                 fontWeight: 700,
                 borderRadius: 2,
                 px: 2,
-                "&:hover": { backgroundColor: "#8a541a" },
+                fontSize: 13,
+                textTransform: "none",
+                boxShadow: "none",
+                "&:hover": { backgroundColor: "rgba(255,255,255,0.90)", boxShadow: "none" },
+                "&.Mui-disabled": { backgroundColor: "rgba(255,255,255,0.50)", color: "rgba(163,105,32,0.50)" },
               }}
             >
               Actualizar
@@ -231,225 +262,189 @@ export default function Estadisticas() {
         </Paper>
 
         {/* ========== KPIs ========== */}
-        <Grid container spacing={2.5} sx={{ mb: 3 }}>
-          {/* Sesiones */}
-          <Grid item xs={6} sm={6} md={3}>
-            <Paper
-              elevation={2}
-              sx={{
-                p: 2.5,
-                borderRadius: 4,
-                border: "1px solid rgba(163,105,32,0.12)",
-                background: "linear-gradient(135deg, rgba(255,246,234,0.95), rgba(255,255,255,0.90))",
-                height: "100%",
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                <TrendingUp sx={{ color: colorPrincipal, fontSize: 28 }} />
-                <Typography sx={{ fontWeight: 800, color: "#2E2E2E", fontSize: 14 }}>Sesiones</Typography>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={6} md={3}>
+            <Paper elevation={1} sx={kpiCardStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+                <Box sx={kpiIconBox("rgba(163,105,32,0.10)")}>
+                  <TrendingUp sx={{ color: colorPrincipal, fontSize: 22 }} />
+                </Box>
+                <Typography sx={{ fontWeight: 700, color: "rgba(46,46,46,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Sesiones
+                </Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: colorPrincipal }}>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: "#2E2E2E", lineHeight: 1 }}>
                 {loading ? "—" : Number(kpi?.sesiones || 0)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.65)" }}>
+              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
                 Tratamientos realizados
               </Typography>
             </Paper>
           </Grid>
 
-          {/* Pacientes */}
-          <Grid item xs={6} sm={6} md={3}>
-            <Paper
-              elevation={2}
-              sx={{
-                p: 2.5,
-                borderRadius: 4,
-                border: "1px solid rgba(163,105,32,0.12)",
-                background: "linear-gradient(135deg, rgba(255,246,234,0.95), rgba(255,255,255,0.90))",
-                height: "100%",
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                <People sx={{ color: colorPrincipal, fontSize: 28 }} />
-                <Typography sx={{ fontWeight: 800, color: "#2E2E2E", fontSize: 14 }}>Pacientes</Typography>
+          <Grid item xs={6} md={3}>
+            <Paper elevation={1} sx={kpiCardStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+                <Box sx={kpiIconBox("rgba(52,152,219,0.10)")}>
+                  <People sx={{ color: "#3498db", fontSize: 22 }} />
+                </Box>
+                <Typography sx={{ fontWeight: 700, color: "rgba(46,46,46,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Pacientes
+                </Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: colorPrincipal }}>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: "#2E2E2E", lineHeight: 1 }}>
                 {loading ? "—" : Number(kpi?.pacientes_unicos || 0)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.65)" }}>
-                Pacientes únicos
+              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
+                Pacientes atendidos
               </Typography>
             </Paper>
           </Grid>
 
-          {/* Ticket promedio */}
-          <Grid item xs={6} sm={6} md={3}>
-            <Paper
-              elevation={2}
-              sx={{
-                p: 2.5,
-                borderRadius: 4,
-                border: "1px solid rgba(163,105,32,0.12)",
-                background: "linear-gradient(135deg, rgba(255,246,234,0.95), rgba(255,255,255,0.90))",
-                height: "100%",
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                <MedicalServices sx={{ color: colorPrincipal, fontSize: 28 }} />
-                <Typography sx={{ fontWeight: 800, color: "#2E2E2E", fontSize: 14 }}>Ticket</Typography>
+          <Grid item xs={6} md={3}>
+            <Paper elevation={1} sx={kpiCardStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+                <Box sx={kpiIconBox("rgba(39,174,96,0.10)")}>
+                  <AccountBalanceWallet sx={{ color: "#27ae60", fontSize: 22 }} />
+                </Box>
+                <Typography sx={{ fontWeight: 700, color: "rgba(46,46,46,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Ingresos
+                </Typography>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: colorPrincipal }}>
-                {loading ? "—" : money(kpi?.ticket_promedio)}
+              <Typography variant="h5" sx={{ fontWeight: 900, color: "#27ae60", lineHeight: 1 }}>
+                {loading ? "—" : money(ingresosBruto)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.65)" }}>
-                Promedio por sesión (neto)
+              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
+                Total facturado
               </Typography>
             </Paper>
           </Grid>
 
-          {/* Comisión POS */}
-          <Grid item xs={6} sm={6} md={3}>
-            <Paper
-              elevation={2}
-              sx={{
-                p: 2.5,
-                borderRadius: 4,
-                border: "1px solid rgba(163,105,32,0.12)",
-                background: "linear-gradient(135deg, rgba(255,246,234,0.95), rgba(255,255,255,0.90))",
-                height: "100%",
-              }}
-            >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                <CreditCard sx={{ color: colorPrincipal, fontSize: 28 }} />
-                <Typography sx={{ fontWeight: 800, color: "#2E2E2E", fontSize: 14 }}>Comisión POS</Typography>
+          <Grid item xs={6} md={3}>
+            <Paper elevation={1} sx={kpiCardStyle}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+                <Box sx={kpiIconBox("rgba(192,57,43,0.08)")}>
+                  <CreditCard sx={{ color: "#c0392b", fontSize: 22 }} />
+                </Box>
+                <Typography sx={{ fontWeight: 700, color: "rgba(46,46,46,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Comisión POS
+                </Typography>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: "#c0392b" }}>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: "#c0392b", lineHeight: 1 }}>
                 {loading ? "—" : money(comisionPos)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.65)" }}>
+              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
                 4% en pagos con tarjeta
               </Typography>
             </Paper>
           </Grid>
         </Grid>
 
-        {/* ========== INGRESOS (Bruto / Neto) ========== */}
+        {/* ========== TICKET PROMEDIO (barra destacada) ========== */}
         <Paper
-          elevation={4}
+          elevation={1}
           sx={{
-            p: { xs: 2.5, sm: 3.5 },
+            p: { xs: 2, sm: 2.5 },
             mb: 3,
-            borderRadius: 4,
-            backgroundColor: "rgba(255,255,255,0.92)",
-            border: "1px solid rgba(163,105,32,0.15)",
+            borderRadius: 3,
+            background: "linear-gradient(135deg, rgba(163,105,32,0.06), rgba(255,255,255,0.95))",
+            border: "1px solid rgba(163,105,32,0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 2,
+            flexWrap: "wrap",
           }}
         >
-          <Typography sx={{ fontWeight: 900, color: "#2E2E2E", mb: 2, fontSize: 16 }}>
-            Ingresos del mes
-          </Typography>
-
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={4}>
-              <Box
-                sx={{
-                  p: 2.5,
-                  borderRadius: 3,
-                  backgroundColor: "rgba(163,105,32,0.06)",
-                  border: "1px solid rgba(163,105,32,0.15)",
-                  textAlign: "center",
-                }}
-              >
-                <AccountBalanceWallet sx={{ color: colorPrincipal, fontSize: 32, mb: 0.5 }} />
-                <Typography variant="caption" sx={{ display: "block", color: "rgba(46,46,46,0.70)", fontWeight: 600 }}>
-                  BRUTO
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: "#2E2E2E" }}>
-                  {loading ? "—" : money(ingresosBruto)}
-                </Typography>
-              </Box>
-            </Grid>
-
-            <Grid item xs={12} sm={4}>
-              <Box
-                sx={{
-                  p: 2.5,
-                  borderRadius: 3,
-                  backgroundColor: "rgba(39,174,96,0.08)",
-                  border: "1px solid rgba(39,174,96,0.25)",
-                  textAlign: "center",
-                }}
-              >
-                <Paid sx={{ color: "#27ae60", fontSize: 32, mb: 0.5 }} />
-                <Typography variant="caption" sx={{ display: "block", color: "rgba(46,46,46,0.70)", fontWeight: 600 }}>
-                  NETO (lo que recibes)
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: "#27ae60" }}>
-                  {loading ? "—" : money(ingresosNeto)}
-                </Typography>
-              </Box>
-            </Grid>
-
-            <Grid item xs={12} sm={4}>
-              <Box
-                sx={{
-                  p: 2.5,
-                  borderRadius: 3,
-                  backgroundColor: "rgba(192,57,43,0.06)",
-                  border: "1px solid rgba(192,57,43,0.20)",
-                  textAlign: "center",
-                }}
-              >
-                <CreditCard sx={{ color: "#c0392b", fontSize: 32, mb: 0.5 }} />
-                <Typography variant="caption" sx={{ display: "block", color: "rgba(46,46,46,0.70)", fontWeight: 600 }}>
-                  COMISIÓN POS (4%)
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: "#c0392b" }}>
-                  {loading ? "—" : money(comisionPos)}
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
+          <MedicalServices sx={{ color: colorPrincipal, fontSize: 28 }} />
+          <Box sx={{ textAlign: "center" }}>
+            <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.60)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
+              Ticket Promedio por Sesión
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: colorPrincipal, lineHeight: 1.2 }}>
+              {loading ? "—" : money(kpi?.ticket_promedio)}
+            </Typography>
+          </Box>
         </Paper>
 
         {/* ========== TABLAS ========== */}
-        <Grid container spacing={3}>
+        <Grid container spacing={2.5}>
           {/* Top tratamientos */}
           <Grid item xs={12} md={6}>
             <Paper
-              elevation={3}
+              elevation={1}
               sx={{
-                p: { xs: 2, sm: 3 },
-                borderRadius: 4,
-                backgroundColor: "rgba(255,255,255,0.92)",
-                border: "1px solid rgba(163,105,32,0.12)",
+                borderRadius: 3,
+                backgroundColor: "rgba(255,255,255,0.96)",
+                border: "1px solid rgba(163,105,32,0.10)",
+                overflow: "hidden",
               }}
             >
-              <Typography sx={{ fontWeight: 900, color: "#2E2E2E", mb: 2 }}>
-                Top tratamientos del mes
-              </Typography>
+              <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                <EmojiEvents sx={{ color: "#D4AF37", fontSize: 22 }} />
+                <Typography sx={{ fontWeight: 800, color: "#2E2E2E", fontSize: 15 }}>
+                  Top Tratamientos
+                </Typography>
+              </Box>
+              <Divider sx={{ borderColor: "rgba(163,105,32,0.08)" }} />
               <TableContainer>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ backgroundColor: "rgba(163,105,32,0.08)" }}>
-                      <TableCell sx={{ fontWeight: 700 }}>Tratamiento</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700 }}>Sesiones</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700 }}>Ingresos (Neto)</TableCell>
+                    <TableRow sx={{ backgroundColor: "rgba(163,105,32,0.04)" }}>
+                      <TableCell sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>#</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Tratamiento</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Sesiones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {(data?.top_tratamientos || []).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ py: 3, color: "rgba(46,46,46,0.60)" }}>
+                        <TableCell colSpan={3} align="center" sx={{ py: 4, color: "rgba(46,46,46,0.45)" }}>
                           {loading ? "Cargando..." : "Sin datos en este periodo"}
                         </TableCell>
                       </TableRow>
                     ) : (
                       (data?.top_tratamientos || []).map((r, idx) => (
-                        <TableRow key={String(r.tratamiento_id || idx)} hover>
-                          <TableCell>{r.tratamiento || "(No especificado)"}</TableCell>
-                          <TableCell align="right">{Number(r.cantidad || 0)}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600, color: "#27ae60" }}>
-                            {money(r.ingresos_neto)}
+                        <TableRow
+                          key={String(r.tratamiento_id || idx)}
+                          sx={{
+                            "&:hover": { backgroundColor: "rgba(163,105,32,0.03)" },
+                            "&:last-child td": { borderBottom: 0 },
+                          }}
+                        >
+                          <TableCell sx={{ width: 40, py: 1.5 }}>
+                            <Box
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: "50%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: idx < 3 ? `${rankColors[idx]}18` : "rgba(0,0,0,0.04)",
+                                color: idx < 3 ? rankColors[idx] : "rgba(46,46,46,0.50)",
+                                fontWeight: 800,
+                                fontSize: 12,
+                              }}
+                            >
+                              {idx + 1}
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: idx < 3 ? 700 : 500, color: "#2E2E2E", py: 1.5 }}>
+                            {r.tratamiento || "(No especificado)"}
+                          </TableCell>
+                          <TableCell align="center" sx={{ py: 1.5 }}>
+                            <Chip
+                              label={Number(r.cantidad || 0)}
+                              size="small"
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: 13,
+                                backgroundColor: "rgba(163,105,32,0.08)",
+                                color: colorPrincipal,
+                                minWidth: 40,
+                              }}
+                            />
                           </TableCell>
                         </TableRow>
                       ))
@@ -463,40 +458,79 @@ export default function Estadisticas() {
           {/* Pacientes frecuentes */}
           <Grid item xs={12} md={6}>
             <Paper
-              elevation={3}
+              elevation={1}
               sx={{
-                p: { xs: 2, sm: 3 },
-                borderRadius: 4,
-                backgroundColor: "rgba(255,255,255,0.92)",
-                border: "1px solid rgba(163,105,32,0.12)",
+                borderRadius: 3,
+                backgroundColor: "rgba(255,255,255,0.96)",
+                border: "1px solid rgba(163,105,32,0.10)",
+                overflow: "hidden",
               }}
             >
-              <Typography sx={{ fontWeight: 900, color: "#2E2E2E", mb: 2 }}>
-                Pacientes frecuentes
-              </Typography>
+              <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                <PersonOutline sx={{ color: "#3498db", fontSize: 22 }} />
+                <Typography sx={{ fontWeight: 800, color: "#2E2E2E", fontSize: 15 }}>
+                  Pacientes Frecuentes
+                </Typography>
+              </Box>
+              <Divider sx={{ borderColor: "rgba(163,105,32,0.08)" }} />
               <TableContainer>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ backgroundColor: "rgba(163,105,32,0.08)" }}>
-                      <TableCell sx={{ fontWeight: 700 }}>Paciente</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700 }}>Sesiones</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700 }}>Ingresos (Neto)</TableCell>
+                    <TableRow sx={{ backgroundColor: "rgba(163,105,32,0.04)" }}>
+                      <TableCell sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>#</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Paciente</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Sesiones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {(data?.pacientes_frecuentes || []).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ py: 3, color: "rgba(46,46,46,0.60)" }}>
+                        <TableCell colSpan={3} align="center" sx={{ py: 4, color: "rgba(46,46,46,0.45)" }}>
                           {loading ? "Cargando..." : "Sin datos en este periodo"}
                         </TableCell>
                       </TableRow>
                     ) : (
                       (data?.pacientes_frecuentes || []).map((r, idx) => (
-                        <TableRow key={String(r.paciente_id || idx)} hover>
-                          <TableCell>{r.paciente || "(No especificado)"}</TableCell>
-                          <TableCell align="right">{Number(r.sesiones || 0)}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600, color: "#27ae60" }}>
-                            {money(r.ingresos_neto)}
+                        <TableRow
+                          key={String(r.paciente_id || idx)}
+                          sx={{
+                            "&:hover": { backgroundColor: "rgba(52,152,219,0.03)" },
+                            "&:last-child td": { borderBottom: 0 },
+                          }}
+                        >
+                          <TableCell sx={{ width: 40, py: 1.5 }}>
+                            <Box
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: "50%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                backgroundColor: idx < 3 ? `${rankColors[idx]}18` : "rgba(0,0,0,0.04)",
+                                color: idx < 3 ? rankColors[idx] : "rgba(46,46,46,0.50)",
+                                fontWeight: 800,
+                                fontSize: 12,
+                              }}
+                            >
+                              {idx + 1}
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: idx < 3 ? 700 : 500, color: "#2E2E2E", py: 1.5 }}>
+                            {r.paciente || "(No especificado)"}
+                          </TableCell>
+                          <TableCell align="center" sx={{ py: 1.5 }}>
+                            <Chip
+                              label={Number(r.sesiones || 0)}
+                              size="small"
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: 13,
+                                backgroundColor: "rgba(52,152,219,0.08)",
+                                color: "#3498db",
+                                minWidth: 40,
+                              }}
+                            />
                           </TableCell>
                         </TableRow>
                       ))

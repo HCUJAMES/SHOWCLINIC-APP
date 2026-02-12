@@ -453,13 +453,13 @@ export default function CrearTratamiento() {
                   isOptionEqualToValue={(opt, val) => opt.id === val.id}
                 />
                 <TextField
-                  label="Cantidad"
+                  label={`Cantidad (${varianteSeleccionada?.unidad_base || "ml"})`}
                   type="number"
                   value={cantidadProducto}
                   onChange={(e) => setCantidadProducto(parseFloat(e.target.value) || 1)}
                   sx={{ width: 120 }}
-                  inputProps={{ min: 0.1, step: 0.1 }}
-                  helperText="ml / unidades"
+                  inputProps={{ min: varianteSeleccionada?.unidad_base === "U" ? 1 : 0.1, step: varianteSeleccionada?.unidad_base === "U" ? 1 : 0.1 }}
+                  helperText={varianteSeleccionada?.unidad_base === "U" ? "Ej: 50 unidades" : "Ej: 1 ml"}
                 />
                 <Button
                   variant="contained"

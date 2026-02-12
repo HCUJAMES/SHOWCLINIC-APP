@@ -299,10 +299,12 @@ router.post("/:id/ofertas", requirePatientWrite, (req, res) => {
       const tratamientoId = it?.tratamientoId;
       const nombre = typeof it?.nombre === "string" ? it.nombre.trim() : "";
       const precioNum = Number(it?.precio);
+      const sesionesNum = Number(it?.sesiones);
       return {
         tratamientoId: tratamientoId !== undefined && tratamientoId !== null ? Number(tratamientoId) : null,
         nombre,
         precio: Number.isFinite(precioNum) ? precioNum : 0,
+        sesiones: Number.isFinite(sesionesNum) && sesionesNum >= 1 ? sesionesNum : 1,
       };
     })
     .filter((it) => it.nombre);
@@ -353,10 +355,12 @@ router.put("/:id/ofertas/:ofertaId", requirePatientWrite, (req, res) => {
       const tratamientoId = it?.tratamientoId;
       const nombre = typeof it?.nombre === "string" ? it.nombre.trim() : "";
       const precioNum = Number(it?.precio);
+      const sesionesNum = Number(it?.sesiones);
       return {
         tratamientoId: tratamientoId !== undefined && tratamientoId !== null ? Number(tratamientoId) : null,
         nombre,
         precio: Number.isFinite(precioNum) ? precioNum : 0,
+        sesiones: Number.isFinite(sesionesNum) && sesionesNum >= 1 ? sesionesNum : 1,
       };
     })
     .filter((it) => it.nombre);

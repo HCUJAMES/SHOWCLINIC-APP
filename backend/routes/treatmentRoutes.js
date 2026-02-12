@@ -345,8 +345,11 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       .slice(0, 19);
 
     // 1) VALIDAR STOCK PARA TODOS LOS TRATAMIENTOS QUE TENGAN RECETA
+    //    Si el doctor eligió una variante específica, se salta la validación por receta
+    //    y se valida solo la variante elegida en el paso 1.b
     for (const b of productosData) {
       if (!b.tratamiento_id) continue; // sin tratamiento asociado, usa flujo clásico
+      if (b.variante_id) continue; // variante elegida manualmente → validar en paso 1.b
 
       const recetas = await dbAll(
         `SELECT * FROM recetas_tratamiento WHERE tratamiento_id = ?`,
@@ -623,8 +626,10 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       }
 
       // Intentar usar receta_tratamiento si existe
+      // Si el doctor eligió una variante específica, se salta la receta y se usa el flujo directo
       let usoReceta = false;
-      if (b.tratamiento_id) {
+      const varianteElegidaDirecta = b.variante_id ? Number(b.variante_id) : null;
+      if (b.tratamiento_id && !varianteElegidaDirecta) {
         const recetas = await dbAll(
           `SELECT * FROM recetas_tratamiento WHERE tratamiento_id = ?`,
           [b.tratamiento_id]
@@ -669,7 +674,10 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       // Consumir por producto seleccionado (variante_id) SOLO si no se usó receta.
       // Esto evita descuento doble cuando hay receta Y variante seleccionada.
       const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
-      const cantidadElegida = parseFloat(b.cantidad) || 0;
+      const cantidadElegida =
+        parseFloat(b.dosis_unidades) > 0
+          ? parseFloat(b.dosis_unidades)
+          : parseFloat(b.cantidad) || 0;
 
       if (!usoReceta && varianteIdElegida && cantidadElegida > 0) {
         const movimiento = await dbRun(

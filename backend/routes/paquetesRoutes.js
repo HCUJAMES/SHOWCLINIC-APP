@@ -943,22 +943,27 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
 
     const presupuestoAsignadoId = result.lastID;
 
-    // Crear las sesiones individuales (1 sesión por tratamiento por defecto)
+    // Crear las sesiones individuales (N sesiones por tratamiento según lo configurado)
     for (const item of items) {
-      await dbRun(
-        `INSERT INTO presupuestos_sesiones (
-          presupuesto_asignado_id, tratamiento_id, tratamiento_nombre,
-          sesion_numero, precio_sesion, estado, creado_en
-        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
-        [
-          presupuestoAsignadoId,
-          item.tratamientoId || item.tratamiento_id || null,
-          item.nombre,
-          1,
-          item.precio || 0,
-          ahora
-        ]
-      );
+      const numSesiones = Number(item.sesiones) >= 1 ? Number(item.sesiones) : 1;
+      const precioTotal = Number(item.precio) || 0;
+
+      for (let s = 1; s <= numSesiones; s++) {
+        await dbRun(
+          `INSERT INTO presupuestos_sesiones (
+            presupuesto_asignado_id, tratamiento_id, tratamiento_nombre,
+            sesion_numero, precio_sesion, estado, creado_en
+          ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
+          [
+            presupuestoAsignadoId,
+            item.tratamientoId || item.tratamiento_id || null,
+            item.nombre,
+            s,
+            precioTotal,
+            ahora
+          ]
+        );
+      }
     }
 
     res.json({ 

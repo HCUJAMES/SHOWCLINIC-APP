@@ -61,8 +61,8 @@ const Paquetes = () => {
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [tratamientosSeleccionados, setTratamientosSeleccionados] = useState([]);
-  const [precioRegular, setPrecioRegular] = useState(0);
-  const [precioPaquete, setPrecioPaquete] = useState(0);
+  const [precioRegular, setPrecioRegular] = useState("");
+  const [precioPaquete, setPrecioPaquete] = useState("");
   const [vigenciaInicio, setVigenciaInicio] = useState("");
   const [vigenciaFin, setVigenciaFin] = useState("");
   const [imagenPromocional, setImagenPromocional] = useState("");
@@ -150,8 +150,8 @@ const Paquetes = () => {
     setNombre("");
     setDescripcion("");
     setTratamientosSeleccionados([]);
-    setPrecioRegular(0);
-    setPrecioPaquete(0);
+    setPrecioRegular("");
+    setPrecioPaquete("");
     setVigenciaInicio("");
     setVigenciaFin("");
     setImagenPromocional("");
@@ -230,17 +230,17 @@ const Paquetes = () => {
       return;
     }
 
-    if (precioRegular <= 0) {
+    if (Number(precioRegular) <= 0) {
       showToast({ severity: "error", message: "El precio regular debe ser mayor a 0" });
       return;
     }
 
-    if (precioPaquete <= 0) {
+    if (Number(precioPaquete) <= 0) {
       showToast({ severity: "error", message: "El precio del paquete debe ser mayor a 0" });
       return;
     }
 
-    if (precioPaquete >= precioRegular) {
+    if (Number(precioPaquete) >= Number(precioRegular)) {
       showToast({ severity: "error", message: "El precio del paquete debe ser menor al precio regular" });
       return;
     }
@@ -260,8 +260,8 @@ const Paquetes = () => {
         nombre: t.nombre,
         sesiones: t.sesiones_tratamiento || 1,
       })),
-      precio_regular: precioRegular,
-      precio_paquete: precioPaquete,
+      precio_regular: Number(precioRegular),
+      precio_paquete: Number(precioPaquete),
       sesiones: totalSesiones,
       vigencia_inicio: vigenciaInicio || null,
       vigencia_fin: vigenciaFin || null,
@@ -347,8 +347,8 @@ const Paquetes = () => {
   };
 
   const calcularDescuento = () => {
-    if (precioRegular > 0 && precioPaquete > 0) {
-      return ((precioRegular - precioPaquete) / precioRegular * 100).toFixed(1);
+    if (Number(precioRegular) > 0 && Number(precioPaquete) > 0) {
+      return ((Number(precioRegular) - Number(precioPaquete)) / Number(precioRegular) * 100).toFixed(1);
     }
     return 0;
   };
@@ -826,7 +826,7 @@ const Paquetes = () => {
                     type="number"
                     label="Precio Regular (S/) - Sin descuento"
                     value={precioRegular}
-                    onChange={(e) => setPrecioRegular(Number(e.target.value))}
+                    onChange={(e) => setPrecioRegular(e.target.value)}
                     inputProps={{ min: 0, step: 0.01 }}
                     helperText="Precio normal si se compraran los tratamientos por separado"
                     InputProps={{
@@ -841,7 +841,7 @@ const Paquetes = () => {
                     type="number"
                     label="Precio Total del Paquete (S/) *"
                     value={precioPaquete}
-                    onChange={(e) => setPrecioPaquete(Number(e.target.value))}
+                    onChange={(e) => setPrecioPaquete(e.target.value)}
                     inputProps={{ min: 0, step: 0.01 }}
                     helperText="Precio promocional del paquete completo"
                     InputProps={{
@@ -854,17 +854,17 @@ const Paquetes = () => {
                   <Box sx={{ 
                     p: 3, 
                     borderRadius: 3, 
-                    background: precioRegular > 0 && precioPaquete > 0 && precioPaquete < precioRegular
+                    background: Number(precioRegular) > 0 && Number(precioPaquete) > 0 && Number(precioPaquete) < Number(precioRegular)
                       ? "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)"
                       : "#e0e0e0",
                     color: "white",
                     textAlign: "center",
                   }}>
                     <Typography variant="h3" sx={{ fontWeight: "bold" }}>
-                      {precioRegular > 0 && precioPaquete > 0 ? ((1 - precioPaquete / precioRegular) * 100).toFixed(0) : 0}% OFF
+                      {Number(precioRegular) > 0 && Number(precioPaquete) > 0 ? ((1 - Number(precioPaquete) / Number(precioRegular)) * 100).toFixed(0) : 0}% OFF
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Ahorro de S/ {(precioRegular - precioPaquete).toFixed(2)}
+                      Ahorro de S/ {(Number(precioRegular) - Number(precioPaquete)).toFixed(2)}
                     </Typography>
                   </Box>
                 </Grid>
@@ -1018,32 +1018,6 @@ const Paquetes = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Modal de confirmación para eliminar */}
-      <Dialog open={openConfirmarEliminar} onClose={() => setOpenConfirmarEliminar(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white" }}>
-          Confirmar Eliminación
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <Typography>
-            ¿Estás seguro de que deseas eliminar el paquete "{paqueteEliminar?.nombre}"?
-          </Typography>
-          <Typography sx={{ mt: 2, color: "#d32f2f", fontWeight: "bold" }}>
-            Esta acción no se puede deshacer.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenConfirmarEliminar(false)} sx={{ color: "#666" }}>
-            Cancelar
-          </Button>
-          <Button
-            onClick={eliminarPaquete}
-            variant="contained"
-            color="error"
-          >
-            Eliminar
-          </Button>
-        </DialogActions>
-      </Dialog>
       </Container>
     </Box>
   );

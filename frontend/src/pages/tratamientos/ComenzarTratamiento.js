@@ -816,8 +816,9 @@ const ComenzarTratamiento = () => {
                                 if (!opt) return "";
                                 const marca = opt.producto_base_nombre || "";
                                 const nombre = opt.nombre || "";
+                                const unidad = opt.unidad_base ? ` (${opt.unidad_base})` : "";
                                 const precio = opt.precio_cliente ? ` - S/ ${Number(opt.precio_cliente).toFixed(2)}` : "";
-                                return `${marca} - ${nombre}${precio}`.trim();
+                                return `${marca} - ${nombre}${unidad}${precio}`.trim();
                               }}
                               isOptionEqualToValue={(opt, val) => String(opt.id) === String(val.id)}
                               onChange={(_, val) => {
@@ -855,22 +856,39 @@ const ComenzarTratamiento = () => {
                       </Grid>
 
                       <Grid item xs={12} sm="auto" md="auto">
-                        <TextField
-                          label="Cantidad (ml)"
-                          type="number"
-                          value={b.cantidad}
-                          onChange={(e) => actualizarBloque(index, "cantidad", e.target.value)}
-                          inputProps={{ min: 0.1, step: 0.1 }}
-                          sx={{
-                            "& .MuiInputBase-root": {
-                              backgroundColor: "rgba(255,255,255,0.95)",
-                              borderRadius: 3,
-                              minHeight: "56px",
-                            },
-                            width: { xs: "100%", sm: 160 },
-                          }}
-                          helperText="ml a descontar del inventario"
-                        />
+                        {(() => {
+                          const varSel = b.variante_id ? variantesInv.find(v => String(v.id) === String(b.variante_id)) : null;
+                          const esUnidades = varSel?.unidad_base === "U";
+                          return (
+                            <TextField
+                              label={esUnidades ? "Unidades (U)" : "Cantidad (ml)"}
+                              type="number"
+                              value={esUnidades ? (b.dosis_unidades || b.cantidad) : b.cantidad}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (esUnidades) {
+                                  setBloques(prev => {
+                                    const copia = [...prev];
+                                    copia[index] = { ...copia[index], dosis_unidades: val, cantidad: val };
+                                    return copia;
+                                  });
+                                } else {
+                                  actualizarBloque(index, "cantidad", val);
+                                }
+                              }}
+                              inputProps={{ min: esUnidades ? 1 : 0.1, step: esUnidades ? 1 : 0.1 }}
+                              sx={{
+                                "& .MuiInputBase-root": {
+                                  backgroundColor: "rgba(255,255,255,0.95)",
+                                  borderRadius: 3,
+                                  minHeight: "56px",
+                                },
+                                width: { xs: "100%", sm: 160 },
+                              }}
+                              helperText={esUnidades ? "Unidades a usar (ej: 50U)" : "ml a descontar del inventario"}
+                            />
+                          );
+                        })()}
                       </Grid>
 
                     </Grid>
