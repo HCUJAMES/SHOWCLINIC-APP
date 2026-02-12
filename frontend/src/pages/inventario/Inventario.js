@@ -945,6 +945,7 @@ export default function Inventario() {
                       >
                         <MenuItem value="ml">ml (mililitros)</MenuItem>
                         <MenuItem value="U">U (unidades)</MenuItem>
+                        <MenuItem value="frasco">Frasco</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1002,11 +1003,13 @@ export default function Inventario() {
                   onChange={(e) =>
                     setFormIngresoSimple((p) => ({ ...p, cantidad: e.target.value }))
                   }
-                  inputProps={{ min: 0.1, step: (modoVariante === "select" && varianteSeleccionada?.unidad_base === "U") || (modoVariante === "new" && unidadNuevaVariante === "U") ? 1 : 0.1 }}
+                  inputProps={{ min: 0.1, step: (modoVariante === "select" && (varianteSeleccionada?.unidad_base === "U" || varianteSeleccionada?.unidad_base === "frasco")) || (modoVariante === "new" && (unidadNuevaVariante === "U" || unidadNuevaVariante === "frasco")) ? 1 : 0.1 }}
                   helperText={
                     (modoVariante === "select" && varianteSeleccionada?.unidad_base === "U") || (modoVariante === "new" && unidadNuevaVariante === "U")
                       ? "Ej: 1 frasco de 100U = 100"
-                      : "Ej: caja 2x1ml = 2"
+                      : (modoVariante === "select" && varianteSeleccionada?.unidad_base === "frasco") || (modoVariante === "new" && unidadNuevaVariante === "frasco")
+                        ? "Ej: 4 frascos"
+                        : "Ej: caja 2x1ml = 2"
                   }
                 />
               </Grid>

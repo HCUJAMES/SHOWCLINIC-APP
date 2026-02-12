@@ -458,8 +458,8 @@ export default function CrearTratamiento() {
                   value={cantidadProducto}
                   onChange={(e) => setCantidadProducto(parseFloat(e.target.value) || 1)}
                   sx={{ width: 120 }}
-                  inputProps={{ min: varianteSeleccionada?.unidad_base === "U" ? 1 : 0.1, step: varianteSeleccionada?.unidad_base === "U" ? 1 : 0.1 }}
-                  helperText={varianteSeleccionada?.unidad_base === "U" ? "Ej: 50 unidades" : "Ej: 1 ml"}
+                  inputProps={{ min: (varianteSeleccionada?.unidad_base === "U" || varianteSeleccionada?.unidad_base === "frasco") ? 1 : 0.1, step: (varianteSeleccionada?.unidad_base === "U" || varianteSeleccionada?.unidad_base === "frasco") ? 1 : 0.1 }}
+                  helperText={varianteSeleccionada?.unidad_base === "U" ? "Ej: 50 unidades" : varianteSeleccionada?.unidad_base === "frasco" ? "Ej: 1 frasco" : "Ej: 1 ml"}
                 />
                 <Button
                   variant="contained"

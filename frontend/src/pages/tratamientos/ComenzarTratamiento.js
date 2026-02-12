@@ -858,15 +858,18 @@ const ComenzarTratamiento = () => {
                       <Grid item xs={12} sm="auto" md="auto">
                         {(() => {
                           const varSel = b.variante_id ? variantesInv.find(v => String(v.id) === String(b.variante_id)) : null;
-                          const esUnidades = varSel?.unidad_base === "U";
+                          const unidadVar = varSel?.unidad_base || "ml";
+                          const esEntera = unidadVar === "U" || unidadVar === "frasco";
+                          const labelCantidad = unidadVar === "U" ? "Unidades (U)" : unidadVar === "frasco" ? "Frascos" : "Cantidad (ml)";
+                          const helperCantidad = unidadVar === "U" ? "Unidades a usar (ej: 50U)" : unidadVar === "frasco" ? "Frascos a usar" : "ml a descontar del inventario";
                           return (
                             <TextField
-                              label={esUnidades ? "Unidades (U)" : "Cantidad (ml)"}
+                              label={labelCantidad}
                               type="number"
-                              value={esUnidades ? (b.dosis_unidades || b.cantidad) : b.cantidad}
+                              value={esEntera ? (b.dosis_unidades || b.cantidad) : b.cantidad}
                               onChange={(e) => {
                                 const val = e.target.value;
-                                if (esUnidades) {
+                                if (esEntera) {
                                   setBloques(prev => {
                                     const copia = [...prev];
                                     copia[index] = { ...copia[index], dosis_unidades: val, cantidad: val };
@@ -876,7 +879,7 @@ const ComenzarTratamiento = () => {
                                   actualizarBloque(index, "cantidad", val);
                                 }
                               }}
-                              inputProps={{ min: esUnidades ? 1 : 0.1, step: esUnidades ? 1 : 0.1 }}
+                              inputProps={{ min: esEntera ? 1 : 0.1, step: esEntera ? 1 : 0.1 }}
                               sx={{
                                 "& .MuiInputBase-root": {
                                   backgroundColor: "rgba(255,255,255,0.95)",
@@ -885,7 +888,7 @@ const ComenzarTratamiento = () => {
                                 },
                                 width: { xs: "100%", sm: 160 },
                               }}
-                              helperText={esUnidades ? "Unidades a usar (ej: 50U)" : "ml a descontar del inventario"}
+                              helperText={helperCantidad}
                             />
                           );
                         })()}
