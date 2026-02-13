@@ -15,9 +15,14 @@ import {
   TableHead,
   TableRow,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Tooltip,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
-import { ArrowBack, Home } from "@mui/icons-material";
+import { ArrowBack, Home, Edit, Delete } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -59,6 +64,9 @@ export default function Inventario() {
   const [editPrecioVarianteId, setEditPrecioVarianteId] = useState(null);
   const [editPrecioCliente, setEditPrecioCliente] = useState("");
   const [guardandoPrecio, setGuardandoPrecio] = useState(false);
+  const [editVarianteOpen, setEditVarianteOpen] = useState(false);
+  const [editVarianteData, setEditVarianteData] = useState({ id: null, nombre: "", laboratorio: "", unidad_base: "ml" });
+  const [guardandoVariante, setGuardandoVariante] = useState(false);
   const role = localStorage.getItem("role");
   const canWriteInventory = role === "doctor" || role === "logistica" || role === "master";
   const token = localStorage.getItem("token");
@@ -503,6 +511,69 @@ export default function Inventario() {
     }
   };
 
+  const abrirEditarVariante = (r) => {
+    setEditVarianteData({
+      id: r.variante_id,
+      nombre: r.variante_nombre || "",
+      laboratorio: r.laboratorio || "",
+      unidad_base: r.unidad_base || "ml",
+    });
+    setEditVarianteOpen(true);
+  };
+
+  const guardarEditVariante = async () => {
+    if (!canWriteInventory || !editVarianteData.id) return;
+    if (!editVarianteData.nombre.trim()) {
+      showToast({ severity: "warning", message: "El nombre es obligatorio" });
+      return;
+    }
+    try {
+      setGuardandoVariante(true);
+      const res = await fetch(`${API_BASE}/api/inventario/variantes/${editVarianteData.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          nombre: editVarianteData.nombre.trim(),
+          laboratorio: editVarianteData.laboratorio.trim() || null,
+          unidad_base: editVarianteData.unidad_base,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      await obtenerVariantes();
+      await obtenerStockLotes();
+      setEditVarianteOpen(false);
+      showToast({ severity: "success", message: "Producto actualizado" });
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: "Error al actualizar producto" });
+    } finally {
+      setGuardandoVariante(false);
+    }
+  };
+
+  const borrarVariante = async (varianteId, nombre) => {
+    if (!canWriteInventory) return;
+    if (!window.confirm(`¿Eliminar "${nombre}" y todo su stock? Esta acción no se puede deshacer.`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/inventario/variantes/${varianteId}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) throw new Error();
+      await obtenerVariantes();
+      await obtenerStockLotes();
+      showToast({ severity: "success", message: `"${nombre}" eliminado` });
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: "Error al eliminar producto" });
+    }
+  };
+
   const registrarIngresoSimple = async () => {
     if (!canWriteInventory) return;
     let productoBaseId = null;
@@ -747,6 +818,7 @@ export default function Inventario() {
               <TableCell>Disponible</TableCell>
               <TableCell>Mínimo</TableCell>
               <TableCell>Estado</TableCell>
+              {canWriteInventory && <TableCell align="center">Acciones</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -775,6 +847,20 @@ export default function Inventario() {
                     {r.estado}
                   </strong>
                 </TableCell>
+                {canWriteInventory && (
+                  <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                    <Tooltip title="Editar producto">
+                      <IconButton size="small" onClick={() => abrirEditarVariante(r)} sx={{ color: colorPrincipal }}>
+                        <Edit fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Eliminar producto">
+                      <IconButton size="small" onClick={() => borrarVariante(r.variante_id, r.variante_nombre)} sx={{ color: "#b71c1c" }}>
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
@@ -1224,6 +1310,45 @@ export default function Inventario() {
           </TableBody>
         </Table>
       </Paper>
+
+      <Dialog open={editVarianteOpen} onClose={() => setEditVarianteOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold" }}>Editar Producto</DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
+          <TextField
+            label="Nombre"
+            fullWidth
+            value={editVarianteData.nombre}
+            onChange={(e) => setEditVarianteData((p) => ({ ...p, nombre: e.target.value }))}
+          />
+          <TextField
+            label="Laboratorio"
+            fullWidth
+            value={editVarianteData.laboratorio}
+            onChange={(e) => setEditVarianteData((p) => ({ ...p, laboratorio: e.target.value }))}
+          />
+          <FormControl fullWidth>
+            <Select
+              value={editVarianteData.unidad_base}
+              onChange={(e) => setEditVarianteData((p) => ({ ...p, unidad_base: e.target.value }))}
+            >
+              <MenuItem value="ml">ml (mililitros)</MenuItem>
+              <MenuItem value="U">U (unidades)</MenuItem>
+              <MenuItem value="frasco">Frasco</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setEditVarianteOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+          <Button
+            variant="contained"
+            onClick={guardarEditVariante}
+            disabled={guardandoVariante}
+            sx={{ backgroundColor: colorPrincipal, "&:hover": { backgroundColor: "#8a541a" } }}
+          >
+            {guardandoVariante ? "Guardando..." : "Guardar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

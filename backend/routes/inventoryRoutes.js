@@ -462,6 +462,18 @@ router.put("/variantes/:id", requireInventoryWrite, async (req, res) => {
   }
 });
 
+router.delete("/variantes/:id", requireInventoryWrite, async (req, res) => {
+  const { id } = req.params;
+  try {
+    await dbRun(`DELETE FROM stock_lotes WHERE variante_id = ?`, [id]);
+    await dbRun(`DELETE FROM variantes WHERE id = ?`, [id]);
+    res.json({ message: "✅ Variante y sus lotes eliminados" });
+  } catch (err) {
+    console.error("❌ Error al eliminar variante:", err.message);
+    res.status(500).json({ message: "Error al eliminar variante" });
+  }
+});
+
 /* ==============================================
    📦 STOCK POR LOTE (FEFO)
 ============================================== */
