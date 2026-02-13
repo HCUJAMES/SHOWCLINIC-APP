@@ -441,4 +441,163 @@ router.get("/reporte", (req, res) => {
   });
 });
 
+// 💰 MARCAR COMO PAGADO — registra pago en deuda o actualiza tratamiento
+router.post("/pagar", (req, res) => {
+  const { tratamiento_realizado_id, finanza_id, monto, metodo_pago, tipo_registro } = req.body;
+
+  if (!monto || !metodo_pago) {
+    return res.status(400).json({ message: "Monto y método de pago son obligatorios" });
+  }
+
+  const montoNum = parseFloat(monto);
+  if (isNaN(montoNum) || montoNum <= 0) {
+    return res.status(400).json({ message: "Monto inválido" });
+  }
+
+  // Si es un tratamiento realizado con deuda
+  if (tratamiento_realizado_id && tipo_registro === "tratamiento") {
+    // Buscar si tiene deuda en deudas_tratamientos
+    db.get(
+      `SELECT * FROM deudas_tratamientos WHERE tratamiento_realizado_id = ? AND estado = 'pendiente'`,
+      [tratamiento_realizado_id],
+      (err, deuda) => {
+        if (err) {
+          console.error("❌ Error buscando deuda:", err.message);
+          return res.status(500).json({ message: "Error al buscar deuda" });
+        }
+
+        if (deuda) {
+          // Registrar pago en deudas_pagos
+          const numPago = (deuda.pagos_cantidad || 0) + 1;
+          db.run(
+            `INSERT INTO deudas_pagos (deuda_id, numero, monto, metodo) VALUES (?, ?, ?, ?)`,
+            [deuda.id, numPago, montoNum, metodo_pago],
+            function (errPago) {
+              if (errPago) {
+                console.error("❌ Error registrando pago:", errPago.message);
+                return res.status(500).json({ message: "Error al registrar pago" });
+              }
+
+              // Verificar si la deuda se saldó completamente
+              db.get(
+                `SELECT COALESCE(SUM(monto), 0) AS total_pagado FROM deudas_pagos WHERE deuda_id = ?`,
+                [deuda.id],
+                (errSum, sumRow) => {
+                  if (errSum) {
+                    console.error("❌ Error sumando pagos:", errSum.message);
+                    return res.status(500).json({ message: "Error al verificar pagos" });
+                  }
+
+                  const totalPagado = sumRow?.total_pagado || 0;
+                  const montoTotal = parseFloat(deuda.monto_total) || 0;
+
+                  if (totalPagado >= montoTotal - 0.01) {
+                    // Marcar deuda como pagada
+                    db.run(
+                      `UPDATE deudas_tratamientos SET estado = 'pagado', cancelado_en = datetime('now'), cancelado_monto = ?, cancelado_metodo = ? WHERE id = ?`,
+                      [montoNum, metodo_pago, deuda.id],
+                      (errUpd) => {
+                        if (errUpd) console.error("❌ Error actualizando deuda:", errUpd.message);
+                        res.json({ message: "✅ Pago registrado y deuda saldada", saldada: true });
+                      }
+                    );
+                  } else {
+                    // Actualizar saldo pendiente
+                    const nuevoSaldo = Math.max(0, montoTotal - totalPagado);
+                    db.run(
+                      `UPDATE deudas_tratamientos SET monto_saldo = ? WHERE id = ?`,
+                      [nuevoSaldo, deuda.id],
+                      (errUpd) => {
+                        if (errUpd) console.error("❌ Error actualizando saldo:", errUpd.message);
+                        res.json({ message: "✅ Pago parcial registrado", saldada: false, saldo_pendiente: nuevoSaldo });
+                      }
+                    );
+                  }
+                }
+              );
+            }
+          );
+        } else {
+          // No tiene deuda registrada, crear registro en finanzas como pago directo
+          const fechaAhora = new Date().toISOString().slice(0, 19).replace("T", " ");
+          db.get(`SELECT paciente_id FROM tratamientos_realizados WHERE id = ?`, [tratamiento_realizado_id], (errTr, tr) => {
+            if (errTr || !tr) {
+              return res.status(404).json({ message: "Tratamiento no encontrado" });
+            }
+            db.run(
+              `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo)
+               VALUES ('ingreso', 'abono_deuda', ?, 'Pago de tratamiento', ?, ?, ?, ?, 'tratamiento_realizado')`,
+              [montoNum, fechaAhora, metodo_pago, tr.paciente_id, tratamiento_realizado_id],
+              function (errIns) {
+                if (errIns) {
+                  console.error("❌ Error insertando finanza:", errIns.message);
+                  return res.status(500).json({ message: "Error al registrar pago" });
+                }
+                res.json({ message: "✅ Pago registrado en finanzas", saldada: true });
+              }
+            );
+          });
+        }
+      }
+    );
+    return;
+  }
+
+  // Si es un registro de finanzas (presupuesto, paquete, etc.)
+  if (finanza_id) {
+    const fechaAhora = new Date().toISOString().slice(0, 19).replace("T", " ");
+    db.run(
+      `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo)
+       VALUES ('ingreso', 'abono_deuda', ?, 'Pago adicional', ?, ?, (SELECT paciente_id FROM finanzas WHERE id = ?), ?, 'finanza')`,
+      [montoNum, fechaAhora, metodo_pago, finanza_id, finanza_id],
+      function (errIns) {
+        if (errIns) {
+          console.error("❌ Error insertando pago finanza:", errIns.message);
+          return res.status(500).json({ message: "Error al registrar pago" });
+        }
+        res.json({ message: "✅ Pago registrado", saldada: true });
+      }
+    );
+    return;
+  }
+
+  res.status(400).json({ message: "Datos insuficientes para registrar pago" });
+});
+
+// 🗑️ ELIMINAR REGISTRO DE FINANZAS
+router.delete("/registro/:tipo/:id", (req, res) => {
+  const { tipo, id } = req.params;
+
+  if (tipo === "tratamiento") {
+    // Eliminar tratamiento realizado y sus deudas asociadas
+    db.get(`SELECT id FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?`, [id], (err, deuda) => {
+      if (err) {
+        console.error("❌ Error buscando deuda:", err.message);
+        return res.status(500).json({ message: "Error al buscar deuda" });
+      }
+      if (deuda) {
+        db.run(`DELETE FROM deudas_pagos WHERE deuda_id = ?`, [deuda.id]);
+        db.run(`DELETE FROM deudas_tratamientos WHERE id = ?`, [deuda.id]);
+      }
+      db.run(`DELETE FROM tratamientos_realizados WHERE id = ?`, [id], function (errDel) {
+        if (errDel) {
+          console.error("❌ Error eliminando tratamiento:", errDel.message);
+          return res.status(500).json({ message: "Error al eliminar registro" });
+        }
+        res.json({ message: "✅ Registro eliminado" });
+      });
+    });
+  } else if (tipo === "finanza") {
+    db.run(`DELETE FROM finanzas WHERE id = ?`, [id], function (errDel) {
+      if (errDel) {
+        console.error("❌ Error eliminando finanza:", errDel.message);
+        return res.status(500).json({ message: "Error al eliminar registro" });
+      }
+      res.json({ message: "✅ Registro eliminado" });
+    });
+  } else {
+    res.status(400).json({ message: "Tipo de registro no válido" });
+  }
+});
+
 export default router;

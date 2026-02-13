@@ -15,8 +15,13 @@ import {
   Divider,
   Box,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home } from "@mui/icons-material";
+import { ArrowBack, Home, CheckCircle, Delete } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -81,6 +86,7 @@ const API_BASE_URL =
 
 const Finanzas = () => {
   const navigate = useNavigate();
+  const isMaster = localStorage.getItem("role") === "master";
   const [paciente, setPaciente] = useState("");
   const [metodoPago, setMetodoPago] = useState("");
   const [fechaInicio, setFechaInicio] = useState("");
@@ -90,10 +96,67 @@ const Finanzas = () => {
   const [totalBruto, setTotalBruto] = useState(0);
   const [totalComision, setTotalComision] = useState(0);
   const [totalesMetodo, setTotalesMetodo] = useState({});
+  const [pagoDialogOpen, setPagoDialogOpen] = useState(false);
+  const [pagoRegistro, setPagoRegistro] = useState(null);
+  const [pagoMonto, setPagoMonto] = useState("");
+  const [pagoMetodo, setPagoMetodo] = useState("Efectivo");
+  const [guardandoPago, setGuardandoPago] = useState(false);
 
   const { showToast } = useToast();
 
   const colorPrincipal = "#a36920";
+
+  const abrirDialogoPago = (r) => {
+    setPagoRegistro(r);
+    setPagoMonto(String(Number(r.deuda_pendiente || r.monto_bruto || r.precio_total || 0).toFixed(2)));
+    setPagoMetodo("Efectivo");
+    setPagoDialogOpen(true);
+  };
+
+  const registrarPago = async () => {
+    if (!pagoRegistro) return;
+    const monto = parseFloat(pagoMonto);
+    if (isNaN(monto) || monto <= 0) {
+      showToast({ severity: "warning", message: "Ingresa un monto válido" });
+      return;
+    }
+    try {
+      setGuardandoPago(true);
+      const body = {
+        monto,
+        metodo_pago: pagoMetodo,
+        tipo_registro: pagoRegistro.tipo_registro || "tratamiento",
+      };
+      if (pagoRegistro.tipo_registro === "tratamiento") {
+        body.tratamiento_realizado_id = pagoRegistro.id;
+      } else {
+        body.finanza_id = pagoRegistro.id;
+      }
+      await axios.post(`${API_BASE_URL}/api/finanzas/pagar`, body);
+      showToast({ severity: "success", message: "Pago registrado correctamente" });
+      setPagoDialogOpen(false);
+      obtenerReporte();
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: "Error al registrar pago" });
+    } finally {
+      setGuardandoPago(false);
+    }
+  };
+
+  const eliminarRegistro = async (r) => {
+    const tipo = r.tipo_registro || "tratamiento";
+    const nombre = r.paciente || "este registro";
+    if (!window.confirm(`¿Eliminar el registro de "${nombre}" de finanzas? Esta acción no se puede deshacer.`)) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/api/finanzas/registro/${tipo}/${r.id}`);
+      showToast({ severity: "success", message: "Registro eliminado" });
+      obtenerReporte();
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: "Error al eliminar registro" });
+    }
+  };
 
   const hoyISO = () => {
     const d = new Date();
@@ -396,6 +459,7 @@ const Finanzas = () => {
                     <TableCell sx={{ minWidth: 130, textAlign: "right" }}>Monto bruto (S/)</TableCell>
                     <TableCell sx={{ minWidth: 110, textAlign: "center" }}>Descuento (%)</TableCell>
                     <TableCell sx={{ minWidth: 100, textAlign: "center" }}>Estado</TableCell>
+                    {isMaster && <TableCell align="center">Acciones</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -435,6 +499,28 @@ const Finanzas = () => {
                           {r.estado_pago || "Pagado"}
                         </Box>
                       </TableCell>
+                      {isMaster && (
+                        <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                          <Tooltip title="Registrar pago">
+                            <IconButton
+                              size="small"
+                              onClick={() => abrirDialogoPago(r)}
+                              sx={{ color: "#2e7d32" }}
+                            >
+                              <CheckCircle fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Eliminar registro">
+                            <IconButton
+                              size="small"
+                              onClick={() => eliminarRegistro(r)}
+                              sx={{ color: "#b71c1c" }}
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -476,6 +562,50 @@ const Finanzas = () => {
             </>
           )}
         </Paper>
+
+        <Dialog open={pagoDialogOpen} onClose={() => setPagoDialogOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold" }}>Registrar Pago</DialogTitle>
+          <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
+            {pagoRegistro && (
+              <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
+                <strong>Paciente:</strong> {pagoRegistro.paciente}<br />
+                <strong>Tratamiento:</strong> {pagoRegistro.tratamiento}
+              </Typography>
+            )}
+            <TextField
+              label="Monto (S/)"
+              type="number"
+              fullWidth
+              value={pagoMonto}
+              onChange={(e) => setPagoMonto(e.target.value)}
+              inputProps={{ min: 0.01, step: 0.01 }}
+            />
+            <TextField
+              select
+              label="Método de pago"
+              fullWidth
+              value={pagoMetodo}
+              onChange={(e) => setPagoMetodo(e.target.value)}
+            >
+              <MenuItem value="Efectivo">Efectivo</MenuItem>
+              <MenuItem value="Tarjeta">Tarjeta</MenuItem>
+              <MenuItem value="Transferencia">Transferencia</MenuItem>
+              <MenuItem value="Yape">Yape</MenuItem>
+              <MenuItem value="Plin">Plin</MenuItem>
+            </TextField>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setPagoDialogOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+            <Button
+              variant="contained"
+              onClick={registrarPago}
+              disabled={guardandoPago}
+              sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}
+            >
+              {guardandoPago ? "Guardando..." : "Registrar Pago"}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </div>
   );
