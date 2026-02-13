@@ -194,6 +194,12 @@ const HistorialClinico = () => {
   // Estado para controlar qué paquetes están colapsados
   const [paquetesColapsados, setPaquetesColapsados] = useState({});
 
+  // Estados para modal global de pagar consulta (desde barra superior)
+  const [modalPagoConsultaGlobal, setModalPagoConsultaGlobal] = useState(false);
+  const [consultaGlobalSeleccion, setConsultaGlobalSeleccion] = useState(null); // { tipo: 'paquete'|'presupuesto', item: {...} }
+  const [montoConsultaGlobal, setMontoConsultaGlobal] = useState(100);
+  const [metodoPagoConsultaGlobal, setMetodoPagoConsultaGlobal] = useState("efectivo");
+
   // Estados para especialistas
   const [especialistas, setEspecialistas] = useState([]);
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
@@ -1857,6 +1863,27 @@ const HistorialClinico = () => {
                       onClick={() => generarConsentimientoPDF(pacienteSeleccionado)}
                     >
                       Consentimiento Informado
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      sx={{
+                        borderColor: "#9c27b0",
+                        color: "#9c27b0",
+                        "&:hover": { 
+                          borderColor: "#7b1fa2",
+                          backgroundColor: "rgba(156, 39, 176, 0.04)"
+                        },
+                        borderRadius: 3,
+                        fontWeight: "bold",
+                      }}
+                      onClick={() => {
+                        setConsultaGlobalSeleccion(null);
+                        setMontoConsultaGlobal(100);
+                        setMetodoPagoConsultaGlobal("efectivo");
+                        setModalPagoConsultaGlobal(true);
+                      }}
+                    >
+                      💊 Pagar Consulta
                     </Button>
                   </Box>
                 </Box>
@@ -4623,6 +4650,229 @@ const HistorialClinico = () => {
               if (presupuestoParaConsulta && Number(montoConsultaPresupuesto) > 0) {
                 await registrarPagoConsultaPresupuesto(presupuestoParaConsulta.id, Number(montoConsultaPresupuesto), metodoPagoConsultaPresupuesto);
                 setModalPagoConsultaPresupuesto(false);
+              }
+            }}
+            sx={{
+              backgroundColor: "#9c27b0",
+              "&:hover": { backgroundColor: "#7b1fa2" },
+            }}
+          >
+            Confirmar Pago de Consulta
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal Global de Pagar Consulta (desde barra superior) */}
+      <Dialog open={modalPagoConsultaGlobal} onClose={() => setModalPagoConsultaGlobal(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ backgroundColor: "#9c27b0", color: "white" }}>
+          💊 Pagar Consulta
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {pacienteSeleccionado && (
+            <>
+              <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
+                Paciente: <strong>{pacienteSeleccionado.nombre} {pacienteSeleccionado.apellido}</strong>
+              </Typography>
+
+              {/* Opción: Pago directo */}
+              <Box
+                onClick={() => setConsultaGlobalSeleccion({ tipo: 'directo', item: null })}
+                sx={{
+                  p: 1.5,
+                  mb: 1,
+                  borderRadius: 2,
+                  cursor: "pointer",
+                  border: consultaGlobalSeleccion?.tipo === 'directo'
+                    ? "2px solid #9c27b0"
+                    : "1px solid #ddd",
+                  backgroundColor: consultaGlobalSeleccion?.tipo === 'directo'
+                    ? "rgba(156, 39, 176, 0.08)"
+                    : "transparent",
+                  "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                  💰 Pago directo de consulta
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  Se registra como ingreso en caja (sin asociar a paquete o presupuesto)
+                </Typography>
+              </Box>
+
+              {/* Opciones: Paquetes pendientes de consulta */}
+              {paquetesPaciente
+                .filter(p => p.consulta_pagada !== 1 && p.estado_pago !== 'pagado' && p.pagado !== 1)
+                .map(paq => (
+                  <Box
+                    key={`paq-${paq.id}`}
+                    onClick={() => setConsultaGlobalSeleccion({ tipo: 'paquete', item: paq })}
+                    sx={{
+                      p: 1.5,
+                      mb: 1,
+                      borderRadius: 2,
+                      cursor: "pointer",
+                      border: consultaGlobalSeleccion?.tipo === 'paquete' && consultaGlobalSeleccion?.item?.id === paq.id
+                        ? "2px solid #9c27b0"
+                        : "1px solid #ddd",
+                      backgroundColor: consultaGlobalSeleccion?.tipo === 'paquete' && consultaGlobalSeleccion?.item?.id === paq.id
+                        ? "rgba(156, 39, 176, 0.08)"
+                        : "transparent",
+                      "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                      📦 Descontar de paquete: {paq.paquete_nombre}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "#666" }}>
+                      Precio: S/ {(paq.precio_total || 0).toFixed(2)}
+                    </Typography>
+                  </Box>
+                ))}
+
+              {/* Opciones: Presupuestos pendientes de consulta */}
+              {presupuestosAsignados
+                .filter(p => p.consulta_pagada !== 1 && p.estado_pago !== 'pagado' && p.pagado !== 1)
+                .map(pres => (
+                  <Box
+                    key={`pres-${pres.id}`}
+                    onClick={() => setConsultaGlobalSeleccion({ tipo: 'presupuesto', item: pres })}
+                    sx={{
+                      p: 1.5,
+                      mb: 1,
+                      borderRadius: 2,
+                      cursor: "pointer",
+                      border: consultaGlobalSeleccion?.tipo === 'presupuesto' && consultaGlobalSeleccion?.item?.id === pres.id
+                        ? "2px solid #9c27b0"
+                        : "1px solid #ddd",
+                      backgroundColor: consultaGlobalSeleccion?.tipo === 'presupuesto' && consultaGlobalSeleccion?.item?.id === pres.id
+                        ? "rgba(156, 39, 176, 0.08)"
+                        : "transparent",
+                      "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                      📋 Descontar de presupuesto #{pres.id}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: "#666" }}>
+                      Precio: S/ {(pres.precio_total || 0).toFixed(2)} {pres.descuento > 0 ? `(Desc: S/ ${pres.descuento.toFixed(2)})` : ''}
+                    </Typography>
+                  </Box>
+                ))}
+
+              {consultaGlobalSeleccion && (
+                <>
+                  <Divider sx={{ my: 2 }} />
+
+                  {consultaGlobalSeleccion.tipo === 'directo' && (
+                    <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
+                      ℹ️ El monto se registrará directamente como ingreso de consulta en la caja.
+                    </Typography>
+                  )}
+                  {consultaGlobalSeleccion.tipo === 'paquete' && (
+                    <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
+                      ℹ️ El monto de la consulta se descontará del precio total del paquete.
+                    </Typography>
+                  )}
+                  {consultaGlobalSeleccion.tipo === 'presupuesto' && (
+                    <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
+                      ℹ️ El monto de la consulta se sumará al descuento del presupuesto.
+                    </Typography>
+                  )}
+
+                  <TextField
+                    fullWidth
+                    label="Monto de Consulta (S/)"
+                    type="number"
+                    value={montoConsultaGlobal}
+                    onChange={(e) => setMontoConsultaGlobal(e.target.value)}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    sx={{ mb: 2 }}
+                  />
+
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel>Método de Pago</InputLabel>
+                    <Select
+                      value={metodoPagoConsultaGlobal}
+                      onChange={(e) => setMetodoPagoConsultaGlobal(e.target.value)}
+                      label="Método de Pago"
+                    >
+                      <MenuItem value="efectivo">Efectivo</MenuItem>
+                      <MenuItem value="tarjeta">Tarjeta</MenuItem>
+                      <MenuItem value="transferencia">Transferencia</MenuItem>
+                      <MenuItem value="yape">Yape</MenuItem>
+                      <MenuItem value="plin">Plin</MenuItem>
+                    </Select>
+                  </FormControl>
+
+                  <Box sx={{ p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#7b1fa2", mb: 1 }}>
+                      📊 Resumen
+                    </Typography>
+                    {consultaGlobalSeleccion.tipo !== 'directo' && (
+                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary">Precio original:</Typography>
+                        <Typography sx={{ fontWeight: "bold" }}>S/ {(consultaGlobalSeleccion.item?.precio_total || 0).toFixed(2)}</Typography>
+                      </Box>
+                    )}
+                    {consultaGlobalSeleccion.tipo === 'presupuesto' && (consultaGlobalSeleccion.item?.descuento || 0) > 0 && (
+                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary">Descuento anterior:</Typography>
+                        <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>- S/ {(consultaGlobalSeleccion.item.descuento || 0).toFixed(2)}</Typography>
+                      </Box>
+                    )}
+                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                      <Typography variant="body2" color="text.secondary">Monto consulta:</Typography>
+                      <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>S/ {Number(montoConsultaGlobal).toFixed(2)}</Typography>
+                    </Box>
+                    {consultaGlobalSeleccion.tipo !== 'directo' && (
+                      <>
+                        <Divider sx={{ my: 1 }} />
+                        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                          <Typography variant="body2" sx={{ fontWeight: "bold" }}>Nuevo precio:</Typography>
+                          <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
+                            S/ {(
+                              (consultaGlobalSeleccion.item?.precio_total || 0)
+                              - (consultaGlobalSeleccion.tipo === 'presupuesto' ? (consultaGlobalSeleccion.item?.descuento || 0) : 0)
+                              - Number(montoConsultaGlobal)
+                            ).toFixed(2)}
+                          </Typography>
+                        </Box>
+                      </>
+                    )}
+                  </Box>
+                </>
+              )}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalPagoConsultaGlobal(false)} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!consultaGlobalSeleccion || Number(montoConsultaGlobal) <= 0}
+            onClick={async () => {
+              if (!consultaGlobalSeleccion || Number(montoConsultaGlobal) <= 0) return;
+              try {
+                if (consultaGlobalSeleccion.tipo === 'directo') {
+                  await axios.post(`${API_BASE_URL}/api/finanzas/consulta-directa`, {
+                    paciente_id: pacienteSeleccionado.id,
+                    monto: Number(montoConsultaGlobal),
+                    metodo_pago: metodoPagoConsultaGlobal,
+                  }, { headers: authHeaders });
+                  showToast({ severity: "success", message: "Pago de consulta registrado en caja" });
+                } else if (consultaGlobalSeleccion.tipo === 'paquete') {
+                  await registrarPagoConsulta(consultaGlobalSeleccion.item.id, Number(montoConsultaGlobal), metodoPagoConsultaGlobal);
+                } else {
+                  await registrarPagoConsultaPresupuesto(consultaGlobalSeleccion.item.id, Number(montoConsultaGlobal), metodoPagoConsultaGlobal);
+                }
+                setModalPagoConsultaGlobal(false);
+              } catch (e) {
+                if (consultaGlobalSeleccion.tipo === 'directo') {
+                  console.error(e);
+                  showToast({ severity: "error", message: "Error al registrar pago de consulta" });
+                }
               }
             }}
             sx={{

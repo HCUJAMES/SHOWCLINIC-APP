@@ -564,7 +564,36 @@ router.post("/pagar", (req, res) => {
   res.status(400).json({ message: "Datos insuficientes para registrar pago" });
 });
 
-// 🗑️ ELIMINAR REGISTRO DE FINANZAS
+// � REGISTRAR PAGO DE CONSULTA DIRECTO (sin paquete/presupuesto)
+router.post("/consulta-directa", (req, res) => {
+  const { paciente_id, monto, metodo_pago } = req.body;
+
+  if (!paciente_id || !monto || !metodo_pago) {
+    return res.status(400).json({ message: "Paciente, monto y método de pago son obligatorios" });
+  }
+
+  const montoNum = parseFloat(monto);
+  if (isNaN(montoNum) || montoNum <= 0) {
+    return res.status(400).json({ message: "Monto inválido" });
+  }
+
+  const fechaAhora = new Date().toISOString().slice(0, 19).replace("T", " ");
+
+  db.run(
+    `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_tipo)
+     VALUES ('ingreso', 'consulta', ?, 'Pago de consulta', ?, ?, ?, 'consulta_directa')`,
+    [montoNum, fechaAhora, metodo_pago, paciente_id],
+    function (err) {
+      if (err) {
+        console.error("❌ Error registrando consulta directa:", err.message);
+        return res.status(500).json({ message: "Error al registrar pago de consulta" });
+      }
+      res.json({ message: "✅ Pago de consulta registrado", id: this.lastID });
+    }
+  );
+});
+
+// �🗑️ ELIMINAR REGISTRO DE FINANZAS
 router.delete("/registro/:tipo/:id", (req, res) => {
   const { tipo, id } = req.params;
 
