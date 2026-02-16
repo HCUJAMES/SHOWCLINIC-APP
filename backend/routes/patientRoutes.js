@@ -56,8 +56,13 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     typeof celular === "string" ? celular.trim() : String(celular || "").trim();
 
   if (!dniStr || !nombreStr || !apellidoStr || !celularStr) {
+    const camposFaltantes = [];
+    if (!dniStr) camposFaltantes.push("DNI");
+    if (!nombreStr) camposFaltantes.push("Nombre");
+    if (!apellidoStr) camposFaltantes.push("Apellido");
+    if (!celularStr) camposFaltantes.push("Celular");
     return res.status(400).json({
-      message: "DNI, Nombre, Apellido y Celular son obligatorios",
+      message: `Campos obligatorios vacíos: ${camposFaltantes.join(", ")}`,
     });
   }
 
@@ -84,9 +89,9 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     query,
     [
       tipoDocumento || 'DNI',
-      dni,
-      nombre,
-      apellido,
+      dniStr,
+      nombreStr,
+      apellidoStr,
       edad,
       sexo,
       direccion,
@@ -97,7 +102,7 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
       alergias,
       enfermedad,
       correo,
-      celular,
+      celularStr,
       cirugiaEstetica,
       embarazada,
       drogas,
@@ -111,7 +116,7 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     function (err) {
       if (err) {
         console.error("❌ Error al editar paciente:", err.message);
-        return res.status(500).json({ message: "Error al editar paciente" });
+        return res.status(500).json({ message: "Error al editar paciente: " + err.message });
       }
       console.log(`✅ Paciente ID ${id} actualizado correctamente`);
       res.json({ message: "Paciente actualizado correctamente" });

@@ -206,12 +206,13 @@ export default function BuscarPaciente() {
           body: JSON.stringify(selectedPaciente),
         }
       );
+      const data = await res.json();
       if (res.ok) {
         showToast({ severity: "success", message: "Paciente actualizado correctamente" });
         setOpenModal(false);
         cargarPacientes();
       } else {
-        showToast({ severity: "error", message: "Error al actualizar paciente" });
+        showToast({ severity: "error", message: data.message || "Error al actualizar paciente" });
       }
     } catch (error) {
       console.error("Error al actualizar paciente:", error);
@@ -751,8 +752,8 @@ export default function BuscarPaciente() {
                 {Object.keys(selectedPaciente)
                   .filter(
                     (key) =>
-                      !["id", "fechaRegistro"].includes(key) &&
-                      typeof selectedPaciente[key] !== "object"
+                      !["id", "fechaRegistro", "fotoPerfil", "observaciones"].includes(key) &&
+                      (selectedPaciente[key] === null || typeof selectedPaciente[key] !== "object")
                   )
                   .map((key) => (
                     <TextField
