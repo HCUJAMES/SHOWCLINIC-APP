@@ -77,14 +77,18 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
     // Construir condiciones WHERE
     let whereConditionsPaquetes = ["ps.estado = 'completada'", "ps.especialista_id IS NOT NULL"];
     let whereConditionsPresupuestos = ["prs.estado = 'completada'", "prs.especialista_id IS NOT NULL"];
+    let whereConditionsTratamientos = ["tr.especialista IS NOT NULL", "tr.especialista != ''", "tr.especialista != 'No especificado'"];
     let paramsPaquetes = [];
     let paramsPresupuestos = [];
+    let paramsTratamientos = [];
 
     if (fecha_inicio) {
       whereConditionsPaquetes.push("DATE(ps.fecha_realizada) >= ?");
       paramsPaquetes.push(fecha_inicio);
       whereConditionsPresupuestos.push("DATE(prs.fecha_realizada) >= ?");
       paramsPresupuestos.push(fecha_inicio);
+      whereConditionsTratamientos.push("DATE(tr.fecha) >= ?");
+      paramsTratamientos.push(fecha_inicio);
     }
 
     if (fecha_fin) {
@@ -92,6 +96,8 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       paramsPaquetes.push(fecha_fin);
       whereConditionsPresupuestos.push("DATE(prs.fecha_realizada) <= ?");
       paramsPresupuestos.push(fecha_fin);
+      whereConditionsTratamientos.push("DATE(tr.fecha) <= ?");
+      paramsTratamientos.push(fecha_fin);
     }
 
     if (especialista_id) {
@@ -99,6 +105,8 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       paramsPaquetes.push(especialista_id);
       whereConditionsPresupuestos.push("prs.especialista_id = ?");
       paramsPresupuestos.push(especialista_id);
+      whereConditionsTratamientos.push("e.id = ?");
+      paramsTratamientos.push(especialista_id);
     }
 
     if (tratamiento) {
@@ -106,10 +114,13 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       paramsPaquetes.push(`%${tratamiento}%`);
       whereConditionsPresupuestos.push("prs.tratamiento_nombre LIKE ?");
       paramsPresupuestos.push(`%${tratamiento}%`);
+      whereConditionsTratamientos.push("(t.nombre LIKE ? OR tr.productos LIKE ?)");
+      paramsTratamientos.push(`%${tratamiento}%`, `%${tratamiento}%`);
     }
 
     const whereClausePaquetes = `WHERE ${whereConditionsPaquetes.join(" AND ")}`;
     const whereClausePresupuestos = `WHERE ${whereConditionsPresupuestos.join(" AND ")}`;
+    const whereClauseTratamientos = `WHERE ${whereConditionsTratamientos.join(" AND ")}`;
 
     // Obtener TODOS los especialistas primero (con comisión y pago fijo)
     const todosEspecialistas = await dbAll(`
@@ -126,7 +137,7 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
         e.id as especialista_id,
         e.nombre as especialista_nombre,
         COUNT(ps.id) as atenciones,
-        COALESCE(SUM(ps.precio_sesion), 0) as ingresos
+        COALESCE(SUM(CASE WHEN ps.precio_sesion > 0 THEN ps.precio_sesion ELSE 0 END), 0) as ingresos
       FROM paquetes_sesiones ps
       INNER JOIN especialistas e ON ps.especialista_id = e.id
       ${whereClausePaquetes}
@@ -139,7 +150,7 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
         e.id as especialista_id,
         e.nombre as especialista_nombre,
         COUNT(prs.id) as atenciones,
-        COALESCE(SUM(prs.precio_sesion), 0) as ingresos
+        COALESCE(SUM(CASE WHEN prs.precio_sesion > 0 THEN prs.precio_sesion ELSE 0 END), 0) as ingresos
       FROM presupuestos_sesiones prs
       INNER JOIN especialistas e ON prs.especialista_id = e.id
       ${whereClausePresupuestos}
@@ -176,6 +187,46 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       ORDER BY e.nombre, prs.tratamiento_nombre
     `, paramsPresupuestos);
 
+    // Estadísticas por especialista de tratamientos individuales (vinculados por nombre)
+    const statsTratamientos = await dbAll(`
+      SELECT 
+        e.id as especialista_id,
+        e.nombre as especialista_nombre,
+        COUNT(tr.id) as atenciones,
+        COALESCE(SUM(CASE WHEN tr.precio_total > 0 THEN tr.precio_total ELSE 0 END), 0) as ingresos
+      FROM tratamientos_realizados tr
+      INNER JOIN especialistas e ON LOWER(TRIM(tr.especialista)) = LOWER(TRIM(e.nombre))
+      ${whereClauseTratamientos}
+      GROUP BY e.id, e.nombre
+    `, paramsTratamientos);
+
+    // Detalle por tratamiento de tratamientos individuales
+    const detalleTratamientosIndividuales = await dbAll(`
+      SELECT 
+        e.id as especialista_id,
+        e.nombre as especialista_nombre,
+        COALESCE(t.nombre, 'Sin tratamiento') as tratamiento_nombre,
+        COUNT(tr.id) as cantidad_sesiones,
+        COALESCE(SUM(tr.precio_total), 0) as total_tratamiento
+      FROM tratamientos_realizados tr
+      INNER JOIN especialistas e ON LOWER(TRIM(tr.especialista)) = LOWER(TRIM(e.nombre))
+      LEFT JOIN tratamientos t ON tr.tratamiento_id = t.id
+      ${whereClauseTratamientos}
+      GROUP BY e.id, e.nombre, t.nombre
+      ORDER BY e.nombre, t.nombre
+    `, paramsTratamientos);
+
+    // Pacientes únicos por especialista (tratamientos individuales)
+    const pacientesUnicosTratamientos = await dbAll(`
+      SELECT 
+        e.id as especialista_id,
+        COUNT(DISTINCT tr.paciente_id) as pacientes_unicos
+      FROM tratamientos_realizados tr
+      INNER JOIN especialistas e ON LOWER(TRIM(tr.especialista)) = LOWER(TRIM(e.nombre))
+      ${whereClauseTratamientos}
+      GROUP BY e.id
+    `, paramsTratamientos);
+
     // Pacientes únicos por especialista (paquetes)
     const pacientesUnicosPaquetes = await dbAll(`
       SELECT 
@@ -211,8 +262,10 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
         pago_fijo: esp.pago_fijo,
         atenciones_paquetes: 0,
         atenciones_presupuestos: 0,
+        atenciones_tratamientos: 0,
         ingresos_paquetes: 0,
         ingresos_presupuestos: 0,
+        ingresos_tratamientos: 0,
         pacientes_unicos: 0
       });
     });
@@ -237,12 +290,25 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       }
     });
 
+    // Agregar estadísticas de tratamientos individuales
+    statsTratamientos.forEach(stat => {
+      const key = stat.especialista_id;
+      if (especialistasMap.has(key)) {
+        const esp = especialistasMap.get(key);
+        esp.atenciones_tratamientos = stat.atenciones || 0;
+        esp.ingresos_tratamientos = parseFloat(stat.ingresos) || 0;
+      }
+    });
+
     // Agregar pacientes únicos
     const pacientesMap = new Map();
     pacientesUnicosPaquetes.forEach(p => {
       pacientesMap.set(p.especialista_id, (pacientesMap.get(p.especialista_id) || 0) + (p.pacientes_unicos || 0));
     });
     pacientesUnicosPresupuestos.forEach(p => {
+      pacientesMap.set(p.especialista_id, (pacientesMap.get(p.especialista_id) || 0) + (p.pacientes_unicos || 0));
+    });
+    pacientesUnicosTratamientos.forEach(p => {
       pacientesMap.set(p.especialista_id, (pacientesMap.get(p.especialista_id) || 0) + (p.pacientes_unicos || 0));
     });
     pacientesMap.forEach((count, espId) => {
@@ -253,13 +319,13 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
 
     // Convertir a array y calcular totales + comisión personalizada + pago fijo
     const estadisticas = Array.from(especialistasMap.values()).map(esp => {
-      const totalAtenciones = esp.atenciones_paquetes + esp.atenciones_presupuestos;
-      const totalIngresos = esp.ingresos_paquetes + esp.ingresos_presupuestos;
+      const totalAtenciones = esp.atenciones_paquetes + esp.atenciones_presupuestos + esp.atenciones_tratamientos;
+      const totalIngresos = esp.ingresos_paquetes + esp.ingresos_presupuestos + esp.ingresos_tratamientos;
       const porcentaje = esp.comision_porcentaje || 20;
       const pagoFijo = esp.pago_fijo || 0;
       const comision_calculada = totalIngresos * (porcentaje / 100);
-      const pago_fijo_total = pagoFijo * totalAtenciones;
-      const pago_total_especialista = comision_calculada + pago_fijo_total;
+      const pago_total_especialista = comision_calculada + pagoFijo;
+      const ganancia_clinica = Math.max(0, totalIngresos - pago_total_especialista);
       
       return {
         ...esp,
@@ -269,9 +335,8 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
         comision_porcentaje: porcentaje,
         pago_fijo: pagoFijo,
         comision_calculada,
-        pago_fijo_total,
         pago_total_especialista,
-        ganancia_clinica: totalIngresos - pago_total_especialista
+        ganancia_clinica
       };
     });
 
@@ -279,14 +344,14 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
     estadisticas.sort((a, b) => b.total_ingresos - a.total_ingresos);
 
     // Combinar detalle de tratamientos
-    const tratamientos = [...detalleTratamientosPaquetes, ...detalleTratamientosPresupuestos];
+    const tratamientos = [...detalleTratamientosPaquetes, ...detalleTratamientosPresupuestos, ...detalleTratamientosIndividuales];
 
     // Calcular resumen general
     const resumen = {
       total_atenciones: estadisticas.reduce((sum, e) => sum + e.total_atenciones, 0),
       total_ingresos: estadisticas.reduce((sum, e) => sum + e.total_ingresos, 0),
       total_pago_especialistas: estadisticas.reduce((sum, e) => sum + e.pago_total_especialista, 0),
-      total_ganancia_clinica: estadisticas.reduce((sum, e) => sum + e.ganancia_clinica, 0),
+      total_ganancia_clinica: Math.max(0, estadisticas.reduce((sum, e) => sum + e.ganancia_clinica, 0)),
       total_pacientes_unicos: estadisticas.reduce((sum, e) => sum + (e.pacientes_unicos || 0), 0),
       total_especialistas: estadisticas.filter(e => e.total_atenciones > 0).length,
       promedio_por_sesion: 0
@@ -461,8 +526,65 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
       console.log("Primera sesión presupuesto (DETALLADA):", JSON.stringify(sesionesPresupuestos[0], null, 2));
     }
 
+    // Obtener tratamientos individuales (no paquetes ni presupuestos) vinculados por nombre
+    let whereConditionsTratInd = [
+      "LOWER(TRIM(tr.especialista)) = LOWER(TRIM(?))",
+      "tr.especialista != 'No especificado'"
+    ];
+    let paramsTratInd = [nombreEspecialista];
+
+    if (fecha_inicio) {
+      whereConditionsTratInd.push("DATE(tr.fecha) >= ?");
+      paramsTratInd.push(fecha_inicio);
+    }
+    if (fecha_fin) {
+      whereConditionsTratInd.push("DATE(tr.fecha) <= ?");
+      paramsTratInd.push(fecha_fin);
+    }
+    if (tratamiento) {
+      whereConditionsTratInd.push("(t.nombre LIKE ? OR tr.productos LIKE ?)");
+      paramsTratInd.push(`%${tratamiento}%`, `%${tratamiento}%`);
+    }
+
+    const whereClauseTratInd = `WHERE ${whereConditionsTratInd.join(" AND ")}`;
+
+    const sesionesTratIndividuales = await dbAll(`
+      SELECT 
+        tr.id as sesion_id,
+        COALESCE(t.nombre, 'Tratamiento Individual') as tratamiento_nombre,
+        tr.tratamiento_id,
+        tr.fecha as fecha_realizada,
+        tr.precio_total as precio_sesion,
+        tr.sesion as sesion_numero,
+        NULL as sesion_notas,
+        COALESCE(p.nombre, 'Sin nombre') as paciente_nombre,
+        COALESCE(p.apellido, '') as paciente_apellido,
+        p.dni as paciente_dni,
+        NULL as paquete_paciente_id,
+        NULL as paquete_nombre,
+        NULL as paquete_precio_total,
+        NULL as tratamientos_json,
+        NULL as paquete_productos_json,
+        NULL as paquete_precio_regular,
+        NULL as paquete_precio,
+        NULL as descuento_porcentaje,
+        NULL as paquete_total_sesiones,
+        tr.productos as productos_usados_json,
+        tr.precio_total as tratamiento_precio_total,
+        tr.descuento as tratamiento_descuento,
+        tr.pagoMetodo as tratamiento_metodo_pago,
+        'Individual' as tipo
+      FROM tratamientos_realizados tr
+      LEFT JOIN patients p ON tr.paciente_id = p.id
+      LEFT JOIN tratamientos t ON tr.tratamiento_id = t.id
+      ${whereClauseTratInd}
+      ORDER BY tr.fecha DESC
+    `, paramsTratInd);
+
+    console.log(`✅ Encontrados ${sesionesTratIndividuales.length} tratamientos individuales`);
+
     // Procesar y enriquecer todas las sesiones con información detallada
-    const todasSesiones = [...sesionesPaquetes, ...sesionesPresupuestos].map(sesion => {
+    const todasSesiones = [...sesionesPaquetes, ...sesionesPresupuestos, ...sesionesTratIndividuales].map(sesion => {
       // Parsear JSON de tratamientos
       let tratamientos_detalle = [];
       try {

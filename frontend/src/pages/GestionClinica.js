@@ -606,15 +606,15 @@ const GestionClinica = () => {
                       )}
                     </TableCell>
                     <TableCell align="right" sx={{ bgcolor: "#fff3e0" }}>
-                      <Tooltip title={`Comisión: S/ ${Number(stat.comision_calculada).toFixed(2)} + Fijo: S/ ${Number(stat.pago_fijo_total).toFixed(2)}`}>
+                      <Tooltip title={`Comisión ${Number(stat.comision_porcentaje).toFixed(0)}%: S/ ${Number(stat.comision_calculada).toFixed(2)} + Pago Fijo: S/ ${Number(stat.pago_fijo).toFixed(2)}`}>
                         <Typography variant="body2" sx={{ fontWeight: "bold", color: "#ff9800" }}>
                           S/ {Number(stat.pago_total_especialista).toFixed(2)}
                         </Typography>
                       </Tooltip>
                     </TableCell>
                     <TableCell align="right" sx={{ bgcolor: "#e8f5e9" }}>
-                      <Typography variant="body2" sx={{ fontWeight: "bold", color: stat.ganancia_clinica >= 0 ? "#2e7d32" : "#d32f2f" }}>
-                        S/ {Number(stat.ganancia_clinica).toFixed(2)}
+                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                        S/ {Math.max(0, Number(stat.ganancia_clinica)).toFixed(2)}
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
@@ -724,9 +724,8 @@ const GestionClinica = () => {
                 const ingresos = Number(totales.total_ingresos || 0);
                 const sesiones = totales.total_sesiones || 0;
                 const comisionCalc = ingresos * (porcentaje / 100);
-                const pagoFijoTotal = pagoFijo * sesiones;
-                const pagoTotalEsp = comisionCalc + pagoFijoTotal;
-                const ganancia = ingresos - pagoTotalEsp;
+                const pagoTotalEsp = comisionCalc + pagoFijo;
+                const ganancia = Math.max(0, ingresos - pagoTotalEsp);
                 return (
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={6} sm={2.4}>
@@ -756,7 +755,7 @@ const GestionClinica = () => {
                         S/ {pagoTotalEsp.toFixed(2)}
                       </Typography>
                       <Typography variant="caption" sx={{ color: "#666" }}>
-                        Pago Esp. ({porcentaje}%{pagoFijo > 0 ? ` + S/${pagoFijo}/ses.` : ""})
+                        Pago Esp. ({porcentaje}%{pagoFijo > 0 ? ` + S/ ${Number(pagoFijo).toFixed(2)} fijo` : ""})
                       </Typography>
                     </CardContent>
                   </Card>
@@ -764,7 +763,7 @@ const GestionClinica = () => {
                 <Grid item xs={6} sm={2.4}>
                   <Card variant="outlined" sx={{ textAlign: "center", borderColor: "#2e7d32" }}>
                     <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-                      <Typography variant="h5" sx={{ fontWeight: "bold", color: ganancia >= 0 ? "#2e7d32" : "#d32f2f" }}>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
                         S/ {ganancia.toFixed(2)}
                       </Typography>
                       <Typography variant="caption" sx={{ color: "#666" }}>Ganancia Clínica</Typography>
