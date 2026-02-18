@@ -617,6 +617,24 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
+    // Agregar columna comision_porcentaje a especialistas (porcentaje personalizado por especialista)
+    db.run(`ALTER TABLE especialistas ADD COLUMN comision_porcentaje REAL DEFAULT 20`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna comision_porcentaje a especialistas:", err.message);
+      } else {
+        console.log("✅ Columna comision_porcentaje agregada a especialistas");
+      }
+    });
+
+    // Agregar columna pago_fijo a especialistas (pago fijo por sesión/atención)
+    db.run(`ALTER TABLE especialistas ADD COLUMN pago_fijo REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna pago_fijo a especialistas:", err.message);
+      } else {
+        console.log("✅ Columna pago_fijo agregada a especialistas");
+      }
+    });
+
     // 💰 Tabla de finanzas para registrar ingresos y egresos
     db.run(`
       CREATE TABLE IF NOT EXISTS finanzas (

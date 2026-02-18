@@ -30,7 +30,9 @@ import {
   AccordionDetails,
   Divider,
   Stack,
-  Alert
+  Alert,
+  TextField,
+  Tooltip
 } from "@mui/material";
 import {
   TrendingUp,
@@ -45,7 +47,16 @@ import {
   CalendarToday,
   LocalHospital,
   FilterList,
-  Refresh
+  Refresh,
+  Download,
+  Groups,
+  MedicalServices,
+  Percent,
+  BarChart,
+  Save,
+  Edit,
+  AccountBalance,
+  MoneyOff
 } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -64,9 +75,13 @@ const GestionClinica = () => {
   const [resumenGeneral, setResumenGeneral] = useState({
     total_atenciones: 0,
     total_ingresos: 0,
-    total_comision_20: 0,
+    total_pago_especialistas: 0,
+    total_ganancia_clinica: 0,
+    total_pacientes_unicos: 0,
+    total_especialistas: 0,
     promedio_por_sesion: 0
   });
+  const [editandoComision, setEditandoComision] = useState({});
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
   const [especialistaFiltro, setEspecialistaFiltro] = useState("");
@@ -121,7 +136,10 @@ const GestionClinica = () => {
       setResumenGeneral(response.data.resumen || {
         total_atenciones: 0,
         total_ingresos: 0,
-        total_comision_20: 0,
+        total_pago_especialistas: 0,
+        total_ganancia_clinica: 0,
+        total_pacientes_unicos: 0,
+        total_especialistas: 0,
         promedio_por_sesion: 0
       });
     } catch (error) {
@@ -173,6 +191,73 @@ const GestionClinica = () => {
 
   const cerrarModalDetalle = () => {
     setModalDetalle({ abierto: false, especialista: null, datos: null });
+  };
+
+  const iniciarEdicion = (espId, comision, pagoFijo) => {
+    setEditandoComision(prev => ({
+      ...prev,
+      [espId]: { comision_porcentaje: comision, pago_fijo: pagoFijo }
+    }));
+  };
+
+  const cancelarEdicion = (espId) => {
+    setEditandoComision(prev => {
+      const nuevo = { ...prev };
+      delete nuevo[espId];
+      return nuevo;
+    });
+  };
+
+  const guardarComision = async (espId) => {
+    const datos = editandoComision[espId];
+    if (!datos) return;
+
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/especialistas/comision/${espId}`,
+        {
+          comision_porcentaje: datos.comision_porcentaje,
+          pago_fijo: datos.pago_fijo
+        },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Comisión actualizada correctamente" });
+      cancelarEdicion(espId);
+      cargarEstadisticas();
+    } catch (error) {
+      console.error("Error al guardar comisión:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al guardar comisión" });
+    }
+  };
+
+  const exportarCSV = () => {
+    if (!estadisticas || estadisticas.length === 0) {
+      showToast({ severity: "warning", message: "No hay datos para exportar" });
+      return;
+    }
+
+    const headers = ["Especialista", "Total Atenciones", "Pacientes Únicos", "Ingresos (S/)", "Comisión %", "Pago Fijo (S/)", "Pago Total Esp. (S/)", "Ganancia Clínica (S/)"];
+    const rows = estadisticas.map(stat => [
+      stat.especialista_nombre,
+      stat.total_atenciones,
+      stat.pacientes_unicos || 0,
+      Number(stat.total_ingresos).toFixed(2),
+      Number(stat.comision_porcentaje).toFixed(0),
+      Number(stat.pago_fijo).toFixed(2),
+      Number(stat.pago_total_especialista).toFixed(2),
+      Number(stat.ganancia_clinica).toFixed(2)
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const fecha = new Date().toISOString().split("T")[0];
+    link.download = `gestion_clinica_${fecha}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast({ severity: "success", message: "Reporte exportado exitosamente" });
   };
 
   return (
@@ -323,13 +408,97 @@ const GestionClinica = () => {
       </Paper>
 
 
+      {/* Tarjetas KPI de Resumen General */}
+      {!loading && estadisticas.length > 0 && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card elevation={2} sx={{ borderTop: "4px solid #a36920" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <MedicalServices sx={{ fontSize: 32, color: "#a36920", mb: 0.5 }} />
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#333" }}>
+                  {resumenGeneral.total_atenciones}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  Total Atenciones
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card elevation={2} sx={{ borderTop: "4px solid #4caf50" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <AttachMoney sx={{ fontSize: 32, color: "#4caf50", mb: 0.5 }} />
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#333" }}>
+                  S/ {Number(resumenGeneral.total_ingresos).toFixed(2)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  Ingresos Totales
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card elevation={2} sx={{ borderTop: "4px solid #ff9800" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <MoneyOff sx={{ fontSize: 32, color: "#ff9800", mb: 0.5 }} />
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#333" }}>
+                  S/ {Number(resumenGeneral.total_pago_especialistas).toFixed(2)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  Pago Especialistas
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card elevation={2} sx={{ borderTop: "4px solid #2e7d32" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <AccountBalance sx={{ fontSize: 32, color: "#2e7d32", mb: 0.5 }} />
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                  S/ {Number(resumenGeneral.total_ganancia_clinica).toFixed(2)}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  Ganancia Clínica
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <Card elevation={2} sx={{ borderTop: "4px solid #2196f3" }}>
+              <CardContent sx={{ textAlign: "center", py: 2 }}>
+                <Groups sx={{ fontSize: 32, color: "#2196f3", mb: 0.5 }} />
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#333" }}>
+                  {resumenGeneral.total_pacientes_unicos || 0}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  Pacientes Atendidos
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
+
       {/* Lista de Especialistas */}
       <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-          <Person sx={{ mr: 1, color: "#a36920" }} />
-          <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920" }}>
-            Lista de Especialistas
-          </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Person sx={{ mr: 1, color: "#a36920" }} />
+            <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920" }}>
+              Lista de Especialistas
+            </Typography>
+          </Box>
+          {estadisticas.length > 0 && (
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Download />}
+              onClick={exportarCSV}
+              sx={{ borderColor: "#a36920", color: "#a36920", "&:hover": { borderColor: "#8a5a1a", backgroundColor: "#fff8f0" } }}
+            >
+              Exportar CSV
+            </Button>
+          )}
         </Box>
         <Divider sx={{ mb: 2 }} />
         
@@ -343,46 +512,164 @@ const GestionClinica = () => {
           </Alert>
         ) : (
           <TableContainer sx={{ maxHeight: 600 }}>
-            <Table stickyHeader>
+            <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Especialista</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Acciones</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 160 }}>Especialista</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Atenciones</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Pacientes</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Ingresos</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#fff8e1", minWidth: 90 }}>Comisión %</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#fff8e1", minWidth: 100 }}>Pago Fijo</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#fff3e0" }}>Pago Esp.</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#e8f5e9" }}>Ganancia</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 160 }}>Acciones</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {estadisticas.map((stat, index) => (
+                {estadisticas.map((stat, index) => {
+                  const editando = editandoComision[stat.especialista_id];
+                  return (
                   <TableRow
                     key={index}
                     sx={{
                       "&:hover": { backgroundColor: "#f9f9f9" },
-                      borderLeft: "4px solid #a36920"
+                      borderLeft: stat.total_atenciones > 0 ? "4px solid #a36920" : "4px solid #e0e0e0",
+                      opacity: stat.total_atenciones > 0 ? 1 : 0.6
                     }}
                   >
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <Person sx={{ mr: 1, color: "#a36920" }} />
-                        <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+                        <Person sx={{ mr: 1, color: "#a36920", fontSize: 20 }} />
+                        <Typography variant="body2" sx={{ fontWeight: "bold" }}>
                           {stat.especialista_nombre}
                         </Typography>
                       </Box>
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        variant="contained"
+                      <Chip
+                        label={stat.total_atenciones}
                         size="small"
-                        startIcon={<Visibility />}
-                        onClick={() => verDetalleEspecialista(stat)}
-                        sx={{ 
-                          backgroundColor: "#a36920", 
-                          "&:hover": { backgroundColor: "#8a5a1a" }
-                        }}
-                      >
-                        Ver Detalle
-                      </Button>
+                        color={stat.total_atenciones > 0 ? "primary" : "default"}
+                        sx={{ fontWeight: "bold", minWidth: 40 }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#2196f3" }}>
+                        {stat.pacientes_unicos || 0}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#4caf50" }}>
+                        S/ {Number(stat.total_ingresos).toFixed(2)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center" sx={{ bgcolor: "#fff8e1" }}>
+                      {editando ? (
+                        <TextField
+                          type="number"
+                          size="small"
+                          value={editando.comision_porcentaje}
+                          onChange={(e) => setEditandoComision(prev => ({
+                            ...prev,
+                            [stat.especialista_id]: { ...prev[stat.especialista_id], comision_porcentaje: e.target.value }
+                          }))}
+                          inputProps={{ min: 0, max: 100, step: 1 }}
+                          sx={{ width: 70, "& input": { textAlign: "center", py: 0.5, fontSize: "0.85rem" } }}
+                        />
+                      ) : (
+                        <Chip
+                          label={`${Number(stat.comision_porcentaje).toFixed(0)}%`}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontWeight: "bold", color: "#ff9800", borderColor: "#ff9800" }}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell align="center" sx={{ bgcolor: "#fff8e1" }}>
+                      {editando ? (
+                        <TextField
+                          type="number"
+                          size="small"
+                          value={editando.pago_fijo}
+                          onChange={(e) => setEditandoComision(prev => ({
+                            ...prev,
+                            [stat.especialista_id]: { ...prev[stat.especialista_id], pago_fijo: e.target.value }
+                          }))}
+                          inputProps={{ min: 0, step: 5 }}
+                          sx={{ width: 80, "& input": { textAlign: "center", py: 0.5, fontSize: "0.85rem" } }}
+                        />
+                      ) : (
+                        <Typography variant="body2" sx={{ color: stat.pago_fijo > 0 ? "#333" : "#999" }}>
+                          S/ {Number(stat.pago_fijo).toFixed(2)}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell align="right" sx={{ bgcolor: "#fff3e0" }}>
+                      <Tooltip title={`Comisión: S/ ${Number(stat.comision_calculada).toFixed(2)} + Fijo: S/ ${Number(stat.pago_fijo_total).toFixed(2)}`}>
+                        <Typography variant="body2" sx={{ fontWeight: "bold", color: "#ff9800" }}>
+                          S/ {Number(stat.pago_total_especialista).toFixed(2)}
+                        </Typography>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell align="right" sx={{ bgcolor: "#e8f5e9" }}>
+                      <Typography variant="body2" sx={{ fontWeight: "bold", color: stat.ganancia_clinica >= 0 ? "#2e7d32" : "#d32f2f" }}>
+                        S/ {Number(stat.ganancia_clinica).toFixed(2)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Stack direction="row" spacing={0.5} justifyContent="center">
+                        {editando ? (
+                          <>
+                            <Tooltip title="Guardar">
+                              <IconButton
+                                size="small"
+                                onClick={() => guardarComision(stat.especialista_id)}
+                                sx={{ color: "#4caf50" }}
+                              >
+                                <Save fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Cancelar">
+                              <IconButton
+                                size="small"
+                                onClick={() => cancelarEdicion(stat.especialista_id)}
+                                sx={{ color: "#d32f2f" }}
+                              >
+                                <Close fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </>
+                        ) : (
+                          <Tooltip title="Editar comisión">
+                            <IconButton
+                              size="small"
+                              onClick={() => iniciarEdicion(stat.especialista_id, stat.comision_porcentaje, stat.pago_fijo)}
+                              sx={{ color: "#ff9800" }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<Visibility />}
+                          onClick={() => verDetalleEspecialista(stat)}
+                          sx={{ 
+                            backgroundColor: "#a36920", 
+                            "&:hover": { backgroundColor: "#8a5a1a" },
+                            fontSize: "0.7rem",
+                            py: 0.3
+                          }}
+                        >
+                          Detalle
+                        </Button>
+                      </Stack>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -428,6 +715,97 @@ const GestionClinica = () => {
             </Box>
           ) : modalDetalle.datos && modalDetalle.datos.sesiones ? (
             <>
+              {/* Resumen del Especialista */}
+              {(() => {
+                const esp = modalDetalle.especialista;
+                const totales = modalDetalle.datos.totales || {};
+                const porcentaje = esp?.comision_porcentaje || 20;
+                const pagoFijo = esp?.pago_fijo || 0;
+                const ingresos = Number(totales.total_ingresos || 0);
+                const sesiones = totales.total_sesiones || 0;
+                const comisionCalc = ingresos * (porcentaje / 100);
+                const pagoFijoTotal = pagoFijo * sesiones;
+                const pagoTotalEsp = comisionCalc + pagoFijoTotal;
+                const ganancia = ingresos - pagoTotalEsp;
+                return (
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={6} sm={2.4}>
+                  <Card variant="outlined" sx={{ textAlign: "center", borderColor: "#a36920" }}>
+                    <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#a36920" }}>
+                        {sesiones}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#666" }}>Total Sesiones</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={6} sm={2.4}>
+                  <Card variant="outlined" sx={{ textAlign: "center", borderColor: "#4caf50" }}>
+                    <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#4caf50" }}>
+                        S/ {ingresos.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#666" }}>Ingresos</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={6} sm={2.4}>
+                  <Card variant="outlined" sx={{ textAlign: "center", borderColor: "#ff9800" }}>
+                    <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#ff9800" }}>
+                        S/ {pagoTotalEsp.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#666" }}>
+                        Pago Esp. ({porcentaje}%{pagoFijo > 0 ? ` + S/${pagoFijo}/ses.` : ""})
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={6} sm={2.4}>
+                  <Card variant="outlined" sx={{ textAlign: "center", borderColor: "#2e7d32" }}>
+                    <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: ganancia >= 0 ? "#2e7d32" : "#d32f2f" }}>
+                        S/ {ganancia.toFixed(2)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#666" }}>Ganancia Clínica</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={6} sm={2.4}>
+                  <Card variant="outlined" sx={{ textAlign: "center", borderColor: "#9c27b0" }}>
+                    <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#9c27b0" }}>
+                        S/ {sesiones > 0 ? (ingresos / sesiones).toFixed(2) : "0.00"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "#666" }}>Prom. Sesión</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+                );
+              })()}
+
+              {/* Resumen por Tratamiento */}
+              {modalDetalle.datos.tratamientos && modalDetalle.datos.tratamientos.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#a36920", mb: 1 }}>
+                    Resumen por Tratamiento
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {modalDetalle.datos.tratamientos.map((trat, idx) => (
+                      <Chip
+                        key={idx}
+                        label={`${trat.tratamiento_nombre} (${trat.total_sesiones} ses. - S/ ${Number(trat.total_ingresos).toFixed(2)})`}
+                        variant="outlined"
+                        size="small"
+                        sx={{ borderColor: "#a36920", color: "#333" }}
+                      />
+                    ))}
+                  </Box>
+                  <Divider sx={{ mt: 2 }} />
+                </Box>
+              )}
+
               {/* Tabla Detallada Tipo Historial Clínico */}
               <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", color: "#a36920" }}>
                 Historial de Tratamientos Realizados

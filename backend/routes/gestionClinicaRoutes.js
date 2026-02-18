@@ -111,9 +111,11 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
     const whereClausePaquetes = `WHERE ${whereConditionsPaquetes.join(" AND ")}`;
     const whereClausePresupuestos = `WHERE ${whereConditionsPresupuestos.join(" AND ")}`;
 
-    // Obtener TODOS los especialistas primero
+    // Obtener TODOS los especialistas primero (con comisión y pago fijo)
     const todosEspecialistas = await dbAll(`
-      SELECT id as especialista_id, nombre as especialista_nombre
+      SELECT id as especialista_id, nombre as especialista_nombre,
+        COALESCE(comision_porcentaje, 20) as comision_porcentaje,
+        COALESCE(pago_fijo, 0) as pago_fijo
       FROM especialistas
       ORDER BY nombre
     `);
@@ -174,6 +176,30 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       ORDER BY e.nombre, prs.tratamiento_nombre
     `, paramsPresupuestos);
 
+    // Pacientes únicos por especialista (paquetes)
+    const pacientesUnicosPaquetes = await dbAll(`
+      SELECT 
+        e.id as especialista_id,
+        COUNT(DISTINCT pp.paciente_id) as pacientes_unicos
+      FROM paquetes_sesiones ps
+      INNER JOIN especialistas e ON ps.especialista_id = e.id
+      LEFT JOIN paquetes_pacientes pp ON ps.paquete_paciente_id = pp.id
+      ${whereClausePaquetes}
+      GROUP BY e.id
+    `, paramsPaquetes);
+
+    // Pacientes únicos por especialista (presupuestos)
+    const pacientesUnicosPresupuestos = await dbAll(`
+      SELECT 
+        e.id as especialista_id,
+        COUNT(DISTINCT pa.paciente_id) as pacientes_unicos
+      FROM presupuestos_sesiones prs
+      INNER JOIN especialistas e ON prs.especialista_id = e.id
+      LEFT JOIN presupuestos_asignados pa ON prs.presupuesto_asignado_id = pa.id
+      ${whereClausePresupuestos}
+      GROUP BY e.id
+    `, paramsPresupuestos);
+
     // Inicializar mapa con TODOS los especialistas
     const especialistasMap = new Map();
     
@@ -181,10 +207,13 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       especialistasMap.set(esp.especialista_id, {
         especialista_id: esp.especialista_id,
         especialista_nombre: esp.especialista_nombre,
+        comision_porcentaje: esp.comision_porcentaje,
+        pago_fijo: esp.pago_fijo,
         atenciones_paquetes: 0,
         atenciones_presupuestos: 0,
         ingresos_paquetes: 0,
-        ingresos_presupuestos: 0
+        ingresos_presupuestos: 0,
+        pacientes_unicos: 0
       });
     });
 
@@ -208,18 +237,41 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       }
     });
 
-    // Convertir a array y calcular totales + comisión del 20%
+    // Agregar pacientes únicos
+    const pacientesMap = new Map();
+    pacientesUnicosPaquetes.forEach(p => {
+      pacientesMap.set(p.especialista_id, (pacientesMap.get(p.especialista_id) || 0) + (p.pacientes_unicos || 0));
+    });
+    pacientesUnicosPresupuestos.forEach(p => {
+      pacientesMap.set(p.especialista_id, (pacientesMap.get(p.especialista_id) || 0) + (p.pacientes_unicos || 0));
+    });
+    pacientesMap.forEach((count, espId) => {
+      if (especialistasMap.has(espId)) {
+        especialistasMap.get(espId).pacientes_unicos = count;
+      }
+    });
+
+    // Convertir a array y calcular totales + comisión personalizada + pago fijo
     const estadisticas = Array.from(especialistasMap.values()).map(esp => {
       const totalAtenciones = esp.atenciones_paquetes + esp.atenciones_presupuestos;
       const totalIngresos = esp.ingresos_paquetes + esp.ingresos_presupuestos;
-      const comision_20 = totalIngresos * 0.20;
+      const porcentaje = esp.comision_porcentaje || 20;
+      const pagoFijo = esp.pago_fijo || 0;
+      const comision_calculada = totalIngresos * (porcentaje / 100);
+      const pago_fijo_total = pagoFijo * totalAtenciones;
+      const pago_total_especialista = comision_calculada + pago_fijo_total;
       
       return {
         ...esp,
         total_atenciones: totalAtenciones,
         total_ingresos: totalIngresos,
         promedio_por_sesion: totalAtenciones > 0 ? totalIngresos / totalAtenciones : 0,
-        comision_20_porciento: comision_20
+        comision_porcentaje: porcentaje,
+        pago_fijo: pagoFijo,
+        comision_calculada,
+        pago_fijo_total,
+        pago_total_especialista,
+        ganancia_clinica: totalIngresos - pago_total_especialista
       };
     });
 
@@ -233,7 +285,10 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
     const resumen = {
       total_atenciones: estadisticas.reduce((sum, e) => sum + e.total_atenciones, 0),
       total_ingresos: estadisticas.reduce((sum, e) => sum + e.total_ingresos, 0),
-      total_comision_20: estadisticas.reduce((sum, e) => sum + e.comision_20_porciento, 0),
+      total_pago_especialistas: estadisticas.reduce((sum, e) => sum + e.pago_total_especialista, 0),
+      total_ganancia_clinica: estadisticas.reduce((sum, e) => sum + e.ganancia_clinica, 0),
+      total_pacientes_unicos: estadisticas.reduce((sum, e) => sum + (e.pacientes_unicos || 0), 0),
+      total_especialistas: estadisticas.filter(e => e.total_atenciones > 0).length,
       promedio_por_sesion: 0
     };
 

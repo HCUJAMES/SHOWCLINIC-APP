@@ -131,4 +131,57 @@ router.post("/normalizar", authMiddleware, requireDoctor, (req, res) => {
   });
 });
 
+// ✅ Actualizar comisión y pago fijo de un especialista (solo doctor)
+router.put("/comision/:id", authMiddleware, requireDoctor, (req, res) => {
+  const { id } = req.params;
+  const { comision_porcentaje, pago_fijo } = req.body;
+
+  const comision = comision_porcentaje != null ? Number(comision_porcentaje) : null;
+  const fijo = pago_fijo != null ? Number(pago_fijo) : null;
+
+  if (comision !== null && (isNaN(comision) || comision < 0 || comision > 100)) {
+    return res.status(400).json({ message: "Comisión debe ser entre 0 y 100" });
+  }
+
+  if (fijo !== null && (isNaN(fijo) || fijo < 0)) {
+    return res.status(400).json({ message: "Pago fijo debe ser mayor o igual a 0" });
+  }
+
+  const updates = [];
+  const params = [];
+
+  if (comision !== null) {
+    updates.push("comision_porcentaje = ?");
+    params.push(comision);
+  }
+  if (fijo !== null) {
+    updates.push("pago_fijo = ?");
+    params.push(fijo);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ message: "No se enviaron datos para actualizar" });
+  }
+
+  params.push(id);
+
+  db.run(
+    `UPDATE especialistas SET ${updates.join(", ")} WHERE id = ?`,
+    params,
+    function (err) {
+      if (err) {
+        console.error("❌ Error al actualizar comisión:", err.message);
+        return res.status(500).json({ message: "Error al actualizar comisión" });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ message: "Especialista no encontrado" });
+      }
+
+      console.log(`✅ Comisión actualizada para especialista ID ${id}`);
+      res.json({ message: "Comisión actualizada correctamente" });
+    }
+  );
+});
+
 export default router;
