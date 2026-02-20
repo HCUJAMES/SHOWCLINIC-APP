@@ -1,30 +1,10 @@
 import express from "express";
-import db from "../db/database.js";
+import db, { dbAll, dbGet } from "../db/database.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = express.Router();
 
 console.log("✅ Módulo de Gestión Clínica cargado");
-
-// Promisify db.all
-const dbAll = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.all(query, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
-
-// Promisify db.get
-const dbGet = (query, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.get(query, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row || null);
-    });
-  });
-};
 
 // ✅ Endpoint de prueba (sin autenticación)
 router.get("/test", (req, res) => {

@@ -593,36 +593,129 @@ router.post("/consulta-directa", (req, res) => {
   );
 });
 
-// �🗑️ ELIMINAR REGISTRO DE FINANZAS
+// 🗑️ ELIMINAR REGISTRO DE FINANZAS
 router.delete("/registro/:tipo/:id", (req, res) => {
   const { tipo, id } = req.params;
 
   if (tipo === "tratamiento") {
-    // Eliminar tratamiento realizado y sus deudas asociadas
+    // Eliminar tratamiento realizado, sus deudas asociadas Y los registros de finanzas relacionados
     db.get(`SELECT id FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?`, [id], (err, deuda) => {
       if (err) {
         console.error("❌ Error buscando deuda:", err.message);
         return res.status(500).json({ message: "Error al buscar deuda" });
       }
-      if (deuda) {
-        db.run(`DELETE FROM deudas_pagos WHERE deuda_id = ?`, [deuda.id]);
-        db.run(`DELETE FROM deudas_tratamientos WHERE id = ?`, [deuda.id]);
-      }
-      db.run(`DELETE FROM tratamientos_realizados WHERE id = ?`, [id], function (errDel) {
-        if (errDel) {
-          console.error("❌ Error eliminando tratamiento:", errDel.message);
-          return res.status(500).json({ message: "Error al eliminar registro" });
+
+      db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+
+        // 1) Eliminar registros de finanzas que referencian este tratamiento realizado
+        db.run(
+          `DELETE FROM finanzas WHERE referencia_id = ? AND referencia_tipo = 'tratamiento_realizado'`,
+          [id]
+        );
+
+        if (deuda) {
+          // 2) Eliminar registros de finanzas que referencian esta deuda
+          db.run(
+            `DELETE FROM finanzas WHERE referencia_id = ? AND referencia_tipo = 'deuda_tratamiento'`,
+            [deuda.id]
+          );
+          // 3) Eliminar pagos de la deuda y la deuda misma
+          db.run(`DELETE FROM deudas_pagos WHERE deuda_id = ?`, [deuda.id]);
+          db.run(`DELETE FROM deudas_tratamientos WHERE id = ?`, [deuda.id]);
         }
-        res.json({ message: "✅ Registro eliminado" });
+
+        // 4) Eliminar el tratamiento realizado
+        db.run(`DELETE FROM tratamientos_realizados WHERE id = ?`, [id], function (errDel) {
+          if (errDel) {
+            db.run("ROLLBACK");
+            console.error("❌ Error eliminando tratamiento:", errDel.message);
+            return res.status(500).json({ message: "Error al eliminar registro" });
+          }
+          db.run("COMMIT");
+          res.json({ message: "✅ Registro eliminado" });
+        });
       });
     });
   } else if (tipo === "finanza") {
-    db.run(`DELETE FROM finanzas WHERE id = ?`, [id], function (errDel) {
-      if (errDel) {
-        console.error("❌ Error eliminando finanza:", errDel.message);
-        return res.status(500).json({ message: "Error al eliminar registro" });
+    // Obtener datos del registro antes de borrarlo para recalcular saldos
+    db.get(`SELECT * FROM finanzas WHERE id = ?`, [id], (errGet, finanza) => {
+      if (errGet) {
+        console.error("❌ Error buscando finanza:", errGet.message);
+        return res.status(500).json({ message: "Error al buscar registro" });
       }
-      res.json({ message: "✅ Registro eliminado" });
+      if (!finanza) {
+        return res.status(404).json({ message: "Registro no encontrado" });
+      }
+
+      const montoEliminado = parseFloat(finanza.monto) || 0;
+      const refTipo = finanza.referencia_tipo;
+      const refId = finanza.referencia_id;
+
+      db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+
+        // Eliminar sub-registros que referencian esta finanza (pagos adicionales)
+        db.run(
+          `DELETE FROM finanzas WHERE referencia_id = ? AND referencia_tipo = 'finanza'`,
+          [id]
+        );
+
+        // Eliminar el registro principal
+        db.run(`DELETE FROM finanzas WHERE id = ?`, [id]);
+
+        // Recalcular saldos en presupuestos/paquetes si aplica
+        if (refTipo === "presupuesto_asignado" && refId) {
+          db.run(
+            `UPDATE presupuestos_asignados 
+             SET monto_pagado = MAX(0, COALESCE(monto_pagado, 0) - ?),
+                 monto_adelanto = MAX(0, COALESCE(monto_adelanto, 0) - ?),
+                 saldo_pendiente = COALESCE(saldo_pendiente, 0) + ?,
+                 pagado = CASE WHEN (COALESCE(monto_pagado, 0) - ?) <= 0 THEN 0 ELSE pagado END,
+                 estado_pago = CASE 
+                   WHEN (COALESCE(monto_pagado, 0) - ?) <= 0 THEN 'pendiente_pago'
+                   WHEN (COALESCE(monto_pagado, 0) - ?) < (precio_total - COALESCE(descuento, 0)) THEN 'adelanto'
+                   ELSE estado_pago
+                 END
+             WHERE id = ?`,
+            [montoEliminado, montoEliminado, montoEliminado, montoEliminado, montoEliminado, montoEliminado, refId]
+          );
+        } else if (refTipo === "paquete_paciente" && refId) {
+          db.run(
+            `UPDATE paquetes_pacientes 
+             SET monto_pagado = MAX(0, COALESCE(monto_pagado, 0) - ?),
+                 monto_adelanto = MAX(0, COALESCE(monto_adelanto, 0) - ?),
+                 saldo_pendiente = COALESCE(saldo_pendiente, 0) + ?,
+                 pagado = CASE WHEN (COALESCE(monto_pagado, 0) - ?) <= 0 THEN 0 ELSE pagado END,
+                 estado_pago = CASE 
+                   WHEN (COALESCE(monto_pagado, 0) - ?) <= 0 THEN 'pendiente_pago'
+                   WHEN (COALESCE(monto_pagado, 0) - ?) < precio_total THEN 'adelanto'
+                   ELSE estado_pago
+                 END
+             WHERE id = ?`,
+            [montoEliminado, montoEliminado, montoEliminado, montoEliminado, montoEliminado, montoEliminado, refId]
+          );
+        } else if (refTipo === "deuda_tratamiento" && refId) {
+          // Recalcular saldo de la deuda
+          db.run(
+            `UPDATE deudas_tratamientos 
+             SET monto_adelanto = MAX(0, COALESCE(monto_adelanto, 0) - ?),
+                 monto_saldo = COALESCE(monto_saldo, 0) + ?,
+                 estado = CASE WHEN (COALESCE(monto_adelanto, 0) - ?) < monto_total THEN 'pendiente' ELSE estado END
+             WHERE id = ?`,
+            [montoEliminado, montoEliminado, montoEliminado, refId]
+          );
+        }
+
+        db.run("COMMIT", (commitErr) => {
+          if (commitErr) {
+            db.run("ROLLBACK");
+            console.error("❌ Error eliminando finanza:", commitErr.message);
+            return res.status(500).json({ message: "Error al eliminar registro" });
+          }
+          res.json({ message: "✅ Registro eliminado" });
+        });
+      });
     });
   } else {
     res.status(400).json({ message: "Tipo de registro no válido" });

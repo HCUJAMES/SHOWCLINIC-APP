@@ -24,7 +24,14 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
-        <Route path="/fotos-paciente" element={<FotosPaciente />} />
+        <Route
+          path="/fotos-paciente"
+          element={
+            <ProtectedRoute>
+              <FotosPaciente />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/dashboard"

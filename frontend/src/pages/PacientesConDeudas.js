@@ -20,7 +20,7 @@ import {
   Grid,
   IconButton,
 } from "@mui/material";
-import { ArrowBack, Home } from "@mui/icons-material";
+import { ArrowBack, Home, Delete } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 
@@ -47,6 +47,11 @@ export default function PacientesConDeudas() {
   const [cancelarMetodo, setCancelarMetodo] = useState("Efectivo");
   const [cancelarMonto, setCancelarMonto] = useState("");
   const [guardandoCancelacion, setGuardandoCancelacion] = useState(false);
+
+  // Estados para eliminar deuda (solo master)
+  const [eliminarOpen, setEliminarOpen] = useState(false);
+  const [eliminarRow, setEliminarRow] = useState(null);
+  const [eliminandoDeuda, setEliminandoDeuda] = useState(false);
 
   const authHeaders = useMemo(
     () => (token ? { Authorization: `Bearer ${token}` } : {}),
@@ -101,6 +106,31 @@ export default function PacientesConDeudas() {
     setCancelarMetodo("Efectivo");
     setCancelarMonto(String(row?.monto_saldo ?? ""));
     setCancelarOpen(true);
+  };
+
+  const confirmarEliminarDeuda = async () => {
+    if (!eliminarRow?.id || !eliminarRow?.tipo_deuda) return;
+    try {
+      setEliminandoDeuda(true);
+      const res = await fetch(
+        `${API_BASE_URL}/api/deudas/eliminar/${eliminarRow.tipo_deuda}/${eliminarRow.id}`,
+        { method: "DELETE", headers: authHeaders }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast({ severity: "error", message: data?.message || "Error al eliminar deuda" });
+        return;
+      }
+      setEliminarOpen(false);
+      setEliminarRow(null);
+      showToast({ severity: "success", message: "Deuda eliminada correctamente" });
+      await cargarDeudas();
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: "Error al eliminar deuda" });
+    } finally {
+      setEliminandoDeuda(false);
+    }
   };
 
   const confirmarCancelacion = async () => {
@@ -306,20 +336,86 @@ export default function PacientesConDeudas() {
                 <TableCell>S/ {Number(r.monto_saldo || 0).toFixed(2)}</TableCell>
                 <TableCell>{r.fecha_tratamiento || r.creado_en || "—"}</TableCell>
                 <TableCell>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    sx={{ backgroundColor: colorPrincipal, fontWeight: "bold" }}
-                    onClick={() => abrirCancelar(r)}
-                  >
-                    Registrar pago
-                  </Button>
+                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      sx={{ backgroundColor: colorPrincipal, fontWeight: "bold" }}
+                      onClick={() => abrirCancelar(r)}
+                    >
+                      Registrar pago
+                    </Button>
+                    {role === "master" && (
+                      <IconButton
+                        size="small"
+                        sx={{ color: "#d32f2f" }}
+                        title="Eliminar deuda"
+                        onClick={() => {
+                          setEliminarRow(r);
+                          setEliminarOpen(true);
+                        }}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    )}
+                  </Box>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Paper>
+
+      {/* Modal confirmar eliminar deuda (solo master) */}
+      <Dialog
+        open={eliminarOpen}
+        onClose={() => !eliminandoDeuda && setEliminarOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white", textAlign: "center" }}>
+          ⚠️ Eliminar Deuda
+        </DialogTitle>
+        <DialogContent sx={{ mt: 3, textAlign: "center" }}>
+          <Typography variant="h6" sx={{ mb: 1, color: "#333", fontWeight: "bold" }}>
+            {`${eliminarRow?.paciente_nombre || ""} ${eliminarRow?.paciente_apellido || ""}`.trim()}
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#666", mb: 1 }}>
+            Tratamiento: <strong>{eliminarRow?.tratamiento_nombre || "—"}</strong>
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#666", mb: 1 }}>
+            Saldo pendiente: <strong style={{ color: "#d32f2f" }}>S/ {Number(eliminarRow?.monto_saldo || 0).toFixed(2)}</strong>
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#999", fontStyle: "italic", mt: 2 }}>
+            {eliminarRow?.tipo_deuda === "tratamiento"
+              ? "Se eliminará la deuda y sus pagos asociados permanentemente."
+              : "Se marcará como pagado y saldrá de la lista de deudas."}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, justifyContent: "center", gap: 2 }}>
+          <Button
+            onClick={() => setEliminarOpen(false)}
+            disabled={eliminandoDeuda}
+            variant="outlined"
+            sx={{ borderColor: "#999", color: "#666", borderRadius: 2 }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={confirmarEliminarDeuda}
+            disabled={eliminandoDeuda}
+            variant="contained"
+            sx={{
+              backgroundColor: "#d32f2f",
+              "&:hover": { backgroundColor: "#b71c1c" },
+              borderRadius: 2,
+              fontWeight: "bold",
+            }}
+          >
+            {eliminandoDeuda ? "Eliminando..." : "Sí, Eliminar"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={cancelarOpen} onClose={() => setCancelarOpen(false)}>
         <DialogTitle>Registrar abono</DialogTitle>

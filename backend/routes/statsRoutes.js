@@ -1,12 +1,9 @@
 import express from "express";
 import { dbAll, dbGet } from "../db/database.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { fechaLima } from "../utils/dateUtils.js";
 
 const router = express.Router();
-
-// Función para obtener fecha/hora de Perú (GMT-5)
-const fechaLima = () =>
-  new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
 
 const getMonthRange = ({ year, month }) => {
   const y = Number(year);

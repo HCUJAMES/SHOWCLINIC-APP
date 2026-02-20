@@ -62,7 +62,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:4000";
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
 
 const GestionClinica = () => {
   const navigate = useNavigate();

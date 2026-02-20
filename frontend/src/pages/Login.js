@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TextField, Button, Typography, Box, InputAdornment, IconButton, Checkbox, FormControlLabel } from "@mui/material";
+import { TextField, Button, Typography, Box, InputAdornment, IconButton } from "@mui/material";
 import { Visibility, VisibilityOff, PersonOutline, LockOutlined } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -14,7 +14,6 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
   const { showToast } = useToast();
 
@@ -265,7 +264,7 @@ export default function Login() {
             placeholder="Ingresa tu usuario"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -326,7 +325,7 @@ export default function Login() {
             placeholder="Ingresa tu contraseña"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && handleLogin()}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -386,40 +385,7 @@ export default function Login() {
             }}
           />
 
-          {/* Remember Me & Forgot Password */}
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              mb: 4,
-              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.9s both",
-            }}
-          >
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  sx={{
-                    color: "rgba(212,175,55,0.4)",
-                    transition: "all 0.3s ease",
-                    "&.Mui-checked": {
-                      color: "#D4AF37",
-                    },
-                    "&:hover": {
-                      transform: "scale(1.1)",
-                    },
-                  }}
-                />
-              }
-              label={
-                <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.9)" }}>
-                  Recordarme
-                </Typography>
-              }
-            />
-          </Box>
+          <Box sx={{ mb: 4 }} />
 
           {/* Botón Sign In */}
           <Button

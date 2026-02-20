@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import db from "../db/database.js";
-import { authMiddleware, requirePatientWrite } from "../middleware/auth.js";
+import { authMiddleware, requirePatientWrite, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -513,7 +513,11 @@ router.get("/:id/historial", (req, res) => {
   const query = `
     SELECT tr.id, tr.fecha, tr.sesion, t.nombre AS tratamiento, 
            tr.productos, tr.cantidad_total, tr.precio_total,
-           tr.descuento, tr.pagoMetodo, tr.fotosAntes, tr.fotosDespues
+           tr.descuento, tr.pagoMetodo,
+           tr.foto_antes1, tr.foto_antes2, tr.foto_antes3,
+           tr.foto_despues1, tr.foto_despues2, tr.foto_despues3,
+           tr.foto_izquierda, tr.foto_frontal, tr.foto_derecha,
+           tr.foto_extra1, tr.foto_extra2, tr.foto_extra3
     FROM tratamientos_realizados tr
     LEFT JOIN tratamientos t ON tr.tratamiento_id = t.id
     WHERE tr.paciente_id = ?
@@ -608,5 +612,60 @@ router.put("/:id/observaciones", requirePatientWrite, (req, res) => {
   });
 });
 
+
+// ✅ Eliminar paciente y todos sus datos relacionados (solo master)
+router.delete("/eliminar/:id", requireRole("master"), (req, res) => {
+  const { id } = req.params;
+
+  // Verificar que el paciente existe
+  db.get("SELECT id, nombre, apellido FROM patients WHERE id = ?", [id], (err, paciente) => {
+    if (err) {
+      console.error("❌ Error al buscar paciente:", err.message);
+      return res.status(500).json({ message: "Error al buscar paciente" });
+    }
+    if (!paciente) {
+      return res.status(404).json({ message: "Paciente no encontrado" });
+    }
+
+    // Eliminar en orden para respetar foreign keys
+    const deletes = [
+      "DELETE FROM deudas_pagos WHERE deuda_id IN (SELECT id FROM deudas_tratamientos WHERE paciente_id = ?)",
+      "DELETE FROM deudas_tratamientos WHERE paciente_id = ?",
+      "DELETE FROM patient_observaciones WHERE paciente_id = ?",
+      "DELETE FROM patient_ofertas WHERE paciente_id = ?",
+      "DELETE FROM paquetes_sesiones WHERE paquete_paciente_id IN (SELECT id FROM paquetes_pacientes WHERE paciente_id = ?)",
+      "DELETE FROM paquetes_pacientes WHERE paciente_id = ?",
+      "DELETE FROM presupuestos_sesiones WHERE presupuesto_asignado_id IN (SELECT id FROM presupuestos_asignados WHERE paciente_id = ?)",
+      "DELETE FROM presupuestos_asignados WHERE paciente_id = ?",
+      "DELETE FROM tratamientos_realizados WHERE paciente_id = ?",
+      "DELETE FROM finanzas WHERE paciente_id = ?",
+      "DELETE FROM patients WHERE id = ?",
+    ];
+
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
+
+      let error = null;
+      for (const sql of deletes) {
+        if (error) break;
+        db.run(sql, [id], (delErr) => {
+          if (delErr && !error) {
+            error = delErr;
+          }
+        });
+      }
+
+      db.run("COMMIT", (commitErr) => {
+        if (error || commitErr) {
+          db.run("ROLLBACK");
+          console.error("❌ Error al eliminar paciente:", (error || commitErr).message);
+          return res.status(500).json({ message: "Error al eliminar paciente" });
+        }
+        console.log(`🗑️ Paciente eliminado: ${paciente.nombre} ${paciente.apellido} (ID: ${id})`);
+        res.json({ message: "Paciente eliminado correctamente" });
+      });
+    });
+  });
+});
 
 export default router;

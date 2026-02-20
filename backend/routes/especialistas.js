@@ -30,9 +30,8 @@ function formatNombreEspecialista(nombre) {
   return formateadas.join(' ');
 }
 
-// Listar especialistas no requiere auth (se usa en ComenzarTratamiento)
-// ✅ Listar especialistas
-router.get("/listar", (req, res) => {
+// ✅ Listar especialistas (requiere autenticación)
+router.get("/listar", authMiddleware, (req, res) => {
   db.all("SELECT * FROM especialistas ORDER BY nombre ASC", [], (err, rows) => {
     if (err) {
       console.error("❌ Error al listar especialistas:", err.message);

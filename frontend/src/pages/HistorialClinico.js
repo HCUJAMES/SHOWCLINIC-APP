@@ -1719,87 +1719,127 @@ const HistorialClinico = () => {
 
           {!pacienteSeleccionado ? (
             <>
+              {/* Barra de búsqueda */}
               <Box
                 sx={{
                   display: "flex",
                   flexDirection: { xs: "column", md: "row" },
                   gap: 2,
                   alignItems: { xs: "stretch", md: "center" },
-                  justifyContent: "space-between",
                   mb: 3,
+                  p: 2,
+                  borderRadius: 3,
+                  backgroundColor: "rgba(163,105,32,0.04)",
+                  border: "1px solid rgba(163,105,32,0.10)",
                 }}
               >
                 <TextField
-                  label="Buscar paciente"
-                  placeholder="Escribe nombre o apellido"
+                  label="🔍 Buscar paciente"
+                  placeholder="Nombre, apellido o DNI..."
                   fullWidth
                   value={filtro}
                   onChange={(e) => setFiltro(e.target.value)}
+                  size="small"
                   sx={{
                     flex: 1,
                     "& .MuiInputBase-root": {
-                      backgroundColor: "rgba(255,255,255,0.72)",
+                      backgroundColor: "white",
                       borderRadius: 2,
                     },
+                    "& .MuiOutlinedInput-root": {
+                      "&:hover fieldset": { borderColor: "#a36920" },
+                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                    },
+                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
                   }}
                 />
-                <Box
-                  sx={{
-                    minWidth: { xs: "auto", md: 240 },
-                    textAlign: { xs: "left", md: "right" },
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    sx={{ color: "rgba(0,0,0,0.60)", lineHeight: 1.4 }}
-                  >
-                    Selecciona un paciente para ver tratamientos,
-                    cargar fotos y exportar PDF.
-                  </Typography>
+                <Box sx={{ minWidth: { xs: "auto", md: 160 }, textAlign: { xs: "left", md: "right" } }}>
+                  <Chip
+                    label={`${pacientesFiltrados.length} paciente${pacientesFiltrados.length !== 1 ? "s" : ""}`}
+                    size="small"
+                    sx={{
+                      backgroundColor: "rgba(163,105,32,0.12)",
+                      color: "#a36920",
+                      fontWeight: 700,
+                      fontSize: "0.8rem",
+                    }}
+                  />
                 </Box>
               </Box>
 
-              <Grid container spacing={2.2}>
+              {/* Lista de pacientes */}
+              <Grid container spacing={1.5}>
                 {pacientesFiltrados.map((pac) => (
                   <Grid item xs={12} md={6} key={pac.id}>
                     <Paper
+                      elevation={0}
                       sx={{
-                        p: 2.2,
+                        p: 2,
                         display: "flex",
                         gap: 2,
                         justifyContent: "space-between",
                         alignItems: "center",
-                        borderRadius: 3,
-                        border: "1px solid rgba(212,175,55,0.22)",
-                        backgroundColor: "rgba(255,255,255,0.70)",
-                        boxShadow: "0 10px 24px rgba(0,0,0,0.08)",
+                        borderRadius: 2.5,
+                        border: "1px solid rgba(163,105,32,0.12)",
+                        backgroundColor: "rgba(255,255,255,0.85)",
+                        transition: "all 0.2s ease",
+                        cursor: "pointer",
+                        "&:hover": {
+                          borderColor: "#a36920",
+                          boxShadow: "0 4px 16px rgba(163,105,32,0.12)",
+                          transform: "translateY(-1px)",
+                        },
                       }}
+                      onClick={() => cargarHistorial(pac.id)}
                     >
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography
-                          fontWeight="bold"
-                          sx={{ color: "#2E2E2E", lineHeight: 1.15 }}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+                        <Avatar
+                          src={pac.fotoPerfil ? `${API_BASE_URL}${pac.fotoPerfil}` : undefined}
+                          sx={{
+                            width: 42,
+                            height: 42,
+                            bgcolor: "rgba(163,105,32,0.12)",
+                            color: "#a36920",
+                            fontWeight: 700,
+                            fontSize: "0.95rem",
+                            border: "2px solid rgba(163,105,32,0.15)",
+                          }}
                         >
-                          {pac.nombre} {pac.apellido}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ color: "rgba(0,0,0,0.60)", mt: 0.4 }}
-                        >
-                          Documento: {pac.tipoDocumento || 'DNI'}: {pac.dni}
-                        </Typography>
+                          {`${pac.nombre || ""}`.charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography
+                            fontWeight={700}
+                            sx={{ color: "#2E2E2E", lineHeight: 1.2, fontSize: "0.95rem" }}
+                            noWrap
+                          >
+                            {pac.nombre} {pac.apellido}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "rgba(0,0,0,0.50)" }}
+                          >
+                            {pac.tipoDocumento || "DNI"}: {pac.dni}
+                          </Typography>
+                        </Box>
                       </Box>
                       <Button
                         variant="contained"
+                        size="small"
                         sx={{
                           backgroundColor: "#a36920",
                           "&:hover": { backgroundColor: "#8b581b" },
-                          borderRadius: 3,
-                          px: 2.4,
-                          py: 1.0,
-                          fontWeight: "bold",
+                          borderRadius: 2,
+                          px: 2,
+                          fontWeight: 700,
+                          textTransform: "none",
+                          fontSize: "0.8rem",
+                          flexShrink: 0,
                         }}
-                        onClick={() => cargarHistorial(pac.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cargarHistorial(pac.id);
+                        }}
                       >
                         Ver historial
                       </Button>

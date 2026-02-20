@@ -40,7 +40,7 @@ import { useAuth } from "../hooks/useAuth";
 import { canWritePackages, canDeletePackages } from "../utils/permissions";
 import { COLORS } from "../constants";
 
-const API_BASE_URL = `http://${window.location.hostname}:4000`;
+const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
 
 const Paquetes = () => {
   const navigate = useNavigate();

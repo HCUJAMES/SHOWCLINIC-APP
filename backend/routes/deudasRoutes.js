@@ -1,13 +1,11 @@
 import express from "express";
 import db, { dbAll, dbRun, dbGet } from "../db/database.js";
-import { authMiddleware, requireDoctor } from "../middleware/auth.js";
+import { authMiddleware, requireDoctor, requireRole } from "../middleware/auth.js";
+import { fechaLima } from "../utils/dateUtils.js";
 
 const router = express.Router();
 
 router.use(authMiddleware);
-
-const fechaLima = () =>
-  new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
 
 const abonarDeuda = async ({ deudaIdNum, metodoStr, montoNum, fechaLocal }) => {
   const deuda = await dbGet(
@@ -195,10 +193,15 @@ router.get("/listar", async (req, res) => {
     const wherePresupuestos = [
       "pa.estado_pago = 'adelanto'",
       "pa.pagado = 0",
-      "(pa.saldo_pendiente > 0 OR (pa.precio_total - COALESCE(pa.monto_pagado, 0)) > 0)"
+      "(pa.saldo_pendiente > 0 OR (pa.precio_total - COALESCE(pa.descuento, 0) - COALESCE(pa.monto_pagado, 0)) > 0)"
     ];
     const paramsPresupuestos = [];
 
+    if (trimmed) {
+      const like = `%${trimmed}%`;
+      wherePresupuestos.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ?)");
+      paramsPresupuestos.push(like, like, like);
+    }
     if (fechaDesdeSql) {
       wherePresupuestos.push("pa.fecha_inicio >= ?");
       paramsPresupuestos.push(fechaDesdeSql);
@@ -252,7 +255,7 @@ router.get("/listar", async (req, res) => {
         monto_saldo: saldoCalculado > 0 ? saldoCalculado : 0,
         estado: 'pendiente'
       };
-    });
+    }).filter(p => p.monto_saldo > 0); // Excluir presupuestos sin saldo real pendiente
 
     // Obtener saldos pendientes de paquetes asignados
     const wherePaquetes = [
@@ -262,6 +265,11 @@ router.get("/listar", async (req, res) => {
     ];
     const paramsPaquetes = [];
 
+    if (trimmed) {
+      const like = `%${trimmed}%`;
+      wherePaquetes.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ?)");
+      paramsPaquetes.push(like, like, like);
+    }
     if (fechaDesdeSql) {
       wherePaquetes.push("pp.fecha_inicio >= ?");
       paramsPaquetes.push(fechaDesdeSql);
@@ -294,11 +302,14 @@ router.get("/listar", async (req, res) => {
     );
 
     // Formatear paquetes
-    const paquetesFormateados = paquetesPendientes.map(p => ({
-      ...p,
-      monto_saldo: p.monto_saldo || (p.monto_total - (p.monto_adelanto || 0)),
-      estado: 'pendiente'
-    }));
+    const paquetesFormateados = paquetesPendientes.map(p => {
+      const saldoReal = p.monto_saldo || (p.monto_total - (p.monto_adelanto || 0));
+      return {
+        ...p,
+        monto_saldo: saldoReal > 0 ? saldoReal : 0,
+        estado: 'pendiente'
+      };
+    }).filter(p => p.monto_saldo > 0); // Excluir paquetes sin saldo real pendiente
 
     // Combinar todas las deudas
     const todasDeudas = [...rows, ...presupuestosFormateados, ...paquetesFormateados];
@@ -320,22 +331,45 @@ router.get("/resumen/:pacienteId", async (req, res) => {
       return res.status(400).json({ message: "Paciente inválido" });
     }
 
-    const rows = await dbAll(
-      `
-        SELECT
-          COUNT(*) AS cantidad_pendiente,
-          COALESCE(SUM(monto_saldo), 0) AS total_pendiente
-        FROM deudas_tratamientos
-        WHERE paciente_id = ? AND estado = 'pendiente'
-      `,
+    // 1) Deudas de tratamientos
+    const deudasTrat = await dbAll(
+      `SELECT COUNT(*) AS cantidad, COALESCE(SUM(monto_saldo), 0) AS total
+       FROM deudas_tratamientos
+       WHERE paciente_id = ? AND estado = 'pendiente'`,
       [pacienteIdNum]
     );
 
-    const r = rows?.[0] || {};
+    // 2) Presupuestos con saldo pendiente
+    const deudasPres = await dbAll(
+      `SELECT COUNT(*) AS cantidad,
+              COALESCE(SUM(precio_total - COALESCE(descuento, 0) - COALESCE(monto_pagado, 0)), 0) AS total
+       FROM presupuestos_asignados
+       WHERE paciente_id = ? AND estado_pago = 'adelanto' AND pagado = 0
+         AND (precio_total - COALESCE(descuento, 0) - COALESCE(monto_pagado, 0)) > 0`,
+      [pacienteIdNum]
+    );
+
+    // 3) Paquetes con saldo pendiente
+    const deudasPaq = await dbAll(
+      `SELECT COUNT(*) AS cantidad,
+              COALESCE(SUM(precio_total - COALESCE(monto_pagado, 0)), 0) AS total
+       FROM paquetes_pacientes
+       WHERE paciente_id = ? AND estado_pago = 'adelanto' AND pagado = 0
+         AND (precio_total - COALESCE(monto_pagado, 0)) > 0`,
+      [pacienteIdNum]
+    );
+
+    const t = deudasTrat?.[0] || {};
+    const p = deudasPres?.[0] || {};
+    const q = deudasPaq?.[0] || {};
+
+    const cantidadTotal = Number(t.cantidad || 0) + Number(p.cantidad || 0) + Number(q.cantidad || 0);
+    const totalPendiente = Number(t.total || 0) + Number(p.total || 0) + Number(q.total || 0);
+
     res.json({
       paciente_id: pacienteIdNum,
-      cantidad_pendiente: Number(r.cantidad_pendiente || 0),
-      total_pendiente: Number(r.total_pendiente || 0),
+      cantidad_pendiente: cantidadTotal,
+      total_pendiente: totalPendiente,
     });
   } catch (err) {
     console.error("❌ Error al obtener resumen de deuda:", err.message);
@@ -448,8 +482,10 @@ router.post("/presupuesto/:id/abonar", requireDoctor, async (req, res) => {
     }
 
     const precioTotal = parseFloat(presupuesto.precio_total) || 0;
+    const descuento = parseFloat(presupuesto.descuento) || 0;
+    const precioConDescuento = precioTotal - descuento;
     const montoYaPagado = parseFloat(presupuesto.monto_pagado) || 0;
-    const saldoActual = precioTotal - montoYaPagado;
+    const saldoActual = precioConDescuento - montoYaPagado;
 
     if (saldoActual <= 0) {
       return res.status(400).json({ message: "El presupuesto no tiene saldo pendiente" });
@@ -460,7 +496,7 @@ router.post("/presupuesto/:id/abonar", requireDoctor, async (req, res) => {
     }
 
     const nuevoMontoPagado = montoYaPagado + montoNum;
-    const nuevoSaldo = precioTotal - nuevoMontoPagado;
+    const nuevoSaldo = precioConDescuento - nuevoMontoPagado;
     const estadoPago = nuevoSaldo <= 0 ? 'pagado' : 'adelanto';
     const pagadoFlag = nuevoSaldo <= 0 ? 1 : 0;
 
@@ -595,6 +631,97 @@ router.post("/paquete/:id/abonar", requireDoctor, async (req, res) => {
   } catch (err) {
     console.error("❌ Error al abonar paquete:", err.message);
     res.status(500).json({ message: "Error al registrar abono" });
+  }
+});
+
+/* ==============================
+   🗑️ ELIMINAR DEUDA (solo master)
+============================== */
+router.delete("/eliminar/:tipo/:id", requireRole("master"), async (req, res) => {
+  const { tipo, id } = req.params;
+  const idNum = Number(id);
+
+  if (!Number.isFinite(idNum) || idNum <= 0) {
+    return res.status(400).json({ message: "ID inválido" });
+  }
+
+  try {
+    if (tipo === "tratamiento") {
+      // Eliminar deuda de tratamiento
+      const deuda = await dbGet(
+        `SELECT * FROM deudas_tratamientos WHERE id = ?`,
+        [idNum]
+      );
+      if (!deuda) {
+        return res.status(404).json({ message: "Deuda no encontrada" });
+      }
+
+      // Eliminar pagos asociados
+      await dbRun(`DELETE FROM deudas_pagos WHERE deuda_id = ?`, [idNum]);
+      // Eliminar registros de finanzas asociados a esta deuda
+      await dbRun(
+        `DELETE FROM finanzas WHERE referencia_id = ? AND referencia_tipo = 'deuda_tratamiento'`,
+        [idNum]
+      );
+      // Eliminar la deuda
+      await dbRun(`DELETE FROM deudas_tratamientos WHERE id = ?`, [idNum]);
+
+      res.json({ message: "✅ Deuda de tratamiento eliminada" });
+
+    } else if (tipo === "presupuesto") {
+      // Marcar presupuesto como pagado (eliminar de la lista de deudas)
+      const presupuesto = await dbGet(
+        `SELECT * FROM presupuestos_asignados WHERE id = ?`,
+        [idNum]
+      );
+      if (!presupuesto) {
+        return res.status(404).json({ message: "Presupuesto no encontrado" });
+      }
+
+      const precioTotal = parseFloat(presupuesto.precio_total) || 0;
+      const descuento = parseFloat(presupuesto.descuento) || 0;
+      const precioConDescuento = precioTotal - descuento;
+
+      // Marcar como pagado completamente para sacarlo de la lista de deudas
+      await dbRun(
+        `UPDATE presupuestos_asignados 
+         SET pagado = 1, monto_pagado = ?, saldo_pendiente = 0, 
+             estado_pago = 'pagado'
+         WHERE id = ?`,
+        [precioConDescuento, idNum]
+      );
+
+      res.json({ message: "✅ Deuda de presupuesto eliminada" });
+
+    } else if (tipo === "paquete") {
+      // Marcar paquete como pagado (eliminar de la lista de deudas)
+      const paquete = await dbGet(
+        `SELECT * FROM paquetes_pacientes WHERE id = ?`,
+        [idNum]
+      );
+      if (!paquete) {
+        return res.status(404).json({ message: "Paquete no encontrado" });
+      }
+
+      const precioTotal = parseFloat(paquete.precio_total) || 0;
+
+      // Marcar como pagado completamente para sacarlo de la lista de deudas
+      await dbRun(
+        `UPDATE paquetes_pacientes 
+         SET pagado = 1, monto_pagado = ?, saldo_pendiente = 0, 
+             estado_pago = 'pagado'
+         WHERE id = ?`,
+        [precioTotal, idNum]
+      );
+
+      res.json({ message: "✅ Deuda de paquete eliminada" });
+
+    } else {
+      return res.status(400).json({ message: "Tipo de deuda no válido" });
+    }
+  } catch (err) {
+    console.error("❌ Error al eliminar deuda:", err.message);
+    res.status(500).json({ message: "Error al eliminar deuda" });
   }
 });
 
