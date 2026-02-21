@@ -145,16 +145,20 @@ const Finanzas = () => {
   };
 
   const eliminarRegistro = async (r) => {
-    const tipo = r.tipo_registro || "tratamiento";
+    const tipoRaw = r.tipo_registro || "tratamiento";
+    const tipo = tipoRaw === "tratamiento" ? "tratamiento" : "finanza";
     const nombre = r.paciente || "este registro";
     if (!window.confirm(`¿Eliminar el registro de "${nombre}" de finanzas? Esta acción no se puede deshacer.`)) return;
     try {
-      await axios.delete(`${API_BASE_URL}/api/finanzas/registro/${tipo}/${r.id}`);
+      const token = localStorage.getItem("token");
+      await axios.delete(`${API_BASE_URL}/api/finanzas/registro/${tipo}/${r.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       showToast({ severity: "success", message: "Registro eliminado" });
       obtenerReporte();
     } catch (e) {
       console.error(e);
-      showToast({ severity: "error", message: "Error al eliminar registro" });
+      showToast({ severity: "error", message: e.response?.data?.message || "Error al eliminar registro" });
     }
   };
 
