@@ -27,7 +27,7 @@ import {
   Autocomplete,
   Chip,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, Print, Close, Description } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { calcularEdad } from "../utils/dateUtils";
 import axios from "axios";
@@ -204,7 +204,12 @@ const HistorialClinico = () => {
   const [especialistas, setEspecialistas] = useState([]);
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
 
+  const [openConfirmarEliminarPaciente, setOpenConfirmarEliminarPaciente] = useState(false);
+  const [pacienteEliminar, setPacienteEliminar] = useState(null);
+
   const token = localStorage.getItem("token");
+  const userRole = localStorage.getItem("role");
+  const isMaster = userRole === "master";
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   useEffect(() => {
@@ -251,6 +256,23 @@ const HistorialClinico = () => {
         setPaquetesActivos([]);
       });
   }, []);
+
+  const handleEliminarPaciente = async () => {
+    if (!pacienteEliminar) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/api/pacientes/eliminar/${pacienteEliminar.id}`, {
+        headers: authHeaders,
+      });
+      showToast({ severity: "success", message: `Paciente ${pacienteEliminar.nombre} ${pacienteEliminar.apellido} eliminado correctamente` });
+      setPacientes((prev) => prev.filter((p) => p.id !== pacienteEliminar.id));
+      setOpenConfirmarEliminarPaciente(false);
+      setPacienteEliminar(null);
+    } catch (err) {
+      console.error("Error al eliminar paciente:", err);
+      const msg = err.response?.data?.message || "Error al eliminar paciente";
+      showToast({ severity: "error", message: msg });
+    }
+  };
 
   const cargarHistorial = async (id) => {
     try {
@@ -1823,26 +1845,44 @@ const HistorialClinico = () => {
                           </Typography>
                         </Box>
                       </Box>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        sx={{
-                          backgroundColor: "#a36920",
-                          "&:hover": { backgroundColor: "#8b581b" },
-                          borderRadius: 2,
-                          px: 2,
-                          fontWeight: 700,
-                          textTransform: "none",
-                          fontSize: "0.8rem",
-                          flexShrink: 0,
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          cargarHistorial(pac.id);
-                        }}
-                      >
-                        Ver historial
-                      </Button>
+                      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexShrink: 0 }}>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          sx={{
+                            backgroundColor: "#a36920",
+                            "&:hover": { backgroundColor: "#8b581b" },
+                            borderRadius: 2,
+                            px: 2,
+                            fontWeight: 700,
+                            textTransform: "none",
+                            fontSize: "0.8rem",
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cargarHistorial(pac.id);
+                          }}
+                        >
+                          Ver historial
+                        </Button>
+                        {isMaster && (
+                          <IconButton
+                            size="small"
+                            title="Eliminar paciente completo"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPacienteEliminar(pac);
+                              setOpenConfirmarEliminarPaciente(true);
+                            }}
+                            sx={{
+                              color: "#d32f2f",
+                              "&:hover": { backgroundColor: "rgba(211,47,47,0.08)" },
+                            }}
+                          >
+                            <DeleteForever fontSize="small" />
+                          </IconButton>
+                        )}
+                      </Box>
                     </Paper>
                   </Grid>
                 ))}
@@ -4921,6 +4961,51 @@ const HistorialClinico = () => {
             }}
           >
             Confirmar Pago de Consulta
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog confirmar eliminar paciente completo (solo master) */}
+      <Dialog
+        open={openConfirmarEliminarPaciente}
+        onClose={() => {
+          setOpenConfirmarEliminarPaciente(false);
+          setPacienteEliminar(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: "#d32f2f", fontWeight: 700 }}>
+          Eliminar Paciente Completo
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ mb: 1 }}>
+            ¿Estás seguro de que deseas eliminar permanentemente al paciente{" "}
+            <strong>{pacienteEliminar?.nombre} {pacienteEliminar?.apellido}</strong>?
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#d32f2f", fontWeight: 600 }}>
+            Esta acción eliminará todos sus datos: tratamientos, deudas, pagos, observaciones, ofertas, paquetes y presupuestos. No se puede deshacer.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => {
+              setOpenConfirmarEliminarPaciente(false);
+              setPacienteEliminar(null);
+            }}
+            sx={{ color: "#666" }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleEliminarPaciente}
+            sx={{
+              backgroundColor: "#d32f2f",
+              "&:hover": { backgroundColor: "#b71c1c" },
+            }}
+          >
+            Eliminar Permanentemente
           </Button>
         </DialogActions>
       </Dialog>
