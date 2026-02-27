@@ -1314,4 +1314,150 @@ router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar
   }
 });
 
+/* ==============================
+   ✏️ EDITAR PAGO DE PRESUPUESTO (Solo Master)
+============================== */
+router.put("/presupuesto/:presupuesto_asignado_id/editar-pago", authMiddleware, requireRole("master"), async (req, res) => {
+  const { presupuesto_asignado_id } = req.params;
+  const { monto_pagado } = req.body;
+
+  try {
+    const presupuesto = await dbGet(
+      `SELECT * FROM presupuestos_asignados WHERE id = ?`,
+      [presupuesto_asignado_id]
+    );
+
+    if (!presupuesto) {
+      return res.status(404).json({ message: "Presupuesto asignado no encontrado" });
+    }
+
+    const nuevoMontoPagado = parseFloat(monto_pagado);
+    if (isNaN(nuevoMontoPagado) || nuevoMontoPagado < 0) {
+      return res.status(400).json({ message: "Monto pagado inválido" });
+    }
+
+    const precioTotal = parseFloat(presupuesto.precio_total) || 0;
+    const descuento = parseFloat(presupuesto.descuento) || 0;
+    const precioConDescuento = precioTotal - descuento;
+
+    let nuevoSaldo = Math.max(0, precioConDescuento - nuevoMontoPagado);
+    let estadoPago = 'pendiente_pago';
+    let pagadoFlag = 0;
+
+    if (nuevoMontoPagado >= precioConDescuento - 0.01) {
+      estadoPago = 'pagado';
+      pagadoFlag = 1;
+      nuevoSaldo = 0;
+    } else if (nuevoMontoPagado > 0) {
+      estadoPago = 'adelanto';
+      pagadoFlag = 0;
+    }
+
+    await dbRun(
+      `UPDATE presupuestos_asignados 
+       SET monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, 
+           estado_pago = ?, pagado = ?
+       WHERE id = ?`,
+      [nuevoMontoPagado, nuevoMontoPagado, nuevoSaldo, estadoPago, pagadoFlag, presupuesto_asignado_id]
+    );
+
+    // Actualizar el monto en el último registro de finanzas asociado
+    const finanzaRegistro = await dbGet(
+      `SELECT id FROM finanzas 
+       WHERE referencia_id = ? AND referencia_tipo = 'presupuesto_asignado' 
+       ORDER BY creado_en DESC LIMIT 1`,
+      [presupuesto_asignado_id]
+    );
+
+    if (finanzaRegistro) {
+      await dbRun(
+        `UPDATE finanzas SET monto = ? WHERE id = ?`,
+        [nuevoMontoPagado, finanzaRegistro.id]
+      );
+    }
+
+    res.json({ 
+      message: "✅ Pago de presupuesto actualizado correctamente",
+      monto_pagado: nuevoMontoPagado,
+      saldo_pendiente: nuevoSaldo,
+      estado_pago: estadoPago
+    });
+  } catch (err) {
+    console.error("❌ Error al editar pago de presupuesto:", err.message);
+    res.status(500).json({ message: "Error al editar pago de presupuesto" });
+  }
+});
+
+/* ==============================
+   ✏️ EDITAR PAGO DE PAQUETE (Solo Master)
+============================== */
+router.put("/paquete-paciente/:paquete_id/editar-pago", authMiddleware, requireRole("master"), async (req, res) => {
+  const { paquete_id } = req.params;
+  const { monto_pagado } = req.body;
+
+  try {
+    const paquete = await dbGet(
+      `SELECT * FROM paquetes_pacientes WHERE id = ?`,
+      [paquete_id]
+    );
+
+    if (!paquete) {
+      return res.status(404).json({ message: "Paquete no encontrado" });
+    }
+
+    const nuevoMontoPagado = parseFloat(monto_pagado);
+    if (isNaN(nuevoMontoPagado) || nuevoMontoPagado < 0) {
+      return res.status(400).json({ message: "Monto pagado inválido" });
+    }
+
+    const precioTotal = parseFloat(paquete.precio_total) || 0;
+
+    let nuevoSaldo = Math.max(0, precioTotal - nuevoMontoPagado);
+    let estadoPago = 'pendiente_pago';
+    let pagadoFlag = 0;
+
+    if (nuevoMontoPagado >= precioTotal - 0.01) {
+      estadoPago = 'pagado';
+      pagadoFlag = 1;
+      nuevoSaldo = 0;
+    } else if (nuevoMontoPagado > 0) {
+      estadoPago = 'adelanto';
+      pagadoFlag = 0;
+    }
+
+    await dbRun(
+      `UPDATE paquetes_pacientes 
+       SET monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, 
+           estado_pago = ?, pagado = ?
+       WHERE id = ?`,
+      [nuevoMontoPagado, nuevoMontoPagado, nuevoSaldo, estadoPago, pagadoFlag, paquete_id]
+    );
+
+    // Actualizar el monto en el último registro de finanzas asociado
+    const finanzaRegistro = await dbGet(
+      `SELECT id FROM finanzas 
+       WHERE referencia_id = ? AND referencia_tipo = 'paquete_paciente' 
+       ORDER BY creado_en DESC LIMIT 1`,
+      [paquete_id]
+    );
+
+    if (finanzaRegistro) {
+      await dbRun(
+        `UPDATE finanzas SET monto = ? WHERE id = ?`,
+        [nuevoMontoPagado, finanzaRegistro.id]
+      );
+    }
+
+    res.json({ 
+      message: "✅ Pago de paquete actualizado correctamente",
+      monto_pagado: nuevoMontoPagado,
+      saldo_pendiente: nuevoSaldo,
+      estado_pago: estadoPago
+    });
+  } catch (err) {
+    console.error("❌ Error al editar pago de paquete:", err.message);
+    res.status(500).json({ message: "Error al editar pago de paquete" });
+  }
+});
+
 export default router;

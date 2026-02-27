@@ -200,6 +200,17 @@ const HistorialClinico = () => {
   const [montoConsultaGlobal, setMontoConsultaGlobal] = useState(100);
   const [metodoPagoConsultaGlobal, setMetodoPagoConsultaGlobal] = useState("efectivo");
 
+  // Estados para editar pago de presupuesto/paquete (solo master)
+  const [modalEditarPagoPresupuesto, setModalEditarPagoPresupuesto] = useState(false);
+  const [presupuestoEditarPago, setPresupuestoEditarPago] = useState(null);
+  const [nuevoMontoPagadoPresupuesto, setNuevoMontoPagadoPresupuesto] = useState("");
+  const [guardandoEditPago, setGuardandoEditPago] = useState(false);
+
+  const [modalEditarPagoPaquete, setModalEditarPagoPaquete] = useState(false);
+  const [paqueteEditarPago, setPaqueteEditarPago] = useState(null);
+  const [nuevoMontoPagadoPaquete, setNuevoMontoPagadoPaquete] = useState("");
+  const [guardandoEditPagoPaquete, setGuardandoEditPagoPaquete] = useState(false);
+
   // Estados para especialistas
   const [especialistas, setEspecialistas] = useState([]);
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
@@ -626,6 +637,66 @@ const HistorialClinico = () => {
     } catch (error) {
       console.error("Error al guardar descuento:", error);
       showToast({ severity: "error", message: "Error al guardar descuento" });
+    }
+  };
+
+  // Editar pago de presupuesto (solo master)
+  const guardarEditarPagoPresupuesto = async () => {
+    if (!presupuestoEditarPago || !pacienteSeleccionado) return;
+    const monto = parseFloat(nuevoMontoPagadoPresupuesto);
+    if (isNaN(monto) || monto < 0) {
+      showToast({ severity: "warning", message: "Ingresa un monto válido" });
+      return;
+    }
+    try {
+      setGuardandoEditPago(true);
+      await axios.put(
+        `${API_BASE_URL}/api/paquetes/presupuesto/${presupuestoEditarPago.id}/editar-pago`,
+        { monto_pagado: monto },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Pago de presupuesto actualizado correctamente" });
+      setModalEditarPagoPresupuesto(false);
+      // Recargar presupuestos asignados
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+    } catch (error) {
+      console.error("Error al editar pago:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al editar pago" });
+    } finally {
+      setGuardandoEditPago(false);
+    }
+  };
+
+  // Editar pago de paquete (solo master)
+  const guardarEditarPagoPaquete = async () => {
+    if (!paqueteEditarPago || !pacienteSeleccionado) return;
+    const monto = parseFloat(nuevoMontoPagadoPaquete);
+    if (isNaN(monto) || monto < 0) {
+      showToast({ severity: "warning", message: "Ingresa un monto válido" });
+      return;
+    }
+    try {
+      setGuardandoEditPagoPaquete(true);
+      await axios.put(
+        `${API_BASE_URL}/api/paquetes/paquete-paciente/${paqueteEditarPago.id}/editar-pago`,
+        { monto_pagado: monto },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Pago de paquete actualizado correctamente" });
+      setModalEditarPagoPaquete(false);
+      // Recargar paquetes del paciente
+      const paquetesRes = await axios.get(`${API_BASE_URL}/api/paquetes/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+    } catch (error) {
+      console.error("Error al editar pago de paquete:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al editar pago" });
+    } finally {
+      setGuardandoEditPagoPaquete(false);
     }
   };
 
@@ -3335,6 +3406,30 @@ const HistorialClinico = () => {
                                   {presupuesto.estado_pago === 'adelanto' ? '💰 Pagar Saldo' : '💰 Registrar Pago'}
                                 </Button>
                               )}
+                              {isMaster && presupuesto.monto_pagado > 0 && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => {
+                                    setPresupuestoEditarPago(presupuesto);
+                                    setNuevoMontoPagadoPresupuesto(String(presupuesto.monto_pagado || 0));
+                                    setModalEditarPagoPresupuesto(true);
+                                  }}
+                                  sx={{
+                                    fontSize: "0.75rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    borderColor: "#1565c0",
+                                    color: "#1565c0",
+                                    "&:hover": { 
+                                      backgroundColor: "rgba(21, 101, 192, 0.08)",
+                                      borderColor: "#0d47a1"
+                                    }
+                                  }}
+                                >
+                                  ✏️ Editar Pago
+                                </Button>
+                              )}
                               {presupuesto.estado !== 'completado' && (
                                 <Button
                                   size="small"
@@ -3749,6 +3844,30 @@ const HistorialClinico = () => {
                                   }}
                                 >
                                   {paquete.estado_pago === 'adelanto' ? '💰 Pagar Saldo' : '💰 Registrar Pago'}
+                                </Button>
+                              )}
+                              {isMaster && paquete.monto_pagado > 0 && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => {
+                                    setPaqueteEditarPago(paquete);
+                                    setNuevoMontoPagadoPaquete(String(paquete.monto_pagado || 0));
+                                    setModalEditarPagoPaquete(true);
+                                  }}
+                                  sx={{
+                                    fontSize: "0.75rem",
+                                    py: 0.5,
+                                    borderRadius: 2,
+                                    borderColor: "#1565c0",
+                                    color: "#1565c0",
+                                    "&:hover": { 
+                                      backgroundColor: "rgba(21, 101, 192, 0.08)",
+                                      borderColor: "#0d47a1"
+                                    }
+                                  }}
+                                >
+                                  ✏️ Editar Pago
                                 </Button>
                               )}
                               {paquete.estado === 'activo' && (
@@ -5006,6 +5125,93 @@ const HistorialClinico = () => {
             }}
           >
             Eliminar Permanentemente
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Editar Pago de Presupuesto (solo master) */}
+      <Dialog open={modalEditarPagoPresupuesto} onClose={() => setModalEditarPagoPresupuesto(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ color: "#1565c0", fontWeight: "bold" }}>
+          ✏️ Editar Pago de Presupuesto
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
+          {presupuestoEditarPago && (
+            <Box>
+              <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
+                <strong>Precio total:</strong> S/ {Number(presupuestoEditarPago.precio_total || 0).toFixed(2)}
+                {presupuestoEditarPago.descuento > 0 && (
+                  <> (Descuento: S/ {Number(presupuestoEditarPago.descuento || 0).toFixed(2)})</>
+                )}
+              </Typography>
+              <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
+                <strong>Monto pagado actual:</strong> S/ {Number(presupuestoEditarPago.monto_pagado || 0).toFixed(2)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: "#f57c00", mb: 1 }}>
+                <strong>Saldo pendiente:</strong> S/ {(presupuestoEditarPago.saldo_pendiente || ((presupuestoEditarPago.precio_total || 0) - (presupuestoEditarPago.descuento || 0) - (presupuestoEditarPago.monto_pagado || 0))).toFixed(2)}
+              </Typography>
+            </Box>
+          )}
+          <TextField
+            label="Nuevo monto pagado (S/)"
+            type="number"
+            fullWidth
+            value={nuevoMontoPagadoPresupuesto}
+            onChange={(e) => setNuevoMontoPagadoPresupuesto(e.target.value)}
+            inputProps={{ min: 0, step: 0.01 }}
+            helperText="Ingresa el monto total que el paciente ha pagado realmente"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setModalEditarPagoPresupuesto(false)} sx={{ color: "#666" }}>Cancelar</Button>
+          <Button
+            variant="contained"
+            onClick={guardarEditarPagoPresupuesto}
+            disabled={guardandoEditPago}
+            sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
+          >
+            {guardandoEditPago ? "Guardando..." : "Guardar Cambio"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Editar Pago de Paquete (solo master) */}
+      <Dialog open={modalEditarPagoPaquete} onClose={() => setModalEditarPagoPaquete(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ color: "#1565c0", fontWeight: "bold" }}>
+          ✏️ Editar Pago de Paquete
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
+          {paqueteEditarPago && (
+            <Box>
+              <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
+                <strong>Precio total:</strong> S/ {Number(paqueteEditarPago.precio_total || 0).toFixed(2)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
+                <strong>Monto pagado actual:</strong> S/ {Number(paqueteEditarPago.monto_pagado || 0).toFixed(2)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: "#f57c00", mb: 1 }}>
+                <strong>Saldo pendiente:</strong> S/ {((paqueteEditarPago.precio_total || 0) - (paqueteEditarPago.monto_pagado || 0)).toFixed(2)}
+              </Typography>
+            </Box>
+          )}
+          <TextField
+            label="Nuevo monto pagado (S/)"
+            type="number"
+            fullWidth
+            value={nuevoMontoPagadoPaquete}
+            onChange={(e) => setNuevoMontoPagadoPaquete(e.target.value)}
+            inputProps={{ min: 0, step: 0.01 }}
+            helperText="Ingresa el monto total que el paciente ha pagado realmente"
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setModalEditarPagoPaquete(false)} sx={{ color: "#666" }}>Cancelar</Button>
+          <Button
+            variant="contained"
+            onClick={guardarEditarPagoPaquete}
+            disabled={guardandoEditPagoPaquete}
+            sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
+          >
+            {guardandoEditPagoPaquete ? "Guardando..." : "Guardar Cambio"}
           </Button>
         </DialogActions>
       </Dialog>

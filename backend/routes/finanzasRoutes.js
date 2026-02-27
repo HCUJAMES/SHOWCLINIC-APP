@@ -343,9 +343,21 @@ router.get("/reporte", (req, res) => {
         0 AS descuento,
         f.metodo_pago AS pagoMetodo,
         f.categoria AS tipo_registro,
-        f.referencia_tipo
+        f.referencia_tipo,
+        f.referencia_id,
+        pa.precio_total AS presupuesto_precio_total,
+        pa.descuento AS presupuesto_descuento,
+        pa.monto_pagado AS presupuesto_monto_pagado,
+        pa.saldo_pendiente AS presupuesto_saldo,
+        pa.estado_pago AS presupuesto_estado_pago,
+        pp.precio_total AS paquete_precio_total,
+        pp.monto_pagado AS paquete_monto_pagado,
+        pp.saldo_pendiente AS paquete_saldo,
+        pp.estado_pago AS paquete_estado_pago
       FROM finanzas f
       LEFT JOIN patients p ON p.id = f.paciente_id
+      LEFT JOIN presupuestos_asignados pa ON f.referencia_tipo = 'presupuesto_asignado' AND pa.id = f.referencia_id
+      LEFT JOIN paquetes_pacientes pp ON f.referencia_tipo = 'paquete_paciente' AND pp.id = f.referencia_id
       WHERE f.tipo = 'ingreso'
         AND f.categoria IN ('presupuesto', 'paquete', 'abono_deuda', 'consulta')
     `;
@@ -385,12 +397,24 @@ router.get("/reporte", (req, res) => {
         // Capitalizar método de pago
         const metodoCapitalizado = metodo.charAt(0).toUpperCase() + metodo.slice(1).toLowerCase();
         
-        // Determinar estado de pago para registros de finanzas
-        // Si es un adelanto de presupuesto/paquete, verificar si hay deuda pendiente
+        // Determinar estado de pago y deuda pendiente real
         let estadoPago = "Pagado";
-        if (r.referencia_tipo === 'presupuesto_asignado' || r.referencia_tipo === 'paquete_paciente') {
-          // Por defecto "Pagado" para pagos de finanzas, ya que son ingresos registrados
-          estadoPago = "Pagado";
+        let deudaPendiente = 0;
+        
+        if (r.referencia_tipo === 'presupuesto_asignado') {
+          const saldo = parseFloat(r.presupuesto_saldo) || 0;
+          const estPago = r.presupuesto_estado_pago || '';
+          if (estPago === 'adelanto' || estPago === 'pendiente_pago' || saldo > 0.01) {
+            estadoPago = "Deuda";
+            deudaPendiente = saldo > 0 ? saldo : 0;
+          }
+        } else if (r.referencia_tipo === 'paquete_paciente') {
+          const saldo = parseFloat(r.paquete_saldo) || 0;
+          const estPago = r.paquete_estado_pago || '';
+          if (estPago === 'adelanto' || estPago === 'pendiente_pago' || saldo > 0.01) {
+            estadoPago = "Deuda";
+            deudaPendiente = saldo > 0 ? saldo : 0;
+          }
         }
         
         return {
@@ -399,7 +423,7 @@ router.get("/reporte", (req, res) => {
           monto_bruto: monto,
           comision_pos: calcularComisionPOS(monto, metodoCapitalizado),
           monto_cobrado: aplicarComisionPOS(monto, metodoCapitalizado),
-          deuda_pendiente: 0,
+          deuda_pendiente: deudaPendiente,
           pagoMetodo: metodoCapitalizado,
           pagoMetodo_mostrado: metodoCapitalizado,
           tipo_registro: r.tipo_registro || 'otro',
