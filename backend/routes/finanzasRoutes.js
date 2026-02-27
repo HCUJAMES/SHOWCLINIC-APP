@@ -1,5 +1,6 @@
 import express from "express";
 import db from "../db/database.js";
+import { authMiddleware, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -719,6 +720,114 @@ router.delete("/registro/:tipo/:id", (req, res) => {
     });
   } else {
     res.status(400).json({ message: "Tipo de registro no válido" });
+  }
+});
+
+// ✏️ EDITAR MÉTODO DE PAGO DE UN REGISTRO
+router.put("/editar-metodo-pago", authMiddleware, requireRole("master"), (req, res) => {
+  const { id, tipo_registro, nuevo_metodo } = req.body;
+
+  if (!id || !nuevo_metodo) {
+    return res.status(400).json({ message: "ID y nuevo método de pago son obligatorios" });
+  }
+
+  const metodosValidos = ["Efectivo", "Tarjeta", "Transferencia", "Yape", "Plin"];
+  if (!metodosValidos.includes(nuevo_metodo)) {
+    return res.status(400).json({ message: "Método de pago no válido" });
+  }
+
+  if (tipo_registro === "tratamiento") {
+    // Actualizar pagoMetodo en tratamientos_realizados
+    db.run(
+      `UPDATE tratamientos_realizados SET pagoMetodo = ? WHERE id = ?`,
+      [nuevo_metodo, id],
+      function (err) {
+        if (err) {
+          console.error("❌ Error actualizando método de pago en tratamiento:", err.message);
+          return res.status(500).json({ message: "Error al actualizar método de pago" });
+        }
+        if (this.changes === 0) {
+          return res.status(404).json({ message: "Tratamiento no encontrado" });
+        }
+
+        // También actualizar en deudas_pagos si tiene pagos asociados
+        db.get(
+          `SELECT id FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?`,
+          [id],
+          (errDeuda, deuda) => {
+            if (errDeuda) {
+              console.error("❌ Error buscando deuda:", errDeuda.message);
+            }
+
+            if (deuda) {
+              // Actualizar todos los pagos de esta deuda al nuevo método
+              db.run(
+                `UPDATE deudas_pagos SET metodo = ? WHERE deuda_id = ?`,
+                [nuevo_metodo, deuda.id],
+                (errPagos) => {
+                  if (errPagos) {
+                    console.error("❌ Error actualizando métodos en deudas_pagos:", errPagos.message);
+                  }
+                }
+              );
+
+              // Actualizar cancelado_metodo si existe
+              db.run(
+                `UPDATE deudas_tratamientos SET cancelado_metodo = ? WHERE id = ? AND cancelado_metodo IS NOT NULL`,
+                [nuevo_metodo, deuda.id],
+                (errCancel) => {
+                  if (errCancel) {
+                    console.error("❌ Error actualizando cancelado_metodo:", errCancel.message);
+                  }
+                }
+              );
+            }
+
+            // Actualizar registros de finanzas relacionados a este tratamiento
+            db.run(
+              `UPDATE finanzas SET metodo_pago = ? WHERE referencia_id = ? AND referencia_tipo = 'tratamiento_realizado'`,
+              [nuevo_metodo, id],
+              (errFin) => {
+                if (errFin) {
+                  console.error("❌ Error actualizando finanzas:", errFin.message);
+                }
+              }
+            );
+
+            // También actualizar finanzas relacionadas a la deuda
+            if (deuda) {
+              db.run(
+                `UPDATE finanzas SET metodo_pago = ? WHERE referencia_id = ? AND referencia_tipo = 'deuda_tratamiento'`,
+                [nuevo_metodo, deuda.id],
+                (errFinDeuda) => {
+                  if (errFinDeuda) {
+                    console.error("❌ Error actualizando finanzas de deuda:", errFinDeuda.message);
+                  }
+                }
+              );
+            }
+
+            res.json({ message: "✅ Método de pago actualizado correctamente" });
+          }
+        );
+      }
+    );
+  } else {
+    // Registro de finanzas (presupuesto, paquete, consulta, abono_deuda, etc.)
+    db.run(
+      `UPDATE finanzas SET metodo_pago = ? WHERE id = ?`,
+      [nuevo_metodo, id],
+      function (err) {
+        if (err) {
+          console.error("❌ Error actualizando método de pago en finanzas:", err.message);
+          return res.status(500).json({ message: "Error al actualizar método de pago" });
+        }
+        if (this.changes === 0) {
+          return res.status(404).json({ message: "Registro no encontrado" });
+        }
+        res.json({ message: "✅ Método de pago actualizado correctamente" });
+      }
+    );
   }
 });
 

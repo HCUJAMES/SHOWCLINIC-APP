@@ -21,7 +21,7 @@ import {
   DialogActions,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, CheckCircle, Delete } from "@mui/icons-material";
+import { ArrowBack, Home, CheckCircle, Delete, Edit } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -101,6 +101,10 @@ const Finanzas = () => {
   const [pagoMonto, setPagoMonto] = useState("");
   const [pagoMetodo, setPagoMetodo] = useState("Efectivo");
   const [guardandoPago, setGuardandoPago] = useState(false);
+  const [editMetodoOpen, setEditMetodoOpen] = useState(false);
+  const [editMetodoRegistro, setEditMetodoRegistro] = useState(null);
+  const [editMetodoNuevo, setEditMetodoNuevo] = useState("Efectivo");
+  const [guardandoMetodo, setGuardandoMetodo] = useState(false);
 
   const { showToast } = useToast();
 
@@ -141,6 +145,35 @@ const Finanzas = () => {
       showToast({ severity: "error", message: "Error al registrar pago" });
     } finally {
       setGuardandoPago(false);
+    }
+  };
+
+  const abrirEditarMetodo = (r) => {
+    setEditMetodoRegistro(r);
+    setEditMetodoNuevo(r.pagoMetodo_mostrado || r.pagoMetodo || "Efectivo");
+    setEditMetodoOpen(true);
+  };
+
+  const guardarMetodoPago = async () => {
+    if (!editMetodoRegistro) return;
+    try {
+      setGuardandoMetodo(true);
+      const token = localStorage.getItem("token");
+      await axios.put(`${API_BASE_URL}/api/finanzas/editar-metodo-pago`, {
+        id: editMetodoRegistro.id,
+        tipo_registro: editMetodoRegistro.tipo_registro || "tratamiento",
+        nuevo_metodo: editMetodoNuevo,
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      showToast({ severity: "success", message: "Método de pago actualizado correctamente" });
+      setEditMetodoOpen(false);
+      obtenerReporte();
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: e.response?.data?.message || "Error al actualizar método de pago" });
+    } finally {
+      setGuardandoMetodo(false);
     }
   };
 
@@ -514,6 +547,15 @@ const Finanzas = () => {
                               <CheckCircle fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          <Tooltip title="Editar método de pago">
+                            <IconButton
+                              size="small"
+                              onClick={() => abrirEditarMetodo(r)}
+                              sx={{ color: "#1565c0" }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Eliminar registro">
                             <IconButton
                               size="small"
@@ -607,6 +649,43 @@ const Finanzas = () => {
               sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}
             >
               {guardandoPago ? "Guardando..." : "Registrar Pago"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={editMetodoOpen} onClose={() => setEditMetodoOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ color: "#1565c0", fontWeight: "bold" }}>Editar Método de Pago</DialogTitle>
+          <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
+            {editMetodoRegistro && (
+              <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
+                <strong>Paciente:</strong> {editMetodoRegistro.paciente}<br />
+                <strong>Tratamiento:</strong> {editMetodoRegistro.tratamiento}<br />
+                <strong>Método actual:</strong> {editMetodoRegistro.pagoMetodo_mostrado || editMetodoRegistro.pagoMetodo || "Desconocido"}
+              </Typography>
+            )}
+            <TextField
+              select
+              label="Nuevo método de pago"
+              fullWidth
+              value={editMetodoNuevo}
+              onChange={(e) => setEditMetodoNuevo(e.target.value)}
+            >
+              <MenuItem value="Efectivo">Efectivo</MenuItem>
+              <MenuItem value="Tarjeta">Tarjeta</MenuItem>
+              <MenuItem value="Transferencia">Transferencia</MenuItem>
+              <MenuItem value="Yape">Yape</MenuItem>
+              <MenuItem value="Plin">Plin</MenuItem>
+            </TextField>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setEditMetodoOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+            <Button
+              variant="contained"
+              onClick={guardarMetodoPago}
+              disabled={guardandoMetodo}
+              sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
+            >
+              {guardandoMetodo ? "Guardando..." : "Guardar Cambio"}
             </Button>
           </DialogActions>
         </Dialog>
