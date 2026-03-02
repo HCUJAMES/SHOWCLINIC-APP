@@ -21,7 +21,7 @@ import {
   DialogActions,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney } from "@mui/icons-material";
+import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney, CalendarMonth } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -109,6 +109,10 @@ const Finanzas = () => {
   const [editMontoRegistro, setEditMontoRegistro] = useState(null);
   const [editMontoNuevo, setEditMontoNuevo] = useState("");
   const [guardandoMonto, setGuardandoMonto] = useState(false);
+  const [editFechaOpen, setEditFechaOpen] = useState(false);
+  const [editFechaRegistro, setEditFechaRegistro] = useState(null);
+  const [editFechaNueva, setEditFechaNueva] = useState("");
+  const [guardandoFecha, setGuardandoFecha] = useState(false);
 
   const { showToast } = useToast();
 
@@ -212,6 +216,38 @@ const Finanzas = () => {
       showToast({ severity: "error", message: e.response?.data?.message || "Error al actualizar monto" });
     } finally {
       setGuardandoMonto(false);
+    }
+  };
+
+  const abrirEditarFecha = (r) => {
+    setEditFechaRegistro(r);
+    setEditFechaNueva(r.fecha ? r.fecha.split(" ")[0] : "");
+    setEditFechaOpen(true);
+  };
+
+  const guardarFechaPago = async () => {
+    if (!editFechaRegistro || !editFechaNueva) {
+      showToast({ severity: "warning", message: "Selecciona una fecha válida" });
+      return;
+    }
+    try {
+      setGuardandoFecha(true);
+      const token = localStorage.getItem("token");
+      await axios.put(`${API_BASE_URL}/api/finanzas/editar-fecha-pago`, {
+        id: editFechaRegistro.id,
+        tipo_registro: editFechaRegistro.tipo_registro || "tratamiento",
+        nueva_fecha: editFechaNueva,
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      showToast({ severity: "success", message: "Fecha actualizada correctamente" });
+      setEditFechaOpen(false);
+      obtenerReporte();
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: e.response?.data?.message || "Error al actualizar fecha" });
+    } finally {
+      setGuardandoFecha(false);
     }
   };
 
@@ -603,6 +639,15 @@ const Finanzas = () => {
                               <AttachMoney fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          <Tooltip title="Editar fecha de pago">
+                            <IconButton
+                              size="small"
+                              onClick={() => abrirEditarFecha(r)}
+                              sx={{ color: "#6a1b9a" }}
+                            >
+                              <CalendarMonth fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Eliminar registro">
                             <IconButton
                               size="small"
@@ -733,6 +778,38 @@ const Finanzas = () => {
               sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
             >
               {guardandoMetodo ? "Guardando..." : "Guardar Cambio"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <Dialog open={editFechaOpen} onClose={() => setEditFechaOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ color: "#6a1b9a", fontWeight: "bold" }}>Editar Fecha de Pago</DialogTitle>
+          <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
+            {editFechaRegistro && (
+              <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
+                <strong>Paciente:</strong> {editFechaRegistro.paciente}<br />
+                <strong>Tratamiento:</strong> {editFechaRegistro.tratamiento}<br />
+                <strong>Fecha actual:</strong> {editFechaRegistro.fecha ? editFechaRegistro.fecha.split(" ")[0] : "Sin fecha"}
+              </Typography>
+            )}
+            <TextField
+              label="Nueva fecha"
+              type="date"
+              fullWidth
+              value={editFechaNueva}
+              onChange={(e) => setEditFechaNueva(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              helperText="Selecciona la fecha real en que se realizó el pago"
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setEditFechaOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+            <Button
+              variant="contained"
+              onClick={guardarFechaPago}
+              disabled={guardandoFecha}
+              sx={{ backgroundColor: "#6a1b9a", "&:hover": { backgroundColor: "#4a148c" } }}
+            >
+              {guardandoFecha ? "Guardando..." : "Guardar Cambio"}
             </Button>
           </DialogActions>
         </Dialog>

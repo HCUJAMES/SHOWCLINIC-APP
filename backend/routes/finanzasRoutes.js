@@ -1088,4 +1088,103 @@ router.put("/editar-monto-pago", authMiddleware, requireRole("master"), (req, re
   }
 });
 
+// ✏️ EDITAR FECHA DE PAGO DE UN REGISTRO
+router.put("/editar-fecha-pago", authMiddleware, requireRole("master"), (req, res) => {
+  const { id, tipo_registro, nueva_fecha } = req.body;
+
+  if (!id || !nueva_fecha) {
+    return res.status(400).json({ message: "ID y nueva fecha son obligatorios" });
+  }
+
+  // Validar formato de fecha (YYYY-MM-DD)
+  const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!fechaRegex.test(nueva_fecha)) {
+    return res.status(400).json({ message: "Formato de fecha inválido. Use YYYY-MM-DD" });
+  }
+
+  if (tipo_registro === "tratamiento") {
+    // Actualizar fecha en tratamientos_realizados
+    db.run(
+      `UPDATE tratamientos_realizados SET fecha = ? WHERE id = ?`,
+      [nueva_fecha, id],
+      function (err) {
+        if (err) {
+          console.error("❌ Error actualizando fecha en tratamiento:", err.message);
+          return res.status(500).json({ message: "Error al actualizar fecha" });
+        }
+        if (this.changes === 0) {
+          return res.status(404).json({ message: "Tratamiento no encontrado" });
+        }
+
+        // También actualizar en finanzas relacionadas
+        db.run(
+          `UPDATE finanzas SET fecha = ? WHERE referencia_id = ? AND referencia_tipo = 'tratamiento_realizado'`,
+          [nueva_fecha, id],
+          (errFin) => {
+            if (errFin) {
+              console.error("❌ Error actualizando fecha en finanzas:", errFin.message);
+            }
+          }
+        );
+
+        res.json({ message: "✅ Fecha actualizada correctamente" });
+      }
+    );
+  } else {
+    // Registro de finanzas (presupuesto, paquete, consulta, etc.)
+    db.get(
+      `SELECT * FROM finanzas WHERE id = ?`,
+      [id],
+      (err, finanza) => {
+        if (err) {
+          console.error("❌ Error obteniendo finanza:", err.message);
+          return res.status(500).json({ message: "Error al obtener registro" });
+        }
+        if (!finanza) {
+          return res.status(404).json({ message: "Registro no encontrado" });
+        }
+
+        // Actualizar fecha en finanzas
+        db.run(
+          `UPDATE finanzas SET fecha = ? WHERE id = ?`,
+          [nueva_fecha, id],
+          function (errUpd) {
+            if (errUpd) {
+              console.error("❌ Error actualizando fecha en finanzas:", errUpd.message);
+              return res.status(500).json({ message: "Error al actualizar fecha" });
+            }
+
+            // Si está vinculado a un presupuesto, actualizar fecha_pago
+            if (finanza.referencia_tipo === 'presupuesto_asignado' && finanza.referencia_id) {
+              db.run(
+                `UPDATE presupuestos_asignados SET fecha_pago = ? WHERE id = ?`,
+                [nueva_fecha + ' 00:00:00', finanza.referencia_id],
+                (errPres) => {
+                  if (errPres) {
+                    console.error("❌ Error actualizando fecha en presupuesto:", errPres.message);
+                  }
+                }
+              );
+            }
+            // Si está vinculado a un paquete, actualizar fecha_pago
+            else if (finanza.referencia_tipo === 'paquete_paciente' && finanza.referencia_id) {
+              db.run(
+                `UPDATE paquetes_pacientes SET fecha_pago = ? WHERE id = ?`,
+                [nueva_fecha + ' 00:00:00', finanza.referencia_id],
+                (errPaq) => {
+                  if (errPaq) {
+                    console.error("❌ Error actualizando fecha en paquete:", errPaq.message);
+                  }
+                }
+              );
+            }
+
+            res.json({ message: "✅ Fecha actualizada correctamente" });
+          }
+        );
+      }
+    );
+  }
+});
+
 export default router;
