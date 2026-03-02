@@ -21,7 +21,7 @@ import {
   DialogActions,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, CheckCircle, Delete, Edit } from "@mui/icons-material";
+import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -105,6 +105,10 @@ const Finanzas = () => {
   const [editMetodoRegistro, setEditMetodoRegistro] = useState(null);
   const [editMetodoNuevo, setEditMetodoNuevo] = useState("Efectivo");
   const [guardandoMetodo, setGuardandoMetodo] = useState(false);
+  const [editMontoOpen, setEditMontoOpen] = useState(false);
+  const [editMontoRegistro, setEditMontoRegistro] = useState(null);
+  const [editMontoNuevo, setEditMontoNuevo] = useState("");
+  const [guardandoMonto, setGuardandoMonto] = useState(false);
 
   const { showToast } = useToast();
 
@@ -174,6 +178,40 @@ const Finanzas = () => {
       showToast({ severity: "error", message: e.response?.data?.message || "Error al actualizar método de pago" });
     } finally {
       setGuardandoMetodo(false);
+    }
+  };
+
+  const abrirEditarMonto = (r) => {
+    setEditMontoRegistro(r);
+    setEditMontoNuevo(String(Number(r.monto_bruto ?? r.precio_total ?? 0).toFixed(2)));
+    setEditMontoOpen(true);
+  };
+
+  const guardarMontoPago = async () => {
+    if (!editMontoRegistro) return;
+    const monto = parseFloat(editMontoNuevo);
+    if (isNaN(monto) || monto < 0) {
+      showToast({ severity: "warning", message: "Ingresa un monto válido" });
+      return;
+    }
+    try {
+      setGuardandoMonto(true);
+      const token = localStorage.getItem("token");
+      await axios.put(`${API_BASE_URL}/api/finanzas/editar-monto-pago`, {
+        id: editMontoRegistro.id,
+        tipo_registro: editMontoRegistro.tipo_registro || "tratamiento",
+        nuevo_monto: monto,
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      showToast({ severity: "success", message: "Monto actualizado correctamente" });
+      setEditMontoOpen(false);
+      obtenerReporte();
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: e.response?.data?.message || "Error al actualizar monto" });
+    } finally {
+      setGuardandoMonto(false);
     }
   };
 
@@ -556,6 +594,15 @@ const Finanzas = () => {
                               <Edit fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          <Tooltip title="Editar monto pagado">
+                            <IconButton
+                              size="small"
+                              onClick={() => abrirEditarMonto(r)}
+                              sx={{ color: "#e65100" }}
+                            >
+                              <AttachMoney fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Eliminar registro">
                             <IconButton
                               size="small"
@@ -686,6 +733,38 @@ const Finanzas = () => {
               sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
             >
               {guardandoMetodo ? "Guardando..." : "Guardar Cambio"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        <Dialog open={editMontoOpen} onClose={() => setEditMontoOpen(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ color: "#e65100", fontWeight: "bold" }}>Editar Monto Pagado</DialogTitle>
+          <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
+            {editMontoRegistro && (
+              <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
+                <strong>Paciente:</strong> {editMontoRegistro.paciente}<br />
+                <strong>Tratamiento:</strong> {editMontoRegistro.tratamiento}<br />
+                <strong>Monto actual:</strong> S/ {Number(editMontoRegistro.monto_bruto ?? editMontoRegistro.precio_total ?? 0).toFixed(2)}
+              </Typography>
+            )}
+            <TextField
+              label="Nuevo monto (S/)"
+              type="number"
+              fullWidth
+              value={editMontoNuevo}
+              onChange={(e) => setEditMontoNuevo(e.target.value)}
+              inputProps={{ min: 0, step: 0.01 }}
+              helperText="Ingresa el monto correcto que se pagó realmente"
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setEditMontoOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+            <Button
+              variant="contained"
+              onClick={guardarMontoPago}
+              disabled={guardandoMonto}
+              sx={{ backgroundColor: "#e65100", "&:hover": { backgroundColor: "#bf360c" } }}
+            >
+              {guardandoMonto ? "Guardando..." : "Guardar Cambio"}
             </Button>
           </DialogActions>
         </Dialog>

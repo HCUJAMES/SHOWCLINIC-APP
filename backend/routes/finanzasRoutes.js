@@ -855,4 +855,237 @@ router.put("/editar-metodo-pago", authMiddleware, requireRole("master"), (req, r
   }
 });
 
+// ✏️ EDITAR MONTO PAGADO DE UN REGISTRO
+router.put("/editar-monto-pago", authMiddleware, requireRole("master"), (req, res) => {
+  const { id, tipo_registro, nuevo_monto } = req.body;
+
+  if (!id || nuevo_monto === undefined || nuevo_monto === null) {
+    return res.status(400).json({ message: "ID y nuevo monto son obligatorios" });
+  }
+
+  const monto = parseFloat(nuevo_monto);
+  if (isNaN(monto) || monto < 0) {
+    return res.status(400).json({ message: "Monto inválido" });
+  }
+
+  if (tipo_registro === "tratamiento") {
+    // 1) Obtener datos del tratamiento actual
+    db.get(
+      `SELECT tr.*, d.id as deuda_id, d.monto_total as deuda_monto_total, d.monto_adelanto as deuda_adelanto, d.monto_saldo as deuda_saldo, d.estado as deuda_estado
+       FROM tratamientos_realizados tr
+       LEFT JOIN deudas_tratamientos d ON d.tratamiento_realizado_id = tr.id
+       WHERE tr.id = ?`,
+      [id],
+      (err, trat) => {
+        if (err) {
+          console.error("❌ Error obteniendo tratamiento:", err.message);
+          return res.status(500).json({ message: "Error al obtener tratamiento" });
+        }
+        if (!trat) {
+          return res.status(404).json({ message: "Tratamiento no encontrado" });
+        }
+
+        const montoAnterior = parseFloat(trat.precio_total) || 0;
+        const descuento = parseFloat(trat.descuento) || 0;
+
+        // Actualizar precio_total en tratamientos_realizados
+        db.run(
+          `UPDATE tratamientos_realizados SET precio_total = ? WHERE id = ?`,
+          [monto, id],
+          function (errUpd) {
+            if (errUpd) {
+              console.error("❌ Error actualizando monto en tratamiento:", errUpd.message);
+              return res.status(500).json({ message: "Error al actualizar monto" });
+            }
+
+            // Si tiene deuda asociada, recalcular
+            if (trat.deuda_id) {
+              const precioConDescuento = monto - (monto * descuento / 100);
+              const adelanto = parseFloat(trat.deuda_adelanto) || 0;
+              const nuevoSaldo = Math.max(0, precioConDescuento - adelanto);
+              const nuevoEstado = nuevoSaldo <= 0.01 ? 'pagado' : 'pendiente';
+
+              db.run(
+                `UPDATE deudas_tratamientos SET monto_total = ?, monto_saldo = ?, estado = ? WHERE id = ?`,
+                [precioConDescuento, nuevoSaldo, nuevoEstado, trat.deuda_id],
+                (errDeuda) => {
+                  if (errDeuda) {
+                    console.error("❌ Error actualizando deuda:", errDeuda.message);
+                  }
+                }
+              );
+            }
+
+            // Actualizar monto en finanzas relacionadas al tratamiento
+            db.run(
+              `UPDATE finanzas SET monto = ? WHERE referencia_id = ? AND referencia_tipo = 'tratamiento_realizado'`,
+              [monto, id],
+              (errFin) => {
+                if (errFin) {
+                  console.error("❌ Error actualizando finanzas:", errFin.message);
+                }
+              }
+            );
+
+            res.json({ message: "✅ Monto actualizado correctamente" });
+          }
+        );
+      }
+    );
+  } else {
+    // Registro de finanzas (presupuesto, paquete, consulta, abono_deuda, etc.)
+    // 1) Obtener el registro de finanzas actual
+    db.get(
+      `SELECT * FROM finanzas WHERE id = ?`,
+      [id],
+      (err, finanza) => {
+        if (err) {
+          console.error("❌ Error obteniendo finanza:", err.message);
+          return res.status(500).json({ message: "Error al obtener registro" });
+        }
+        if (!finanza) {
+          return res.status(404).json({ message: "Registro no encontrado" });
+        }
+
+        const montoAnterior = parseFloat(finanza.monto) || 0;
+        const diferencia = monto - montoAnterior;
+
+        // Actualizar monto en finanzas
+        db.run(
+          `UPDATE finanzas SET monto = ? WHERE id = ?`,
+          [monto, id],
+          function (errUpd) {
+            if (errUpd) {
+              console.error("❌ Error actualizando monto en finanzas:", errUpd.message);
+              return res.status(500).json({ message: "Error al actualizar monto" });
+            }
+            if (this.changes === 0) {
+              return res.status(404).json({ message: "Registro no encontrado" });
+            }
+
+            // Si está vinculado a un presupuesto, recalcular presupuestos_asignados
+            if (finanza.referencia_tipo === 'presupuesto_asignado' && finanza.referencia_id) {
+              // Sumar TODOS los pagos de finanzas para este presupuesto
+              db.get(
+                `SELECT COALESCE(SUM(f.monto), 0) as total_pagado
+                 FROM finanzas f
+                 WHERE f.referencia_id = ? AND f.referencia_tipo = 'presupuesto_asignado' AND f.tipo = 'ingreso'`,
+                [finanza.referencia_id],
+                (errSum, sumRow) => {
+                  if (errSum) {
+                    console.error("❌ Error sumando pagos de presupuesto:", errSum.message);
+                    return res.json({ message: "✅ Monto actualizado en finanzas (sin actualizar presupuesto)" });
+                  }
+
+                  const totalPagado = parseFloat(sumRow?.total_pagado) || 0;
+
+                  db.get(
+                    `SELECT precio_total, descuento FROM presupuestos_asignados WHERE id = ?`,
+                    [finanza.referencia_id],
+                    (errPres, pres) => {
+                      if (errPres || !pres) {
+                        console.error("❌ Error obteniendo presupuesto:", errPres?.message);
+                        return res.json({ message: "✅ Monto actualizado en finanzas" });
+                      }
+
+                      const precioTotal = parseFloat(pres.precio_total) || 0;
+                      const descuento = parseFloat(pres.descuento) || 0;
+                      const precioConDescuento = precioTotal - descuento;
+                      const nuevoSaldo = Math.max(0, precioConDescuento - totalPagado);
+                      let estadoPago = 'pendiente_pago';
+                      let pagadoFlag = 0;
+
+                      if (totalPagado >= precioConDescuento - 0.01) {
+                        estadoPago = 'pagado';
+                        pagadoFlag = 1;
+                      } else if (totalPagado > 0) {
+                        estadoPago = 'adelanto';
+                        pagadoFlag = 0;
+                      }
+
+                      db.run(
+                        `UPDATE presupuestos_asignados 
+                         SET monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, 
+                             estado_pago = ?, pagado = ?
+                         WHERE id = ?`,
+                        [totalPagado, totalPagado, nuevoSaldo, estadoPago, pagadoFlag, finanza.referencia_id],
+                        (errUpdPres) => {
+                          if (errUpdPres) {
+                            console.error("❌ Error actualizando presupuesto:", errUpdPres.message);
+                          }
+                          res.json({ message: "✅ Monto actualizado correctamente" });
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+            // Si está vinculado a un paquete, recalcular paquetes_pacientes
+            else if (finanza.referencia_tipo === 'paquete_paciente' && finanza.referencia_id) {
+              // Sumar TODOS los pagos de finanzas para este paquete
+              db.get(
+                `SELECT COALESCE(SUM(f.monto), 0) as total_pagado
+                 FROM finanzas f
+                 WHERE f.referencia_id = ? AND f.referencia_tipo = 'paquete_paciente' AND f.tipo = 'ingreso'`,
+                [finanza.referencia_id],
+                (errSum, sumRow) => {
+                  if (errSum) {
+                    console.error("❌ Error sumando pagos de paquete:", errSum.message);
+                    return res.json({ message: "✅ Monto actualizado en finanzas (sin actualizar paquete)" });
+                  }
+
+                  const totalPagado = parseFloat(sumRow?.total_pagado) || 0;
+
+                  db.get(
+                    `SELECT precio_total FROM paquetes_pacientes WHERE id = ?`,
+                    [finanza.referencia_id],
+                    (errPaq, paq) => {
+                      if (errPaq || !paq) {
+                        console.error("❌ Error obteniendo paquete:", errPaq?.message);
+                        return res.json({ message: "✅ Monto actualizado en finanzas" });
+                      }
+
+                      const precioTotal = parseFloat(paq.precio_total) || 0;
+                      const nuevoSaldo = Math.max(0, precioTotal - totalPagado);
+                      let estadoPago = 'pendiente_pago';
+                      let pagadoFlag = 0;
+
+                      if (totalPagado >= precioTotal - 0.01) {
+                        estadoPago = 'pagado';
+                        pagadoFlag = 1;
+                      } else if (totalPagado > 0) {
+                        estadoPago = 'adelanto';
+                        pagadoFlag = 0;
+                      }
+
+                      db.run(
+                        `UPDATE paquetes_pacientes 
+                         SET monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, 
+                             estado_pago = ?, pagado = ?
+                         WHERE id = ?`,
+                        [totalPagado, totalPagado, nuevoSaldo, estadoPago, pagadoFlag, finanza.referencia_id],
+                        (errUpdPaq) => {
+                          if (errUpdPaq) {
+                            console.error("❌ Error actualizando paquete:", errUpdPaq.message);
+                          }
+                          res.json({ message: "✅ Monto actualizado correctamente" });
+                        }
+                      );
+                    }
+                  );
+                }
+              );
+            }
+            else {
+              // Registro genérico de finanzas (consulta, abono_deuda, etc.)
+              res.json({ message: "✅ Monto actualizado correctamente" });
+            }
+          }
+        );
+      }
+    );
+  }
+});
+
 export default router;
