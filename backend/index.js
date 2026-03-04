@@ -45,6 +45,9 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("PRAGMA synchronous=NORMAL");
     db.run("PRAGMA cache_size=-20000");
 
+    // 🔒 serialize() garantiza que todas las operaciones se ejecuten en orden secuencial
+    db.serialize(() => {
+
     // 🧱 Tabla de usuarios (login)
     db.run(`
       CREATE TABLE IF NOT EXISTS users (
@@ -927,6 +930,8 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
+
+    }); // fin db.serialize()
   }
 });
 
