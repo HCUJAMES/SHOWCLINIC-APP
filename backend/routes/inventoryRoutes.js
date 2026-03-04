@@ -265,12 +265,15 @@ router.get("/productos-base", async (req, res) => {
 
 router.put("/stock-lotes/:id", requireInventoryWrite, async (req, res) => {
   const { id } = req.params;
-  const { lote, cantidad_unidades } = req.body;
+  const { lote, cantidad_unidades, cajas, jeringas } = req.body;
 
   const cantidad = parseFloat(cantidad_unidades);
   if (isNaN(cantidad) || cantidad < 0) {
     return res.status(400).json({ message: "cantidad_unidades inválida" });
   }
+
+  const cajasVal = parseFloat(cajas) || 0;
+  const jeringasVal = parseFloat(jeringas) || 0;
 
   try {
     await dbRun(
@@ -278,10 +281,12 @@ router.put("/stock-lotes/:id", requireInventoryWrite, async (req, res) => {
         UPDATE stock_lotes
         SET lote = ?,
             cantidad_unidades = ?,
+            cajas = ?,
+            jeringas = ?,
             actualizado_en = datetime('now', '-5 hours')
         WHERE id = ?
       `,
-      [lote || null, cantidad, id]
+      [lote || null, cantidad, cajasVal, jeringasVal, id]
     );
 
     res.json({ message: "✅ Lote actualizado" });
@@ -605,7 +610,12 @@ router.post("/ingreso", requireInventoryWrite, upload.single("pdf"), async (req,
         cantidad_presentaciones,
         condicion_almacenamiento,
         costo_unitario,
+        cajas: lineaCajas,
+        jeringas: lineaJeringas,
       } = linea;
+
+      const cajasVal = parseFloat(lineaCajas) || 0;
+      const jeringasVal = parseFloat(lineaJeringas) || 0;
 
       if (!variante_id || (cantidad_unidades == null && cantidad_presentaciones == null)) {
         continue; // saltar líneas inválidas sin cortar todo el ingreso
@@ -665,20 +675,25 @@ router.post("/ingreso", requireInventoryWrite, upload.single("pdf"), async (req,
             `
               UPDATE stock_lotes
               SET cantidad_unidades = cantidad_unidades + ?,
+                  cajas = cajas + ?,
+                  jeringas = jeringas + ?,
                   documento_pdf = ?,
                   actualizado_en = datetime('now', '-5 hours')
               WHERE id = ?
             `,
-            [cantidad, pdfFilename, loteExistente.id]
+            [cantidad, cajasVal, jeringasVal, pdfFilename, loteExistente.id]
           );
         } else {
           await dbRun(
             `
               UPDATE stock_lotes
-              SET cantidad_unidades = cantidad_unidades + ?, actualizado_en = datetime('now', '-5 hours')
+              SET cantidad_unidades = cantidad_unidades + ?,
+                  cajas = cajas + ?,
+                  jeringas = jeringas + ?,
+                  actualizado_en = datetime('now', '-5 hours')
               WHERE id = ?
             `,
-            [cantidad, loteExistente.id]
+            [cantidad, cajasVal, jeringasVal, loteExistente.id]
           );
         }
 
@@ -688,8 +703,8 @@ router.post("/ingreso", requireInventoryWrite, upload.single("pdf"), async (req,
         const nuevoLote = await dbRun(
           `
             INSERT INTO stock_lotes
-            (variante_id, lote, fecha_vencimiento, ubicacion, condicion_almacenamiento, cantidad_unidades, documento_pdf, creado_en)
-            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '-5 hours'))
+            (variante_id, lote, fecha_vencimiento, ubicacion, condicion_almacenamiento, cantidad_unidades, cajas, jeringas, documento_pdf, creado_en)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-5 hours'))
           `,
           [
             variante_id,
@@ -698,6 +713,8 @@ router.post("/ingreso", requireInventoryWrite, upload.single("pdf"), async (req,
             ubicacion || null,
             condicion_almacenamiento || null,
             cantidad,
+            cajasVal,
+            jeringasVal,
             pdfFilename,
           ]
         );

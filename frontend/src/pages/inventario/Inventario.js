@@ -51,6 +51,8 @@ export default function Inventario() {
     laboratorio: "",
     lote: "",
     cantidad: "",
+    cajas: "",
+    jeringas: "",
   });
   const [unidadNuevaVariante, setUnidadNuevaVariante] = useState("ml");
   const [contenidoNuevaVariante, setContenidoNuevaVariante] = useState("");
@@ -60,6 +62,8 @@ export default function Inventario() {
   const [editLoteId, setEditLoteId] = useState(null);
   const [editLote, setEditLote] = useState("");
   const [editCantidad, setEditCantidad] = useState("");
+  const [editCajas, setEditCajas] = useState("");
+  const [editJeringas, setEditJeringas] = useState("");
   const [guardandoEdicionLote, setGuardandoEdicionLote] = useState(false);
   const [editPrecioVarianteId, setEditPrecioVarianteId] = useState(null);
   const [editPrecioCliente, setEditPrecioCliente] = useState("");
@@ -234,6 +238,8 @@ export default function Inventario() {
         (parseFloat(l.cantidad_unidades) || 0) -
           (parseFloat(l.cantidad_reservada_unidades) || 0)
       );
+      const cajasLote = parseFloat(l.cajas) || 0;
+      const jeringasLote = parseFloat(l.jeringas) || 0;
 
       const prev = map.get(key);
       if (!prev) {
@@ -245,9 +251,13 @@ export default function Inventario() {
           laboratorio: "",
           stock_minimo_unidades: 0,
           disponible_efectivo: disponible,
+          total_cajas: cajasLote,
+          total_jeringas: jeringasLote,
         });
       } else {
         prev.disponible_efectivo += disponible;
+        prev.total_cajas = (prev.total_cajas || 0) + cajasLote;
+        prev.total_jeringas = (prev.total_jeringas || 0) + jeringasLote;
       }
     });
 
@@ -263,6 +273,8 @@ export default function Inventario() {
         laboratorio: v.laboratorio || "",
         stock_minimo_unidades: parseFloat(v.stock_minimo_unidades) || 0,
         disponible_efectivo: 0,
+        total_cajas: 0,
+        total_jeringas: 0,
       });
     });
 
@@ -442,13 +454,15 @@ export default function Inventario() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ lote: lote || null, cantidad_unidades: cantidad }),
+        body: JSON.stringify({ lote: lote || null, cantidad_unidades: cantidad, cajas: parseFloat(editCajas) || 0, jeringas: parseFloat(editJeringas) || 0 }),
       });
       if (!res.ok) throw new Error();
       await obtenerStockLotes();
       setEditLoteId(null);
       setEditLote("");
       setEditCantidad("");
+      setEditCajas("");
+      setEditJeringas("");
     } catch (e) {
       console.error(e);
       showToast({ severity: "error", message: "Error al editar lote" });
@@ -655,6 +669,8 @@ export default function Inventario() {
             cantidad_presentaciones: null,
             costo_unitario: null,
             condicion_almacenamiento: null,
+            cajas: parseFloat(formIngresoSimple.cajas) || 0,
+            jeringas: parseFloat(formIngresoSimple.jeringas) || 0,
           },
         ],
       };
@@ -689,7 +705,7 @@ export default function Inventario() {
       }
       if (!res.ok) throw new Error();
 
-      setFormIngresoSimple({ marca: "", variante: "", laboratorio: "", lote: "", cantidad: "" });
+      setFormIngresoSimple({ marca: "", variante: "", laboratorio: "", lote: "", cantidad: "", cajas: "", jeringas: "" });
       setPdfIngreso(null);
       setPdfIngresoKey((k) => k + 1);
       setSelectedMarcaId("");
@@ -815,6 +831,8 @@ export default function Inventario() {
               <TableCell>Marca</TableCell>
               <TableCell>Variante</TableCell>
               <TableCell>Laboratorio</TableCell>
+              <TableCell>Cajas</TableCell>
+              <TableCell>Jeringas</TableCell>
               <TableCell>Disponible</TableCell>
               <TableCell>Mínimo</TableCell>
               <TableCell>Estado</TableCell>
@@ -834,6 +852,12 @@ export default function Inventario() {
                 <TableCell>{r.producto_base_nombre}</TableCell>
                 <TableCell>{r.variante_nombre}</TableCell>
                 <TableCell>{r.laboratorio || "—"}</TableCell>
+                <TableCell>
+                  <strong>{Number(r.total_cajas || 0).toFixed(0)}</strong>
+                </TableCell>
+                <TableCell>
+                  <strong>{Number(r.total_jeringas || 0).toFixed(0)}</strong>
+                </TableCell>
                 <TableCell>
                   <strong>
                     {Number(r.disponible_efectivo || 0).toFixed(2)} {r.unidad_base}
@@ -1073,6 +1097,34 @@ export default function Inventario() {
                   }
                 />
               </Grid>
+              <Grid item xs={6} md={1.5}>
+                <TextField
+                  label="Cajas"
+                  type="number"
+                  fullWidth
+                  size="small"
+                  value={formIngresoSimple.cajas}
+                  onChange={(e) =>
+                    setFormIngresoSimple((p) => ({ ...p, cajas: e.target.value }))
+                  }
+                  inputProps={{ min: 0, step: 1 }}
+                  helperText="Ej: 2"
+                />
+              </Grid>
+              <Grid item xs={6} md={1.5}>
+                <TextField
+                  label="Jeringas"
+                  type="number"
+                  fullWidth
+                  size="small"
+                  value={formIngresoSimple.jeringas}
+                  onChange={(e) =>
+                    setFormIngresoSimple((p) => ({ ...p, jeringas: e.target.value }))
+                  }
+                  inputProps={{ min: 0, step: 1 }}
+                  helperText="Ej: 4"
+                />
+              </Grid>
               <Grid item xs={12} md={3}>
                 <TextField
                   label={`Cantidad (${
@@ -1185,6 +1237,8 @@ export default function Inventario() {
               <TableCell>Variante</TableCell>
               <TableCell>Laboratorio</TableCell>
               <TableCell>Número de lote</TableCell>
+              <TableCell>Cajas</TableCell>
+              <TableCell>Jeringas</TableCell>
               <TableCell>Cantidad</TableCell>
               <TableCell>PDF</TableCell>
               {canWriteInventory && <TableCell>Acciones</TableCell>}
@@ -1222,6 +1276,32 @@ export default function Inventario() {
                         />
                       ) : (
                         l.lote || "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {enEdicion ? (
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={editCajas}
+                          onChange={(e) => setEditCajas(e.target.value)}
+                          sx={{ width: 70 }}
+                        />
+                      ) : (
+                        Number(l.cajas || 0).toFixed(0)
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {enEdicion ? (
+                        <TextField
+                          size="small"
+                          type="number"
+                          value={editJeringas}
+                          onChange={(e) => setEditJeringas(e.target.value)}
+                          sx={{ width: 70 }}
+                        />
+                      ) : (
+                        Number(l.jeringas || 0).toFixed(0)
                       )}
                     </TableCell>
                     <TableCell>
@@ -1273,6 +1353,8 @@ export default function Inventario() {
                                 setEditLoteId(null);
                                 setEditLote("");
                                 setEditCantidad("");
+                                setEditCajas("");
+                                setEditJeringas("");
                               }}
                             >
                               Cancelar
@@ -1288,6 +1370,8 @@ export default function Inventario() {
                                 setEditLoteId(l.id);
                                 setEditLote(l.lote || "");
                                 setEditCantidad(String(l.cantidad_unidades ?? ""));
+                                setEditCajas(String(l.cajas ?? ""));
+                                setEditJeringas(String(l.jeringas ?? ""));
                               }}
                             >
                               Editar

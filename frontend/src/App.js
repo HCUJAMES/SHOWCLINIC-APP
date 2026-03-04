@@ -1,27 +1,52 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import PacientesMenu from "./pages/PacientesMenu";
-import RegistrarPaciente from "./pages/RegistrarPaciente";
-import BuscarPaciente from "./pages/BuscarPaciente";
-import PacientesConDeudas from "./pages/PacientesConDeudas";
-import TratamientosMenu from "./pages/tratamientos/TratamientosMenu";
-import CrearTratamiento from "./pages/tratamientos/CrearTratamiento";
-import ComenzarTratamiento from "./pages/tratamientos/ComenzarTratamiento";
-import Inventario from "./pages/inventario/Inventario";
-import HistorialClinico from "./pages/HistorialClinico";
-import Finanzas from "./pages/Finanzas";
-import FotosPaciente from "./pages/FotosPaciente";
-import Especialistas from "./pages/Especialistas";
-import Estadisticas from "./pages/Estadisticas";
-import Gestion from "./pages/Gestion";
-import Paquetes from "./pages/Paquetes";
-import GestionClinica from "./pages/GestionClinica";
 import ProtectedRoute from "./components/ProtectedRoute";
+
+// Lazy load todas las páginas para que solo se carguen cuando se visitan
+const Login = React.lazy(() => import("./pages/Login"));
+const Dashboard = React.lazy(() => import("./pages/Dashboard"));
+const PacientesMenu = React.lazy(() => import("./pages/PacientesMenu"));
+const RegistrarPaciente = React.lazy(() => import("./pages/RegistrarPaciente"));
+const BuscarPaciente = React.lazy(() => import("./pages/BuscarPaciente"));
+const PacientesConDeudas = React.lazy(() => import("./pages/PacientesConDeudas"));
+const TratamientosMenu = React.lazy(() => import("./pages/tratamientos/TratamientosMenu"));
+const CrearTratamiento = React.lazy(() => import("./pages/tratamientos/CrearTratamiento"));
+const ComenzarTratamiento = React.lazy(() => import("./pages/tratamientos/ComenzarTratamiento"));
+const Inventario = React.lazy(() => import("./pages/inventario/Inventario"));
+const HistorialClinico = React.lazy(() => import("./pages/HistorialClinico"));
+const Finanzas = React.lazy(() => import("./pages/Finanzas"));
+const FotosPaciente = React.lazy(() => import("./pages/FotosPaciente"));
+const Especialistas = React.lazy(() => import("./pages/Especialistas"));
+const Estadisticas = React.lazy(() => import("./pages/Estadisticas"));
+const Gestion = React.lazy(() => import("./pages/Gestion"));
+const Paquetes = React.lazy(() => import("./pages/Paquetes"));
+const GestionClinica = React.lazy(() => import("./pages/GestionClinica"));
+
+// Spinner de carga mientras se descarga el chunk de la página
+const PageLoader = () => (
+  <div style={{
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: "100vh",
+    background: "linear-gradient(rgba(255,255,255,0.9), rgba(232,211,57,0.3))",
+  }}>
+    <div style={{
+      width: 48,
+      height: 48,
+      border: "4px solid #e0c97a",
+      borderTop: "4px solid #a36920",
+      borderRadius: "50%",
+      animation: "spin 0.8s linear infinite",
+    }} />
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
+
 function App() {
   return (
     <BrowserRouter>
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Login />} />
         <Route
@@ -167,6 +192,7 @@ function App() {
         />
 
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

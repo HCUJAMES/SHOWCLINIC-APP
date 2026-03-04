@@ -130,9 +130,16 @@ const HistorialClinico = () => {
   const [guardandoOferta, setGuardandoOferta] = useState(false);
   const [ofertas, setOfertas] = useState([]);
   const [ofertaEditId, setOfertaEditId] = useState(null);
-  const [subiendoFotoPerfil, setSubiendoFotoPerfil] = useState(false);
   const [fotosTratamiento, setFotosTratamiento] = useState([]);
   const [tratamientoSeleccionado, setTratamientoSeleccionado] = useState(null);
+
+  // Estados para galería de fotos del paciente
+  const [fotosPaciente, setFotosPaciente] = useState([]);
+  const [mostrarTodasFotos, setMostrarTodasFotos] = useState(false);
+  const [subiendoFotosPaciente, setSubiendoFotosPaciente] = useState(false);
+  const [archivosFotosPaciente, setArchivosFotosPaciente] = useState([]);
+  const [nombreTratamientoFoto, setNombreTratamientoFoto] = useState("");
+  const [fotoPreview, setFotoPreview] = useState(null);
 
   // Estado para modal de recibo
   const [openReciboModal, setOpenReciboModal] = useState(false);
@@ -297,6 +304,11 @@ const HistorialClinico = () => {
       setOfertaEditId(null);
       setObservacionEditId(null);
       setObservacionEditTexto("");
+      setFotosPaciente([]);
+      setMostrarTodasFotos(false);
+      setArchivosFotosPaciente([]);
+      setNombreTratamientoFoto("");
+      setFotoPreview(null);
       try {
         const obsRes = await axios.get(`${API_BASE_URL}/api/pacientes/${id}/observaciones`, {
           headers: authHeaders,
@@ -355,6 +367,17 @@ const HistorialClinico = () => {
       } catch (e) {
         console.error("Error al obtener presupuestos asignados:", e);
         setPresupuestosAsignados([]);
+      }
+
+      // Cargar fotos del paciente
+      try {
+        const fotosRes = await axios.get(`${API_BASE_URL}/api/pacientes/${id}/fotos`, {
+          headers: authHeaders,
+        });
+        setFotosPaciente(Array.isArray(fotosRes.data) ? fotosRes.data : []);
+      } catch (e) {
+        console.error("Error al obtener fotos del paciente:", e);
+        setFotosPaciente([]);
       }
     } catch (error) {
       console.error("Error al obtener historial clínico:", error);
@@ -786,14 +809,20 @@ const HistorialClinico = () => {
     }
   };
 
-  const subirFotoPerfil = async (file) => {
-    if (!pacienteSeleccionado?.id || !file) return;
+  const subirFotosPaciente = async () => {
+    if (!pacienteSeleccionado?.id || !archivosFotosPaciente.length) return;
+    if (!nombreTratamientoFoto.trim()) {
+      showToast({ severity: "warning", message: "Escribe el nombre del tratamiento para las fotos" });
+      return;
+    }
     try {
-      setSubiendoFotoPerfil(true);
+      setSubiendoFotosPaciente(true);
       const formData = new FormData();
-      formData.append("foto", file);
-      const res = await axios.post(
-        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/foto-perfil`,
+      archivosFotosPaciente.forEach((f) => formData.append("fotos", f));
+      formData.append("nombre_tratamiento", nombreTratamientoFoto.trim());
+
+      await axios.post(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/fotos`,
         formData,
         {
           headers: {
@@ -803,21 +832,33 @@ const HistorialClinico = () => {
         }
       );
 
-      const fotoPerfil = res?.data?.fotoPerfil;
-      if (fotoPerfil) {
-        const updated = { ...pacienteSeleccionado, fotoPerfil };
-        setPacienteSeleccionado(updated);
-        setPacientes((prev) =>
-          prev.map((p) => (p.id === updated.id ? { ...p, fotoPerfil } : p))
-        );
-      }
+      showToast({ severity: "success", message: "Fotos subidas correctamente" });
+      setArchivosFotosPaciente([]);
+      setNombreTratamientoFoto("");
 
-      showToast({ severity: "success", message: "Foto de perfil actualizada" });
+      const fotosRes = await axios.get(`${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/fotos`, {
+        headers: authHeaders,
+      });
+      setFotosPaciente(Array.isArray(fotosRes.data) ? fotosRes.data : []);
     } catch (e) {
-      console.error("Error al subir foto de perfil:", e);
-      showToast({ severity: "error", message: "Error al subir foto de perfil" });
+      console.error("Error al subir fotos:", e);
+      showToast({ severity: "error", message: "Error al subir fotos" });
     } finally {
-      setSubiendoFotoPerfil(false);
+      setSubiendoFotosPaciente(false);
+    }
+  };
+
+  const eliminarFotoPaciente = async (fotoId) => {
+    if (!pacienteSeleccionado?.id) return;
+    try {
+      await axios.delete(`${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/fotos/${fotoId}`, {
+        headers: authHeaders,
+      });
+      setFotosPaciente((prev) => prev.filter((f) => f.id !== fotoId));
+      showToast({ severity: "success", message: "Foto eliminada" });
+    } catch (e) {
+      console.error("Error al eliminar foto:", e);
+      showToast({ severity: "error", message: "Error al eliminar foto" });
     }
   };
 
@@ -2089,109 +2130,299 @@ const HistorialClinico = () => {
                 }}
               >
                 <Grid container spacing={2.2}>
-                  <Grid item xs={12} md={4}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2,
-                        borderRadius: 3,
-                        backgroundColor: "rgba(255,255,255,0.78)",
-                        border: "1px solid rgba(163,105,32,0.16)",
-                      }}
-                    >
-                      <Typography sx={{ fontWeight: "bold", color: "#a36920", mb: 1 }}>
-                        Foto de perfil
-                      </Typography>
-
-                      <Avatar
-                        variant="rounded"
-                        src={
-                          pacienteSeleccionado?.fotoPerfil
-                            ? `${API_BASE_URL}${pacienteSeleccionado.fotoPerfil}`
-                            : undefined
-                        }
-                        sx={{
-                          width: "100%",
-                          height: { xs: 240, md: 280 },
-                          borderRadius: 3,
-                          border: "2px solid rgba(163,105,32,0.22)",
-                          boxShadow: "0 12px 26px rgba(0,0,0,0.10)",
-                          bgcolor: "rgba(163,105,32,0.12)",
-                          color: "#a36920",
-                          fontWeight: "bold",
-                          fontSize: 64,
-                        }}
-                      >
-                        {`${pacienteSeleccionado?.nombre || ""} ${pacienteSeleccionado?.apellido || ""}`
-                          .trim()
-                          .slice(0, 1)
-                          .toUpperCase() || "P"}
-                      </Avatar>
-
-                      <Button
-                        fullWidth
-                        variant="outlined"
-                        component="label"
-                        disabled={subiendoFotoPerfil}
-                        sx={{
-                          mt: 2,
-                          borderColor: "#a36920",
-                          color: "#a36920",
-                          fontWeight: "bold",
-                          borderRadius: 3,
-                          "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
-                        }}
-                      >
-                        {pacienteSeleccionado?.fotoPerfil ? "Cambiar foto" : "Subir foto"}
-                        <input
-                          hidden
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) subirFotoPerfil(file);
-                            e.target.value = "";
-                          }}
-                        />
-                      </Button>
-                    </Paper>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ display: "grid", gap: 0.8 }}>
+                      <Typography><strong>Documento:</strong> {pacienteSeleccionado.tipoDocumento || 'DNI'}: {pacienteSeleccionado.dni}</Typography>
+                      <Typography><strong>Nombre:</strong> {pacienteSeleccionado.nombre}</Typography>
+                      <Typography><strong>Apellido:</strong> {pacienteSeleccionado.apellido}</Typography>
+                      <Typography><strong>Edad:</strong> {calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || 'N/A'} años</Typography>
+                      <Typography><strong>Sexo:</strong> {pacienteSeleccionado.sexo}</Typography>
+                      <Typography><strong>Embarazada:</strong> {pacienteSeleccionado.embarazada || "No especifica"}</Typography>
+                      <Typography><strong>Ocupación:</strong> {pacienteSeleccionado.ocupacion}</Typography>
+                      <Typography><strong>Fecha Nacimiento:</strong> {pacienteSeleccionado.fechaNacimiento}</Typography>
+                      <Typography><strong>Ciudad Nacimiento:</strong> {pacienteSeleccionado.ciudadNacimiento}</Typography>
+                      <Typography><strong>Ciudad Residencia:</strong> {pacienteSeleccionado.ciudadResidencia}</Typography>
+                    </Box>
                   </Grid>
-
-                  <Grid item xs={12} md={8}>
-                    <Grid container spacing={2.2}>
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ display: "grid", gap: 0.8 }}>
-                          <Typography><strong>Documento:</strong> {pacienteSeleccionado.tipoDocumento || 'DNI'}: {pacienteSeleccionado.dni}</Typography>
-                          <Typography><strong>Nombre:</strong> {pacienteSeleccionado.nombre}</Typography>
-                          <Typography><strong>Apellido:</strong> {pacienteSeleccionado.apellido}</Typography>
-                          <Typography><strong>Edad:</strong> {calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || 'N/A'} años</Typography>
-                          <Typography><strong>Sexo:</strong> {pacienteSeleccionado.sexo}</Typography>
-                          <Typography><strong>Embarazada:</strong> {pacienteSeleccionado.embarazada || "No especifica"}</Typography>
-                          <Typography><strong>Ocupación:</strong> {pacienteSeleccionado.ocupacion}</Typography>
-                          <Typography><strong>Fecha Nacimiento:</strong> {pacienteSeleccionado.fechaNacimiento}</Typography>
-                          <Typography><strong>Ciudad Nacimiento:</strong> {pacienteSeleccionado.ciudadNacimiento}</Typography>
-                          <Typography><strong>Ciudad Residencia:</strong> {pacienteSeleccionado.ciudadResidencia}</Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <Box sx={{ display: "grid", gap: 0.8 }}>
-                          <Typography><strong>Correo:</strong> {pacienteSeleccionado.correo}</Typography>
-                          <Typography><strong>Celular:</strong> {pacienteSeleccionado.celular}</Typography>
-                          <Typography><strong>Dirección:</strong> {pacienteSeleccionado.direccion}</Typography>
-                          <Typography><strong>Alergias:</strong> {pacienteSeleccionado.alergias || "Ninguna"}</Typography>
-                          <Typography><strong>Enfermedades:</strong> {pacienteSeleccionado.enfermedad || "Ninguna"}</Typography>
-                          <Typography><strong>Cirugía estética:</strong> {pacienteSeleccionado.cirugiaEstetica || "No"}</Typography>
-                          <Typography><strong>Consume tabaco:</strong> {pacienteSeleccionado.tabaco || "No"}</Typography>
-                          <Typography><strong>Consume alcohol:</strong> {pacienteSeleccionado.alcohol || "No"}</Typography>
-                          <Typography><strong>Consume drogas:</strong> {pacienteSeleccionado.drogas || "No"}</Typography>
-                          <Typography><strong>Referencia:</strong> {pacienteSeleccionado.referencia || "No especificada"}</Typography>
-                          <Typography><strong>Número de hijos:</strong> {pacienteSeleccionado.numeroHijos ?? "No registrado"}</Typography>
-                        </Box>
-                      </Grid>
-                    </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ display: "grid", gap: 0.8 }}>
+                      <Typography><strong>Correo:</strong> {pacienteSeleccionado.correo}</Typography>
+                      <Typography><strong>Celular:</strong> {pacienteSeleccionado.celular}</Typography>
+                      <Typography><strong>Dirección:</strong> {pacienteSeleccionado.direccion}</Typography>
+                      <Typography><strong>Alergias:</strong> {pacienteSeleccionado.alergias || "Ninguna"}</Typography>
+                      <Typography><strong>Enfermedades:</strong> {pacienteSeleccionado.enfermedad || "Ninguna"}</Typography>
+                      <Typography><strong>Cirugía estética:</strong> {pacienteSeleccionado.cirugiaEstetica || "No"}</Typography>
+                      <Typography><strong>Consume tabaco:</strong> {pacienteSeleccionado.tabaco || "No"}</Typography>
+                      <Typography><strong>Consume alcohol:</strong> {pacienteSeleccionado.alcohol || "No"}</Typography>
+                      <Typography><strong>Consume drogas:</strong> {pacienteSeleccionado.drogas || "No"}</Typography>
+                      <Typography><strong>Referencia:</strong> {pacienteSeleccionado.referencia || "No especificada"}</Typography>
+                      <Typography><strong>Número de hijos:</strong> {pacienteSeleccionado.numeroHijos ?? "No registrado"}</Typography>
+                    </Box>
                   </Grid>
                 </Grid>
               </Paper>
+
+              {/* ========== GALERÍA DE FOTOS DEL PACIENTE ========== */}
+              <Typography
+                variant="h6"
+                sx={{ color: "#a36920", fontWeight: "bold", mb: 2 }}
+              >
+                Galería de fotos
+              </Typography>
+
+              <Paper
+                elevation={0}
+                sx={{
+                  mb: 4,
+                  p: 2.5,
+                  borderRadius: 3,
+                  backgroundColor: "rgba(255,255,255,0.68)",
+                  border: "1px solid rgba(212,175,55,0.18)",
+                }}
+              >
+                {/* Subir fotos */}
+                <Box sx={{ mb: 2.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "rgba(0,0,0,0.70)", mb: 1.5 }}>
+                    Subir fotos (máx. 15 por lote)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Nombre del tratamiento"
+                    placeholder="Ej: Botox, Limpieza facial, Peeling..."
+                    value={nombreTratamientoFoto}
+                    onChange={(e) => setNombreTratamientoFoto(e.target.value)}
+                    sx={{
+                      mb: 1.5,
+                      "& .MuiInputBase-root": {
+                        backgroundColor: "rgba(255,255,255,0.72)",
+                        borderRadius: 2,
+                      },
+                    }}
+                  />
+                  <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      size="small"
+                      sx={{
+                        borderColor: "#a36920",
+                        color: "#a36920",
+                        fontWeight: "bold",
+                        borderRadius: 2,
+                        textTransform: "none",
+                        "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
+                      }}
+                    >
+                      Seleccionar fotos
+                      <input
+                        hidden
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => {
+                          const archivos = Array.from(e.target.files || []);
+                          if (archivos.length > 15) {
+                            showToast({ severity: "warning", message: "Solo puedes subir hasta 15 fotos por lote" });
+                          }
+                          setArchivosFotosPaciente(archivos.slice(0, 15));
+                          e.target.value = "";
+                        }}
+                      />
+                    </Button>
+                    {archivosFotosPaciente.length > 0 && (
+                      <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.60)" }}>
+                        {archivosFotosPaciente.length} foto(s) seleccionada(s)
+                      </Typography>
+                    )}
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={!archivosFotosPaciente.length || !nombreTratamientoFoto.trim() || subiendoFotosPaciente}
+                      onClick={subirFotosPaciente}
+                      sx={{
+                        backgroundColor: "#a36920",
+                        "&:hover": { backgroundColor: "#8b581b" },
+                        borderRadius: 2,
+                        fontWeight: "bold",
+                        textTransform: "none",
+                      }}
+                    >
+                      {subiendoFotosPaciente ? "Subiendo..." : "Subir fotos"}
+                    </Button>
+                  </Box>
+
+                  {/* Preview de archivos seleccionados */}
+                  {archivosFotosPaciente.length > 0 && (
+                    <Box sx={{ display: "flex", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
+                      {archivosFotosPaciente.map((file, idx) => (
+                        <Box
+                          key={idx}
+                          sx={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: 1.5,
+                            overflow: "hidden",
+                            border: "1px solid rgba(163,105,32,0.25)",
+                          }}
+                        >
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`preview-${idx}`}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+
+                <Divider sx={{ mb: 2.5 }} />
+
+                {/* Galería de fotos subidas */}
+                {fotosPaciente.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.50)", fontStyle: "italic" }}>
+                    No hay fotos registradas para este paciente.
+                  </Typography>
+                ) : (
+                  <>
+                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "rgba(0,0,0,0.70)", mb: 1.5 }}>
+                      Últimas fotos ({fotosPaciente.length} en total)
+                    </Typography>
+                    <Grid container spacing={1.5}>
+                      {(mostrarTodasFotos ? fotosPaciente : fotosPaciente.slice(0, 5)).map((foto) => (
+                        <Grid item xs={6} sm={4} md={3} key={foto.id}>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              borderRadius: 2,
+                              overflow: "hidden",
+                              border: "1px solid rgba(163,105,32,0.18)",
+                              backgroundColor: "rgba(255,255,255,0.80)",
+                              transition: "box-shadow 0.2s, transform 0.2s",
+                              "&:hover": {
+                                boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+                                transform: "translateY(-2px)",
+                              },
+                            }}
+                          >
+                            <Box
+                              sx={{ position: "relative", cursor: "pointer" }}
+                              onClick={() => setFotoPreview(foto)}
+                            >
+                              <img
+                                src={`${API_BASE_URL}${foto.archivo}`}
+                                alt={foto.nombre_tratamiento}
+                                style={{
+                                  width: "100%",
+                                  height: 200,
+                                  objectFit: "cover",
+                                  display: "block",
+                                }}
+                              />
+                            </Box>
+                            <Box sx={{ p: 1 }}>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  display: "block",
+                                  fontWeight: 700,
+                                  color: "#a36920",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {foto.nombre_tratamiento}
+                              </Typography>
+                              <Typography variant="caption" sx={{ display: "block", color: "rgba(0,0,0,0.50)", fontSize: "0.68rem" }}>
+                                {foto.creado_en ? foto.creado_en.split(" ")[0] : ""}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => eliminarFotoPaciente(foto.id)}
+                                sx={{
+                                  mt: 0.3,
+                                  color: "#d32f2f",
+                                  padding: "2px",
+                                  "&:hover": { backgroundColor: "rgba(211,47,47,0.08)" },
+                                }}
+                              >
+                                <Delete sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Box>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+
+                    {fotosPaciente.length > 5 && (
+                      <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => setMostrarTodasFotos((v) => !v)}
+                          sx={{
+                            borderColor: "#a36920",
+                            color: "#a36920",
+                            fontWeight: "bold",
+                            borderRadius: 3,
+                            textTransform: "none",
+                            "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
+                          }}
+                        >
+                          {mostrarTodasFotos ? "Mostrar menos" : `Mostrar más (${fotosPaciente.length - 5} fotos más)`}
+                        </Button>
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Paper>
+
+              {/* Modal de previsualización de foto */}
+              <Dialog
+                open={Boolean(fotoPreview)}
+                onClose={() => setFotoPreview(null)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                  sx: {
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    background: "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.95) 100%)",
+                  },
+                }}
+              >
+                {fotoPreview && (
+                  <>
+                    <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1 }}>
+                      <Box>
+                        <Typography variant="h6" sx={{ color: "#a36920", fontWeight: "bold" }}>
+                          {fotoPreview.nombre_tratamiento}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.50)" }}>
+                          {fotoPreview.creado_en}
+                        </Typography>
+                      </Box>
+                      <IconButton onClick={() => setFotoPreview(null)}>
+                        <Close />
+                      </IconButton>
+                    </DialogTitle>
+                    <DialogContent sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+                      <img
+                        src={`${API_BASE_URL}${fotoPreview.archivo}`}
+                        alt={fotoPreview.nombre_tratamiento}
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: "70vh",
+                          objectFit: "contain",
+                          borderRadius: 8,
+                        }}
+                      />
+                    </DialogContent>
+                  </>
+                )}
+              </Dialog>
 
               <Typography
                 variant="h6"

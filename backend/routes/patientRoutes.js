@@ -21,6 +21,18 @@ const storagePerfil = multer.diskStorage({
 });
 
 const uploadPerfil = multer({ storage: storagePerfil });
+
+const storageFotosPaciente = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = "./uploads/fotos-paciente";
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `foto_${Date.now()}_${Math.round(Math.random() * 1e4)}${path.extname(file.originalname)}`);
+  },
+});
+const uploadFotosPaciente = multer({ storage: storageFotosPaciente });
 // ✅ Editar paciente
 router.put("/editar/:id", requirePatientWrite, (req, res) => {
   const {
@@ -533,6 +545,102 @@ router.get("/:id/historial", (req, res) => {
   });
 });
 
+// 📸 Subir fotos de paciente (hasta 15 fotos con nombre de tratamiento)
+router.post("/:id/fotos", requirePatientWrite, uploadFotosPaciente.array("fotos", 15), (req, res) => {
+  const { id } = req.params;
+  const { nombre_tratamiento } = req.body;
+
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ message: "No se enviaron imágenes" });
+  }
+
+  const nombreTrat = typeof nombre_tratamiento === "string" ? nombre_tratamiento.trim() : "Sin nombre";
+
+  const creadoEn = new Date()
+    .toLocaleString("sv-SE", { timeZone: "America/Lima" })
+    .replace("T", " ")
+    .slice(0, 19);
+
+  const insertados = [];
+  let errores = 0;
+
+  req.files.forEach((file, idx) => {
+    const rutaArchivo = `/uploads/fotos-paciente/${file.filename}`;
+    db.run(
+      `INSERT INTO fotos_paciente (paciente_id, nombre_tratamiento, archivo, creado_en) VALUES (?, ?, ?, ?)`,
+      [id, nombreTrat, rutaArchivo, creadoEn],
+      function (err) {
+        if (err) {
+          console.error("❌ Error al guardar foto de paciente:", err.message);
+          errores++;
+        } else {
+          insertados.push({ id: this.lastID, archivo: rutaArchivo, nombre_tratamiento: nombreTrat, creado_en: creadoEn });
+        }
+
+        if (insertados.length + errores === req.files.length) {
+          res.json({ message: `${insertados.length} foto(s) subidas correctamente`, fotos: insertados });
+        }
+      }
+    );
+  });
+});
+
+// 📸 Listar fotos de un paciente (ordenadas por fecha DESC)
+router.get("/:id/fotos", (req, res) => {
+  const { id } = req.params;
+  const query = `
+    SELECT id, paciente_id, nombre_tratamiento, archivo, creado_en
+    FROM fotos_paciente
+    WHERE paciente_id = ?
+    ORDER BY creado_en DESC, id DESC
+  `;
+
+  db.all(query, [id], (err, rows) => {
+    if (err) {
+      console.error("❌ Error al listar fotos de paciente:", err.message);
+      return res.status(500).json({ message: "Error al listar fotos" });
+    }
+    res.json(rows || []);
+  });
+});
+
+// 📸 Eliminar una foto de paciente
+router.delete("/:id/fotos/:fotoId", requirePatientWrite, (req, res) => {
+  const { id, fotoId } = req.params;
+
+  db.get(
+    `SELECT archivo FROM fotos_paciente WHERE id = ? AND paciente_id = ?`,
+    [fotoId, id],
+    (err, row) => {
+      if (err) {
+        console.error("❌ Error al buscar foto:", err.message);
+        return res.status(500).json({ message: "Error al eliminar foto" });
+      }
+      if (!row) {
+        return res.status(404).json({ message: "Foto no encontrada" });
+      }
+
+      // Eliminar archivo físico
+      const filePath = "." + row.archivo;
+      if (fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch (e) { console.error("Error borrando archivo:", e); }
+      }
+
+      db.run(
+        `DELETE FROM fotos_paciente WHERE id = ? AND paciente_id = ?`,
+        [fotoId, id],
+        function (delErr) {
+          if (delErr) {
+            console.error("❌ Error al eliminar foto:", delErr.message);
+            return res.status(500).json({ message: "Error al eliminar foto" });
+          }
+          res.json({ message: "Foto eliminada correctamente" });
+        }
+      );
+    }
+  );
+});
+
 // ✅ Obtener un paciente por ID
 router.get("/:id", (req, res) => {
   const { id } = req.params;
@@ -612,7 +720,6 @@ router.put("/:id/observaciones", requirePatientWrite, (req, res) => {
   });
 });
 
-
 // ✅ Eliminar paciente y todos sus datos relacionados (solo master)
 router.delete("/eliminar/:id", requireRole("master"), (req, res) => {
   const { id } = req.params;
@@ -633,6 +740,7 @@ router.delete("/eliminar/:id", requireRole("master"), (req, res) => {
       "DELETE FROM deudas_tratamientos WHERE paciente_id = ?",
       "DELETE FROM patient_observaciones WHERE paciente_id = ?",
       "DELETE FROM patient_ofertas WHERE paciente_id = ?",
+      "DELETE FROM fotos_paciente WHERE paciente_id = ?",
       "DELETE FROM paquetes_sesiones WHERE paquete_paciente_id IN (SELECT id FROM paquetes_pacientes WHERE paciente_id = ?)",
       "DELETE FROM paquetes_pacientes WHERE paciente_id = ?",
       "DELETE FROM presupuestos_sesiones WHERE presupuesto_asignado_id IN (SELECT id FROM presupuestos_asignados WHERE paciente_id = ?)",

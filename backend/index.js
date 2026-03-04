@@ -40,6 +40,11 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
   } else {
     console.log("✅ Conectado a showclinic.db");
 
+    // ⚡ Optimización SQLite: WAL mode + caché (fuera de transacciones)
+    db.run("PRAGMA journal_mode=WAL");
+    db.run("PRAGMA synchronous=NORMAL");
+    db.run("PRAGMA cache_size=-20000");
+
     // 🧱 Tabla de usuarios (login)
     db.run(`
       CREATE TABLE IF NOT EXISTS users (
@@ -316,6 +321,25 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run(`ALTER TABLE patient_ofertas ADD COLUMN descuento REAL DEFAULT 0`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
         console.log('Columna descuento ya existe o error:', err.message);
+      }
+    });
+
+    // 📸 Tabla de fotos de paciente (galería independiente)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS fotos_paciente (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        nombre_tratamiento TEXT NOT NULL,
+        archivo TEXT NOT NULL,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id)
+      )
+    `, (err) => {
+      if (err) {
+        console.error("❌ Error creando tabla fotos_paciente:", err.message);
+      } else {
+        db.run("CREATE INDEX IF NOT EXISTS idx_fotos_paciente_paciente ON fotos_paciente(paciente_id)");
+        db.run("CREATE INDEX IF NOT EXISTS idx_fotos_paciente_fecha ON fotos_paciente(creado_en)");
       }
     });
 
@@ -795,6 +819,8 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     [
       ["laboratorio", "TEXT"],
       ["precio_cliente", "REAL"],
+      ["jeringas_por_caja", "REAL DEFAULT 0"],
+      ["ml_por_jeringa", "REAL DEFAULT 0"],
     ].forEach(([column, definition]) =>
       ensureColumnExists("variantes", column, definition)
     );
@@ -818,6 +844,8 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       ["condicion_almacenamiento", "TEXT"],
       ["estado", "TEXT NOT NULL DEFAULT 'Disponible'"],
       ["documento_pdf", "TEXT"],
+      ["cajas", "REAL DEFAULT 0"],
+      ["jeringas", "REAL DEFAULT 0"],
     ].forEach(([column, definition]) =>
       ensureColumnExists("stock_lotes", column, definition)
     );
@@ -861,6 +889,43 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       )
     `);
 
+    // ⚡ Índices para acelerar queries frecuentes
+    db.run("CREATE INDEX IF NOT EXISTS idx_patients_nombre_apellido ON patients(nombre, apellido)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_patients_dni ON patients(dni)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_patients_celular ON patients(celular)");
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_tratamientos_realizados_paciente ON tratamientos_realizados(paciente_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_tratamientos_realizados_fecha ON tratamientos_realizados(fecha)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_tratamientos_realizados_tratamiento ON tratamientos_realizados(tratamiento_id)");
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_deudas_tratamientos_paciente ON deudas_tratamientos(paciente_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_deudas_tratamientos_tratamiento ON deudas_tratamientos(tratamiento_realizado_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_deudas_tratamientos_estado ON deudas_tratamientos(estado)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_deudas_pagos_deuda ON deudas_pagos(deuda_id)");
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_finanzas_fecha ON finanzas(fecha)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_finanzas_paciente ON finanzas(paciente_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_finanzas_referencia ON finanzas(referencia_id, referencia_tipo)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_finanzas_tipo ON finanzas(tipo)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_finanzas_metodo ON finanzas(metodo_pago)");
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_paquetes_pacientes_paciente ON paquetes_pacientes(paciente_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_paquetes_pacientes_estado ON paquetes_pacientes(estado)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_paquetes_sesiones_paquete ON paquetes_sesiones(paquete_paciente_id)");
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_presupuestos_asignados_paciente ON presupuestos_asignados(paciente_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_presupuestos_asignados_estado ON presupuestos_asignados(estado)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_presupuestos_sesiones_presupuesto ON presupuestos_sesiones(presupuesto_asignado_id)");
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_patient_observaciones_paciente ON patient_observaciones(paciente_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_patient_ofertas_paciente ON patient_ofertas(paciente_id)");
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_variantes_producto ON variantes(producto_base_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_stock_lotes_variante ON stock_lotes(variante_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_movimientos_detalle_movimiento ON movimientos_detalle(movimiento_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_movimientos_detalle_variante ON movimientos_detalle(variante_id)");
+
+    console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
   }
 });
