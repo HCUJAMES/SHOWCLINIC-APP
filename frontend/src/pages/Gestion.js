@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Container, Typography, Button, Paper, Box, IconButton, CircularProgress } from "@mui/material";
-import { ArrowBack, Backup, PhotoLibrary } from "@mui/icons-material";
+import { Container, Typography, Button, Paper, Box, IconButton, CircularProgress, Table, TableBody, TableCell, TableHead, TableRow, Chip } from "@mui/material";
+import { ArrowBack, Backup, PhotoLibrary, SearchOff, Delete, DeleteSweep } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { useAuth } from "../hooks/useAuth";
@@ -13,6 +13,9 @@ const Gestion = () => {
   const colorPrincipal = COLORS.PRIMARY;
   const [generandoBackup, setGenerandoBackup] = useState(false);
   const [generandoBackupImagenes, setGenerandoBackupImagenes] = useState(false);
+  const [huerfanos, setHuerfanos] = useState([]);
+  const [buscandoHuerfanos, setBuscandoHuerfanos] = useState(false);
+  const [eliminandoTodos, setEliminandoTodos] = useState(false);
 
   // Verificar que el usuario sea master
   if (role !== "master") {
@@ -45,6 +48,63 @@ const Gestion = () => {
       </Box>
     );
   }
+
+  const buscarHuerfanos = async () => {
+    try {
+      setBuscandoHuerfanos(true);
+      const response = await fetch(`${API_BASE_URL}/api/tratamientos/huerfanos`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Error al buscar");
+      const data = await response.json();
+      setHuerfanos(Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length === 0) {
+        showToast({ severity: "info", message: "No se encontraron tratamientos huérfanos" });
+      }
+    } catch (err) {
+      console.error(err);
+      showToast({ severity: "error", message: "Error al buscar tratamientos huérfanos" });
+    } finally {
+      setBuscandoHuerfanos(false);
+    }
+  };
+
+  const eliminarHuerfano = async (id) => {
+    if (!window.confirm("¿Estás seguro de eliminar este tratamiento huérfano?")) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/tratamientos/huerfanos/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Error al eliminar");
+      }
+      showToast({ severity: "success", message: "Tratamiento huérfano eliminado" });
+      setHuerfanos((prev) => prev.filter((h) => h.id !== id));
+    } catch (err) {
+      showToast({ severity: "error", message: err.message || "Error al eliminar" });
+    }
+  };
+
+  const eliminarTodosHuerfanos = async () => {
+    if (!window.confirm(`¿Estás seguro de eliminar los ${huerfanos.length} tratamiento(s) huérfano(s)? Esta acción no se puede deshacer.`)) return;
+    try {
+      setEliminandoTodos(true);
+      const response = await fetch(`${API_BASE_URL}/api/tratamientos/huerfanos`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) throw new Error("Error al eliminar");
+      const data = await response.json();
+      showToast({ severity: "success", message: data.message });
+      setHuerfanos([]);
+    } catch (err) {
+      showToast({ severity: "error", message: "Error al eliminar tratamientos huérfanos" });
+    } finally {
+      setEliminandoTodos(false);
+    }
+  };
 
   const realizarBackup = async () => {
     try {
@@ -296,6 +356,125 @@ const Gestion = () => {
               >
                 {generandoBackupImagenes ? "Generando Backup..." : "Descargar Imágenes"}
               </Button>
+            </Paper>
+            {/* Sección Tratamientos Huérfanos */}
+            <Paper
+              elevation={3}
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                border: "1px solid rgba(212,175,55,0.25)",
+                backgroundColor: "rgba(255,255,255,0.95)",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+                <SearchOff sx={{ fontSize: 40, color: "#d32f2f" }} />
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h6" sx={{ color: colorPrincipal, fontWeight: 700 }}>
+                    Tratamientos Huérfanos
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.70)" }}>
+                    Busca tratamientos registrados sin paciente asignado (por error al no seleccionar paciente)
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={buscandoHuerfanos ? <CircularProgress size={20} color="inherit" /> : <SearchOff />}
+                onClick={buscarHuerfanos}
+                disabled={buscandoHuerfanos}
+                sx={{
+                  mt: 1,
+                  py: 1.5,
+                  backgroundColor: "#ed6c02",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                  borderRadius: 2,
+                  "&:hover": { backgroundColor: "#c55a02" },
+                  "&:disabled": { backgroundColor: "rgba(237,108,2,0.5)" },
+                }}
+              >
+                {buscandoHuerfanos ? "Buscando..." : "Buscar Tratamientos Huérfanos"}
+              </Button>
+
+              {huerfanos.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#d32f2f" }}>
+                      {huerfanos.length} tratamiento(s) sin paciente encontrado(s)
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      color="error"
+                      size="small"
+                      startIcon={eliminandoTodos ? <CircularProgress size={16} color="inherit" /> : <DeleteSweep />}
+                      onClick={eliminarTodosHuerfanos}
+                      disabled={eliminandoTodos}
+                    >
+                      Eliminar Todos
+                    </Button>
+                  </Box>
+                  <Box sx={{ overflowX: "auto" }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: "rgba(211,47,47,0.08)" }}>
+                          <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Fecha</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Tratamiento</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Especialista</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Precio</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Sesión</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Paciente ID</TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>Acción</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {huerfanos.map((h) => (
+                          <TableRow key={h.id} hover>
+                            <TableCell>{h.id}</TableCell>
+                            <TableCell>{h.fecha ? new Date(h.fecha).toLocaleString("es-PE") : "-"}</TableCell>
+                            <TableCell>
+                              <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {h.tratamiento_nombre}
+                                </Typography>
+                                {h.productos?.length > 0 && (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {h.productos.map((p) => p.nombre || p.producto).filter(Boolean).join(", ")}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </TableCell>
+                            <TableCell>{h.especialista || "-"}</TableCell>
+                            <TableCell>S/ {(h.precio_total || 0).toFixed(2)}</TableCell>
+                            <TableCell>{h.sesion || "-"}</TableCell>
+                            <TableCell>
+                              <Chip
+                                label={h.paciente_id == null ? "NULL" : h.paciente_id === 0 ? "0" : `#${h.paciente_id} (no existe)`}
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <IconButton
+                                color="error"
+                                size="small"
+                                onClick={() => eliminarHuerfano(h.id)}
+                                title="Eliminar este tratamiento"
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                </Box>
+              )}
             </Paper>
           </Box>
         </Paper>

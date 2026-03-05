@@ -1061,4 +1061,138 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
   }
 });
 
+/* ==============================
+   🔍 TRATAMIENTOS HUÉRFANOS (SIN PACIENTE)
+   Solo accesible por rol master
+============================== */
+
+router.get("/huerfanos", requireRole("master"), async (req, res) => {
+  try {
+    const rows = await dbAll(`
+      SELECT 
+        tr.id,
+        tr.paciente_id,
+        tr.tratamiento_id,
+        tr.productos,
+        tr.cantidad_total,
+        tr.precio_total,
+        tr.descuento,
+        tr.pagoMetodo,
+        tr.sesion,
+        tr.tipoAtencion,
+        tr.especialista,
+        tr.fecha,
+        t.nombre AS tratamiento_nombre,
+        p.nombre AS paciente_nombre,
+        p.apellido AS paciente_apellido
+      FROM tratamientos_realizados tr
+      LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
+      LEFT JOIN patients p ON p.id = tr.paciente_id
+      WHERE tr.paciente_id IS NULL 
+         OR tr.paciente_id = 0
+         OR p.id IS NULL
+      ORDER BY tr.fecha DESC
+    `);
+
+    const resultado = rows.map((r) => {
+      let productosInfo = [];
+      try {
+        productosInfo = JSON.parse(r.productos || "[]");
+      } catch (_) {}
+
+      return {
+        id: r.id,
+        paciente_id: r.paciente_id,
+        tratamiento_id: r.tratamiento_id,
+        tratamiento_nombre: r.tratamiento_nombre || "Sin tratamiento",
+        productos: productosInfo,
+        cantidad_total: r.cantidad_total,
+        precio_total: r.precio_total,
+        descuento: r.descuento,
+        pagoMetodo: r.pagoMetodo,
+        sesion: r.sesion,
+        tipoAtencion: r.tipoAtencion,
+        especialista: r.especialista,
+        fecha: r.fecha,
+        paciente_nombre: r.paciente_nombre
+          ? `${r.paciente_nombre} ${r.paciente_apellido || ""}`.trim()
+          : null,
+      };
+    });
+
+    res.json(resultado);
+  } catch (err) {
+    console.error("❌ Error al buscar tratamientos huérfanos:", err.message);
+    res.status(500).json({ message: "Error al buscar tratamientos huérfanos" });
+  }
+});
+
+router.delete("/huerfanos/:id", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const tratamiento = await dbGet(
+      `SELECT tr.*, p.id AS paciente_existe
+       FROM tratamientos_realizados tr
+       LEFT JOIN patients p ON p.id = tr.paciente_id
+       WHERE tr.id = ?`,
+      [id]
+    );
+
+    if (!tratamiento) {
+      return res.status(404).json({ message: "Tratamiento no encontrado" });
+    }
+
+    const esHuerfano =
+      tratamiento.paciente_id == null ||
+      tratamiento.paciente_id === 0 ||
+      tratamiento.paciente_existe == null;
+
+    if (!esHuerfano) {
+      return res.status(400).json({
+        message: "Este tratamiento tiene un paciente asignado válido. No se puede eliminar desde aquí.",
+      });
+    }
+
+    await dbRun(`DELETE FROM deudas_pagos WHERE deuda_id IN (SELECT id FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?)`, [id]);
+    await dbRun(`DELETE FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?`, [id]);
+    await dbRun(`DELETE FROM finanzas WHERE referencia_id = ? AND referencia_tipo = 'tratamiento_realizado'`, [id]);
+    await dbRun(`DELETE FROM tratamientos_realizados WHERE id = ?`, [id]);
+
+    res.json({ message: "✅ Tratamiento huérfano eliminado correctamente" });
+  } catch (err) {
+    console.error("❌ Error al eliminar tratamiento huérfano:", err.message);
+    res.status(500).json({ message: "Error al eliminar tratamiento huérfano" });
+  }
+});
+
+router.delete("/huerfanos", requireRole("master"), async (req, res) => {
+  try {
+    const huerfanos = await dbAll(`
+      SELECT tr.id
+      FROM tratamientos_realizados tr
+      LEFT JOIN patients p ON p.id = tr.paciente_id
+      WHERE tr.paciente_id IS NULL 
+         OR tr.paciente_id = 0
+         OR p.id IS NULL
+    `);
+
+    if (huerfanos.length === 0) {
+      return res.json({ message: "No hay tratamientos huérfanos para eliminar", eliminados: 0 });
+    }
+
+    const ids = huerfanos.map((h) => h.id);
+    const placeholders = ids.map(() => "?").join(",");
+
+    await dbRun(`DELETE FROM deudas_pagos WHERE deuda_id IN (SELECT id FROM deudas_tratamientos WHERE tratamiento_realizado_id IN (${placeholders}))`, ids);
+    await dbRun(`DELETE FROM deudas_tratamientos WHERE tratamiento_realizado_id IN (${placeholders})`, ids);
+    await dbRun(`DELETE FROM finanzas WHERE referencia_id IN (${placeholders}) AND referencia_tipo = 'tratamiento_realizado'`, ids);
+    await dbRun(`DELETE FROM tratamientos_realizados WHERE id IN (${placeholders})`, ids);
+
+    res.json({ message: `✅ ${ids.length} tratamiento(s) huérfano(s) eliminado(s)`, eliminados: ids.length });
+  } catch (err) {
+    console.error("❌ Error al eliminar tratamientos huérfanos:", err.message);
+    res.status(500).json({ message: "Error al eliminar tratamientos huérfanos" });
+  }
+});
+
 export default router;
