@@ -1153,12 +1153,45 @@ router.delete("/huerfanos/:id", requireRole("master"), async (req, res) => {
       });
     }
 
+    // Devolver productos al inventario
+    let productosDevueltos = [];
+    if (tratamiento.productos) {
+      try {
+        const productos = JSON.parse(tratamiento.productos);
+        for (const prod of productos) {
+          const productoId = prod.producto_id || prod.id;
+          const cantidad = prod.cantidad || 1;
+          
+          if (productoId && cantidad > 0) {
+            // Obtener el lote más antiguo para devolver (FEFO)
+            const lote = await dbGet(
+              `SELECT id FROM lotes WHERE producto_id = ? AND cantidad > 0 ORDER BY fecha_vencimiento ASC LIMIT 1`,
+              [productoId]
+            );
+            
+            if (lote) {
+              await dbRun(
+                `UPDATE lotes SET cantidad = cantidad + ? WHERE id = ?`,
+                [cantidad, lote.id]
+              );
+              productosDevueltos.push({ producto_id: productoId, cantidad, lote_id: lote.id });
+            }
+          }
+        }
+      } catch (parseErr) {
+        console.error("Error al parsear productos:", parseErr);
+      }
+    }
+
     await dbRun(`DELETE FROM deudas_pagos WHERE deuda_id IN (SELECT id FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?)`, [id]);
     await dbRun(`DELETE FROM deudas_tratamientos WHERE tratamiento_realizado_id = ?`, [id]);
     await dbRun(`DELETE FROM finanzas WHERE referencia_id = ? AND referencia_tipo = 'tratamiento_realizado'`, [id]);
     await dbRun(`DELETE FROM tratamientos_realizados WHERE id = ?`, [id]);
 
-    res.json({ message: "✅ Tratamiento huérfano eliminado correctamente" });
+    res.json({ 
+      message: "✅ Tratamiento huérfano eliminado correctamente", 
+      productosDevueltos: productosDevueltos.length 
+    });
   } catch (err) {
     console.error("❌ Error al eliminar tratamiento huérfano:", err.message);
     res.status(500).json({ message: "Error al eliminar tratamiento huérfano" });
@@ -1168,7 +1201,7 @@ router.delete("/huerfanos/:id", requireRole("master"), async (req, res) => {
 router.delete("/huerfanos", requireRole("master"), async (req, res) => {
   try {
     const huerfanos = await dbAll(`
-      SELECT tr.id
+      SELECT tr.id, tr.productos
       FROM tratamientos_realizados tr
       LEFT JOIN patients p ON p.id = tr.paciente_id
       WHERE tr.paciente_id IS NULL 
@@ -1180,6 +1213,37 @@ router.delete("/huerfanos", requireRole("master"), async (req, res) => {
       return res.json({ message: "No hay tratamientos huérfanos para eliminar", eliminados: 0 });
     }
 
+    // Devolver productos al inventario para cada tratamiento
+    let totalProductosDevueltos = 0;
+    for (const huerfano of huerfanos) {
+      if (huerfano.productos) {
+        try {
+          const productos = JSON.parse(huerfano.productos);
+          for (const prod of productos) {
+            const productoId = prod.producto_id || prod.id;
+            const cantidad = prod.cantidad || 1;
+            
+            if (productoId && cantidad > 0) {
+              const lote = await dbGet(
+                `SELECT id FROM lotes WHERE producto_id = ? AND cantidad > 0 ORDER BY fecha_vencimiento ASC LIMIT 1`,
+                [productoId]
+              );
+              
+              if (lote) {
+                await dbRun(
+                  `UPDATE lotes SET cantidad = cantidad + ? WHERE id = ?`,
+                  [cantidad, lote.id]
+                );
+                totalProductosDevueltos++;
+              }
+            }
+          }
+        } catch (parseErr) {
+          console.error("Error al parsear productos:", parseErr);
+        }
+      }
+    }
+
     const ids = huerfanos.map((h) => h.id);
     const placeholders = ids.map(() => "?").join(",");
 
@@ -1188,7 +1252,11 @@ router.delete("/huerfanos", requireRole("master"), async (req, res) => {
     await dbRun(`DELETE FROM finanzas WHERE referencia_id IN (${placeholders}) AND referencia_tipo = 'tratamiento_realizado'`, ids);
     await dbRun(`DELETE FROM tratamientos_realizados WHERE id IN (${placeholders})`, ids);
 
-    res.json({ message: `✅ ${ids.length} tratamiento(s) huérfano(s) eliminado(s)`, eliminados: ids.length });
+    res.json({ 
+      message: `✅ ${ids.length} tratamiento(s) huérfano(s) eliminado(s). ${totalProductosDevueltos} producto(s) devuelto(s) al inventario.`, 
+      eliminados: ids.length,
+      productosDevueltos: totalProductosDevueltos
+    });
   } catch (err) {
     console.error("❌ Error al eliminar tratamientos huérfanos:", err.message);
     res.status(500).json({ message: "Error al eliminar tratamientos huérfanos" });
