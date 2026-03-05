@@ -1,3 +1,4 @@
+// Gestión del Sistema - Incluye tratamientos huérfanos
 import React, { useState } from "react";
 import { Container, Typography, Button, Paper, Box, IconButton, CircularProgress, Table, TableBody, TableCell, TableHead, TableRow, Chip } from "@mui/material";
 import { ArrowBack, Backup, PhotoLibrary, SearchOff, Delete, DeleteSweep } from "@mui/icons-material";
