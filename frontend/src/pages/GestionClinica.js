@@ -61,6 +61,7 @@ import {
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
+import { formatearFechaCorta } from "../utils/dateUtils";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -84,7 +85,10 @@ const GestionClinica = () => {
   const [editandoComision, setEditandoComision] = useState({});
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
+  const [mesFiltro, setMesFiltro] = useState("");
+  const [anioFiltro, setAnioFiltro] = useState("");
   const [especialistaFiltro, setEspecialistaFiltro] = useState("");
+  const [tipoEspecialistaFiltro, setTipoEspecialistaFiltro] = useState("");
   const [tratamientoFiltro, setTratamientoFiltro] = useState("");
   const [mostrarDetalleTratamientos, setMostrarDetalleTratamientos] = useState(false);
   const [modalDetalle, setModalDetalle] = useState({ abierto: false, especialista: null, datos: null });
@@ -153,9 +157,30 @@ const GestionClinica = () => {
   const limpiarFiltros = () => {
     setFechaInicio("");
     setFechaFin("");
+    setMesFiltro("");
+    setAnioFiltro("");
     setEspecialistaFiltro("");
+    setTipoEspecialistaFiltro("");
     setTratamientoFiltro("");
     cargarEstadisticas();
+  };
+
+  const filtrarPorMes = (mes) => {
+    const anio = new Date().getFullYear();
+    const primerDia = new Date(anio, mes - 1, 1);
+    const ultimoDia = new Date(anio, mes, 0);
+    
+    const formatoISO = (d) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+    
+    setFechaInicio(formatoISO(primerDia));
+    setFechaFin(formatoISO(ultimoDia));
+    setMesFiltro(mes);
+    setTimeout(cargarEstadisticas, 100);
   };
 
   const verDetalleEspecialista = async (especialista) => {
@@ -279,7 +304,7 @@ const GestionClinica = () => {
               Gestión Clínica
             </Typography>
             <Typography variant="body1">
-              Sistema de control y comisiones de especialistas
+              Control de atenciones, productividad y liquidación mensual
             </Typography>
           </Box>
           <Button
@@ -309,47 +334,51 @@ const GestionClinica = () => {
         </Box>
         <Divider sx={{ mb: 2 }} />
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm={6} md={2.5}>
-            <Box>
-              <Typography variant="caption" sx={{ display: "block", mb: 0.5, color: "#666" }}>
-                Fecha Inicio
-              </Typography>
-              <input
-                type="date"
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                style={{
-                  padding: "10px 12px",
-                  fontSize: "14px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  width: "100%",
-                  fontFamily: "inherit"
-                }}
-              />
+          <Grid item xs={12}>
+            <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#666", mb: 1 }}>
+              Filtrar por Mes (Año {new Date().getFullYear()})
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              {[
+                { mes: 1, nombre: "Enero" },
+                { mes: 2, nombre: "Febrero" },
+                { mes: 3, nombre: "Marzo" },
+                { mes: 4, nombre: "Abril" },
+                { mes: 5, nombre: "Mayo" },
+                { mes: 6, nombre: "Junio" },
+                { mes: 7, nombre: "Julio" },
+                { mes: 8, nombre: "Agosto" },
+                { mes: 9, nombre: "Septiembre" },
+                { mes: 10, nombre: "Octubre" },
+                { mes: 11, nombre: "Noviembre" },
+                { mes: 12, nombre: "Diciembre" }
+              ].map(({ mes, nombre }) => (
+                <Button
+                  key={mes}
+                  variant={mesFiltro === mes ? "contained" : "outlined"}
+                  size="small"
+                  onClick={() => filtrarPorMes(mes)}
+                  sx={{
+                    backgroundColor: mesFiltro === mes ? "#a36920" : "transparent",
+                    borderColor: "#a36920",
+                    color: mesFiltro === mes ? "white" : "#a36920",
+                    "&:hover": {
+                      backgroundColor: mesFiltro === mes ? "#8a5a1a" : "rgba(163, 105, 32, 0.1)"
+                    },
+                    minWidth: 90,
+                    fontWeight: "bold",
+                    fontSize: "0.75rem"
+                  }}
+                >
+                  {nombre}
+                </Button>
+              ))}
             </Box>
           </Grid>
-          <Grid item xs={12} sm={6} md={2.5}>
-            <Box>
-              <Typography variant="caption" sx={{ display: "block", mb: 0.5, color: "#666" }}>
-                Fecha Fin
-              </Typography>
-              <input
-                type="date"
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                style={{
-                  padding: "10px 12px",
-                  fontSize: "14px",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  width: "100%",
-                  fontFamily: "inherit"
-                }}
-              />
-            </Box>
+          <Grid item xs={12}>
+            <Divider sx={{ my: 1 }} />
           </Grid>
-          <Grid item xs={12} sm={6} md={2.5}>
+          <Grid item xs={12} sm={6} md={3}>
             <FormControl fullWidth size="small">
               <InputLabel>Especialista</InputLabel>
               <Select
@@ -368,6 +397,20 @@ const GestionClinica = () => {
           </Grid>
           <Grid item xs={12} sm={6} md={2.5}>
             <FormControl fullWidth size="small">
+              <InputLabel>Tipo</InputLabel>
+              <Select
+                value={tipoEspecialistaFiltro}
+                onChange={(e) => setTipoEspecialistaFiltro(e.target.value)}
+                label="Tipo"
+              >
+                <MenuItem value="">Todos</MenuItem>
+                <MenuItem value="doctor">Doctor</MenuItem>
+                <MenuItem value="cosmiatra">Cosmiatra</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3.5}>
+            <FormControl fullWidth size="small">
               <InputLabel>Tratamiento</InputLabel>
               <Select
                 value={tratamientoFiltro}
@@ -383,7 +426,7 @@ const GestionClinica = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={12} md={2}>
+          <Grid item xs={12} sm={6} md={3}>
             <Stack direction="row" spacing={1}>
               <Button
                 variant="contained"
@@ -515,14 +558,15 @@ const GestionClinica = () => {
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 160 }}>Especialista</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Atenciones</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Pacientes</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Ingresos</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#fff8e1", minWidth: 90 }}>Comisión %</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#fff8e1", minWidth: 100 }}>Pago Fijo</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#fff3e0" }}>Pago Esp.</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#e8f5e9" }}>Ganancia</TableCell>
+                  <TableCell sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 180 }}>Nombre Completo</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 100 }}>Tipo</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#e3f2fd" }}>Pacientes Atendidos</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#e3f2fd" }}>Tratamientos Realizados</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#e8f5e9" }}>Monto Generado</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#fff8e1", minWidth: 90 }}>% Comisión</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#fff8e1" }}>Comisión Calculada</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#fff3e0", minWidth: 100 }}>Sueldo Fijo</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#ffebee", minWidth: 120 }}>Total a Pagar</TableCell>
                   <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 160 }}>Acciones</TableCell>
                 </TableRow>
               </TableHead>
@@ -548,19 +592,27 @@ const GestionClinica = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Chip
-                        label={stat.total_atenciones}
+                        label={stat.tipo || "Doctor"}
                         size="small"
-                        color={stat.total_atenciones > 0 ? "primary" : "default"}
-                        sx={{ fontWeight: "bold", minWidth: 40 }}
+                        color={stat.tipo === "Cosmiatra" ? "secondary" : "primary"}
+                        sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
                       />
                     </TableCell>
-                    <TableCell align="center">
-                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#2196f3" }}>
+                    <TableCell align="center" sx={{ bgcolor: "#e3f2fd" }}>
+                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#1976d2" }}>
                         {stat.pacientes_unicos || 0}
                       </Typography>
                     </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#4caf50" }}>
+                    <TableCell align="center" sx={{ bgcolor: "#e3f2fd" }}>
+                      <Chip
+                        label={stat.total_atenciones}
+                        size="small"
+                        color={stat.total_atenciones > 0 ? "info" : "default"}
+                        sx={{ fontWeight: "bold", minWidth: 40 }}
+                      />
+                    </TableCell>
+                    <TableCell align="right" sx={{ bgcolor: "#e8f5e9" }}>
+                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
                         S/ {Number(stat.total_ingresos).toFixed(2)}
                       </Typography>
                     </TableCell>
@@ -605,17 +657,36 @@ const GestionClinica = () => {
                         </Typography>
                       )}
                     </TableCell>
+                    <TableCell align="right" sx={{ bgcolor: "#fff8e1" }}>
+                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#f57c00" }}>
+                        S/ {Number(stat.comision_calculada).toFixed(2)}
+                      </Typography>
+                    </TableCell>
                     <TableCell align="right" sx={{ bgcolor: "#fff3e0" }}>
-                      <Tooltip title={`Comisión ${Number(stat.comision_porcentaje).toFixed(0)}%: S/ ${Number(stat.comision_calculada).toFixed(2)} + Pago Fijo: S/ ${Number(stat.pago_fijo).toFixed(2)}`}>
-                        <Typography variant="body2" sx={{ fontWeight: "bold", color: "#ff9800" }}>
+                      {editando ? (
+                        <TextField
+                          type="number"
+                          size="small"
+                          value={editando.pago_fijo}
+                          onChange={(e) => setEditandoComision(prev => ({
+                            ...prev,
+                            [stat.especialista_id]: { ...prev[stat.especialista_id], pago_fijo: e.target.value }
+                          }))}
+                          inputProps={{ min: 0, step: 5 }}
+                          sx={{ width: 90, "& input": { textAlign: "right", py: 0.5, fontSize: "0.85rem" } }}
+                        />
+                      ) : (
+                        <Typography variant="body2" sx={{ fontWeight: "bold", color: stat.pago_fijo > 0 ? "#e65100" : "#999" }}>
+                          S/ {Number(stat.pago_fijo).toFixed(2)}
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell align="right" sx={{ bgcolor: "#ffebee" }}>
+                      <Tooltip title={`Comisión: S/ ${Number(stat.comision_calculada).toFixed(2)} + Sueldo Fijo: S/ ${Number(stat.pago_fijo).toFixed(2)}`}>
+                        <Typography variant="body2" sx={{ fontWeight: "bold", color: "#c62828", fontSize: "0.95rem" }}>
                           S/ {Number(stat.pago_total_especialista).toFixed(2)}
                         </Typography>
                       </Tooltip>
-                    </TableCell>
-                    <TableCell align="right" sx={{ bgcolor: "#e8f5e9" }}>
-                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
-                        S/ {Math.max(0, Number(stat.ganancia_clinica)).toFixed(2)}
-                      </Typography>
                     </TableCell>
                     <TableCell align="center">
                       <Stack direction="row" spacing={0.5} justifyContent="center">
@@ -832,8 +903,8 @@ const GestionClinica = () => {
                           <TableCell>
                             <Box sx={{ display: "flex", alignItems: "center" }}>
                               <CalendarToday sx={{ fontSize: 16, mr: 1, color: "#666" }} />
-                              <Typography variant="body2">
-                                {new Date(sesion.fecha_realizada).toLocaleDateString('es-PE')}
+                              <Typography variant="body2" sx={{ whiteSpace: "nowrap" }}>
+                                {formatearFechaCorta(sesion.fecha_realizada)}
                               </Typography>
                             </Box>
                           </TableCell>
@@ -916,6 +987,88 @@ const GestionClinica = () => {
               ) : (
                 <Alert severity="info">No hay tratamientos registrados para este especialista.</Alert>
               )}
+
+              {/* Tabla de Productos Usados */}
+              {modalDetalle.datos.sesiones && modalDetalle.datos.sesiones.length > 0 && (() => {
+                const productosUsados = [];
+                modalDetalle.datos.sesiones.forEach(sesion => {
+                  if (sesion.productos_usados && sesion.productos_usados.length > 0) {
+                    sesion.productos_usados.forEach(prod => {
+                      const key = `${prod.nombre || prod.variante_nombre || 'Producto'}_${prod.variante_id || ''}`;
+                      const existing = productosUsados.find(p => 
+                        `${p.nombre}_${p.variante_id}` === key
+                      );
+                      if (existing) {
+                        existing.cantidad_total += parseFloat(prod.cantidad || 0);
+                        existing.veces_usado += 1;
+                      } else {
+                        productosUsados.push({
+                          nombre: prod.nombre || prod.variante_nombre || 'Producto',
+                          variante_id: prod.variante_id,
+                          cantidad_total: parseFloat(prod.cantidad || 0),
+                          veces_usado: 1,
+                          precio_unitario: prod.precio || 0
+                        });
+                      }
+                    });
+                  }
+                });
+
+                return productosUsados.length > 0 ? (
+                  <Box sx={{ mt: 4 }}>
+                    <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", color: "#a36920" }}>
+                      Productos Usados
+                    </Typography>
+                    <TableContainer component={Paper} elevation={1}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Producto</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Cantidad Total Usada</TableCell>
+                            <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Veces Usado</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5" }}>Costo Unit.</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#fff3e0" }}>Subtotal</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {productosUsados.map((prod, idx) => (
+                            <TableRow key={idx} sx={{ "&:hover": { backgroundColor: "#f9f9f9" } }}>
+                              <TableCell>
+                                <Typography variant="body2" sx={{ fontWeight: "bold" }}>
+                                  {prod.nombre}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Chip 
+                                  label={`${prod.cantidad_total.toFixed(2)} ml`}
+                                  size="small"
+                                  color="info"
+                                  sx={{ fontWeight: "bold" }}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Typography variant="body2" sx={{ color: "#666" }}>
+                                  {prod.veces_usado} {prod.veces_usado === 1 ? 'vez' : 'veces'}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right">
+                                <Typography variant="body2">
+                                  S/ {Number(prod.precio_unitario).toFixed(2)}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right" sx={{ bgcolor: "#fff3e0" }}>
+                                <Typography variant="body2" sx={{ fontWeight: "bold", color: "#f57c00" }}>
+                                  S/ {(prod.cantidad_total * prod.precio_unitario).toFixed(2)}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                ) : null;
+              })()}
             </>
           ) : (
             <Alert severity="warning">No se pudo cargar la información del especialista.</Alert>

@@ -97,3 +97,29 @@ export const formatearFechaHora = (fechaHora) => {
     minute: '2-digit'
   });
 };
+
+/**
+ * Formatea una fecha en formato corto dd/mm/aa (zona horaria Perú)
+ * @param {string} fechaISO - Fecha en formato ISO (YYYY-MM-DD o YYYY-MM-DD HH:mm:ss)
+ * @returns {string} Fecha formateada en formato dd/mm/aa
+ */
+export const formatearFechaCorta = (fechaISO) => {
+  if (!fechaISO) return '-';
+  const fecha = fechaISO.split(' ')[0];
+  const [yyyy, mm, dd] = fecha.split('-');
+  if (!yyyy || !mm || !dd) return '-';
+  return `${dd}/${mm}/${yyyy.slice(-2)}`;
+};
+
+/**
+ * Formatea una fecha completa en formato dd/mm/aaaa (zona horaria Perú)
+ * @param {string} fechaISO - Fecha en formato ISO (YYYY-MM-DD o YYYY-MM-DD HH:mm:ss)
+ * @returns {string} Fecha formateada en formato dd/mm/aaaa
+ */
+export const formatearFechaCompleta = (fechaISO) => {
+  if (!fechaISO) return '-';
+  const fecha = fechaISO.split(' ')[0];
+  const [yyyy, mm, dd] = fecha.split('-');
+  if (!yyyy || !mm || !dd) return '-';
+  return `${dd}/${mm}/${yyyy}`;
+};

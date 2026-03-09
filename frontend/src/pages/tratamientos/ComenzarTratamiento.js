@@ -778,19 +778,6 @@ const ComenzarTratamiento = () => {
                         </FormControl>
                       </Grid>
 
-                      {/* Mostrar productos configurados para el tratamiento */}
-                      {(() => {
-                        const receta = b.tratamiento_id ? recetasPorTratamiento[b.tratamiento_id] || [] : [];
-                        if (!receta || receta.length === 0) return null;
-                        return (
-                          <Grid item xs={12}>
-                            <Typography variant="body2" sx={{ color: "#666", fontStyle: "italic", mb: -1 }}>
-                              Productos disponibles: {receta.map(r => `${r.producto_base_nombre || ""} ${r.variante_nombre || ""}`).join(", ")}
-                            </Typography>
-                          </Grid>
-                        );
-                      })()}
-
                       <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 260 }}>
                         {(() => {
                           // Filtrar productos según la receta del tratamiento

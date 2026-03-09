@@ -69,7 +69,7 @@ export default function Inventario() {
   const [editPrecioCliente, setEditPrecioCliente] = useState("");
   const [guardandoPrecio, setGuardandoPrecio] = useState(false);
   const [editVarianteOpen, setEditVarianteOpen] = useState(false);
-  const [editVarianteData, setEditVarianteData] = useState({ id: null, nombre: "", laboratorio: "", unidad_base: "ml" });
+  const [editVarianteData, setEditVarianteData] = useState({ id: null, nombre: "", laboratorio: "", unidad_base: "ml", precio_cliente: "" });
   const [guardandoVariante, setGuardandoVariante] = useState(false);
   const role = localStorage.getItem("role");
   const canWriteInventory = role === "doctor" || role === "logistica" || role === "master";
@@ -531,6 +531,7 @@ export default function Inventario() {
       nombre: r.variante_nombre || "",
       laboratorio: r.laboratorio || "",
       unidad_base: r.unidad_base || "ml",
+      precio_cliente: r.precio_cliente != null ? String(r.precio_cliente) : "",
     });
     setEditVarianteOpen(true);
   };
@@ -553,6 +554,7 @@ export default function Inventario() {
           nombre: editVarianteData.nombre.trim(),
           laboratorio: editVarianteData.laboratorio.trim() || null,
           unidad_base: editVarianteData.unidad_base,
+          precio_cliente: editVarianteData.precio_cliente !== "" ? parseFloat(editVarianteData.precio_cliente) : null,
         }),
       });
       if (!res.ok) throw new Error();

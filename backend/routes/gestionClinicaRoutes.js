@@ -52,7 +52,7 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
   console.log("📊 Solicitud de estadísticas recibida");
   
   try {
-    const { fecha_inicio, fecha_fin, especialista_id, tratamiento } = req.query;
+    const { fecha_inicio, fecha_fin, especialista_id, tratamiento, tipo_especialista } = req.query;
 
     // Construir condiciones WHERE
     let whereConditionsPaquetes = ["ps.estado = 'completada'", "ps.especialista_id IS NOT NULL"];
@@ -103,6 +103,7 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
     const whereClauseTratamientos = `WHERE ${whereConditionsTratamientos.join(" AND ")}`;
 
     // Obtener TODOS los especialistas primero (con comisión y pago fijo)
+    // Nota: El campo 'tipo' es opcional y se agregará en una migración futura
     const todosEspecialistas = await dbAll(`
       SELECT id as especialista_id, nombre as especialista_nombre,
         COALESCE(comision_porcentaje, 20) as comision_porcentaje,
@@ -110,6 +111,11 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       FROM especialistas
       ORDER BY nombre
     `);
+    
+    // Agregar campo 'tipo' con valor por defecto si no existe en la BD
+    todosEspecialistas.forEach(esp => {
+      esp.tipo = esp.tipo || 'doctor';
+    });
 
     // Estadísticas por especialista de paquetes
     const statsPaquetes = await dbAll(`
@@ -238,6 +244,7 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       especialistasMap.set(esp.especialista_id, {
         especialista_id: esp.especialista_id,
         especialista_nombre: esp.especialista_nombre,
+        tipo: esp.tipo,
         comision_porcentaje: esp.comision_porcentaje,
         pago_fijo: esp.pago_fijo,
         atenciones_paquetes: 0,

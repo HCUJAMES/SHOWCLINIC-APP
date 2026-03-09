@@ -21,12 +21,13 @@ import {
   DialogActions,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney, CalendarMonth } from "@mui/icons-material";
+import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney, CalendarMonth, SwapVert } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useToast } from "../components/ToastProvider";
+import { formatearFechaCorta } from "../utils/dateUtils";
 
 const loadImage = (src) =>
   new Promise((resolve) => {
@@ -113,10 +114,25 @@ const Finanzas = () => {
   const [editFechaRegistro, setEditFechaRegistro] = useState(null);
   const [editFechaNueva, setEditFechaNueva] = useState("");
   const [guardandoFecha, setGuardandoFecha] = useState(false);
+  const [ordenDescendente, setOrdenDescendente] = useState(false);
 
   const { showToast } = useToast();
 
   const colorPrincipal = "#a36920";
+
+  const ordenarReporte = (datos, descendente) => {
+    return [...datos].sort((a, b) => {
+      const fechaA = new Date(a.fecha);
+      const fechaB = new Date(b.fecha);
+      return descendente ? fechaB - fechaA : fechaA - fechaB;
+    });
+  };
+
+  const toggleOrden = () => {
+    const nuevoOrden = !ordenDescendente;
+    setOrdenDescendente(nuevoOrden);
+    setReporte(prev => ordenarReporte(prev, nuevoOrden));
+  };
 
   const abrirDialogoPago = (r) => {
     setPagoRegistro(r);
@@ -277,6 +293,49 @@ const Finanzas = () => {
     return `${yyyy}-${mm}-${dd}`;
   };
 
+  const filtrarPorDia = () => {
+    const hoy = hoyISO();
+    setFechaInicio(hoy);
+    setFechaFin(hoy);
+    setTimeout(obtenerReporte, 0);
+  };
+
+  const filtrarPorSemana = () => {
+    const hoy = new Date();
+    const primerDia = new Date(hoy);
+    primerDia.setDate(hoy.getDate() - hoy.getDay());
+    const ultimoDia = new Date(primerDia);
+    ultimoDia.setDate(primerDia.getDate() + 6);
+    
+    const formatoISO = (d) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+    
+    setFechaInicio(formatoISO(primerDia));
+    setFechaFin(formatoISO(ultimoDia));
+    setTimeout(obtenerReporte, 0);
+  };
+
+  const filtrarPorMes = () => {
+    const hoy = new Date();
+    const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+    
+    const formatoISO = (d) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+    
+    setFechaInicio(formatoISO(primerDia));
+    setFechaFin(formatoISO(ultimoDia));
+    setTimeout(obtenerReporte, 0);
+  };
+
   const obtenerReporte = async () => {
     try {
       const params = {};
@@ -286,7 +345,9 @@ const Finanzas = () => {
       if (fechaFin) params.fechaFin = fechaFin;
 
       const res = await axios.get(`${API_BASE_URL}/api/finanzas/reporte`, { params });
-      setReporte(res.data.resultados);
+      const resultados = res.data.resultados || [];
+      const ordenados = ordenarReporte(resultados, ordenDescendente);
+      setReporte(ordenados);
       setTotalGeneral(res.data.totalGeneral);
       setTotalBruto(Number(res.data.totalBruto || 0));
       setTotalComision(Number(res.data.totalComision || 0));
@@ -311,7 +372,7 @@ const Finanzas = () => {
       const logoCircular = makeCircularImageDataUrl(img, 256, 10);
 
       const tabla = (reporte || []).map((r) => [
-        r.fecha ? r.fecha.split(" ")[0] : "-",
+        formatearFechaCorta(r.fecha),
         r.deuda_pendiente > 0
           ? `${r.paciente || "-"} (Deuda: S/ ${Number(r.deuda_pendiente || 0).toFixed(2)})`
           : r.paciente || "-",
@@ -514,7 +575,7 @@ const Finanzas = () => {
             </Grid>
             <Grid item xs={12}>
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} sm={6} md={3}>
                   <Button
                     variant="contained"
                     fullWidth
@@ -528,7 +589,7 @@ const Finanzas = () => {
                     Filtrar
                   </Button>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={6} sm={3} md={2.25}>
                   <Button
                     variant="outlined"
                     fullWidth
@@ -538,17 +599,72 @@ const Finanzas = () => {
                       fontWeight: "bold",
                       "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
                     }}
-                    onClick={() => {
-                      const hoy = hoyISO();
-                      setFechaInicio(hoy);
-                      setFechaFin(hoy);
-                      setTimeout(obtenerReporte, 0);
-                    }}
+                    onClick={filtrarPorDia}
                   >
-                    HOY (Cierre de caja)
+                    Día
+                  </Button>
+                </Grid>
+                <Grid item xs={6} sm={3} md={2.25}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    sx={{
+                      borderColor: colorPrincipal,
+                      color: colorPrincipal,
+                      fontWeight: "bold",
+                      "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
+                    }}
+                    onClick={filtrarPorSemana}
+                  >
+                    Semana
+                  </Button>
+                </Grid>
+                <Grid item xs={6} sm={3} md={2.25}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    sx={{
+                      borderColor: colorPrincipal,
+                      color: colorPrincipal,
+                      fontWeight: "bold",
+                      "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
+                    }}
+                    onClick={filtrarPorMes}
+                  >
+                    Mes
+                  </Button>
+                </Grid>
+                <Grid item xs={6} sm={3} md={2.25}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    sx={{
+                      borderColor: "#2e7d32",
+                      color: "#2e7d32",
+                      fontWeight: "bold",
+                      "&:hover": { backgroundColor: "rgba(46,125,50,0.1)" },
+                    }}
+                    onClick={filtrarPorDia}
+                  >
+                    Cierre de caja
                   </Button>
                 </Grid>
               </Grid>
+            </Grid>
+            <Grid item xs={12}>
+              <Button
+                variant="outlined"
+                startIcon={<SwapVert />}
+                sx={{
+                  borderColor: colorPrincipal,
+                  color: colorPrincipal,
+                  fontWeight: "bold",
+                  "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
+                }}
+                onClick={toggleOrden}
+              >
+                {ordenDescendente ? "Más recientes primero" : "Más antiguos primero"}
+              </Button>
             </Grid>
           </Grid>
 
@@ -576,7 +692,7 @@ const Finanzas = () => {
                 <TableBody>
                   {reporte.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell>{r.fecha?.split(" ")[0]}</TableCell>
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>{formatearFechaCorta(r.fecha)}</TableCell>
                       <TableCell sx={{ minWidth: 220, maxWidth: 320, whiteSpace: "normal", wordBreak: "normal" }}>
                         {r.paciente}
                         {Number(r.deuda_pendiente || 0) > 0 ? (
@@ -788,7 +904,7 @@ const Finanzas = () => {
               <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
                 <strong>Paciente:</strong> {editFechaRegistro.paciente}<br />
                 <strong>Tratamiento:</strong> {editFechaRegistro.tratamiento}<br />
-                <strong>Fecha actual:</strong> {editFechaRegistro.fecha ? editFechaRegistro.fecha.split(" ")[0] : "Sin fecha"}
+                <strong>Fecha actual:</strong> {formatearFechaCorta(editFechaRegistro.fecha)}
               </Typography>
             )}
             <TextField

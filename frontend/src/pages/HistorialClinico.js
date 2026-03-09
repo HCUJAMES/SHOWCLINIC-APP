@@ -29,7 +29,7 @@ import {
 } from "@mui/material";
 import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { calcularEdad } from "../utils/dateUtils";
+import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
 import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProformaPDF";
 import generarConsentimientoPDF from "../utils/generarConsentimientoPDF";
@@ -4216,6 +4216,7 @@ const HistorialClinico = () => {
                           <TableCell sx={{ fontWeight: "bold" }}>Fecha</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Tratamiento</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Cantidad (ml)</TableCell>
+                          <TableCell sx={{ fontWeight: "bold" }}>Producto Usado</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Tipo Atención</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Especialista</TableCell>
                           <TableCell sx={{ fontWeight: "bold" }}>Sesión</TableCell>
@@ -4231,11 +4232,31 @@ const HistorialClinico = () => {
                         const tieneFotosLegacy = CAMPOS_FOTOS_LEGACY.some((key) => t[key]);
                         const tieneFotos = tieneFotosAntes || tieneFotosDespues || tieneFotosLegacy;
 
+                        let productoUsado = "-";
+                        try {
+                          if (t.productos) {
+                            const productosArray = typeof t.productos === 'string' ? JSON.parse(t.productos) : t.productos;
+                            if (Array.isArray(productosArray) && productosArray.length > 0) {
+                              const prod = productosArray[0];
+                              if (prod.variante_nombre) {
+                                productoUsado = `${prod.nombre || ''} ${prod.variante_nombre}`.trim();
+                              } else if (prod.nombre) {
+                                productoUsado = prod.nombre;
+                              } else if (prod.producto) {
+                                productoUsado = prod.producto;
+                              }
+                            }
+                          }
+                        } catch (e) {
+                          console.error('Error parseando productos:', e);
+                        }
+
                         return (
                           <TableRow key={t.id}>
-                            <TableCell>{t.fecha?.split(" ")[0]}</TableCell>
+                            <TableCell sx={{ whiteSpace: "nowrap" }}>{formatearFechaCorta(t.fecha)}</TableCell>
                             <TableCell>{t.nombreTratamiento}</TableCell>
                             <TableCell>{t.cantidad_total || "-"}</TableCell>
+                            <TableCell>{productoUsado}</TableCell>
                             <TableCell>{t.tipoAtencion}</TableCell>
                             <TableCell>{t.especialista}</TableCell>
                             <TableCell>{t.sesion}</TableCell>

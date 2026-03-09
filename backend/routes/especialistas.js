@@ -43,27 +43,29 @@ router.get("/listar", authMiddleware, (req, res) => {
 
 // ✅ Crear especialista (solo doctor)
 router.post("/crear", authMiddleware, requireDoctor, (req, res) => {
-  const { nombre, especialidad, telefono, correo } = req.body;
+  const { nombre, especialidad, telefono, correo, tipo } = req.body;
 
   if (!nombre) {
     return res.status(400).json({ message: "El nombre es obligatorio" });
   }
 
+  const tipoEspecialista = tipo || 'doctor';
+
   const query = `
-    INSERT INTO especialistas (nombre, especialidad, telefono, correo)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO especialistas (nombre, especialidad, telefono, correo, tipo)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
   const nombreFormateado = formatNombreEspecialista(nombre);
 
-  db.run(query, [nombreFormateado, especialidad, telefono, correo], function (err) {
+  db.run(query, [nombreFormateado, especialidad, telefono, correo, tipoEspecialista], function (err) {
     if (err) {
       console.error("❌ Error al crear especialista:", err.message);
       return res.status(500).json({ message: "Error al crear especialista" });
     }
 
     console.log(`✅ Especialista creado con ID ${this.lastID}`);
-    res.json({ id: this.lastID, nombre: nombreFormateado, especialidad, telefono, correo });
+    res.json({ id: this.lastID, nombre: nombreFormateado, especialidad, telefono, correo, tipo: tipoEspecialista });
   });
 });
 

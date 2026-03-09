@@ -299,6 +299,15 @@ export default function CrearTratamiento() {
                 setNuevo({ ...nuevo, descripcion: e.target.value })
               }
             />
+            <TextField
+              label="Precio del tratamiento (S/)"
+              type="number"
+              value={nuevo.precio}
+              onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value })}
+              placeholder="Ej: 1200"
+              inputProps={{ min: 0, step: 0.01 }}
+              helperText="Precio fijo que se cobra al paciente por este tratamiento"
+            />
             <Button
               variant="contained"
               sx={{
@@ -337,6 +346,7 @@ export default function CrearTratamiento() {
             <TableRow sx={{ backgroundColor: colorPrincipal }}>
               <TableCell sx={{ color: "white" }}>Nombre</TableCell>
               <TableCell sx={{ color: "white" }}>Descripción</TableCell>
+              <TableCell sx={{ color: "white" }} align="right">Precio</TableCell>
               <TableCell sx={{ color: "white" }}>Acciones</TableCell>
             </TableRow>
           </TableHead>
@@ -345,6 +355,13 @@ export default function CrearTratamiento() {
               <TableRow key={t.id}>
                 <TableCell>{t.nombre}</TableCell>
                 <TableCell>{t.descripcion}</TableCell>
+                <TableCell align="right">
+                  {t.precio != null && t.precio !== "" ? (
+                    <strong>S/ {Number(t.precio).toFixed(2)}</strong>
+                  ) : (
+                    <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.35)", fontStyle: "italic" }}>—</Typography>
+                  )}
+                </TableCell>
                 <TableCell>
                   {isDoctor ? (
                     <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
