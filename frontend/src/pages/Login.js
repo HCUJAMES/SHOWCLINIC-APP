@@ -243,7 +243,7 @@ export default function Login() {
               animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both",
             }}
           >
-            Ingresa tus credenciales para continuar
+            Ingresa tu usuario y contraseña
           </Typography>
 
           {/* Campo Usuario */}

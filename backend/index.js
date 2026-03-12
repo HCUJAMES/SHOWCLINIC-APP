@@ -40,6 +40,8 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
   } else {
     console.log("✅ Conectado a showclinic.db");
 
+    db.serialize(() => {
+
     // ⚡ Optimización SQLite: WAL mode + caché (fuera de transacciones)
     db.run("PRAGMA journal_mode=WAL");
     db.run("PRAGMA synchronous=NORMAL");
@@ -641,6 +643,18 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
+    // 🧱 Tabla de especialistas
+    db.run(`
+      CREATE TABLE IF NOT EXISTS especialistas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        especialidad TEXT,
+        telefono TEXT,
+        correo TEXT,
+        tipo TEXT DEFAULT 'doctor'
+      )
+    `);
+
     // Agregar columna comision_porcentaje a especialistas (porcentaje personalizado por especialista)
     db.run(`ALTER TABLE especialistas ADD COLUMN comision_porcentaje REAL DEFAULT 20`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
@@ -927,6 +941,8 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
+
+    }); // fin db.serialize
   }
 });
 
