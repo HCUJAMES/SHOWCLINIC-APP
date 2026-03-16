@@ -72,8 +72,8 @@ export const requirePatientWrite = (req, res, next) => {
  */
 export const requireDoctor = (req, res, next) => {
   const role = req.user?.role;
-  if (role !== "doctor" && role !== "master") {
-    return res.status(403).json({ message: "Solo el rol doctor puede ejecutar esta acción" });
+  if (role !== "doctor" && role !== "admin" && role !== "master") {
+    return res.status(403).json({ message: "No tienes permisos para ejecutar esta acción" });
   }
   next();
 };

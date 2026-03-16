@@ -23,6 +23,7 @@ import {
   Card,
   CardContent,
   Divider,
+  Collapse,
 } from "@mui/material";
 import {
   Add,
@@ -32,6 +33,8 @@ import {
   LocalOffer,
   CheckCircle,
   Cancel,
+  KeyboardArrowDown,
+  KeyboardArrowUp,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -70,6 +73,11 @@ const Paquetes = () => {
 
   const [openConfirmarEliminar, setOpenConfirmarEliminar] = useState(false);
   const [paqueteEliminar, setPaqueteEliminar] = useState(null);
+  const [paquetesExpandidos, setPaquetesExpandidos] = useState({});
+
+  const toggleExpandirPaquete = (id) => {
+    setPaquetesExpandidos((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -471,101 +479,130 @@ const Paquetes = () => {
                 </TableRow>
               ) : (
                 paquetes.map((paquete) => (
-                  <TableRow key={paquete.id} hover>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
-                          {paquete.nombre}
-                        </Typography>
-                        {paquete.descripcion && (
-                          <Typography variant="caption" color="text.secondary">
-                            {paquete.descripcion}
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {paquete.tratamientos?.map((t, index) => (
+                  <React.Fragment key={paquete.id}>
+                    <TableRow
+                      hover
+                      onClick={() => toggleExpandirPaquete(paquete.id)}
+                      sx={{ cursor: "pointer", "& > *": { borderBottom: paquetesExpandidos[paquete.id] ? "none" : undefined } }}
+                    >
+                      <TableCell>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <IconButton size="small" sx={{ p: 0 }}>
+                            {paquetesExpandidos[paquete.id] ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
+                          </IconButton>
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>
+                              {paquete.nombre}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
                         <Chip
-                          key={index}
-                          label={t.nombre}
+                          label={`${paquete.tratamientos?.length || 0} trat.`}
                           size="small"
                           sx={{ mr: 0.5, mb: 0.5 }}
                         />
-                      ))}
-                    </TableCell>
-                    <TableCell>{paquete.sesiones}</TableCell>
-                    <TableCell>S/ {paquete.precio_regular?.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
-                        S/ {paquete.precio_paquete?.toFixed(2)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={`${((paquete.precio_regular - paquete.precio_paquete) / paquete.precio_regular * 100).toFixed(1)}%`}
-                        size="small"
-                        sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="caption">
-                        {paquete.vigencia_inicio && paquete.vigencia_fin
-                          ? `${paquete.vigencia_inicio} al ${paquete.vigencia_fin}`
-                          : "Sin límite"
-                        }
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => cambiarEstado(paquete)}
-                        disabled={!paquete || !paquete.id}
-                        sx={{
-                          backgroundColor: (paquete?.estado || "activo") === "activo" ? "#e8f5e9" : "#ffebee",
-                          color: (paquete?.estado || "activo") === "activo" ? "#2e7d32" : "#c62828",
-                          borderColor: (paquete?.estado || "activo") === "activo" ? "#4caf50" : "#f44336",
-                          "&:hover": {
-                            backgroundColor: (paquete?.estado || "activo") === "activo" ? "#c8e6c9" : "#ffcdd2",
-                          },
-                          "&:disabled": {
-                            backgroundColor: "#f5f5f5",
-                            color: "#999",
-                            borderColor: "#ccc",
-                          },
-                          textTransform: "none",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {(paquete?.estado || "activo") === "activo" ? "✓ Activo" : "✗ Inactivo"}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: "flex", gap: 1 }}>
-                        {canWrite && (
-                          <IconButton
-                            size="small"
-                            sx={{ color: "#1976d2", mr: 1 }}
-                            onClick={() => abrirModalEditar(paquete)}
-                            title="Editar paquete"
-                          >
-                            <Edit />
-                          </IconButton>
-                        )}
-                        {canDelete && (
-                          <IconButton
-                            size="small"
-                            sx={{ color: "#d32f2f" }}
-                            onClick={() => abrirConfirmarEliminar(paquete)}
-                            title="Eliminar paquete"
-                          >
-                            <Delete />
-                          </IconButton>
-                        )}
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                      </TableCell>
+                      <TableCell>{paquete.sesiones}</TableCell>
+                      <TableCell>S/ {paquete.precio_regular?.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                          S/ {paquete.precio_paquete?.toFixed(2)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={`${((paquete.precio_regular - paquete.precio_paquete) / paquete.precio_regular * 100).toFixed(1)}%`}
+                          size="small"
+                          sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption">
+                          {paquete.vigencia_inicio && paquete.vigencia_fin
+                            ? `${paquete.vigencia_inicio} al ${paquete.vigencia_fin}`
+                            : "Sin límite"
+                          }
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={(e) => { e.stopPropagation(); cambiarEstado(paquete); }}
+                          disabled={!paquete || !paquete.id}
+                          sx={{
+                            backgroundColor: (paquete?.estado || "activo") === "activo" ? "#e8f5e9" : "#ffebee",
+                            color: (paquete?.estado || "activo") === "activo" ? "#2e7d32" : "#c62828",
+                            borderColor: (paquete?.estado || "activo") === "activo" ? "#4caf50" : "#f44336",
+                            "&:hover": {
+                              backgroundColor: (paquete?.estado || "activo") === "activo" ? "#c8e6c9" : "#ffcdd2",
+                            },
+                            "&:disabled": {
+                              backgroundColor: "#f5f5f5",
+                              color: "#999",
+                              borderColor: "#ccc",
+                            },
+                            textTransform: "none",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {(paquete?.estado || "activo") === "activo" ? "✓ Activo" : "✗ Inactivo"}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          {canWrite && (
+                            <IconButton
+                              size="small"
+                              sx={{ color: "#1976d2", mr: 1 }}
+                              onClick={(e) => { e.stopPropagation(); abrirModalEditar(paquete); }}
+                              title="Editar paquete"
+                            >
+                              <Edit />
+                            </IconButton>
+                          )}
+                          {canDelete && (
+                            <IconButton
+                              size="small"
+                              sx={{ color: "#d32f2f" }}
+                              onClick={(e) => { e.stopPropagation(); abrirConfirmarEliminar(paquete); }}
+                              title="Eliminar paquete"
+                            >
+                              <Delete />
+                            </IconButton>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell colSpan={9} sx={{ py: 0, borderBottom: paquetesExpandidos[paquete.id] ? undefined : "none" }}>
+                        <Collapse in={paquetesExpandidos[paquete.id]} timeout="auto" unmountOnExit>
+                          <Box sx={{ py: 2, px: 2 }}>
+                            {paquete.descripcion && (
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                                {paquete.descripcion}
+                              </Typography>
+                            )}
+                            <Typography variant="caption" sx={{ fontWeight: "bold", color: "#666", mb: 1, display: "block" }}>
+                              Tratamientos incluidos:
+                            </Typography>
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                              {paquete.tratamientos?.map((t, index) => (
+                                <Chip
+                                  key={index}
+                                  label={t.nombre}
+                                  size="small"
+                                  sx={{ backgroundColor: "rgba(163,105,32,0.1)", color: "#a36920" }}
+                                />
+                              ))}
+                            </Box>
+                          </Box>
+                        </Collapse>
+                      </TableCell>
+                    </TableRow>
+                  </React.Fragment>
                 ))
               )}
             </TableBody>

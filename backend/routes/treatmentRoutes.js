@@ -12,7 +12,7 @@ const router = express.Router();
 // Middlewares específicos de tratamientos
 const requireTreatmentBaseCreate = (req, res, next) => {
   const role = req.user?.role;
-  if (role !== "doctor" && role !== "asistente" && role !== "master") {
+  if (role !== "doctor" && role !== "asistente" && role !== "admin" && role !== "master") {
     return res.status(403).json({ message: "No tienes permisos para crear tratamientos" });
   }
   next();
@@ -20,7 +20,7 @@ const requireTreatmentBaseCreate = (req, res, next) => {
 
 const requireTratamientoRealizadoWrite = (req, res, next) => {
   const role = req.user?.role;
-  if (role !== "doctor" && role !== "asistente" && role !== "master") {
+  if (role !== "doctor" && role !== "asistente" && role !== "admin" && role !== "master") {
     return res.status(403).json({ message: "No tienes permisos para registrar tratamientos" });
   }
   next();

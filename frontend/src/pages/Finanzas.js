@@ -87,7 +87,10 @@ const API_BASE_URL =
 
 const Finanzas = () => {
   const navigate = useNavigate();
-  const isMaster = localStorage.getItem("role") === "master";
+  const userRole = localStorage.getItem("role");
+  const isMaster = userRole === "master";
+  const isAdmin = userRole === "admin";
+  const canDoActions = isMaster || isAdmin;
   const [paciente, setPaciente] = useState("");
   const [metodoPago, setMetodoPago] = useState("");
   const [fechaInicio, setFechaInicio] = useState("");
@@ -115,6 +118,10 @@ const Finanzas = () => {
   const [editFechaNueva, setEditFechaNueva] = useState("");
   const [guardandoFecha, setGuardandoFecha] = useState(false);
   const [ordenDescendente, setOrdenDescendente] = useState(false);
+  const [filtroDia, setFiltroDia] = useState("");
+  const [filtroMes, setFiltroMes] = useState("");
+  const [filtroAnio, setFiltroAnio] = useState("");
+  const [filtroRapido, setFiltroRapido] = useState("");
 
   const { showToast } = useToast();
 
@@ -333,6 +340,62 @@ const Finanzas = () => {
     
     setFechaInicio(formatoISO(primerDia));
     setFechaFin(formatoISO(ultimoDia));
+    setTimeout(obtenerReporte, 0);
+  };
+
+  const meses = [
+    { value: 1, label: "Enero" }, { value: 2, label: "Febrero" }, { value: 3, label: "Marzo" },
+    { value: 4, label: "Abril" }, { value: 5, label: "Mayo" }, { value: 6, label: "Junio" },
+    { value: 7, label: "Julio" }, { value: 8, label: "Agosto" }, { value: 9, label: "Septiembre" },
+    { value: 10, label: "Octubre" }, { value: 11, label: "Noviembre" }, { value: 12, label: "Diciembre" },
+  ];
+
+  const anioActual = new Date().getFullYear();
+  const aniosDisponibles = [];
+  for (let y = anioActual; y >= anioActual - 5; y--) aniosDisponibles.push(y);
+
+  const diasDelMes = (mes, anio) => {
+    if (!mes) return 31;
+    return new Date(anio || anioActual, mes, 0).getDate();
+  };
+
+  const aplicarFiltroInteligente = (dia, mes, anio) => {
+    const formatoISO = (d) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const a = anio || anioActual;
+
+    if (dia && mes) {
+      // Día específico de un mes
+      const fecha = new Date(a, mes - 1, dia);
+      setFechaInicio(formatoISO(fecha));
+      setFechaFin(formatoISO(fecha));
+    } else if (mes) {
+      // Mes completo
+      const primerDia = new Date(a, mes - 1, 1);
+      const ultimoDia = new Date(a, mes, 0);
+      setFechaInicio(formatoISO(primerDia));
+      setFechaFin(formatoISO(ultimoDia));
+    } else if (anio) {
+      // Año completo
+      const primerDia = new Date(a, 0, 1);
+      const ultimoDia = new Date(a, 11, 31);
+      setFechaInicio(formatoISO(primerDia));
+      setFechaFin(formatoISO(ultimoDia));
+    } else if (dia) {
+      // Solo día = día del mes actual
+      const hoy = new Date();
+      const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), dia);
+      setFechaInicio(formatoISO(fecha));
+      setFechaFin(formatoISO(fecha));
+    } else {
+      return; // Nada seleccionado
+    }
+    setFiltroRapido("");
     setTimeout(obtenerReporte, 0);
   };
 
@@ -573,88 +636,189 @@ const Finanzas = () => {
                 fullWidth
               />
             </Grid>
+            {/* Filtro inteligente: Día / Mes / Año */}
             <Grid item xs={12}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Button
-                    variant="contained"
-                    fullWidth
-                    sx={{
-                      backgroundColor: colorPrincipal,
-                      color: "white",
-                      fontWeight: "bold",
-                    }}
-                    onClick={obtenerReporte}
-                  >
-                    Filtrar
-                  </Button>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  backgroundColor: "rgba(163,105,32,0.04)",
+                  border: "1px solid rgba(163,105,32,0.15)",
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: colorPrincipal, mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+                  <CalendarMonth fontSize="small" /> Filtro Rápido
+                </Typography>
+                <Grid container spacing={1.5} alignItems="center">
+                  <Grid item xs={4} sm={2.5}>
+                    <TextField
+                      select
+                      label="Día"
+                      size="small"
+                      fullWidth
+                      value={filtroDia}
+                      onChange={(e) => {
+                        const d = e.target.value;
+                        setFiltroDia(d);
+                        setFiltroRapido("custom");
+                        aplicarFiltroInteligente(d ? Number(d) : "", filtroMes ? Number(filtroMes) : "", filtroAnio ? Number(filtroAnio) : "");
+                      }}
+                      sx={{ 
+                        "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2 },
+                        "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                        "& .MuiInputLabel-root.Mui-focused": { color: colorPrincipal },
+                      }}
+                    >
+                      <MenuItem value="">—</MenuItem>
+                      {Array.from({ length: diasDelMes(filtroMes ? Number(filtroMes) : null, filtroAnio ? Number(filtroAnio) : null) }, (_, i) => (
+                        <MenuItem key={i + 1} value={i + 1}>{i + 1}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={4} sm={3.5}>
+                    <TextField
+                      select
+                      label="Mes"
+                      size="small"
+                      fullWidth
+                      value={filtroMes}
+                      onChange={(e) => {
+                        const m = e.target.value;
+                        setFiltroMes(m);
+                        setFiltroRapido("custom");
+                        // Ajustar día si excede el máximo del nuevo mes
+                        const maxDia = diasDelMes(m ? Number(m) : null, filtroAnio ? Number(filtroAnio) : null);
+                        let diaActual = filtroDia ? Number(filtroDia) : "";
+                        if (diaActual && diaActual > maxDia) { diaActual = maxDia; setFiltroDia(String(maxDia)); }
+                        aplicarFiltroInteligente(diaActual ? Number(diaActual) : "", m ? Number(m) : "", filtroAnio ? Number(filtroAnio) : "");
+                      }}
+                      sx={{ 
+                        "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2 },
+                        "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                        "& .MuiInputLabel-root.Mui-focused": { color: colorPrincipal },
+                      }}
+                    >
+                      <MenuItem value="">—</MenuItem>
+                      {meses.map((m) => (
+                        <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={4} sm={2.5}>
+                    <TextField
+                      select
+                      label="Año"
+                      size="small"
+                      fullWidth
+                      value={filtroAnio}
+                      onChange={(e) => {
+                        const a = e.target.value;
+                        setFiltroAnio(a);
+                        setFiltroRapido("custom");
+                        aplicarFiltroInteligente(filtroDia ? Number(filtroDia) : "", filtroMes ? Number(filtroMes) : "", a ? Number(a) : "");
+                      }}
+                      sx={{ 
+                        "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2 },
+                        "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                        "& .MuiInputLabel-root.Mui-focused": { color: colorPrincipal },
+                      }}
+                    >
+                      <MenuItem value="">—</MenuItem>
+                      {aniosDisponibles.map((a) => (
+                        <MenuItem key={a} value={a}>{a}</MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                  <Grid item xs={6} sm={1.75}>
+                    <Button
+                      variant="contained"
+                      fullWidth
+                      size="small"
+                      sx={{
+                        backgroundColor: colorPrincipal,
+                        color: "white",
+                        fontWeight: "bold",
+                        height: 40,
+                        "&:hover": { backgroundColor: "#8a5a1a" },
+                      }}
+                      onClick={obtenerReporte}
+                    >
+                      Filtrar
+                    </Button>
+                  </Grid>
+                  <Grid item xs={6} sm={1.75}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      size="small"
+                      sx={{
+                        borderColor: "#999",
+                        color: "#666",
+                        fontWeight: "bold",
+                        height: 40,
+                        "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
+                      }}
+                      onClick={() => {
+                        setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); setFiltroRapido("");
+                        setFechaInicio(""); setFechaFin("");
+                      }}
+                    >
+                      Limpiar
+                    </Button>
+                  </Grid>
                 </Grid>
-                <Grid item xs={6} sm={3} md={2.25}>
+
+                {/* Accesos rápidos */}
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 2 }}>
+                  {[
+                    { label: "Hoy", key: "hoy", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("hoy"); } },
+                    { label: "Esta semana", key: "semana", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorSemana(); setFiltroRapido("semana"); } },
+                    { label: "Este mes", key: "mes", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorMes(); setFiltroRapido("mes"); } },
+                  ].map((btn) => (
+                    <Button
+                      key={btn.key}
+                      variant={filtroRapido === btn.key ? "contained" : "outlined"}
+                      size="small"
+                      onClick={btn.action}
+                      sx={{
+                        backgroundColor: filtroRapido === btn.key ? colorPrincipal : "transparent",
+                        borderColor: colorPrincipal,
+                        color: filtroRapido === btn.key ? "white" : colorPrincipal,
+                        fontWeight: "bold",
+                        fontSize: "0.75rem",
+                        px: 2,
+                        "&:hover": { backgroundColor: filtroRapido === btn.key ? "#8a5a1a" : "rgba(163,105,32,0.08)" },
+                      }}
+                    >
+                      {btn.label}
+                    </Button>
+                  ))}
                   <Button
-                    variant="outlined"
-                    fullWidth
+                    variant={filtroRapido === "caja" ? "contained" : "outlined"}
+                    size="small"
+                    onClick={() => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("caja"); }}
                     sx={{
-                      borderColor: colorPrincipal,
-                      color: colorPrincipal,
-                      fontWeight: "bold",
-                      "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
-                    }}
-                    onClick={filtrarPorDia}
-                  >
-                    Día
-                  </Button>
-                </Grid>
-                <Grid item xs={6} sm={3} md={2.25}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    sx={{
-                      borderColor: colorPrincipal,
-                      color: colorPrincipal,
-                      fontWeight: "bold",
-                      "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
-                    }}
-                    onClick={filtrarPorSemana}
-                  >
-                    Semana
-                  </Button>
-                </Grid>
-                <Grid item xs={6} sm={3} md={2.25}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    sx={{
-                      borderColor: colorPrincipal,
-                      color: colorPrincipal,
-                      fontWeight: "bold",
-                      "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
-                    }}
-                    onClick={filtrarPorMes}
-                  >
-                    Mes
-                  </Button>
-                </Grid>
-                <Grid item xs={6} sm={3} md={2.25}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    sx={{
+                      backgroundColor: filtroRapido === "caja" ? "#2e7d32" : "transparent",
                       borderColor: "#2e7d32",
-                      color: "#2e7d32",
+                      color: filtroRapido === "caja" ? "white" : "#2e7d32",
                       fontWeight: "bold",
-                      "&:hover": { backgroundColor: "rgba(46,125,50,0.1)" },
+                      fontSize: "0.75rem",
+                      px: 2,
+                      "&:hover": { backgroundColor: filtroRapido === "caja" ? "#1b5e20" : "rgba(46,125,50,0.08)" },
                     }}
-                    onClick={filtrarPorDia}
                   >
                     Cierre de caja
                   </Button>
-                </Grid>
-              </Grid>
+                </Box>
+              </Paper>
             </Grid>
+
             <Grid item xs={12}>
               <Button
                 variant="outlined"
                 startIcon={<SwapVert />}
+                size="small"
                 sx={{
                   borderColor: colorPrincipal,
                   color: colorPrincipal,
@@ -686,7 +850,7 @@ const Finanzas = () => {
                     <TableCell sx={{ minWidth: 130, textAlign: "right" }}>Monto bruto (S/)</TableCell>
                     <TableCell sx={{ minWidth: 110, textAlign: "center" }}>Descuento (%)</TableCell>
                     <TableCell sx={{ minWidth: 100, textAlign: "center" }}>Estado</TableCell>
-                    {isMaster && <TableCell align="center">Acciones</TableCell>}
+                    {canDoActions && <TableCell align="center">Acciones</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -726,7 +890,7 @@ const Finanzas = () => {
                           {r.estado_pago || "Pagado"}
                         </Box>
                       </TableCell>
-                      {isMaster && (
+                      {canDoActions && (
                         <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                           <Tooltip title="Registrar pago">
                             <IconButton
@@ -737,42 +901,46 @@ const Finanzas = () => {
                               <CheckCircle fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Editar método de pago">
-                            <IconButton
-                              size="small"
-                              onClick={() => abrirEditarMetodo(r)}
-                              sx={{ color: "#1565c0" }}
-                            >
-                              <Edit fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Editar monto pagado">
-                            <IconButton
-                              size="small"
-                              onClick={() => abrirEditarMonto(r)}
-                              sx={{ color: "#e65100" }}
-                            >
-                              <AttachMoney fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Editar fecha de pago">
-                            <IconButton
-                              size="small"
-                              onClick={() => abrirEditarFecha(r)}
-                              sx={{ color: "#6a1b9a" }}
-                            >
-                              <CalendarMonth fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Eliminar registro">
-                            <IconButton
-                              size="small"
-                              onClick={() => eliminarRegistro(r)}
-                              sx={{ color: "#b71c1c" }}
-                            >
-                              <Delete fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {isMaster && (
+                            <>
+                              <Tooltip title="Editar método de pago">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => abrirEditarMetodo(r)}
+                                  sx={{ color: "#1565c0" }}
+                                >
+                                  <Edit fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Editar monto pagado">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => abrirEditarMonto(r)}
+                                  sx={{ color: "#e65100" }}
+                                >
+                                  <AttachMoney fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Editar fecha de pago">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => abrirEditarFecha(r)}
+                                  sx={{ color: "#6a1b9a" }}
+                                >
+                                  <CalendarMonth fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Eliminar registro">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => eliminarRegistro(r)}
+                                  sx={{ color: "#b71c1c" }}
+                                >
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          )}
                         </TableCell>
                       )}
                     </TableRow>
@@ -782,37 +950,152 @@ const Finanzas = () => {
 
               <Divider sx={{ my: 3 }} />
 
-              <Typography align="right" sx={{ color: colorPrincipal, fontWeight: "bold", mb: 1 }}>
-                Total neto: S/ {Number(totalGeneral || 0).toFixed(2)}
-              </Typography>
-
-              <Typography align="right" sx={{ color: "#555" }}>
-                Total bruto: S/ {Number(totalBruto || 0).toFixed(2)}
-              </Typography>
-
-              <Typography align="right" sx={{ color: "#555", mb: 1 }}>
-                Comisión POS (4% Tarjeta): S/ {Number(totalComision || 0).toFixed(2)}
-              </Typography>
-
-              {Object.entries(totalesMetodo).map(([metodo, total]) => (
-                <Typography key={metodo} align="right" sx={{ color: "#555" }}>
-                  {metodo}: S/ {total.toFixed(2)}
-                </Typography>
-              ))}
-
-              <Button
-                variant="outlined"
-                onClick={generarPDF}
+              {/* Resumen de ingresos profesional */}
+              <Paper
+                elevation={0}
                 sx={{
-                  mt: 3,
-                  borderColor: colorPrincipal,
-                  color: colorPrincipal,
-                  fontWeight: "bold",
-                  "&:hover": { backgroundColor: "#f6e3c5" },
+                  p: 3,
+                  borderRadius: 3,
+                  background: "linear-gradient(135deg, rgba(163,105,32,0.06) 0%, rgba(212,175,55,0.08) 100%)",
+                  border: "1px solid rgba(163,105,32,0.18)",
                 }}
               >
-                Exportar PDF
-              </Button>
+                <Typography variant="h6" sx={{ fontWeight: "bold", color: colorPrincipal, mb: 2.5, display: "flex", alignItems: "center", gap: 1 }}>
+                  <AttachMoney /> Resumen de Ingresos
+                </Typography>
+
+                <Grid container spacing={2} sx={{ mb: 2.5 }}>
+                  {/* Total Bruto */}
+                  <Grid item xs={12} sm={4}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2.5,
+                        backgroundColor: "rgba(46,125,50,0.08)",
+                        border: "1px solid rgba(46,125,50,0.25)",
+                        textAlign: "center",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Total Bruto
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#2e7d32", mt: 0.5 }}>
+                        S/ {Number(totalBruto || 0).toFixed(2)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  {/* Total Neto */}
+                  <Grid item xs={12} sm={4}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2.5,
+                        backgroundColor: "rgba(163,105,32,0.08)",
+                        border: "1px solid rgba(163,105,32,0.25)",
+                        textAlign: "center",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Total Neto
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: colorPrincipal, mt: 0.5 }}>
+                        S/ {Number(totalGeneral || 0).toFixed(2)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  {/* Comisión POS */}
+                  <Grid item xs={12} sm={4}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2.5,
+                        backgroundColor: "rgba(198,40,40,0.06)",
+                        border: "1px solid rgba(198,40,40,0.18)",
+                        textAlign: "center",
+                        height: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Comisión POS (4%)
+                      </Typography>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#c62828", mt: 0.5 }}>
+                        S/ {Number(totalComision || 0).toFixed(2)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                {/* Desglose por método de pago */}
+                {Object.keys(totalesMetodo).length > 0 && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      backgroundColor: "rgba(255,255,255,0.7)",
+                      border: "1px solid rgba(163,105,32,0.12)",
+                    }}
+                  >
+                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#555", mb: 1.5 }}>
+                      Desglose por Método de Pago
+                    </Typography>
+                    <Grid container spacing={1}>
+                      {Object.entries(totalesMetodo).map(([metodo, total]) => (
+                        <Grid item xs={6} sm={4} md={3} key={metodo}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              p: 1.2,
+                              borderRadius: 1.5,
+                              backgroundColor: "rgba(163,105,32,0.04)",
+                              border: "1px solid rgba(163,105,32,0.10)",
+                            }}
+                          >
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#555" }}>
+                              {metodo}
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: "bold", color: colorPrincipal }}>
+                              S/ {total.toFixed(2)}
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Paper>
+                )}
+
+                <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2.5 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={generarPDF}
+                    sx={{
+                      borderColor: colorPrincipal,
+                      color: colorPrincipal,
+                      fontWeight: "bold",
+                      px: 3,
+                      "&:hover": { backgroundColor: "#f6e3c5" },
+                    }}
+                  >
+                    Exportar PDF
+                  </Button>
+                </Box>
+              </Paper>
             </>
           )}
         </Paper>

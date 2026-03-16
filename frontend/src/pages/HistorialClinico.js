@@ -26,8 +26,10 @@ import {
   InputLabel,
   Autocomplete,
   Chip,
+  Checkbox,
+  Collapse,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -200,6 +202,22 @@ const HistorialClinico = () => {
   
   // Estado para controlar qué paquetes están colapsados
   const [paquetesColapsados, setPaquetesColapsados] = useState({});
+  const [presupuestosAsignadosCheck, setPresupuestosAsignadosCheck] = useState({});
+  const [paquetesPromoExpanded, setPaquetesPromoExpanded] = useState(false);
+  const [tratamientosMarcados, setTratamientosMarcadosRaw] = useState({});
+
+  // Wrapper que persiste marcas en localStorage por paciente
+  const setTratamientosMarcados = (valOrFn) => {
+    setTratamientosMarcadosRaw(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      // Guardar en localStorage con el id del paciente actual
+      const pacId = pacienteSeleccionado?.id;
+      if (pacId) {
+        try { localStorage.setItem(`marcados_${pacId}`, JSON.stringify(next)); } catch(e) {}
+      }
+      return next;
+    });
+  };
 
   // Estados para modal global de pagar consulta (desde barra superior)
   const [modalPagoConsultaGlobal, setModalPagoConsultaGlobal] = useState(false);
@@ -228,6 +246,8 @@ const HistorialClinico = () => {
   const token = localStorage.getItem("token");
   const userRole = localStorage.getItem("role");
   const isMaster = userRole === "master";
+  const isAdmin = userRole === "admin";
+  const canDoActions = isMaster || isAdmin;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   useEffect(() => {
@@ -304,6 +324,11 @@ const HistorialClinico = () => {
       setOfertaEditId(null);
       setObservacionEditId(null);
       setObservacionEditTexto("");
+      // Restaurar marcas desde localStorage
+      try {
+        const saved = localStorage.getItem(`marcados_${id}`);
+        setTratamientosMarcadosRaw(saved ? JSON.parse(saved) : {});
+      } catch(e) { setTratamientosMarcadosRaw({}); }
       setFotosPaciente([]);
       setMostrarTodasFotos(false);
       setArchivosFotosPaciente([]);
@@ -1294,7 +1319,7 @@ const HistorialClinico = () => {
     setOfertaItems((prev) => {
       const exists = prev.some((x) => x.tratamientoId === t.id);
       if (exists) return prev.filter((x) => x.tratamientoId !== t.id);
-      return [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: "", sesiones: "1" }];
+      return [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: "", sesiones: "1", producto: "", ml: "" }];
     });
   };
 
@@ -1310,6 +1335,22 @@ const HistorialClinico = () => {
     setOfertaItems((prev) =>
       prev.map((x) =>
         x.tratamientoId === tratamientoId ? { ...x, sesiones: value } : x
+      )
+    );
+  };
+
+  const setOfertaProducto = (tratamientoId, value) => {
+    setOfertaItems((prev) =>
+      prev.map((x) =>
+        x.tratamientoId === tratamientoId ? { ...x, producto: value } : x
+      )
+    );
+  };
+
+  const setOfertaMl = (tratamientoId, value) => {
+    setOfertaItems((prev) =>
+      prev.map((x) =>
+        x.tratamientoId === tratamientoId ? { ...x, ml: value } : x
       )
     );
   };
@@ -1333,6 +1374,8 @@ const HistorialClinico = () => {
           nombre: it.nombre,
           precio: it.precio,
           sesiones: Number(it.sesiones) || 1,
+          producto: it.producto || "",
+          ml: it.ml || "",
         })),
       };
 
@@ -1465,11 +1508,13 @@ const HistorialClinico = () => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const pacientesFiltrados = pacientes.filter(
-    (p) =>
-      p.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
-      p.apellido.toLowerCase().includes(filtro.toLowerCase())
-  );
+  const pacientesFiltrados = pacientes
+    .filter(
+      (p) =>
+        p.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
+        p.apellido.toLowerCase().includes(filtro.toLowerCase())
+    )
+    .sort((a, b) => b.id - a.id);
 
   const totalGeneral = tratamientos.reduce(
     (acc, t) => acc + Number(t.precio_total || t.precioTotal || 0),
@@ -1877,7 +1922,7 @@ const HistorialClinico = () => {
                   sx={{
                     flex: 1,
                     "& .MuiInputBase-root": {
-                      backgroundColor: "white",
+                      backgroundColor: "rgba(212, 175, 55, 0.10)",
                       borderRadius: 2,
                     },
                     "& .MuiOutlinedInput-root": {
@@ -2195,9 +2240,14 @@ const HistorialClinico = () => {
                     sx={{
                       mb: 1.5,
                       "& .MuiInputBase-root": {
-                        backgroundColor: "rgba(255,255,255,0.72)",
+                        backgroundColor: "rgba(212, 175, 55, 0.10)",
                         borderRadius: 2,
                       },
+                      "& .MuiOutlinedInput-root": {
+                        "&:hover fieldset": { borderColor: "#a36920" },
+                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                      },
+                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
                     }}
                   />
                   <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
@@ -2450,9 +2500,14 @@ const HistorialClinico = () => {
                   onChange={(e) => setNuevaObservacion(e.target.value)}
                   sx={{
                     "& .MuiInputBase-root": {
-                      backgroundColor: "rgba(255,255,255,0.72)",
+                      backgroundColor: "rgba(212, 175, 55, 0.10)",
                       borderRadius: 2,
                     },
+                    "& .MuiOutlinedInput-root": {
+                      "&:hover fieldset": { borderColor: "#a36920" },
+                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                    },
+                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
                   }}
                 />
                 <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
@@ -2530,8 +2585,12 @@ const HistorialClinico = () => {
                                   }
                                   sx={{
                                     "& .MuiInputBase-root": {
-                                      backgroundColor: "rgba(255,255,255,0.72)",
+                                      backgroundColor: "rgba(212, 175, 55, 0.10)",
                                       borderRadius: 2,
+                                    },
+                                    "& .MuiOutlinedInput-root": {
+                                      "&:hover fieldset": { borderColor: "#a36920" },
+                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
                                     },
                                   }}
                                 />
@@ -2680,7 +2739,18 @@ const HistorialClinico = () => {
                         {...params}
                         label="Buscar y agregar tratamiento"
                         placeholder="Ej: Botox, Peeling, Diseño de Labios..."
-                        sx={{ mb: 2 }}
+                        sx={{ 
+                          mb: 2,
+                          "& .MuiInputBase-root": {
+                            backgroundColor: "rgba(212, 175, 55, 0.10)",
+                            borderRadius: 2,
+                          },
+                          "& .MuiOutlinedInput-root": {
+                            "&:hover fieldset": { borderColor: "#a36920" },
+                            "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                          },
+                          "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                        }}
                       />
                     )}
                   />
@@ -2802,6 +2872,40 @@ const HistorialClinico = () => {
                               }}
                             />
                           </Box>
+                          <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start", mt: 1 }}>
+                            <TextField
+                              label="Producto"
+                              value={item?.producto ?? ""}
+                              onChange={(e) =>
+                                setOfertaProducto(t.id, e.target.value)
+                              }
+                              sx={{
+                                flex: 1,
+                                "& .MuiInputBase-root": {
+                                  backgroundColor: "rgba(255,255,255,0.72)",
+                                  borderRadius: 2,
+                                },
+                              }}
+                              placeholder="Ej: Ácido hialurónico"
+                            />
+                            <TextField
+                              label="ML"
+                              type="number"
+                              value={item?.ml ?? ""}
+                              onChange={(e) =>
+                                setOfertaMl(t.id, e.target.value)
+                              }
+                              inputProps={{ min: 0, step: 0.1 }}
+                              sx={{
+                                width: 100,
+                                "& .MuiInputBase-root": {
+                                  backgroundColor: "rgba(255,255,255,0.72)",
+                                  borderRadius: 2,
+                                },
+                              }}
+                              placeholder="ml"
+                            />
+                          </Box>
                         </Paper>
                       );
                     })}
@@ -2876,6 +2980,7 @@ const HistorialClinico = () => {
                     {ofertas.map((o) => {
                       const items = o.items || [];
                       const totalItems = items.length;
+                      const yaAsignado = presupuestosAsignados.some(p => p.oferta_id === o.id);
                       
                       return (
                         <Paper
@@ -2884,18 +2989,59 @@ const HistorialClinico = () => {
                           sx={{
                             p: 2,
                             borderRadius: 2,
-                            backgroundColor: "white",
-                            border: "1px solid rgba(163, 105, 32, 0.2)",
+                            backgroundColor: yaAsignado ? "rgba(76, 175, 80, 0.08)" : "white",
+                            border: yaAsignado ? "1px solid rgba(76, 175, 80, 0.4)" : "1px solid rgba(163, 105, 32, 0.2)",
+                            transition: "all 0.3s ease",
                           }}
                         >
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-                            <Box>
-                              <Typography sx={{ fontWeight: "bold", color: "#333" }}>
-                                Presupuesto
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Creado: {o.creado_en?.split(' ')[0] || o.creado_en}
-                              </Typography>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Checkbox
+                                checked={yaAsignado}
+                                onChange={async () => {
+                                  if (!yaAsignado) {
+                                    // Capturar qué tratamientos fueron marcados antes de asignar
+                                    const marcadosDeEstaOferta = {};
+                                    (o.items || []).forEach((it, idx) => {
+                                      if (tratamientosMarcados[`${o.id}-${idx}`]) {
+                                        marcadosDeEstaOferta[idx] = true;
+                                      }
+                                    });
+                                    await asignarPresupuesto(o);
+                                    // Transferir marcas al presupuesto asignado
+                                    // Los presupuestos asignados usan sesiones, mapear por índice
+                                    setTimeout(() => {
+                                      setPresupuestosAsignados(prev => {
+                                        const nuevo = prev.find(p => p.oferta_id === o.id);
+                                        if (nuevo && nuevo.sesiones) {
+                                          const newMarcados = { ...tratamientosMarcados };
+                                          nuevo.sesiones.forEach((sesion, idx) => {
+                                            if (marcadosDeEstaOferta[idx]) {
+                                              newMarcados[`asig-${nuevo.id}-${sesion.id}`] = true;
+                                            }
+                                          });
+                                          setTratamientosMarcados(newMarcados);
+                                        }
+                                        return prev;
+                                      });
+                                    }, 500);
+                                  }
+                                }}
+                                disabled={yaAsignado || asignandoPresupuesto}
+                                sx={{
+                                  color: "#a36920",
+                                  "&.Mui-checked": { color: "#4caf50" },
+                                  p: 0,
+                                }}
+                              />
+                              <Box>
+                                <Typography sx={{ fontWeight: "bold", color: yaAsignado ? "#2e7d32" : "#333" }}>
+                                  {yaAsignado ? "Presupuesto Asignado" : "Presupuesto"}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Creado: {o.creado_en?.split(' ')[0] || o.creado_en}
+                                </Typography>
+                              </Box>
                             </Box>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                               <Box sx={{ 
@@ -2943,27 +3089,63 @@ const HistorialClinico = () => {
                                   }}
                                 >
                                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                    <Box sx={{
-                                      width: 20,
-                                      height: 20,
-                                      borderRadius: "50%",
-                                      backgroundColor: "#a36920",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "0.7rem",
-                                      color: "white"
-                                    }}>
+                                    <Box 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nuevoValor = !tratamientosMarcados[`${o.id}-${idx}`];
+                                        const newMarcados = {
+                                          ...tratamientosMarcados,
+                                          [`${o.id}-${idx}`]: nuevoValor
+                                        };
+                                        // Sincronizar con presupuesto asignado si existe
+                                        const asignado = presupuestosAsignados.find(p => p.oferta_id === o.id);
+                                        if (asignado && asignado.sesiones && asignado.sesiones[idx]) {
+                                          newMarcados[`asig-${asignado.id}-${asignado.sesiones[idx].id}`] = nuevoValor;
+                                        }
+                                        setTratamientosMarcados(newMarcados);
+                                      }}
+                                      sx={{
+                                        width: 22,
+                                        height: 22,
+                                        borderRadius: "50%",
+                                        backgroundColor: tratamientosMarcados[`${o.id}-${idx}`] ? "#d4af37" : "#a36920",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.7rem",
+                                        color: tratamientosMarcados[`${o.id}-${idx}`] ? "#3e2c0a" : "white",
+                                        fontWeight: tratamientosMarcados[`${o.id}-${idx}`] ? "bold" : "normal",
+                                        cursor: "pointer",
+                                        transition: "all 0.2s ease",
+                                        boxShadow: tratamientosMarcados[`${o.id}-${idx}`] ? "0 0 0 2px #d4af37, 0 0 0 4px rgba(212,175,55,0.35)" : "none",
+                                        "&:hover": { 
+                                          transform: "scale(1.15)",
+                                          backgroundColor: tratamientosMarcados[`${o.id}-${idx}`] ? "#c9a230" : "#7a4f18",
+                                        }
+                                      }}
+                                    >
                                       {idx + 1}
                                     </Box>
-                                    <Typography variant="body2">
-                                      {it.nombre}
-                                      {Number(it.sesiones) > 1 && (
-                                        <Typography component="span" variant="caption" sx={{ ml: 0.5, color: "#888", fontWeight: 600 }}>
-                                          ({it.sesiones} sesiones)
+                                    <Box>
+                                      <Typography variant="body2" sx={{ 
+                                        fontWeight: tratamientosMarcados[`${o.id}-${idx}`] ? "bold" : "normal",
+                                        color: tratamientosMarcados[`${o.id}-${idx}`] ? "#b8860b" : "inherit",
+                                      }}>
+                                        {it.nombre}
+                                        {Number(it.sesiones) > 1 && (
+                                          <Typography component="span" variant="caption" sx={{ ml: 0.5, color: "#888", fontWeight: 600 }}>
+                                            ({it.sesiones} sesiones)
+                                          </Typography>
+                                        )}
+                                      </Typography>
+                                      {(it.producto || it.ml) && (
+                                        <Typography variant="caption" sx={{ color: "#777", display: "block", mt: 0.3 }}>
+                                          {it.producto && `Producto: ${it.producto}`}
+                                          {it.producto && it.ml ? " — " : ""}
+                                          {it.ml && `${it.ml} ml`}
                                         </Typography>
                                       )}
-                                    </Typography>
+                                    </Box>
                                   </Box>
                                   <Typography variant="body2" sx={{ fontWeight: "bold", color: "#a36920" }}>
                                     S/ {Number(it.precio || 0).toFixed(2)}
@@ -3021,21 +3203,6 @@ const HistorialClinico = () => {
                               <Button
                                 size="small"
                                 variant="contained"
-                                disabled={asignandoPresupuesto}
-                                onClick={() => asignarPresupuesto(o)}
-                                sx={{
-                                  fontSize: "0.7rem",
-                                  py: 0.5,
-                                  borderRadius: 2,
-                                  backgroundColor: "#4caf50",
-                                  "&:hover": { backgroundColor: "#388e3c" }
-                                }}
-                              >
-                                {asignandoPresupuesto ? "Asignando..." : "✓ Asignar"}
-                              </Button>
-                              <Button
-                                size="small"
-                                variant="contained"
                                 startIcon={<Print />}
                                 onClick={() => {
                                   setPresupuestoParaProforma(o);
@@ -3063,6 +3230,8 @@ const HistorialClinico = () => {
                                       nombre: it.nombre,
                                       precio: String(it.precio ?? ""),
                                       sesiones: String(it.sesiones ?? "1"),
+                                      producto: it.producto || "",
+                                      ml: it.ml || "",
                                     }))
                                   );
                                   setShowOferta(true);
@@ -3102,12 +3271,29 @@ const HistorialClinico = () => {
                     border: "1px solid rgba(76, 175, 80, 0.3)",
                   }}
                 >
-                  <Typography
-                    variant="h6"
-                    sx={{ color: "#2e7d32", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+                  <Box
+                    onClick={() => setPaquetesPromoExpanded(prev => !prev)}
+                    sx={{ 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "space-between",
+                      cursor: "pointer",
+                      mb: paquetesPromoExpanded ? 2 : 0,
+                      "&:hover": { opacity: 0.85 },
+                    }}
                   >
-                    🎁 Paquetes Promocionales Disponibles
-                  </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: "#2e7d32", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
+                    >
+                      🎁 Paquetes Promocionales Disponibles
+                      <Chip label={`${paquetesActivos.length}`} size="small" sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold", ml: 1 }} />
+                    </Typography>
+                    <IconButton size="small" sx={{ color: "#2e7d32" }}>
+                      {paquetesPromoExpanded ? <ExpandLess /> : <ExpandMore />}
+                    </IconButton>
+                  </Box>
+                  <Collapse in={paquetesPromoExpanded} timeout="auto" unmountOnExit>
                   <Box
                     sx={{
                       display: "grid",
@@ -3237,6 +3423,7 @@ const HistorialClinico = () => {
                       );
                     })}
                   </Box>
+                  </Collapse>
                 </Paper>
               )}
 
@@ -3385,20 +3572,63 @@ const HistorialClinico = () => {
                                     }}
                                   >
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                      <Box sx={{
-                                        width: 20,
-                                        height: 20,
-                                        borderRadius: "50%",
-                                        backgroundColor: sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0',
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "0.7rem",
-                                        color: sesion.estado === 'completada' ? 'white' : '#666'
-                                      }}>
+                                      <Box 
+                                        onClick={(e) => {
+                                          if (sesion.estado !== 'completada') {
+                                            e.stopPropagation();
+                                            const nuevoValor = !tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`];
+                                            const newMarcados = {
+                                              ...tratamientosMarcados,
+                                              [`asig-${presupuesto.id}-${sesion.id}`]: nuevoValor
+                                            };
+                                            // Sincronizar con presupuesto del paciente (ofertas)
+                                            if (presupuesto.oferta_id) {
+                                              const oferta = ofertas.find(of => of.id === presupuesto.oferta_id);
+                                              if (oferta) {
+                                                const sesionIdx = presupuesto.sesiones.indexOf(sesion);
+                                                if (sesionIdx >= 0) {
+                                                  newMarcados[`${oferta.id}-${sesionIdx}`] = nuevoValor;
+                                                }
+                                              }
+                                            }
+                                            setTratamientosMarcados(newMarcados);
+                                          }
+                                        }}
+                                        sx={{
+                                          width: 22,
+                                          height: 22,
+                                          borderRadius: "50%",
+                                          backgroundColor: sesion.estado === 'completada' 
+                                            ? '#4caf50' 
+                                            : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] 
+                                              ? '#d4af37' 
+                                              : '#e0e0e0',
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          fontSize: "0.7rem",
+                                          color: sesion.estado === 'completada' 
+                                            ? 'white' 
+                                            : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] 
+                                              ? '#3e2c0a' 
+                                              : '#666',
+                                          fontWeight: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' ? "bold" : "normal",
+                                          cursor: sesion.estado !== 'completada' ? "pointer" : "default",
+                                          transition: "all 0.2s ease",
+                                          boxShadow: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' 
+                                            ? "0 0 0 2px #d4af37, 0 0 0 4px rgba(212,175,55,0.35)" : "none",
+                                          "&:hover": sesion.estado !== 'completada' ? { 
+                                            transform: "scale(1.15)",
+                                            backgroundColor: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] ? "#c9a230" : "#bdbdbd",
+                                          } : {}
+                                        }}
+                                      >
                                         {sesion.estado === 'completada' ? '✓' : sesion.sesion_numero}
                                       </Box>
-                                      <Typography variant="body2">
+                                      <Typography variant="body2" sx={{
+                                        fontWeight: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' ? "bold" : "normal",
+                                        color: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' ? "#b8860b" : "inherit",
+                                      }}>
                                         {sesion.tratamiento_nombre}
                                       </Typography>
                                       <Typography variant="caption" color="text.secondary">

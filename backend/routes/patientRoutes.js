@@ -322,6 +322,8 @@ router.post("/:id/ofertas", requirePatientWrite, (req, res) => {
         nombre,
         precio: Number.isFinite(precioNum) ? precioNum : 0,
         sesiones: Number.isFinite(sesionesNum) && sesionesNum >= 1 ? sesionesNum : 1,
+        producto: typeof it?.producto === "string" ? it.producto.trim() : "",
+        ml: typeof it?.ml === "string" ? it.ml.trim() : (it?.ml ? String(it.ml) : ""),
       };
     })
     .filter((it) => it.nombre);
@@ -378,6 +380,8 @@ router.put("/:id/ofertas/:ofertaId", requirePatientWrite, (req, res) => {
         nombre,
         precio: Number.isFinite(precioNum) ? precioNum : 0,
         sesiones: Number.isFinite(sesionesNum) && sesionesNum >= 1 ? sesionesNum : 1,
+        producto: typeof it?.producto === "string" ? it.producto.trim() : "",
+        ml: typeof it?.ml === "string" ? it.ml.trim() : (it?.ml ? String(it.ml) : ""),
       };
     })
     .filter((it) => it.nombre);

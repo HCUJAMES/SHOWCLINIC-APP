@@ -18,8 +18,8 @@ export const hasPermission = (role, action) => {
     readPatients: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.LOGISTICA, ROLES.MASTER, ROLES.DOCTORA],
 
     // Permisos de tratamientos
-    writeTreatments: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.MASTER, ROLES.DOCTORA],
-    createTreatmentBase: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.MASTER, ROLES.DOCTORA],
+    writeTreatments: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER, ROLES.DOCTORA],
+    createTreatmentBase: [ROLES.DOCTOR, ROLES.ASISTENTE, ROLES.ADMIN, ROLES.MASTER, ROLES.DOCTORA],
     deleteTreatments: [ROLES.DOCTOR, ROLES.MASTER],
 
     // Permisos de inventario
@@ -28,7 +28,7 @@ export const hasPermission = (role, action) => {
 
     // Permisos de finanzas
     viewStats: [ROLES.DOCTOR, ROLES.ADMIN, ROLES.MASTER],
-    modifyDebts: [ROLES.DOCTOR, ROLES.MASTER, ROLES.DOCTORA],
+    modifyDebts: [ROLES.DOCTOR, ROLES.ADMIN, ROLES.MASTER, ROLES.DOCTORA],
 
     // Permisos de gestión
     manageSystem: [ROLES.MASTER],

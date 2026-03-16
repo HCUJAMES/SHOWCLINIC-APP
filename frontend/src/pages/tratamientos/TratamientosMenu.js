@@ -89,25 +89,6 @@ export default function TratamientosMenu() {
           </Button>
         )}
 
-        {/* Botón visible para ADMIN (solo lectura) */}
-        {role === "admin" && (
-          <Button
-            fullWidth
-            variant="contained"
-            sx={{
-              backgroundColor: colorPrincipal,
-              mb: 2,
-              py: 1.5,
-              borderRadius: 3,
-              fontWeight: "bold",
-              "&:hover": { backgroundColor: "#8a541a" },
-            }}
-            onClick={() => navigate("/tratamientos/crear")}
-          >
-            VER TRATAMIENTOS
-          </Button>
-        )}
-
         {/* Botón visible para ambos (doctor y admin) */}
         <Button
           fullWidth

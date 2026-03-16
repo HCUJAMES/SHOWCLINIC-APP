@@ -121,12 +121,14 @@ const GestionClinica = () => {
     }
   };
 
-  const cargarEstadisticas = async () => {
+  const cargarEstadisticas = async (overrides = {}) => {
     setLoading(true);
     try {
+      const fi = overrides.fechaInicio !== undefined ? overrides.fechaInicio : fechaInicio;
+      const ff = overrides.fechaFin !== undefined ? overrides.fechaFin : fechaFin;
       const params = new URLSearchParams();
-      if (fechaInicio) params.append("fecha_inicio", fechaInicio);
-      if (fechaFin) params.append("fecha_fin", fechaFin);
+      if (fi) params.append("fecha_inicio", fi);
+      if (ff) params.append("fecha_fin", ff);
       if (especialistaFiltro) params.append("especialista_id", especialistaFiltro);
       if (tratamientoFiltro) params.append("tratamiento", tratamientoFiltro);
 
@@ -177,10 +179,12 @@ const GestionClinica = () => {
       return `${yyyy}-${mm}-${dd}`;
     };
     
-    setFechaInicio(formatoISO(primerDia));
-    setFechaFin(formatoISO(ultimoDia));
+    const fi = formatoISO(primerDia);
+    const ff = formatoISO(ultimoDia);
+    setFechaInicio(fi);
+    setFechaFin(ff);
     setMesFiltro(mes);
-    setTimeout(cargarEstadisticas, 100);
+    cargarEstadisticas({ fechaInicio: fi, fechaFin: ff });
   };
 
   const verDetalleEspecialista = async (especialista) => {

@@ -32,7 +32,7 @@ export default function PacientesConDeudas() {
   const { showToast } = useToast();
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
-  const canModifyDeudas = role === "doctor" || role === "master";
+  const canModifyDeudas = role === "doctor" || role === "admin" || role === "master";
 
   const [rows, setRows] = useState([]);
   const [tratamientosBase, setTratamientosBase] = useState([]);
