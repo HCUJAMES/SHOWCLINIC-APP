@@ -744,6 +744,7 @@ router.delete("/eliminar/:id", requireRole("master"), (req, res) => {
       "DELETE FROM deudas_tratamientos WHERE paciente_id = ?",
       "DELETE FROM patient_observaciones WHERE paciente_id = ?",
       "DELETE FROM patient_ofertas WHERE paciente_id = ?",
+      "DELETE FROM patient_marcados WHERE paciente_id = ?",
       "DELETE FROM fotos_paciente WHERE paciente_id = ?",
       "DELETE FROM paquetes_sesiones WHERE paquete_paciente_id IN (SELECT id FROM paquetes_pacientes WHERE paciente_id = ?)",
       "DELETE FROM paquetes_pacientes WHERE paciente_id = ?",
@@ -778,6 +779,46 @@ router.delete("/eliminar/:id", requireRole("master"), (req, res) => {
       });
     });
   });
+});
+
+// 📌 Obtener marcas de tratamientos de un paciente
+router.get("/:id/marcados", (req, res) => {
+  const { id } = req.params;
+  db.get(
+    `SELECT marcados_json FROM patient_marcados WHERE paciente_id = ?`,
+    [id],
+    (err, row) => {
+      if (err) {
+        console.error("❌ Error al obtener marcados:", err.message);
+        return res.status(500).json({ message: "Error al obtener marcados" });
+      }
+      try {
+        res.json(row ? JSON.parse(row.marcados_json) : {});
+      } catch (e) {
+        res.json({});
+      }
+    }
+  );
+});
+
+// 📌 Guardar marcas de tratamientos de un paciente
+router.put("/:id/marcados", (req, res) => {
+  const { id } = req.params;
+  const { marcados } = req.body;
+  const json = JSON.stringify(marcados || {});
+  db.run(
+    `INSERT INTO patient_marcados (paciente_id, marcados_json, actualizado_en)
+     VALUES (?, ?, datetime('now', '-5 hours'))
+     ON CONFLICT(paciente_id) DO UPDATE SET marcados_json = ?, actualizado_en = datetime('now', '-5 hours')`,
+    [id, json, json],
+    (err) => {
+      if (err) {
+        console.error("❌ Error al guardar marcados:", err.message);
+        return res.status(500).json({ message: "Error al guardar marcados" });
+      }
+      res.json({ message: "Marcados guardados" });
+    }
+  );
 });
 
 export default router;

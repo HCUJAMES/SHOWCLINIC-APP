@@ -822,12 +822,24 @@ router.post("/paquete-paciente/:paquete_paciente_id/consulta", requirePaquetesAs
     const ahora = fechaLima();
     const montoConsulta = parseFloat(monto_consulta);
     const precioTotal = parseFloat(paquete.precio_total) || 0;
+    const montoPagado = parseFloat(paquete.monto_pagado) || 0;
 
     // Calcular nuevo precio total (precio original - monto de consulta)
     const nuevoPrecioTotal = precioTotal - montoConsulta;
 
     if (nuevoPrecioTotal < 0) {
       return res.status(400).json({ message: "El monto de consulta no puede ser mayor al precio del paquete" });
+    }
+
+    // Recalcular saldo considerando lo ya pagado
+    const nuevoSaldo = Math.max(0, nuevoPrecioTotal - montoPagado);
+    
+    // Si con el descuento de consulta ya se cubrió todo, marcar como pagado
+    let estadoPago = paquete.estado_pago || 'pendiente_pago';
+    let pagadoFlag = paquete.pagado || 0;
+    if (nuevoSaldo <= 0 && nuevoPrecioTotal > 0) {
+      estadoPago = 'pagado';
+      pagadoFlag = 1;
     }
 
     // Actualizar paquete con datos de consulta y nuevo precio total
@@ -838,9 +850,11 @@ router.post("/paquete-paciente/:paquete_paciente_id/consulta", requirePaquetesAs
            metodo_pago_consulta = ?, 
            fecha_pago_consulta = ?,
            precio_total = ?,
-           saldo_pendiente = ?
+           saldo_pendiente = ?,
+           estado_pago = ?,
+           pagado = ?
        WHERE id = ?`,
-      [montoConsulta, metodo_pago || 'efectivo', ahora, nuevoPrecioTotal, nuevoPrecioTotal, paquete_paciente_id]
+      [montoConsulta, metodo_pago || 'efectivo', ahora, nuevoPrecioTotal, nuevoSaldo, estadoPago, pagadoFlag, paquete_paciente_id]
     );
 
     // Registrar en finanzas como ingreso por consulta
@@ -1159,6 +1173,7 @@ router.post("/presupuesto/:presupuesto_asignado_id/consulta", requirePaquetesAsi
     const montoConsulta = parseFloat(monto_consulta);
     const precioTotal = parseFloat(presupuesto.precio_total) || 0;
     const descuentoActual = parseFloat(presupuesto.descuento) || 0;
+    const montoPagado = parseFloat(presupuesto.monto_pagado) || 0;
 
     // Calcular nuevo descuento (descuento anterior + monto de consulta)
     const nuevoDescuento = descuentoActual + montoConsulta;
@@ -1167,16 +1182,31 @@ router.post("/presupuesto/:presupuesto_asignado_id/consulta", requirePaquetesAsi
       return res.status(400).json({ message: "El monto de consulta no puede ser mayor al precio del presupuesto" });
     }
 
-    // Actualizar presupuesto con datos de consulta y nuevo descuento
+    // Recalcular saldo considerando nuevo descuento y lo ya pagado
+    const precioConDescuento = precioTotal - nuevoDescuento;
+    const nuevoSaldo = Math.max(0, precioConDescuento - montoPagado);
+    
+    // Si con el descuento de consulta ya se cubrió todo, marcar como pagado
+    let estadoPago = presupuesto.estado_pago || 'pendiente_pago';
+    let pagadoFlag = presupuesto.pagado || 0;
+    if (nuevoSaldo <= 0 && precioConDescuento > 0) {
+      estadoPago = 'pagado';
+      pagadoFlag = 1;
+    }
+
+    // Actualizar presupuesto con datos de consulta, nuevo descuento y saldo recalculado
     await dbRun(
       `UPDATE presupuestos_asignados 
        SET consulta_pagada = 1, 
            monto_consulta = ?, 
            metodo_pago_consulta = ?, 
            fecha_pago_consulta = ?,
-           descuento = ?
+           descuento = ?,
+           saldo_pendiente = ?,
+           estado_pago = ?,
+           pagado = ?
        WHERE id = ?`,
-      [montoConsulta, metodo_pago || 'efectivo', ahora, nuevoDescuento, presupuesto_asignado_id]
+      [montoConsulta, metodo_pago || 'efectivo', ahora, nuevoDescuento, nuevoSaldo, estadoPago, pagadoFlag, presupuesto_asignado_id]
     );
 
     // Registrar en finanzas como ingreso por consulta

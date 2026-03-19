@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Container,
   Typography,
@@ -122,6 +122,7 @@ const HistorialClinico = () => {
   const [observacionEditTexto, setObservacionEditTexto] = useState("");
   const [guardandoObservacionEdit, setGuardandoObservacionEdit] = useState(false);
   const [tratamientosBase, setTratamientosBase] = useState([]);
+  const [productosInventario, setProductosInventario] = useState([]);
   const [paquetesActivos, setPaquetesActivos] = useState([]);
   const [paquetesPaciente, setPaquetesPaciente] = useState([]);
   const [asignandoPaquete, setAsignandoPaquete] = useState(false);
@@ -205,15 +206,19 @@ const HistorialClinico = () => {
   const [presupuestosAsignadosCheck, setPresupuestosAsignadosCheck] = useState({});
   const [paquetesPromoExpanded, setPaquetesPromoExpanded] = useState(false);
   const [tratamientosMarcados, setTratamientosMarcadosRaw] = useState({});
+  const marcadosTimerRef = useRef(null);
 
-  // Wrapper que persiste marcas en localStorage por paciente
+  // Wrapper que persiste marcas en la base de datos (sincroniza entre dispositivos)
   const setTratamientosMarcados = (valOrFn) => {
     setTratamientosMarcadosRaw(prev => {
       const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
-      // Guardar en localStorage con el id del paciente actual
       const pacId = pacienteSeleccionado?.id;
       if (pacId) {
-        try { localStorage.setItem(`marcados_${pacId}`, JSON.stringify(next)); } catch(e) {}
+        // Debounce: guardar en BD después de 500ms sin cambios
+        if (marcadosTimerRef.current) clearTimeout(marcadosTimerRef.current);
+        marcadosTimerRef.current = setTimeout(() => {
+          axios.put(`${API_BASE_URL}/api/pacientes/${pacId}/marcados`, { marcados: next }, { headers: authHeaders }).catch(() => {});
+        }, 500);
       }
       return next;
     });
@@ -293,6 +298,33 @@ const HistorialClinico = () => {
         console.error("Error al obtener paquetes:", err);
         setPaquetesActivos([]);
       });
+
+    // Cargar productos del inventario para autocompletar en presupuestos
+    const cargarProductosInventario = async () => {
+      try {
+        const [variantesRes, productosRes] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/inventario/variantes`, { headers: authHeaders }).catch(() => ({ data: [] })),
+          axios.get(`${API_BASE_URL}/api/tratamientos/productos`, { headers: authHeaders }).catch(() => ({ data: [] })),
+        ]);
+        const variantes = (variantesRes.data || []).map(v => ({
+          label: `${v.producto_base_nombre || ''} ${v.nombre || ''}`.trim(),
+          value: `${v.producto_base_nombre || ''} ${v.nombre || ''}`.trim(),
+        }));
+        const productosOld = (productosRes.data || []).map(p => ({
+          label: `${p.producto || ''} ${p.marca || ''}`.trim(),
+          value: `${p.producto || ''} ${p.marca || ''}`.trim(),
+        }));
+        // Combinar y eliminar duplicados
+        const todos = [...variantes, ...productosOld];
+        const unicos = [...new Map(todos.map(p => [p.value.toLowerCase(), p])).values()]
+          .filter(p => p.value)
+          .sort((a, b) => a.label.localeCompare(b.label));
+        setProductosInventario(unicos);
+      } catch (err) {
+        console.error("Error al cargar productos inventario:", err);
+      }
+    };
+    cargarProductosInventario();
   }, []);
 
   const handleEliminarPaciente = async () => {
@@ -324,11 +356,10 @@ const HistorialClinico = () => {
       setOfertaEditId(null);
       setObservacionEditId(null);
       setObservacionEditTexto("");
-      // Restaurar marcas desde localStorage
-      try {
-        const saved = localStorage.getItem(`marcados_${id}`);
-        setTratamientosMarcadosRaw(saved ? JSON.parse(saved) : {});
-      } catch(e) { setTratamientosMarcadosRaw({}); }
+      // Restaurar marcas desde la base de datos
+      axios.get(`${API_BASE_URL}/api/pacientes/${id}/marcados`, { headers: authHeaders })
+        .then(res => setTratamientosMarcadosRaw(res.data || {}))
+        .catch(() => setTratamientosMarcadosRaw({}));
       setFotosPaciente([]);
       setMostrarTodasFotos(false);
       setArchivosFotosPaciente([]);
@@ -1434,6 +1465,43 @@ const HistorialClinico = () => {
     }
   };
 
+  // Eliminar un tratamiento individual de un presupuesto ya creado
+  const eliminarItemOferta = async (ofertaId, itemIdx) => {
+    if (!pacienteSeleccionado?.id) return;
+    const oferta = ofertas.find(o => o.id === ofertaId);
+    if (!oferta) return;
+    const items = oferta.items || [];
+    if (items.length <= 1) {
+      showToast({ severity: "warning", message: "No puedes eliminar el último tratamiento. Elimina el presupuesto completo." });
+      return;
+    }
+    const nuevoItems = items.filter((_, idx) => idx !== itemIdx);
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas/${ofertaId}`,
+        { items: nuevoItems.map(it => ({
+            tratamientoId: it.tratamientoId || it.tratamiento_id || 0,
+            nombre: it.nombre,
+            precio: it.precio,
+            sesiones: Number(it.sesiones) || 1,
+            producto: it.producto || "",
+            ml: it.ml || "",
+          }))
+        },
+        { headers: authHeaders }
+      );
+      const ofertasRes = await axios.get(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas`,
+        { headers: authHeaders }
+      );
+      setOfertas(Array.isArray(ofertasRes.data) ? ofertasRes.data : []);
+      showToast({ severity: "success", message: "Tratamiento eliminado del presupuesto" });
+    } catch (e) {
+      console.error("Error al eliminar item de oferta:", e);
+      showToast({ severity: "error", message: "Error al eliminar tratamiento" });
+    }
+  };
+
   const guardarObservacion = async () => {
     if (!pacienteSeleccionado?.id) return;
     try {
@@ -2114,9 +2182,22 @@ const HistorialClinico = () => {
                         fontWeight: "bold",
                       }}
                       onClick={() => {
-                        setConsultaGlobalSeleccion(null);
                         setMontoConsultaGlobal(100);
                         setMetodoPagoConsultaGlobal("efectivo");
+                        // Auto-detectar presupuestos/paquetes pendientes de consulta
+                        const presPendientes = presupuestosAsignados.filter(p => p.consulta_pagada !== 1 && p.estado_pago !== 'pagado' && p.pagado !== 1);
+                        const paqPendientes = paquetesPaciente.filter(p => p.consulta_pagada !== 1 && p.estado_pago !== 'pagado' && p.pagado !== 1);
+                        const todosItems = [
+                          ...presPendientes.map(p => ({ tipo: 'presupuesto', item: p })),
+                          ...paqPendientes.map(p => ({ tipo: 'paquete', item: p })),
+                        ];
+                        if (todosItems.length === 1) {
+                          setConsultaGlobalSeleccion(todosItems[0]);
+                        } else if (todosItems.length > 1) {
+                          setConsultaGlobalSeleccion(todosItems[0]);
+                        } else {
+                          setConsultaGlobalSeleccion({ tipo: 'directo', item: null });
+                        }
                         setModalPagoConsultaGlobal(true);
                       }}
                     >
@@ -2873,20 +2954,44 @@ const HistorialClinico = () => {
                             />
                           </Box>
                           <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start", mt: 1 }}>
-                            <TextField
-                              label="Producto"
-                              value={item?.producto ?? ""}
-                              onChange={(e) =>
-                                setOfertaProducto(t.id, e.target.value)
-                              }
-                              sx={{
-                                flex: 1,
-                                "& .MuiInputBase-root": {
-                                  backgroundColor: "rgba(255,255,255,0.72)",
-                                  borderRadius: 2,
-                                },
+                            <Autocomplete
+                              freeSolo
+                              options={productosInventario}
+                              getOptionLabel={(option) => typeof option === "string" ? option : option?.label || ""}
+                              value={item?.producto || ""}
+                              onChange={(e, newValue) => {
+                                const val = typeof newValue === "string" ? newValue : newValue?.value || "";
+                                setOfertaProducto(t.id, val);
                               }}
-                              placeholder="Ej: Ácido hialurónico"
+                              onInputChange={(e, newInputValue, reason) => {
+                                if (reason === "input") {
+                                  setOfertaProducto(t.id, newInputValue);
+                                }
+                              }}
+                              filterOptions={(options, { inputValue }) => {
+                                const term = (inputValue || "").toLowerCase();
+                                if (!term) return options.slice(0, 20);
+                                return options.filter(o => o.label.toLowerCase().includes(term)).slice(0, 20);
+                              }}
+                              sx={{ flex: 1 }}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  label="Producto"
+                                  placeholder="Escribir para buscar..."
+                                  sx={{
+                                    "& .MuiInputBase-root": {
+                                      backgroundColor: "rgba(255,255,255,0.72)",
+                                      borderRadius: 2,
+                                    },
+                                    "& .MuiOutlinedInput-root": {
+                                      "&:hover fieldset": { borderColor: "#a36920" },
+                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                                    },
+                                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                                  }}
+                                />
+                              )}
                             />
                             <TextField
                               label="ML"
@@ -3147,9 +3252,28 @@ const HistorialClinico = () => {
                                       )}
                                     </Box>
                                   </Box>
-                                  <Typography variant="body2" sx={{ fontWeight: "bold", color: "#a36920" }}>
-                                    S/ {Number(it.precio || 0).toFixed(2)}
-                                  </Typography>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: "bold", color: "#a36920" }}>
+                                      S/ {Number(it.precio || 0).toFixed(2)}
+                                    </Typography>
+                                    {!presupuestosAsignados.some(p => p.oferta_id === o.id) && items.length > 1 && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          eliminarItemOferta(o.id, idx);
+                                        }}
+                                        sx={{
+                                          color: "#d32f2f",
+                                          p: 0.3,
+                                          "&:hover": { backgroundColor: "rgba(211,47,47,0.08)" },
+                                        }}
+                                        title="Eliminar tratamiento"
+                                      >
+                                        <Close sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    )}
+                                  </Box>
                                 </Box>
                               ))}
                             </Box>
@@ -3822,10 +3946,10 @@ const HistorialClinico = () => {
                                   size="small"
                                   variant="outlined"
                                   onClick={() => {
-                                    setPresupuestoParaConsulta(presupuesto);
-                                    setMontoConsultaPresupuesto(100);
-                                    setMetodoPagoConsultaPresupuesto("efectivo");
-                                    setModalPagoConsultaPresupuesto(true);
+                                    setConsultaGlobalSeleccion({ tipo: 'presupuesto', item: presupuesto });
+                                    setMontoConsultaGlobal(100);
+                                    setMetodoPagoConsultaGlobal("efectivo");
+                                    setModalPagoConsultaGlobal(true);
                                   }}
                                   sx={{
                                     fontSize: "0.75rem",
@@ -4264,10 +4388,10 @@ const HistorialClinico = () => {
                                   size="small"
                                   variant="outlined"
                                   onClick={() => {
-                                    setPaqueteParaConsulta(paquete);
-                                    setMontoConsulta(100);
-                                    setMetodoPagoConsulta("efectivo");
-                                    setModalPagoConsulta(true);
+                                    setConsultaGlobalSeleccion({ tipo: 'paquete', item: paquete });
+                                    setMontoConsultaGlobal(100);
+                                    setMetodoPagoConsultaGlobal("efectivo");
+                                    setModalPagoConsultaGlobal(true);
                                   }}
                                   sx={{
                                     fontSize: "0.75rem",
@@ -5355,173 +5479,153 @@ const HistorialClinico = () => {
                 Paciente: <strong>{pacienteSeleccionado.nombre} {pacienteSeleccionado.apellido}</strong>
               </Typography>
 
-              {/* Opción: Pago directo */}
-              <Box
-                onClick={() => setConsultaGlobalSeleccion({ tipo: 'directo', item: null })}
-                sx={{
-                  p: 1.5,
-                  mb: 1,
-                  borderRadius: 2,
-                  cursor: "pointer",
-                  border: consultaGlobalSeleccion?.tipo === 'directo'
-                    ? "2px solid #9c27b0"
-                    : "1px solid #ddd",
-                  backgroundColor: consultaGlobalSeleccion?.tipo === 'directo'
-                    ? "rgba(156, 39, 176, 0.08)"
-                    : "transparent",
-                  "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                  💰 Pago directo de consulta
-                </Typography>
-                <Typography variant="caption" sx={{ color: "#666" }}>
-                  Se registra como ingreso en caja (sin asociar a paquete o presupuesto)
-                </Typography>
-              </Box>
+              {/* Info automática: dónde se aplicará */}
+              {consultaGlobalSeleccion && consultaGlobalSeleccion.tipo !== 'directo' && (
+                <Box sx={{ p: 1.5, mb: 2, borderRadius: 2, backgroundColor: "rgba(76, 175, 80, 0.08)", border: "1px solid rgba(76, 175, 80, 0.3)" }}>
+                  <Typography variant="body2" sx={{ fontWeight: "bold", color: "#2e7d32", mb: 0.5 }}>
+                    ✓ Se descontará automáticamente de:
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#2e7d32" }}>
+                    {consultaGlobalSeleccion.tipo === 'paquete' 
+                      ? `📦 Paquete: ${consultaGlobalSeleccion.item?.paquete_nombre || 'Paquete'}`
+                      : `📋 Presupuesto #${consultaGlobalSeleccion.item?.id}`
+                    }
+                    {' — '}S/ {(consultaGlobalSeleccion.item?.precio_total || 0).toFixed(2)}
+                    {consultaGlobalSeleccion.tipo === 'presupuesto' && (consultaGlobalSeleccion.item?.descuento || 0) > 0 
+                      ? ` (Desc: S/ ${(consultaGlobalSeleccion.item.descuento || 0).toFixed(2)})` 
+                      : ''}
+                  </Typography>
+                </Box>
+              )}
 
-              {/* Opciones: Paquetes pendientes de consulta */}
-              {paquetesPaciente
-                .filter(p => p.consulta_pagada !== 1 && p.estado_pago !== 'pagado' && p.pagado !== 1)
-                .map(paq => (
-                  <Box
-                    key={`paq-${paq.id}`}
-                    onClick={() => setConsultaGlobalSeleccion({ tipo: 'paquete', item: paq })}
-                    sx={{
-                      p: 1.5,
-                      mb: 1,
-                      borderRadius: 2,
-                      cursor: "pointer",
-                      border: consultaGlobalSeleccion?.tipo === 'paquete' && consultaGlobalSeleccion?.item?.id === paq.id
-                        ? "2px solid #9c27b0"
-                        : "1px solid #ddd",
-                      backgroundColor: consultaGlobalSeleccion?.tipo === 'paquete' && consultaGlobalSeleccion?.item?.id === paq.id
-                        ? "rgba(156, 39, 176, 0.08)"
-                        : "transparent",
-                      "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                      📦 Descontar de paquete: {paq.paquete_nombre}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: "#666" }}>
-                      Precio: S/ {(paq.precio_total || 0).toFixed(2)}
-                    </Typography>
-                  </Box>
-                ))}
+              {consultaGlobalSeleccion?.tipo === 'directo' && (
+                <Box sx={{ p: 1.5, mb: 2, borderRadius: 2, backgroundColor: "rgba(156, 39, 176, 0.08)", border: "1px solid rgba(156, 39, 176, 0.3)" }}>
+                  <Typography variant="body2" sx={{ color: "#7b1fa2" }}>
+                    💰 No hay presupuestos ni paquetes pendientes. Se registrará como ingreso directo en caja.
+                  </Typography>
+                </Box>
+              )}
 
-              {/* Opciones: Presupuestos pendientes de consulta */}
-              {presupuestosAsignados
-                .filter(p => p.consulta_pagada !== 1 && p.estado_pago !== 'pagado' && p.pagado !== 1)
-                .map(pres => (
-                  <Box
-                    key={`pres-${pres.id}`}
-                    onClick={() => setConsultaGlobalSeleccion({ tipo: 'presupuesto', item: pres })}
-                    sx={{
-                      p: 1.5,
-                      mb: 1,
-                      borderRadius: 2,
-                      cursor: "pointer",
-                      border: consultaGlobalSeleccion?.tipo === 'presupuesto' && consultaGlobalSeleccion?.item?.id === pres.id
-                        ? "2px solid #9c27b0"
-                        : "1px solid #ddd",
-                      backgroundColor: consultaGlobalSeleccion?.tipo === 'presupuesto' && consultaGlobalSeleccion?.item?.id === pres.id
-                        ? "rgba(156, 39, 176, 0.08)"
-                        : "transparent",
-                      "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                      📋 Descontar de presupuesto #{pres.id}
+              {/* Si hay múltiples opciones, mostrar selector compacto */}
+              {(() => {
+                const presPend = presupuestosAsignados.filter(p => p.consulta_pagada !== 1 && p.estado_pago !== 'pagado' && p.pagado !== 1);
+                const paqPend = paquetesPaciente.filter(p => p.consulta_pagada !== 1 && p.estado_pago !== 'pagado' && p.pagado !== 1);
+                const totalOpciones = presPend.length + paqPend.length;
+                if (totalOpciones <= 1) return null;
+                return (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="caption" sx={{ color: "#666", mb: 1, display: "block" }}>
+                      Hay {totalOpciones} opciones disponibles. Selecciona dónde descontar:
                     </Typography>
-                    <Typography variant="caption" sx={{ color: "#666" }}>
-                      Precio: S/ {(pres.precio_total || 0).toFixed(2)} {pres.descuento > 0 ? `(Desc: S/ ${pres.descuento.toFixed(2)})` : ''}
-                    </Typography>
-                  </Box>
-                ))}
-
-              {consultaGlobalSeleccion && (
-                <>
-                  <Divider sx={{ my: 2 }} />
-
-                  {consultaGlobalSeleccion.tipo === 'directo' && (
-                    <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
-                      ℹ️ El monto se registrará directamente como ingreso de consulta en la caja.
-                    </Typography>
-                  )}
-                  {consultaGlobalSeleccion.tipo === 'paquete' && (
-                    <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
-                      ℹ️ El monto de la consulta se descontará del precio total del paquete.
-                    </Typography>
-                  )}
-                  {consultaGlobalSeleccion.tipo === 'presupuesto' && (
-                    <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
-                      ℹ️ El monto de la consulta se sumará al descuento del presupuesto.
-                    </Typography>
-                  )}
-
-                  <TextField
-                    fullWidth
-                    label="Monto de Consulta (S/)"
-                    type="number"
-                    value={montoConsultaGlobal}
-                    onChange={(e) => setMontoConsultaGlobal(e.target.value)}
-                    inputProps={{ min: 0, step: 0.01 }}
-                    sx={{ mb: 2 }}
-                  />
-
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel>Método de Pago</InputLabel>
-                    <Select
-                      value={metodoPagoConsultaGlobal}
-                      onChange={(e) => setMetodoPagoConsultaGlobal(e.target.value)}
-                      label="Método de Pago"
+                    {paqPend.map(paq => (
+                      <Box
+                        key={`paq-${paq.id}`}
+                        onClick={() => setConsultaGlobalSeleccion({ tipo: 'paquete', item: paq })}
+                        sx={{
+                          p: 1, mb: 0.5, borderRadius: 1.5, cursor: "pointer",
+                          border: consultaGlobalSeleccion?.tipo === 'paquete' && consultaGlobalSeleccion?.item?.id === paq.id
+                            ? "2px solid #9c27b0" : "1px solid #e0e0e0",
+                          backgroundColor: consultaGlobalSeleccion?.tipo === 'paquete' && consultaGlobalSeleccion?.item?.id === paq.id
+                            ? "rgba(156, 39, 176, 0.08)" : "transparent",
+                          "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
+                          📦 {paq.paquete_nombre} — S/ {(paq.precio_total || 0).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    ))}
+                    {presPend.map(pres => (
+                      <Box
+                        key={`pres-${pres.id}`}
+                        onClick={() => setConsultaGlobalSeleccion({ tipo: 'presupuesto', item: pres })}
+                        sx={{
+                          p: 1, mb: 0.5, borderRadius: 1.5, cursor: "pointer",
+                          border: consultaGlobalSeleccion?.tipo === 'presupuesto' && consultaGlobalSeleccion?.item?.id === pres.id
+                            ? "2px solid #9c27b0" : "1px solid #e0e0e0",
+                          backgroundColor: consultaGlobalSeleccion?.tipo === 'presupuesto' && consultaGlobalSeleccion?.item?.id === pres.id
+                            ? "rgba(156, 39, 176, 0.08)" : "transparent",
+                          "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
+                          📋 Presupuesto #{pres.id} — S/ {(pres.precio_total || 0).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    ))}
+                    <Box
+                      onClick={() => setConsultaGlobalSeleccion({ tipo: 'directo', item: null })}
+                      sx={{
+                        p: 1, mb: 0.5, borderRadius: 1.5, cursor: "pointer",
+                        border: consultaGlobalSeleccion?.tipo === 'directo'
+                          ? "2px solid #9c27b0" : "1px solid #e0e0e0",
+                        backgroundColor: consultaGlobalSeleccion?.tipo === 'directo'
+                          ? "rgba(156, 39, 176, 0.08)" : "transparent",
+                        "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                      }}
                     >
-                      <MenuItem value="efectivo">Efectivo</MenuItem>
-                      <MenuItem value="tarjeta">Tarjeta</MenuItem>
-                      <MenuItem value="transferencia">Transferencia</MenuItem>
-                      <MenuItem value="yape">Yape</MenuItem>
-                      <MenuItem value="plin">Plin</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <Box sx={{ p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#7b1fa2", mb: 1 }}>
-                      📊 Resumen
-                    </Typography>
-                    {consultaGlobalSeleccion.tipo !== 'directo' && (
-                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                        <Typography variant="body2" color="text.secondary">Precio original:</Typography>
-                        <Typography sx={{ fontWeight: "bold" }}>S/ {(consultaGlobalSeleccion.item?.precio_total || 0).toFixed(2)}</Typography>
-                      </Box>
-                    )}
-                    {consultaGlobalSeleccion.tipo === 'presupuesto' && (consultaGlobalSeleccion.item?.descuento || 0) > 0 && (
-                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                        <Typography variant="body2" color="text.secondary">Descuento anterior:</Typography>
-                        <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>- S/ {(consultaGlobalSeleccion.item.descuento || 0).toFixed(2)}</Typography>
-                      </Box>
-                    )}
-                    <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-                      <Typography variant="body2" color="text.secondary">Monto consulta:</Typography>
-                      <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>S/ {Number(montoConsultaGlobal).toFixed(2)}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
+                        💰 Pago directo (sin descontar)
+                      </Typography>
                     </Box>
-                    {consultaGlobalSeleccion.tipo !== 'directo' && (
-                      <>
-                        <Divider sx={{ my: 1 }} />
-                        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                          <Typography variant="body2" sx={{ fontWeight: "bold" }}>Nuevo precio:</Typography>
-                          <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
-                            S/ {(
-                              (consultaGlobalSeleccion.item?.precio_total || 0)
-                              - (consultaGlobalSeleccion.tipo === 'presupuesto' ? (consultaGlobalSeleccion.item?.descuento || 0) : 0)
-                              - Number(montoConsultaGlobal)
-                            ).toFixed(2)}
-                          </Typography>
-                        </Box>
-                      </>
-                    )}
                   </Box>
-                </>
+                );
+              })()}
+
+              <TextField
+                fullWidth
+                label="Monto de Consulta (S/)"
+                type="number"
+                value={montoConsultaGlobal}
+                onChange={(e) => setMontoConsultaGlobal(e.target.value)}
+                inputProps={{ min: 0, step: 0.01 }}
+                sx={{ mb: 2 }}
+              />
+
+              <FormControl fullWidth sx={{ mb: 2 }}>
+                <InputLabel>Método de Pago</InputLabel>
+                <Select
+                  value={metodoPagoConsultaGlobal}
+                  onChange={(e) => setMetodoPagoConsultaGlobal(e.target.value)}
+                  label="Método de Pago"
+                >
+                  <MenuItem value="efectivo">Efectivo</MenuItem>
+                  <MenuItem value="tarjeta">Tarjeta</MenuItem>
+                  <MenuItem value="transferencia">Transferencia</MenuItem>
+                  <MenuItem value="yape">Yape</MenuItem>
+                  <MenuItem value="plin">Plin</MenuItem>
+                </Select>
+              </FormControl>
+
+              {/* Resumen visual */}
+              {consultaGlobalSeleccion && consultaGlobalSeleccion.tipo !== 'directo' && (
+                <Box sx={{ p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.08)", borderRadius: 2 }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary">Precio actual:</Typography>
+                    <Typography sx={{ fontWeight: "bold" }}>
+                      S/ {(
+                        (consultaGlobalSeleccion.item?.precio_total || 0)
+                        - (consultaGlobalSeleccion.tipo === 'presupuesto' ? (consultaGlobalSeleccion.item?.descuento || 0) : 0)
+                      ).toFixed(2)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+                    <Typography variant="body2" color="text.secondary">Consulta:</Typography>
+                    <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {Number(montoConsultaGlobal || 0).toFixed(2)}</Typography>
+                  </Box>
+                  <Divider sx={{ my: 0.5 }} />
+                  <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                    <Typography variant="body2" sx={{ fontWeight: "bold" }}>Nuevo saldo a pagar:</Typography>
+                    <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
+                      S/ {Math.max(0,
+                        (consultaGlobalSeleccion.item?.precio_total || 0)
+                        - (consultaGlobalSeleccion.tipo === 'presupuesto' ? (consultaGlobalSeleccion.item?.descuento || 0) : 0)
+                        - (consultaGlobalSeleccion.item?.monto_pagado || 0)
+                        - Number(montoConsultaGlobal || 0)
+                      ).toFixed(2)}
+                    </Typography>
+                  </Box>
+                </Box>
               )}
             </>
           )}
@@ -5561,7 +5665,7 @@ const HistorialClinico = () => {
               "&:hover": { backgroundColor: "#7b1fa2" },
             }}
           >
-            Confirmar Pago de Consulta
+            Confirmar Pago
           </Button>
         </DialogActions>
       </Dialog>

@@ -939,6 +939,18 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE INDEX IF NOT EXISTS idx_movimientos_detalle_movimiento ON movimientos_detalle(movimiento_id)");
     db.run("CREATE INDEX IF NOT EXISTS idx_movimientos_detalle_variante ON movimientos_detalle(variante_id)");
 
+    // 📌 Tabla para persistir marcas de tratamientos en presupuestos (sincroniza entre dispositivos)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS patient_marcados (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL UNIQUE,
+        marcados_json TEXT NOT NULL DEFAULT '{}',
+        actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_patient_marcados_paciente ON patient_marcados(paciente_id)");
+
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
 

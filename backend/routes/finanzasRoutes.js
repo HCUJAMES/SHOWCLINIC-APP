@@ -244,8 +244,10 @@ router.get("/reporte", (req, res) => {
           return "Deuda";
         }
         
-        // Si no tiene ningún pago registrado pero tiene precio, es deuda
-        if (!tieneTablaPagos && !tienePagoEnPartesLegacy && precioTotal > 0) {
+        // Si existe un registro de deuda (deuda_estado no es null) pero no tiene pagos registrados,
+        // verificar si el saldo legacy indica deuda pendiente.
+        // Si NO existe registro de deuda (deuda_estado es null), el tratamiento fue pagado en su totalidad.
+        if (r.deuda_estado && !tieneTablaPagos && !tienePagoEnPartesLegacy && precioTotal > 0) {
           const adelanto = parseFloat(r.monto_adelanto) || 0;
           const cancelado = parseFloat(r.cancelado_monto) || 0;
           const totalPagadoLegacy = adelanto + cancelado;
