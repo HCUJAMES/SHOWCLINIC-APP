@@ -127,6 +127,7 @@ const HistorialClinico = () => {
   const [paquetesPaciente, setPaquetesPaciente] = useState([]);
   const [asignandoPaquete, setAsignandoPaquete] = useState(false);
   const [presupuestosAsignados, setPresupuestosAsignados] = useState([]);
+  const [editandoSesiones, setEditandoSesiones] = useState(null); // { ofertaId, itemIdx, sesiones }
   const [asignandoPresupuesto, setAsignandoPresupuesto] = useState(false);
   const [showOferta, setShowOferta] = useState(false);
   const [ofertaItems, setOfertaItems] = useState([]);
@@ -252,6 +253,7 @@ const HistorialClinico = () => {
   const userRole = localStorage.getItem("role");
   const isMaster = userRole === "master";
   const isAdmin = userRole === "admin";
+  const isDoctor = userRole === "doctor";
   const canDoActions = isMaster || isAdmin;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -1495,10 +1497,53 @@ const HistorialClinico = () => {
         { headers: authHeaders }
       );
       setOfertas(Array.isArray(ofertasRes.data) ? ofertasRes.data : []);
+      // Recargar presupuestos asignados (se sincronizan en backend)
+      try {
+        const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, { headers: authHeaders });
+        setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      } catch (_) {}
       showToast({ severity: "success", message: "Tratamiento eliminado del presupuesto" });
     } catch (e) {
       console.error("Error al eliminar item de oferta:", e);
       showToast({ severity: "error", message: "Error al eliminar tratamiento" });
+    }
+  };
+
+  // Editar número de sesiones de un tratamiento en un presupuesto
+  const editarSesionesOferta = async (ofertaId, itemIdx, nuevasSesiones) => {
+    if (!pacienteSeleccionado?.id) return;
+    const oferta = ofertas.find(o => o.id === ofertaId);
+    if (!oferta) return;
+    const items = oferta.items || [];
+    const nuevoItems = items.map((it, idx) => ({
+      tratamientoId: it.tratamientoId || it.tratamiento_id || 0,
+      nombre: it.nombre,
+      precio: it.precio,
+      sesiones: idx === itemIdx ? Math.max(1, Number(nuevasSesiones) || 1) : (Number(it.sesiones) || 1),
+      producto: it.producto || "",
+      ml: it.ml || "",
+    }));
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas/${ofertaId}`,
+        { items: nuevoItems },
+        { headers: authHeaders }
+      );
+      const ofertasRes = await axios.get(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas`,
+        { headers: authHeaders }
+      );
+      setOfertas(Array.isArray(ofertasRes.data) ? ofertasRes.data : []);
+      // Recargar presupuestos asignados (se sincronizan en backend)
+      try {
+        const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, { headers: authHeaders });
+        setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      } catch (_) {}
+      setEditandoSesiones(null);
+      showToast({ severity: "success", message: "Sesiones actualizadas" });
+    } catch (e) {
+      console.error("Error al editar sesiones:", e);
+      showToast({ severity: "error", message: "Error al editar sesiones" });
     }
   };
 
@@ -3237,9 +3282,45 @@ const HistorialClinico = () => {
                                         color: tratamientosMarcados[`${o.id}-${idx}`] ? "#b8860b" : "inherit",
                                       }}>
                                         {it.nombre}
-                                        {Number(it.sesiones) > 1 && (
-                                          <Typography component="span" variant="caption" sx={{ ml: 0.5, color: "#888", fontWeight: 600 }}>
-                                            ({it.sesiones} sesiones)
+                                        {editandoSesiones?.ofertaId === o.id && editandoSesiones?.itemIdx === idx ? (
+                                          <Box component="span" sx={{ ml: 0.5, display: "inline-flex", alignItems: "center", gap: 0.3 }}>
+                                            <input
+                                              type="number"
+                                              min="1"
+                                              value={editandoSesiones.sesiones}
+                                              onChange={(e) => setEditandoSesiones({ ...editandoSesiones, sesiones: e.target.value })}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') editarSesionesOferta(o.id, idx, editandoSesiones.sesiones);
+                                                if (e.key === 'Escape') setEditandoSesiones(null);
+                                              }}
+                                              autoFocus
+                                              style={{ width: 40, fontSize: "0.75rem", textAlign: "center", borderRadius: 4, border: "1px solid #a36920", padding: "1px 2px" }}
+                                            />
+                                            <Typography 
+                                              component="span" variant="caption" 
+                                              sx={{ color: "#4caf50", cursor: "pointer", fontWeight: "bold", "&:hover": { color: "#2e7d32" } }}
+                                              onClick={(e) => { e.stopPropagation(); editarSesionesOferta(o.id, idx, editandoSesiones.sesiones); }}
+                                            >✓</Typography>
+                                            <Typography 
+                                              component="span" variant="caption" 
+                                              sx={{ color: "#f44336", cursor: "pointer", fontWeight: "bold", "&:hover": { color: "#c62828" } }}
+                                              onClick={(e) => { e.stopPropagation(); setEditandoSesiones(null); }}
+                                            >✕</Typography>
+                                          </Box>
+                                        ) : (
+                                          <Typography 
+                                            component="span" variant="caption" 
+                                            sx={{ 
+                                              ml: 0.5, color: "#888", fontWeight: 600,
+                                              ...(isDoctor || isMaster ? { cursor: "pointer", "&:hover": { color: "#a36920", textDecoration: "underline" } } : {})
+                                            }}
+                                            onClick={(isDoctor || isMaster) ? (e) => {
+                                              e.stopPropagation();
+                                              setEditandoSesiones({ ofertaId: o.id, itemIdx: idx, sesiones: Number(it.sesiones) || 1 });
+                                            } : undefined}
+                                          >
+                                            ({Number(it.sesiones) || 1} {Number(it.sesiones) === 1 ? 'sesión' : 'sesiones'})
+                                            {(isDoctor || isMaster) && <Edit sx={{ fontSize: 11, ml: 0.3, verticalAlign: "middle", color: "#aaa" }} />}
                                           </Typography>
                                         )}
                                       </Typography>
@@ -3256,7 +3337,7 @@ const HistorialClinico = () => {
                                     <Typography variant="body2" sx={{ fontWeight: "bold", color: "#a36920" }}>
                                       S/ {Number(it.precio || 0).toFixed(2)}
                                     </Typography>
-                                    {!presupuestosAsignados.some(p => p.oferta_id === o.id) && items.length > 1 && (
+                                    {(isDoctor || isMaster) && items.length > 1 && (
                                       <IconButton
                                         size="small"
                                         onClick={(e) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Container,
   Typography,
@@ -122,6 +122,7 @@ const Finanzas = () => {
   const [filtroMes, setFiltroMes] = useState("");
   const [filtroAnio, setFiltroAnio] = useState("");
   const [filtroRapido, setFiltroRapido] = useState("");
+  const [fetchTrigger, setFetchTrigger] = useState(0);
 
   const { showToast } = useToast();
 
@@ -304,7 +305,7 @@ const Finanzas = () => {
     const hoy = hoyISO();
     setFechaInicio(hoy);
     setFechaFin(hoy);
-    setTimeout(obtenerReporte, 0);
+    setFetchTrigger(t => t + 1);
   };
 
   const filtrarPorSemana = () => {
@@ -323,7 +324,7 @@ const Finanzas = () => {
     
     setFechaInicio(formatoISO(primerDia));
     setFechaFin(formatoISO(ultimoDia));
-    setTimeout(obtenerReporte, 0);
+    setFetchTrigger(t => t + 1);
   };
 
   const filtrarPorMes = () => {
@@ -340,7 +341,7 @@ const Finanzas = () => {
     
     setFechaInicio(formatoISO(primerDia));
     setFechaFin(formatoISO(ultimoDia));
-    setTimeout(obtenerReporte, 0);
+    setFetchTrigger(t => t + 1);
   };
 
   const meses = [
@@ -396,8 +397,16 @@ const Finanzas = () => {
       return; // Nada seleccionado
     }
     setFiltroRapido("");
-    setTimeout(obtenerReporte, 0);
+    setFetchTrigger(t => t + 1);
   };
+
+  // Auto-fetch cuando cambian los filtros (fetchTrigger se incrementa después de setFechaInicio/setFechaFin)
+  useEffect(() => {
+    if (fetchTrigger > 0) {
+      obtenerReporte();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchTrigger]);
 
   const obtenerReporte = async () => {
     try {
@@ -591,246 +600,253 @@ const Finanzas = () => {
             </IconButton>
           </Box>
 
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                label="Paciente"
-                value={paciente}
-                onChange={(e) => setPaciente(e.target.value)}
-                fullWidth
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                select
-                label="Método de pago"
-                value={metodoPago}
-                onChange={(e) => setMetodoPago(e.target.value)}
-                fullWidth
-              >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="Efectivo">Efectivo</MenuItem>
-                <MenuItem value="Tarjeta">Tarjeta</MenuItem>
-                <MenuItem value="Transferencia">Transferencia</MenuItem>
-                <MenuItem value="Yape">Yape</MenuItem>
-                <MenuItem value="Plin">Plin</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={6} sm={2}>
-              <TextField
-                label="Desde"
-                type="date"
-                InputLabelProps={{ shrink: true }}
-                value={fechaInicio}
-                onChange={(e) => setFechaInicio(e.target.value)}
-                fullWidth
-              />
-            </Grid>
-            <Grid item xs={6} sm={2}>
-              <TextField
-                label="Hasta"
-                type="date"
-                InputLabelProps={{ shrink: true }}
-                value={fechaFin}
-                onChange={(e) => setFechaFin(e.target.value)}
-                fullWidth
-              />
-            </Grid>
-            {/* Filtro inteligente: Día / Mes / Año */}
-            <Grid item xs={12}>
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 2,
-                  borderRadius: 3,
-                  backgroundColor: "rgba(163,105,32,0.04)",
-                  border: "1px solid rgba(163,105,32,0.15)",
-                }}
-              >
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: colorPrincipal, mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-                  <CalendarMonth fontSize="small" /> Filtro Rápido
-                </Typography>
-                <Grid container spacing={1.5} alignItems="center">
-                  <Grid item xs={4} sm={2.5}>
-                    <TextField
-                      select
-                      label="Día"
-                      size="small"
-                      fullWidth
-                      value={filtroDia}
-                      onChange={(e) => {
-                        const d = e.target.value;
-                        setFiltroDia(d);
-                        setFiltroRapido("custom");
-                        aplicarFiltroInteligente(d ? Number(d) : "", filtroMes ? Number(filtroMes) : "", filtroAnio ? Number(filtroAnio) : "");
-                      }}
-                      sx={{ 
-                        "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2 },
-                        "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
-                        "& .MuiInputLabel-root.Mui-focused": { color: colorPrincipal },
-                      }}
-                    >
-                      <MenuItem value="">—</MenuItem>
-                      {Array.from({ length: diasDelMes(filtroMes ? Number(filtroMes) : null, filtroAnio ? Number(filtroAnio) : null) }, (_, i) => (
-                        <MenuItem key={i + 1} value={i + 1}>{i + 1}</MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={4} sm={3.5}>
-                    <TextField
-                      select
-                      label="Mes"
-                      size="small"
-                      fullWidth
-                      value={filtroMes}
-                      onChange={(e) => {
-                        const m = e.target.value;
-                        setFiltroMes(m);
-                        setFiltroRapido("custom");
-                        // Ajustar día si excede el máximo del nuevo mes
-                        const maxDia = diasDelMes(m ? Number(m) : null, filtroAnio ? Number(filtroAnio) : null);
-                        let diaActual = filtroDia ? Number(filtroDia) : "";
-                        if (diaActual && diaActual > maxDia) { diaActual = maxDia; setFiltroDia(String(maxDia)); }
-                        aplicarFiltroInteligente(diaActual ? Number(diaActual) : "", m ? Number(m) : "", filtroAnio ? Number(filtroAnio) : "");
-                      }}
-                      sx={{ 
-                        "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2 },
-                        "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
-                        "& .MuiInputLabel-root.Mui-focused": { color: colorPrincipal },
-                      }}
-                    >
-                      <MenuItem value="">—</MenuItem>
-                      {meses.map((m) => (
-                        <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={4} sm={2.5}>
-                    <TextField
-                      select
-                      label="Año"
-                      size="small"
-                      fullWidth
-                      value={filtroAnio}
-                      onChange={(e) => {
-                        const a = e.target.value;
-                        setFiltroAnio(a);
-                        setFiltroRapido("custom");
-                        aplicarFiltroInteligente(filtroDia ? Number(filtroDia) : "", filtroMes ? Number(filtroMes) : "", a ? Number(a) : "");
-                      }}
-                      sx={{ 
-                        "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2 },
-                        "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
-                        "& .MuiInputLabel-root.Mui-focused": { color: colorPrincipal },
-                      }}
-                    >
-                      <MenuItem value="">—</MenuItem>
-                      {aniosDisponibles.map((a) => (
-                        <MenuItem key={a} value={a}>{a}</MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={6} sm={1.75}>
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      size="small"
-                      sx={{
-                        backgroundColor: colorPrincipal,
-                        color: "white",
-                        fontWeight: "bold",
-                        height: 40,
-                        "&:hover": { backgroundColor: "#8a5a1a" },
-                      }}
-                      onClick={obtenerReporte}
-                    >
-                      Filtrar
-                    </Button>
-                  </Grid>
-                  <Grid item xs={6} sm={1.75}>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      size="small"
-                      sx={{
-                        borderColor: "#999",
-                        color: "#666",
-                        fontWeight: "bold",
-                        height: 40,
-                        "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
-                      }}
-                      onClick={() => {
-                        setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); setFiltroRapido("");
-                        setFechaInicio(""); setFechaFin("");
-                      }}
-                    >
-                      Limpiar
-                    </Button>
-                  </Grid>
-                </Grid>
-
-                {/* Accesos rápidos */}
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 2 }}>
-                  {[
-                    { label: "Hoy", key: "hoy", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("hoy"); } },
-                    { label: "Esta semana", key: "semana", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorSemana(); setFiltroRapido("semana"); } },
-                    { label: "Este mes", key: "mes", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorMes(); setFiltroRapido("mes"); } },
-                  ].map((btn) => (
-                    <Button
-                      key={btn.key}
-                      variant={filtroRapido === btn.key ? "contained" : "outlined"}
-                      size="small"
-                      onClick={btn.action}
-                      sx={{
-                        backgroundColor: filtroRapido === btn.key ? colorPrincipal : "transparent",
-                        borderColor: colorPrincipal,
-                        color: filtroRapido === btn.key ? "white" : colorPrincipal,
-                        fontWeight: "bold",
-                        fontSize: "0.75rem",
-                        px: 2,
-                        "&:hover": { backgroundColor: filtroRapido === btn.key ? "#8a5a1a" : "rgba(163,105,32,0.08)" },
-                      }}
-                    >
-                      {btn.label}
-                    </Button>
-                  ))}
-                  <Button
-                    variant={filtroRapido === "caja" ? "contained" : "outlined"}
-                    size="small"
-                    onClick={() => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("caja"); }}
-                    sx={{
-                      backgroundColor: filtroRapido === "caja" ? "#2e7d32" : "transparent",
-                      borderColor: "#2e7d32",
-                      color: filtroRapido === "caja" ? "white" : "#2e7d32",
-                      fontWeight: "bold",
-                      fontSize: "0.75rem",
-                      px: 2,
-                      "&:hover": { backgroundColor: filtroRapido === "caja" ? "#1b5e20" : "rgba(46,125,50,0.08)" },
-                    }}
-                  >
-                    Cierre de caja
-                  </Button>
-                </Box>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12}>
+          {/* ===== FILTROS ===== */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2.5,
+              borderRadius: 3,
+              background: "linear-gradient(135deg, rgba(163,105,32,0.03) 0%, rgba(212,175,55,0.06) 100%)",
+              border: "1px solid rgba(163,105,32,0.15)",
+              mb: 1,
+            }}
+          >
+            {/* Accesos rápidos — arriba, prominentes */}
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2.5 }}>
+              {[
+                { label: "📅 Hoy", key: "hoy", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("hoy"); } },
+                { label: "📆 Esta semana", key: "semana", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorSemana(); setFiltroRapido("semana"); } },
+                { label: "🗓️ Este mes", key: "mes", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorMes(); setFiltroRapido("mes"); } },
+              ].map((btn) => (
+                <Button
+                  key={btn.key}
+                  variant={filtroRapido === btn.key ? "contained" : "outlined"}
+                  size="small"
+                  onClick={btn.action}
+                  sx={{
+                    backgroundColor: filtroRapido === btn.key ? colorPrincipal : "white",
+                    borderColor: filtroRapido === btn.key ? colorPrincipal : "rgba(163,105,32,0.3)",
+                    color: filtroRapido === btn.key ? "white" : colorPrincipal,
+                    fontWeight: 700,
+                    fontSize: "0.8rem",
+                    px: 2.5,
+                    py: 0.8,
+                    borderRadius: 2.5,
+                    textTransform: "none",
+                    boxShadow: filtroRapido === btn.key ? "0 2px 8px rgba(163,105,32,0.3)" : "0 1px 3px rgba(0,0,0,0.06)",
+                    "&:hover": { 
+                      backgroundColor: filtroRapido === btn.key ? "#8a5a1a" : "rgba(163,105,32,0.06)",
+                      boxShadow: "0 2px 8px rgba(163,105,32,0.2)",
+                    },
+                  }}
+                >
+                  {btn.label}
+                </Button>
+              ))}
               <Button
-                variant="outlined"
-                startIcon={<SwapVert />}
+                variant={filtroRapido === "caja" ? "contained" : "outlined"}
                 size="small"
+                onClick={() => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("caja"); }}
                 sx={{
-                  borderColor: colorPrincipal,
-                  color: colorPrincipal,
-                  fontWeight: "bold",
-                  "&:hover": { backgroundColor: "rgba(246,227,197,0.75)" },
+                  backgroundColor: filtroRapido === "caja" ? "#2e7d32" : "white",
+                  borderColor: filtroRapido === "caja" ? "#2e7d32" : "rgba(46,125,50,0.3)",
+                  color: filtroRapido === "caja" ? "white" : "#2e7d32",
+                  fontWeight: 700,
+                  fontSize: "0.8rem",
+                  px: 2.5,
+                  py: 0.8,
+                  borderRadius: 2.5,
+                  textTransform: "none",
+                  boxShadow: filtroRapido === "caja" ? "0 2px 8px rgba(46,125,50,0.3)" : "0 1px 3px rgba(0,0,0,0.06)",
+                  "&:hover": { backgroundColor: filtroRapido === "caja" ? "#1b5e20" : "rgba(46,125,50,0.06)" },
                 }}
+              >
+                💰 Cierre de caja
+              </Button>
+            </Box>
+
+            {/* Filtros por Día / Mes / Año */}
+            <Grid container spacing={1.5} alignItems="flex-end">
+              <Grid item xs={4} sm={2}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: colorPrincipal, mb: 0.5, display: "block", fontSize: "0.75rem", letterSpacing: 0.5 }}>
+                  DÍA
+                </Typography>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  value={filtroDia}
+                  onChange={(e) => {
+                    const d = e.target.value;
+                    setFiltroDia(d);
+                    setFiltroRapido("custom");
+                    aplicarFiltroInteligente(d ? Number(d) : "", filtroMes ? Number(filtroMes) : "", filtroAnio ? Number(filtroAnio) : "");
+                  }}
+                  sx={{ 
+                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                  }}
+                >
+                  <MenuItem value="">Todos</MenuItem>
+                  {Array.from({ length: diasDelMes(filtroMes ? Number(filtroMes) : null, filtroAnio ? Number(filtroAnio) : null) }, (_, i) => (
+                    <MenuItem key={i + 1} value={i + 1}>{i + 1}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={4} sm={3}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: colorPrincipal, mb: 0.5, display: "block", fontSize: "0.75rem", letterSpacing: 0.5 }}>
+                  MES
+                </Typography>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  value={filtroMes}
+                  onChange={(e) => {
+                    const m = e.target.value;
+                    setFiltroMes(m);
+                    setFiltroRapido("custom");
+                    const maxDia = diasDelMes(m ? Number(m) : null, filtroAnio ? Number(filtroAnio) : null);
+                    let diaActual = filtroDia ? Number(filtroDia) : "";
+                    if (diaActual && diaActual > maxDia) { diaActual = maxDia; setFiltroDia(String(maxDia)); }
+                    aplicarFiltroInteligente(diaActual ? Number(diaActual) : "", m ? Number(m) : "", filtroAnio ? Number(filtroAnio) : "");
+                  }}
+                  sx={{ 
+                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                  }}
+                >
+                  <MenuItem value="">Todos</MenuItem>
+                  {meses.map((m) => (
+                    <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={4} sm={2}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: colorPrincipal, mb: 0.5, display: "block", fontSize: "0.75rem", letterSpacing: 0.5 }}>
+                  AÑO
+                </Typography>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  value={filtroAnio}
+                  onChange={(e) => {
+                    const a = e.target.value;
+                    setFiltroAnio(a);
+                    setFiltroRapido("custom");
+                    aplicarFiltroInteligente(filtroDia ? Number(filtroDia) : "", filtroMes ? Number(filtroMes) : "", a ? Number(a) : "");
+                  }}
+                  sx={{ 
+                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                  }}
+                >
+                  <MenuItem value="">Todos</MenuItem>
+                  {aniosDisponibles.map((a) => (
+                    <MenuItem key={a} value={a}>{a}</MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={6} sm={2.5}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: colorPrincipal, mb: 0.5, display: "block", fontSize: "0.75rem", letterSpacing: 0.5 }}>
+                  PACIENTE
+                </Typography>
+                <TextField
+                  size="small"
+                  placeholder="Buscar..."
+                  value={paciente}
+                  onChange={(e) => setPaciente(e.target.value)}
+                  fullWidth
+                  sx={{ 
+                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6} sm={2.5}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: colorPrincipal, mb: 0.5, display: "block", fontSize: "0.75rem", letterSpacing: 0.5 }}>
+                  MÉTODO
+                </Typography>
+                <TextField
+                  select
+                  size="small"
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value)}
+                  fullWidth
+                  sx={{ 
+                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                  }}
+                >
+                  <MenuItem value="">Todos</MenuItem>
+                  <MenuItem value="Efectivo">Efectivo</MenuItem>
+                  <MenuItem value="Tarjeta">Tarjeta</MenuItem>
+                  <MenuItem value="Transferencia">Transferencia</MenuItem>
+                  <MenuItem value="Yape">Yape</MenuItem>
+                  <MenuItem value="Plin">Plin</MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
+
+            {/* Botones de acción */}
+            <Box sx={{ display: "flex", gap: 1, mt: 2, justifyContent: "flex-end", flexWrap: "wrap", alignItems: "center" }}>
+              <Button
+                variant="text"
+                size="small"
+                startIcon={<SwapVert />}
                 onClick={toggleOrden}
+                sx={{
+                  color: "#666",
+                  fontWeight: 600,
+                  textTransform: "none",
+                  fontSize: "0.8rem",
+                  mr: "auto",
+                  "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
+                }}
               >
                 {ordenDescendente ? "Más recientes primero" : "Más antiguos primero"}
               </Button>
-            </Grid>
-          </Grid>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => {
+                  setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); setFiltroRapido("");
+                  setFechaInicio(""); setFechaFin(""); setPaciente(""); setMetodoPago("");
+                  setReporte([]); setTotalGeneral(0); setTotalBruto(0); setTotalComision(0); setTotalesMetodo({});
+                }}
+                sx={{
+                  borderColor: "#bbb",
+                  color: "#777",
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontSize: "0.8rem",
+                  "&:hover": { backgroundColor: "rgba(0,0,0,0.04)", borderColor: "#999" },
+                }}
+              >
+                Limpiar
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={obtenerReporte}
+                sx={{
+                  backgroundColor: colorPrincipal,
+                  color: "white",
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontSize: "0.85rem",
+                  px: 3,
+                  boxShadow: "0 2px 8px rgba(163,105,32,0.25)",
+                  "&:hover": { backgroundColor: "#8a5a1a" },
+                }}
+              >
+                🔍 Buscar
+              </Button>
+            </Box>
+          </Paper>
 
           <Divider sx={{ my: 3 }} />
 
@@ -950,7 +966,7 @@ const Finanzas = () => {
 
               <Divider sx={{ my: 3 }} />
 
-              {/* Resumen de ingresos profesional */}
+              {/* Resumen de ingresos — solo del filtro actual */}
               <Paper
                 elevation={0}
                 sx={{
@@ -960,9 +976,17 @@ const Finanzas = () => {
                   border: "1px solid rgba(163,105,32,0.18)",
                 }}
               >
-                <Typography variant="h6" sx={{ fontWeight: "bold", color: colorPrincipal, mb: 2.5, display: "flex", alignItems: "center", gap: 1 }}>
-                  <AttachMoney /> Resumen de Ingresos
-                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5, flexWrap: "wrap", gap: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: "bold", color: colorPrincipal, display: "flex", alignItems: "center", gap: 1 }}>
+                    <AttachMoney /> Total del Período Filtrado
+                  </Typography>
+                  {(fechaInicio || fechaFin) && (
+                    <Typography variant="body2" sx={{ color: "#666", fontWeight: 600, backgroundColor: "rgba(163,105,32,0.08)", px: 1.5, py: 0.5, borderRadius: 2, fontSize: "0.8rem" }}>
+                      {fechaInicio === fechaFin ? fechaInicio : `${fechaInicio || '...'} — ${fechaFin || '...'}`}
+                      {` (${reporte.length} registro${reporte.length !== 1 ? 's' : ''})`}
+                    </Typography>
+                  )}
+                </Box>
 
                 <Grid container spacing={2} sx={{ mb: 2.5 }}>
                   {/* Total Bruto */}

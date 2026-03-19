@@ -2,7 +2,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import db from "../db/database.js";
+import db, { dbGet, dbRun, dbAll } from "../db/database.js";
 import { authMiddleware, requirePatientWrite, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -360,8 +360,8 @@ router.post("/:id/ofertas", requirePatientWrite, (req, res) => {
   });
 });
 
-// ✅ Editar oferta ofrecida (items y total)
-router.put("/:id/ofertas/:ofertaId", requirePatientWrite, (req, res) => {
+// ✅ Editar oferta ofrecida (items y total) + sincronizar presupuesto asignado
+router.put("/:id/ofertas/:ofertaId", requirePatientWrite, async (req, res) => {
   const { id, ofertaId } = req.params;
   const { items } = req.body;
 
@@ -392,22 +392,101 @@ router.put("/:id/ofertas/:ofertaId", requirePatientWrite, (req, res) => {
 
   const total = normalized.reduce((sum, it) => sum + (Number(it.precio) || 0), 0);
 
-  const query = `
-    UPDATE patient_ofertas
-    SET items_json = ?, total = ?
-    WHERE id = ? AND paciente_id = ?
-  `;
+  try {
+    // 1. Actualizar la oferta
+    const result = await dbRun(
+      `UPDATE patient_ofertas SET items_json = ?, total = ? WHERE id = ? AND paciente_id = ?`,
+      [JSON.stringify(normalized), total, ofertaId, id]
+    );
 
-  db.run(query, [JSON.stringify(normalized), total, ofertaId, id], function (err) {
-    if (err) {
-      console.error("❌ Error al editar oferta:", err.message);
-      return res.status(500).json({ message: "Error al editar oferta" });
-    }
-    if (this.changes === 0) {
+    if (result.changes === 0) {
       return res.status(404).json({ message: "Oferta no encontrada" });
     }
+
+    // 2. Sincronizar presupuesto asignado vinculado (si existe)
+    const asignado = await dbGet(
+      `SELECT * FROM presupuestos_asignados WHERE oferta_id = ? AND paciente_id = ?`,
+      [ofertaId, id]
+    );
+
+    if (asignado) {
+      const descuento = Number(asignado.descuento) || 0;
+      const montoPagado = Number(asignado.monto_pagado) || 0;
+      const nuevoSaldo = Math.max(0, total - descuento - montoPagado);
+
+      // Actualizar tratamientos_json y precio_total del presupuesto asignado
+      await dbRun(
+        `UPDATE presupuestos_asignados 
+         SET tratamientos_json = ?, precio_total = ?, saldo_pendiente = ?
+         WHERE id = ?`,
+        [JSON.stringify(normalized), total, nuevoSaldo, asignado.id]
+      );
+
+      // 3. Sincronizar sesiones: reconstruir sesiones pendientes
+      // Obtener sesiones completadas (no se tocan)
+      const sesionesCompletadas = await dbAll(
+        `SELECT * FROM presupuestos_sesiones 
+         WHERE presupuesto_asignado_id = ? AND estado = 'completada'`,
+        [asignado.id]
+      );
+
+      // Eliminar solo sesiones pendientes
+      await dbRun(
+        `DELETE FROM presupuestos_sesiones 
+         WHERE presupuesto_asignado_id = ? AND estado = 'pendiente'`,
+        [asignado.id]
+      );
+
+      // Crear un mapa de sesiones completadas por tratamiento
+      const completadasPorTrat = {};
+      for (const sc of sesionesCompletadas) {
+        const key = sc.tratamiento_nombre;
+        completadasPorTrat[key] = (completadasPorTrat[key] || 0) + 1;
+      }
+
+      // Recrear sesiones pendientes según los nuevos items
+      const ahora = new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
+      for (const item of normalized) {
+        const numSesiones = Number(item.sesiones) >= 1 ? Number(item.sesiones) : 1;
+        const completadas = completadasPorTrat[item.nombre] || 0;
+        const pendientes = Math.max(0, numSesiones - completadas);
+
+        for (let s = 1; s <= pendientes; s++) {
+          await dbRun(
+            `INSERT INTO presupuestos_sesiones (
+              presupuesto_asignado_id, tratamiento_id, tratamiento_nombre,
+              sesion_numero, precio_sesion, estado, creado_en
+            ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
+            [
+              asignado.id,
+              item.tratamientoId || item.tratamiento_id || null,
+              item.nombre,
+              completadas + s,
+              Number(item.precio) || 0,
+              ahora
+            ]
+          );
+        }
+      }
+
+      // Si un tratamiento fue eliminado, también remove sus sesiones completadas
+      // (solo si ese nombre ya no existe en normalized)
+      const nombresActuales = normalized.map(it => it.nombre);
+      for (const sc of sesionesCompletadas) {
+        if (!nombresActuales.includes(sc.tratamiento_nombre)) {
+          await dbRun(
+            `DELETE FROM presupuestos_sesiones WHERE id = ?`,
+            [sc.id]
+          );
+        }
+      }
+    }
+
     res.json({ message: "Oferta actualizada correctamente" });
-  });
+  } catch (err) {
+    console.error("❌ Error al editar oferta:", err.message);
+    res.status(500).json({ message: "Error al editar oferta" });
+  }
 });
 
 // ✅ Actualizar descuento de una oferta
