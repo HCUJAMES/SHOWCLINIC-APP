@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import useSocket from "../hooks/useSocket";
 import {
   Container,
   Typography,
@@ -29,7 +30,7 @@ import {
   Checkbox,
   Collapse,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -112,6 +113,7 @@ const HistorialClinico = () => {
   const { showToast } = useToast();
   const [pacientes, setPacientes] = useState([]);
   const [filtro, setFiltro] = useState("");
+  const [ordenPacientes, setOrdenPacientes] = useState("reciente");
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null);
   const [tratamientos, setTratamientos] = useState([]);
   const [resumenDeuda, setResumenDeuda] = useState({ cantidad_pendiente: 0, total_pendiente: 0 });
@@ -441,6 +443,37 @@ const HistorialClinico = () => {
       console.error("Error al obtener historial clínico:", error);
     }
   };
+
+  // Refetch silencioso para sincronización en tiempo real (no resetea UI)
+  const refetchPacienteActual = useCallback(async () => {
+    const id = pacienteSeleccionado?.id;
+    if (!id) return;
+    try {
+      const [ofertasRes, presupuestosRes, tratRes, deudaRes, paquetesRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/pacientes/${id}/ofertas`, { headers: authHeaders }).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${id}`, { headers: authHeaders }).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/api/tratamientos/historial/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/api/deudas/resumen/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => ({ data: {} })),
+        axios.get(`${API_BASE_URL}/api/paquetes/paciente/${id}`, { headers: authHeaders }).catch(() => ({ data: [] })),
+      ]);
+      setOfertas(Array.isArray(ofertasRes.data) ? ofertasRes.data : []);
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      setTratamientos(Array.isArray(tratRes.data) ? tratRes.data : []);
+      setResumenDeuda({
+        cantidad_pendiente: Number(deudaRes?.data?.cantidad_pendiente || 0),
+        total_pendiente: Number(deudaRes?.data?.total_pendiente || 0),
+      });
+      setPaquetesPaciente(Array.isArray(paquetesRes.data) ? paquetesRes.data : []);
+    } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacienteSeleccionado?.id]);
+
+  // Sincronización en tiempo real: recargar datos del paciente cuando otro dispositivo hace cambios
+  useSocket(
+    ["pacientes:updated", "paquetes:updated", "finanzas:updated", "deudas:updated", "tratamientos:updated"],
+    refetchPacienteActual,
+    !!pacienteSeleccionado?.id
+  );
 
   // Asignar paquete al paciente
   const asignarPaquete = async (paquete) => {
@@ -1627,7 +1660,19 @@ const HistorialClinico = () => {
         p.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
         p.apellido.toLowerCase().includes(filtro.toLowerCase())
     )
-    .sort((a, b) => b.id - a.id);
+    .sort((a, b) => {
+      switch (ordenPacientes) {
+        case "az":
+          return (a.nombre || "").localeCompare(b.nombre || "", "es");
+        case "za":
+          return (b.nombre || "").localeCompare(a.nombre || "", "es");
+        case "antiguo":
+          return a.id - b.id;
+        case "reciente":
+        default:
+          return b.id - a.id;
+      }
+    });
 
   const totalGeneral = tratamientos.reduce(
     (acc, t) => acc + Number(t.precio_total || t.precioTotal || 0),
@@ -2011,53 +2056,76 @@ const HistorialClinico = () => {
 
           {!pacienteSeleccionado ? (
             <>
-              {/* Barra de búsqueda */}
-              <Box
+              {/* Barra de búsqueda y filtros */}
+              <Paper
+                elevation={0}
                 sx={{
-                  display: "flex",
-                  flexDirection: { xs: "column", md: "row" },
-                  gap: 2,
-                  alignItems: { xs: "stretch", md: "center" },
                   mb: 3,
-                  p: 2,
+                  p: 2.5,
                   borderRadius: 3,
-                  backgroundColor: "rgba(163,105,32,0.04)",
-                  border: "1px solid rgba(163,105,32,0.10)",
+                  backgroundColor: "#fffdf7",
+                  border: "1px solid rgba(186,154,99,0.25)",
                 }}
               >
-                <TextField
-                  label="🔍 Buscar paciente"
-                  placeholder="Nombre, apellido o DNI..."
-                  fullWidth
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value)}
-                  size="small"
-                  sx={{
-                    flex: 1,
-                    "& .MuiInputBase-root": {
-                      backgroundColor: "rgba(212, 175, 55, 0.10)",
-                      borderRadius: 2,
-                    },
-                    "& .MuiOutlinedInput-root": {
-                      "&:hover fieldset": { borderColor: "#a36920" },
-                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                    },
-                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                  }}
-                />
-                <Box sx={{ minWidth: { xs: "auto", md: 160 }, textAlign: { xs: "left", md: "right" } }}>
+                <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 2, alignItems: { xs: "stretch", md: "center" } }}>
+                  <TextField
+                    label="Buscar paciente"
+                    placeholder="Nombre, apellido o DNI..."
+                    fullWidth
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                    size="small"
+                    sx={{
+                      flex: 1,
+                      "& .MuiInputBase-root": { backgroundColor: "#f5f1e4", borderRadius: 2 },
+                      "& .MuiOutlinedInput-root": {
+                        "&:hover fieldset": { borderColor: "#ba9a63" },
+                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                      },
+                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                    }}
+                  />
                   <Chip
                     label={`${pacientesFiltrados.length} paciente${pacientesFiltrados.length !== 1 ? "s" : ""}`}
                     size="small"
-                    sx={{
-                      backgroundColor: "rgba(163,105,32,0.12)",
-                      color: "#a36920",
-                      fontWeight: 700,
-                      fontSize: "0.8rem",
-                    }}
+                    sx={{ backgroundColor: "rgba(163,105,32,0.12)", color: "#a36920", fontWeight: 700, fontSize: "0.8rem", minWidth: 100, justifyContent: "center" }}
                   />
                 </Box>
-              </Box>
+
+                {/* Filtros de orden */}
+                <Box sx={{ display: "flex", gap: 1, mt: 2, flexWrap: "wrap", alignItems: "center" }}>
+                  <Typography variant="caption" sx={{ color: "#ba9a63", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", mr: 0.5 }}>
+                    Ordenar:
+                  </Typography>
+                  {[
+                    { key: "az", label: "A → Z", icon: <SortByAlpha sx={{ fontSize: 16 }} /> },
+                    { key: "za", label: "Z → A", icon: <SortByAlpha sx={{ fontSize: 16, transform: "scaleX(-1)" }} /> },
+                    { key: "reciente", label: "Más reciente", icon: <Schedule sx={{ fontSize: 16 }} /> },
+                    { key: "antiguo", label: "Más antiguo", icon: <Schedule sx={{ fontSize: 16 }} /> },
+                  ].map((opt) => (
+                    <Chip
+                      key={opt.key}
+                      icon={opt.icon}
+                      label={opt.label}
+                      size="small"
+                      clickable
+                      onClick={() => setOrdenPacientes(opt.key)}
+                      sx={{
+                        fontWeight: ordenPacientes === opt.key ? 700 : 500,
+                        fontSize: "0.75rem",
+                        backgroundColor: ordenPacientes === opt.key ? "#a36920" : "#f5f1e4",
+                        color: ordenPacientes === opt.key ? "white" : "#5a3e1b",
+                        border: ordenPacientes === opt.key ? "1px solid #8a5a1a" : "1px solid rgba(186,154,99,0.3)",
+                        "& .MuiChip-icon": { color: ordenPacientes === opt.key ? "white" : "#a36920" },
+                        "&:hover": {
+                          backgroundColor: ordenPacientes === opt.key ? "#8a5a1a" : "rgba(163,105,32,0.12)",
+                        },
+                        transition: "all 0.2s ease",
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Paper>
 
               {/* Lista de pacientes */}
               <Grid container spacing={1.5}>
@@ -2294,40 +2362,54 @@ const HistorialClinico = () => {
                 elevation={0}
                 sx={{
                   mb: 4,
-                  p: 2.5,
+                  p: 3,
                   borderRadius: 3,
-                  backgroundColor: "rgba(255,255,255,0.68)",
-                  border: "1px solid rgba(212,175,55,0.18)",
+                  backgroundColor: "#fffdf7",
+                  border: "1px solid rgba(186,154,99,0.25)",
                 }}
               >
-                <Grid container spacing={2.2}>
+                <Grid container spacing={2.5}>
                   <Grid item xs={12} md={6}>
-                    <Box sx={{ display: "grid", gap: 0.8 }}>
-                      <Typography><strong>Documento:</strong> {pacienteSeleccionado.tipoDocumento || 'DNI'}: {pacienteSeleccionado.dni}</Typography>
-                      <Typography><strong>Nombre:</strong> {pacienteSeleccionado.nombre}</Typography>
-                      <Typography><strong>Apellido:</strong> {pacienteSeleccionado.apellido}</Typography>
-                      <Typography><strong>Edad:</strong> {calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || 'N/A'} años</Typography>
-                      <Typography><strong>Sexo:</strong> {pacienteSeleccionado.sexo}</Typography>
-                      <Typography><strong>Embarazada:</strong> {pacienteSeleccionado.embarazada || "No especifica"}</Typography>
-                      <Typography><strong>Ocupación:</strong> {pacienteSeleccionado.ocupacion}</Typography>
-                      <Typography><strong>Fecha Nacimiento:</strong> {pacienteSeleccionado.fechaNacimiento}</Typography>
-                      <Typography><strong>Ciudad Nacimiento:</strong> {pacienteSeleccionado.ciudadNacimiento}</Typography>
-                      <Typography><strong>Ciudad Residencia:</strong> {pacienteSeleccionado.ciudadResidencia}</Typography>
+                    <Box sx={{ display: "grid", gap: 1.2 }}>
+                      {[
+                        ["Documento", `${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni}`],
+                        ["Nombre", pacienteSeleccionado.nombre],
+                        ["Apellido", pacienteSeleccionado.apellido],
+                        ["Edad", `${calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || 'N/A'} años`],
+                        ["Sexo", pacienteSeleccionado.sexo],
+                        ["Embarazada", pacienteSeleccionado.embarazada || "No especifica"],
+                        ["Ocupación", pacienteSeleccionado.ocupacion],
+                        ["Fecha Nac.", pacienteSeleccionado.fechaNacimiento],
+                        ["Ciudad Nac.", pacienteSeleccionado.ciudadNacimiento],
+                        ["Ciudad Res.", pacienteSeleccionado.ciudadResidencia],
+                      ].map(([label, value]) => (
+                        <Box key={label} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.3, borderBottom: "1px solid rgba(186,154,99,0.1)" }}>
+                          <Typography variant="caption" sx={{ minWidth: 95, fontWeight: 700, color: "#a36920", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.68rem" }}>{label}</Typography>
+                          <Typography variant="body2" sx={{ color: "#333", fontWeight: 500 }}>{value || "—"}</Typography>
+                        </Box>
+                      ))}
                     </Box>
                   </Grid>
                   <Grid item xs={12} md={6}>
-                    <Box sx={{ display: "grid", gap: 0.8 }}>
-                      <Typography><strong>Correo:</strong> {pacienteSeleccionado.correo}</Typography>
-                      <Typography><strong>Celular:</strong> {pacienteSeleccionado.celular}</Typography>
-                      <Typography><strong>Dirección:</strong> {pacienteSeleccionado.direccion}</Typography>
-                      <Typography><strong>Alergias:</strong> {pacienteSeleccionado.alergias || "Ninguna"}</Typography>
-                      <Typography><strong>Enfermedades:</strong> {pacienteSeleccionado.enfermedad || "Ninguna"}</Typography>
-                      <Typography><strong>Cirugía estética:</strong> {pacienteSeleccionado.cirugiaEstetica || "No"}</Typography>
-                      <Typography><strong>Consume tabaco:</strong> {pacienteSeleccionado.tabaco || "No"}</Typography>
-                      <Typography><strong>Consume alcohol:</strong> {pacienteSeleccionado.alcohol || "No"}</Typography>
-                      <Typography><strong>Consume drogas:</strong> {pacienteSeleccionado.drogas || "No"}</Typography>
-                      <Typography><strong>Referencia:</strong> {pacienteSeleccionado.referencia || "No especificada"}</Typography>
-                      <Typography><strong>Número de hijos:</strong> {pacienteSeleccionado.numeroHijos ?? "No registrado"}</Typography>
+                    <Box sx={{ display: "grid", gap: 1.2 }}>
+                      {[
+                        ["Correo", pacienteSeleccionado.correo],
+                        ["Celular", pacienteSeleccionado.celular],
+                        ["Dirección", pacienteSeleccionado.direccion],
+                        ["Alergias", pacienteSeleccionado.alergias || "Ninguna"],
+                        ["Enfermedades", pacienteSeleccionado.enfermedad || "Ninguna"],
+                        ["Cirugía Est.", pacienteSeleccionado.cirugiaEstetica || "No"],
+                        ["Tabaco", pacienteSeleccionado.tabaco || "No"],
+                        ["Alcohol", pacienteSeleccionado.alcohol || "No"],
+                        ["Drogas", pacienteSeleccionado.drogas || "No"],
+                        ["Referencia", pacienteSeleccionado.referencia || "No especificada"],
+                        ["N° de hijos", pacienteSeleccionado.numeroHijos ?? "No registrado"],
+                      ].map(([label, value]) => (
+                        <Box key={label} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.3, borderBottom: "1px solid rgba(186,154,99,0.1)" }}>
+                          <Typography variant="caption" sx={{ minWidth: 95, fontWeight: 700, color: "#a36920", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.68rem" }}>{label}</Typography>
+                          <Typography variant="body2" sx={{ color: "#333", fontWeight: 500 }}>{value || "—"}</Typography>
+                        </Box>
+                      ))}
                     </Box>
                   </Grid>
                 </Grid>
@@ -3126,11 +3208,35 @@ const HistorialClinico = () => {
                   >
                     📋 Presupuestos del Paciente
                   </Typography>
+
+                  {/* Leyenda de estados */}
+                  <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box sx={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: "#d4af37" }} />
+                      <Typography variant="caption" sx={{ color: "#b8860b", fontWeight: 600 }}>Se hará y se cobrará</Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box sx={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: "#7b1fa2" }} />
+                      <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: 600 }}>Se hará pero aún no paga</Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <Box sx={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: "#bdbdbd" }} />
+                      <Typography variant="caption" sx={{ color: "#888", fontWeight: 600 }}>Pendiente (no suma al total)</Typography>
+                    </Box>
+                  </Box>
+
                   <Box sx={{ display: "grid", gap: 2 }}>
                     {ofertas.map((o) => {
                       const items = o.items || [];
                       const totalItems = items.length;
                       const yaAsignado = presupuestosAsignados.some(p => p.oferta_id === o.id);
+                      // Total activo: solo suman los marcados como gold o purple
+                      const totalActivo = items.reduce((sum, it, idx) => {
+                        const estado = tratamientosMarcados[`${o.id}-${idx}`];
+                        if (estado === "gold" || estado === "purple") return sum + Number(it.precio || 0);
+                        return sum;
+                      }, 0);
+                      const hayMarcados = items.some((_, idx) => tratamientosMarcados[`${o.id}-${idx}`] === "gold" || tratamientosMarcados[`${o.id}-${idx}`] === "purple");
                       
                       return (
                         <Paper
@@ -3242,15 +3348,15 @@ const HistorialClinico = () => {
                                     <Box 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const nuevoValor = !tratamientosMarcados[`${o.id}-${idx}`];
-                                        const newMarcados = {
-                                          ...tratamientosMarcados,
-                                          [`${o.id}-${idx}`]: nuevoValor
-                                        };
+                                        const key = `${o.id}-${idx}`;
+                                        const current = tratamientosMarcados[key];
+                                        // Cycle: false/undefined (gray) -> "gold" -> "purple" -> false
+                                        const next = !current ? "gold" : current === "gold" ? "purple" : false;
+                                        const newMarcados = { ...tratamientosMarcados, [key]: next };
                                         // Sincronizar con presupuesto asignado si existe
                                         const asignado = presupuestosAsignados.find(p => p.oferta_id === o.id);
                                         if (asignado && asignado.sesiones && asignado.sesiones[idx]) {
-                                          newMarcados[`asig-${asignado.id}-${asignado.sesiones[idx].id}`] = nuevoValor;
+                                          newMarcados[`asig-${asignado.id}-${asignado.sesiones[idx].id}`] = next;
                                         }
                                         setTratamientosMarcados(newMarcados);
                                       }}
@@ -3258,19 +3364,29 @@ const HistorialClinico = () => {
                                         width: 22,
                                         height: 22,
                                         borderRadius: "50%",
-                                        backgroundColor: tratamientosMarcados[`${o.id}-${idx}`] ? "#d4af37" : "#a36920",
+                                        backgroundColor: tratamientosMarcados[`${o.id}-${idx}`] === "gold" ? "#d4af37" 
+                                          : tratamientosMarcados[`${o.id}-${idx}`] === "purple" ? "#7b1fa2" 
+                                          : "#bdbdbd",
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
                                         fontSize: "0.7rem",
-                                        color: tratamientosMarcados[`${o.id}-${idx}`] ? "#3e2c0a" : "white",
+                                        color: tratamientosMarcados[`${o.id}-${idx}`] === "gold" ? "#3e2c0a" 
+                                          : tratamientosMarcados[`${o.id}-${idx}`] === "purple" ? "white" 
+                                          : "white",
                                         fontWeight: tratamientosMarcados[`${o.id}-${idx}`] ? "bold" : "normal",
                                         cursor: "pointer",
                                         transition: "all 0.2s ease",
-                                        boxShadow: tratamientosMarcados[`${o.id}-${idx}`] ? "0 0 0 2px #d4af37, 0 0 0 4px rgba(212,175,55,0.35)" : "none",
+                                        boxShadow: tratamientosMarcados[`${o.id}-${idx}`] === "gold" 
+                                          ? "0 0 0 2px #d4af37, 0 0 0 4px rgba(212,175,55,0.35)" 
+                                          : tratamientosMarcados[`${o.id}-${idx}`] === "purple" 
+                                            ? "0 0 0 2px #7b1fa2, 0 0 0 4px rgba(123,31,162,0.35)" 
+                                            : "none",
                                         "&:hover": { 
                                           transform: "scale(1.15)",
-                                          backgroundColor: tratamientosMarcados[`${o.id}-${idx}`] ? "#c9a230" : "#7a4f18",
+                                          backgroundColor: tratamientosMarcados[`${o.id}-${idx}`] === "gold" ? "#c9a230" 
+                                            : tratamientosMarcados[`${o.id}-${idx}`] === "purple" ? "#6a1b9a" 
+                                            : "#9e9e9e",
                                         }
                                       }}
                                     >
@@ -3279,7 +3395,9 @@ const HistorialClinico = () => {
                                     <Box>
                                       <Typography variant="body2" sx={{ 
                                         fontWeight: tratamientosMarcados[`${o.id}-${idx}`] ? "bold" : "normal",
-                                        color: tratamientosMarcados[`${o.id}-${idx}`] ? "#b8860b" : "inherit",
+                                        color: tratamientosMarcados[`${o.id}-${idx}`] === "gold" ? "#b8860b" 
+                                          : tratamientosMarcados[`${o.id}-${idx}`] === "purple" ? "#7b1fa2" 
+                                          : "inherit",
                                       }}>
                                         {it.nombre}
                                         {editandoSesiones?.ofertaId === o.id && editandoSesiones?.itemIdx === idx ? (
@@ -3363,26 +3481,32 @@ const HistorialClinico = () => {
                           {/* Total del presupuesto y botones */}
                           <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                             <Box>
-                              <Typography variant="body2" color="text.secondary">
-                                Subtotal:
-                              </Typography>
-                              <Typography sx={{ fontWeight: "bold", color: "#666", fontSize: "0.95rem" }}>
-                                S/ {Number(o.total || 0).toFixed(2)}
-                              </Typography>
-                              {Number(o.descuento || 0) > 0 && (
-                                <Box sx={{ mt: 0.5 }}>
-                                  <Typography variant="body2" color="error" sx={{ fontSize: "0.85rem" }}>
-                                    Descuento: -S/ {Number(o.descuento).toFixed(2)}
+                              {hayMarcados ? (
+                                <>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Total todos: S/ {Number(o.total || 0).toFixed(2)}
                                   </Typography>
+                                  {Number(o.descuento || 0) > 0 && (
+                                    <Typography variant="body2" color="error" sx={{ fontSize: "0.85rem" }}>
+                                      Descuento: -S/ {Number(o.descuento).toFixed(2)}
+                                    </Typography>
+                                  )}
                                   <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
-                                    Total: S/ {(Number(o.total || 0) - Number(o.descuento || 0)).toFixed(2)}
+                                    Total seleccionado: S/ {(totalActivo - Number(o.descuento || 0) > 0 ? totalActivo - Number(o.descuento || 0) : totalActivo).toFixed(2)}
                                   </Typography>
-                                </Box>
-                              )}
-                              {Number(o.descuento || 0) === 0 && (
-                                <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
-                                  Total: S/ {Number(o.total || 0).toFixed(2)}
-                                </Typography>
+                                </>
+                              ) : (
+                                <>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Subtotal:
+                                  </Typography>
+                                  <Typography sx={{ fontWeight: "bold", color: "#888", fontSize: "0.95rem" }}>
+                                    S/ {Number(o.total || 0).toFixed(2)}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: "#999", fontStyle: "italic" }}>
+                                    Selecciona tratamientos para calcular total
+                                  </Typography>
+                                </>
                               )}
                             </Box>
                             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -3781,18 +3905,17 @@ const HistorialClinico = () => {
                                         onClick={(e) => {
                                           if (sesion.estado !== 'completada') {
                                             e.stopPropagation();
-                                            const nuevoValor = !tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`];
-                                            const newMarcados = {
-                                              ...tratamientosMarcados,
-                                              [`asig-${presupuesto.id}-${sesion.id}`]: nuevoValor
-                                            };
+                                            const key = `asig-${presupuesto.id}-${sesion.id}`;
+                                            const current = tratamientosMarcados[key];
+                                            const next = !current ? "gold" : current === "gold" ? "purple" : false;
+                                            const newMarcados = { ...tratamientosMarcados, [key]: next };
                                             // Sincronizar con presupuesto del paciente (ofertas)
                                             if (presupuesto.oferta_id) {
                                               const oferta = ofertas.find(of => of.id === presupuesto.oferta_id);
                                               if (oferta) {
                                                 const sesionIdx = presupuesto.sesiones.indexOf(sesion);
                                                 if (sesionIdx >= 0) {
-                                                  newMarcados[`${oferta.id}-${sesionIdx}`] = nuevoValor;
+                                                  newMarcados[`${oferta.id}-${sesionIdx}`] = next;
                                                 }
                                               }
                                             }
@@ -3805,26 +3928,35 @@ const HistorialClinico = () => {
                                           borderRadius: "50%",
                                           backgroundColor: sesion.estado === 'completada' 
                                             ? '#4caf50' 
-                                            : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] 
+                                            : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold" 
                                               ? '#d4af37' 
-                                              : '#e0e0e0',
+                                              : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple"
+                                                ? '#7b1fa2'
+                                                : '#bdbdbd',
                                           display: "flex",
                                           alignItems: "center",
                                           justifyContent: "center",
                                           fontSize: "0.7rem",
                                           color: sesion.estado === 'completada' 
                                             ? 'white' 
-                                            : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] 
+                                            : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold" 
                                               ? '#3e2c0a' 
-                                              : '#666',
+                                              : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple"
+                                                ? 'white'
+                                                : 'white',
                                           fontWeight: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' ? "bold" : "normal",
                                           cursor: sesion.estado !== 'completada' ? "pointer" : "default",
                                           transition: "all 0.2s ease",
-                                          boxShadow: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' 
-                                            ? "0 0 0 2px #d4af37, 0 0 0 4px rgba(212,175,55,0.35)" : "none",
+                                          boxShadow: sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold"
+                                            ? "0 0 0 2px #d4af37, 0 0 0 4px rgba(212,175,55,0.35)" 
+                                            : sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple"
+                                              ? "0 0 0 2px #7b1fa2, 0 0 0 4px rgba(123,31,162,0.35)"
+                                              : "none",
                                           "&:hover": sesion.estado !== 'completada' ? { 
                                             transform: "scale(1.15)",
-                                            backgroundColor: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] ? "#c9a230" : "#bdbdbd",
+                                            backgroundColor: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold" ? "#c9a230" 
+                                              : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple" ? "#6a1b9a"
+                                              : "#9e9e9e",
                                           } : {}
                                         }}
                                       >
@@ -3832,7 +3964,9 @@ const HistorialClinico = () => {
                                       </Box>
                                       <Typography variant="body2" sx={{
                                         fontWeight: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' ? "bold" : "normal",
-                                        color: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' ? "#b8860b" : "inherit",
+                                        color: sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold" ? "#b8860b" 
+                                          : sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple" ? "#7b1fa2"
+                                          : "inherit",
                                       }}>
                                         {sesion.tratamiento_nombre}
                                       </Typography>
@@ -4648,16 +4782,23 @@ const HistorialClinico = () => {
                     <Table stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ fontWeight: "bold" }}>Fecha</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Tratamiento</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Cantidad (ml)</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Producto Usado</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Tipo Atención</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Especialista</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Sesión</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Fotos</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Recibo</TableCell>
-                          <TableCell sx={{ fontWeight: "bold" }}>Acciones</TableCell>
+                          {["Fecha", "Tratamiento", "Cantidad (ml)", "Producto Usado", "Tipo Atención", "Especialista", "Sesión", "Fotos", "Recibo", "Acciones"].map((header) => (
+                            <TableCell
+                              key={header}
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: "0.8rem",
+                                color: "white",
+                                backgroundColor: "#a36920",
+                                borderBottom: "2px solid #8a5a1a",
+                                whiteSpace: "nowrap",
+                                letterSpacing: "0.03em",
+                                py: 1.5,
+                              }}
+                            >
+                              {header}
+                            </TableCell>
+                          ))}
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -4687,14 +4828,22 @@ const HistorialClinico = () => {
                         }
 
                         return (
-                          <TableRow key={t.id}>
-                            <TableCell sx={{ whiteSpace: "nowrap" }}>{formatearFechaCorta(t.fecha)}</TableCell>
-                            <TableCell>{t.nombreTratamiento}</TableCell>
-                            <TableCell>{t.cantidad_total || "-"}</TableCell>
-                            <TableCell>{productoUsado}</TableCell>
-                            <TableCell>{t.tipoAtencion}</TableCell>
-                            <TableCell>{t.especialista}</TableCell>
-                            <TableCell>{t.sesion}</TableCell>
+                          <TableRow 
+                            key={t.id}
+                            sx={{
+                              "&:nth-of-type(odd)": { backgroundColor: "#fffdf7" },
+                              "&:nth-of-type(even)": { backgroundColor: "#f5f1e4" },
+                              "&:hover": { backgroundColor: "rgba(163,105,32,0.10)" },
+                              transition: "background-color 0.15s ease",
+                            }}
+                          >
+                            <TableCell sx={{ whiteSpace: "nowrap", fontWeight: 600, color: "#5a3e1b", fontSize: "0.82rem" }}>{formatearFechaCorta(t.fecha)}</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: "#333" }}>{t.nombreTratamiento}</TableCell>
+                            <TableCell sx={{ color: "#666" }}>{t.cantidad_total || "-"}</TableCell>
+                            <TableCell sx={{ color: "#666", fontSize: "0.82rem" }}>{productoUsado}</TableCell>
+                            <TableCell sx={{ color: "#555" }}>{t.tipoAtencion}</TableCell>
+                            <TableCell sx={{ color: "#555" }}>{t.especialista}</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: "#a36920" }}>{t.sesion}</TableCell>
 
                             <TableCell>
                               {tratamientoSeleccionado === t.id ? (
@@ -4997,28 +5146,58 @@ const HistorialClinico = () => {
                 Presupuesto Seleccionado
               </Typography>
               <Box sx={{ mb: 3, p: 2, backgroundColor: "#f5f5f5", borderRadius: 2 }}>
-                {(presupuestoParaProforma.items || []).map((item, idx) => (
-                  <Box
-                    key={idx}
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      mb: 1,
-                    }}
-                  >
-                    <Typography>{item.nombre}</Typography>
-                    <Typography sx={{ fontWeight: "bold" }}>
-                      S/ {Number(item.precio || 0).toFixed(2)}
-                    </Typography>
-                  </Box>
-                ))}
-                <Divider sx={{ my: 1.5 }} />
-                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                  <Typography sx={{ fontWeight: "bold" }}>Subtotal:</Typography>
-                  <Typography sx={{ fontWeight: "bold" }}>
-                    S/ {(presupuestoParaProforma.items || []).reduce((sum, item) => sum + Number(item.precio || 0), 0).toFixed(2)}
-                  </Typography>
-                </Box>
+                {(() => {
+                  const allItems = presupuestoParaProforma.items || [];
+                  const ofertaId = presupuestoParaProforma.id;
+                  // Filtrar: solo gold y purple aparecen en proforma
+                  const itemsFiltrados = allItems.filter((_, idx) => {
+                    const estado = tratamientosMarcados[`${ofertaId}-${idx}`];
+                    return estado === "gold" || estado === "purple";
+                  });
+                  // Si no hay ninguno marcado, mostrar todos como fallback
+                  const itemsAMostrar = itemsFiltrados.length > 0 ? itemsFiltrados : allItems;
+                  return (
+                    <>
+                      {itemsAMostrar.map((item, idx) => {
+                        const originalIdx = allItems.indexOf(item);
+                        const estado = tratamientosMarcados[`${ofertaId}-${originalIdx}`];
+                        return (
+                          <Box
+                            key={idx}
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              mb: 1,
+                            }}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              {estado && (
+                                <Box sx={{
+                                  width: 10, height: 10, borderRadius: "50%",
+                                  backgroundColor: estado === "gold" ? "#d4af37" : "#7b1fa2",
+                                }} />
+                              )}
+                              <Typography sx={{ color: estado === "purple" ? "#7b1fa2" : "inherit" }}>
+                                {item.nombre}
+                              </Typography>
+                            </Box>
+                            <Typography sx={{ fontWeight: "bold" }}>
+                              S/ {Number(item.precio || 0).toFixed(2)}
+                            </Typography>
+                          </Box>
+                        );
+                      })}
+                      <Divider sx={{ my: 1.5 }} />
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontWeight: "bold" }}>Subtotal:</Typography>
+                        <Typography sx={{ fontWeight: "bold" }}>
+                          S/ {itemsAMostrar.reduce((sum, item) => sum + Number(item.precio || 0), 0).toFixed(2)}
+                        </Typography>
+                      </Box>
+                    </>
+                  );
+                })()}
               </Box>
 
               <TextField
@@ -5033,21 +5212,33 @@ const HistorialClinico = () => {
               />
 
               <Box sx={{ p: 2, backgroundColor: "#e8f5e9", borderRadius: 2 }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Typography variant="h6" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
-                    Total Final:
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
-                    S/ {(
-                      (presupuestoParaProforma.items || []).reduce((sum, item) => sum + Number(item.precio || 0), 0) - Number(descuentoProforma || 0)
-                    ).toFixed(2)}
-                  </Typography>
-                </Box>
-                {Number(descuentoProforma) > 0 && (
-                  <Typography variant="caption" sx={{ color: "#666", mt: 1, display: "block" }}>
-                    Ahorro: S/ {Number(descuentoProforma).toFixed(2)}
-                  </Typography>
-                )}
+                {(() => {
+                  const allItems = presupuestoParaProforma.items || [];
+                  const ofertaId = presupuestoParaProforma.id;
+                  const filtrados = allItems.filter((_, idx) => {
+                    const est = tratamientosMarcados[`${ofertaId}-${idx}`];
+                    return est === "gold" || est === "purple";
+                  });
+                  const items = filtrados.length > 0 ? filtrados : allItems;
+                  const totalFinal = items.reduce((s, it) => s + Number(it.precio || 0), 0) - Number(descuentoProforma || 0);
+                  return (
+                    <>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <Typography variant="h6" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                          Total Final:
+                        </Typography>
+                        <Typography variant="h5" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                          S/ {totalFinal.toFixed(2)}
+                        </Typography>
+                      </Box>
+                      {Number(descuentoProforma) > 0 && (
+                        <Typography variant="caption" sx={{ color: "#666", mt: 1, display: "block" }}>
+                          Ahorro: S/ {Number(descuentoProforma).toFixed(2)}
+                        </Typography>
+                      )}
+                    </>
+                  );
+                })()}
               </Box>
             </>
           )}
@@ -5061,8 +5252,15 @@ const HistorialClinico = () => {
             startIcon={<Print />}
             onClick={async () => {
               if (presupuestoParaProforma && pacienteSeleccionado) {
+                const allItems = presupuestoParaProforma.items || [];
+                const ofertaId = presupuestoParaProforma.id;
+                const filtrados = allItems.filter((_, idx) => {
+                  const est = tratamientosMarcados[`${ofertaId}-${idx}`];
+                  return est === "gold" || est === "purple";
+                });
+                const itemsParaPDF = filtrados.length > 0 ? filtrados : allItems;
                 await generarProformaPDF(
-                  { ...presupuestoParaProforma, descuento: Number(descuentoProforma) || 0 },
+                  { ...presupuestoParaProforma, items: itemsParaPDF, descuento: Number(descuentoProforma) || 0 },
                   pacienteSeleccionado
                 );
                 setModalDescuento(false);

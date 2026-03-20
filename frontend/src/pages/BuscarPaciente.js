@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import useSocket from "../hooks/useSocket";
 import {
   Box,
   Typography,
@@ -225,6 +226,12 @@ export default function BuscarPaciente() {
     cargarTratamientosBase();
     cargarPacientesEnTratamiento();
   }, []);
+
+  // Sincronización en tiempo real
+  useSocket(["pacientes:updated", "tratamientos:updated"], () => {
+    cargarPacientes();
+    cargarPacientesEnTratamiento();
+  });
 
   useEffect(() => {
     // Si hay un paciente seleccionado para tratamientos, al cambiar filtro se refresca la lista

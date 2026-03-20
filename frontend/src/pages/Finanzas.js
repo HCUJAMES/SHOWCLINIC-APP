@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import useSocket from "../hooks/useSocket";
 import {
   Container,
   Typography,
@@ -408,6 +409,13 @@ const Finanzas = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchTrigger]);
 
+  // Sincronización en tiempo real: refrescar reporte si hay datos visibles
+  useSocket(["finanzas:updated", "deudas:updated", "paquetes:updated"], () => {
+    if (reporte.length > 0 || fechaInicio || fechaFin) {
+      obtenerReporte();
+    }
+  });
+
   const obtenerReporte = async () => {
     try {
       const params = {};
@@ -561,7 +569,7 @@ const Finanzas = () => {
     <div
       style={{
         backgroundImage:
-          "linear-gradient(rgba(255,255,255,0.85), rgba(232,211,57,0.85)), url('/images/background-showclinic.jpg')",
+          "linear-gradient(rgba(245,241,228,0.92), rgba(186,154,99,0.25)), url('/images/background-showclinic.jpg')",
         backgroundSize: "cover",
         backgroundPosition: "center",
         minHeight: "100vh",
@@ -577,12 +585,12 @@ const Finanzas = () => {
           sx={{
             p: 5,
             background:
-              "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
-            border: "1px solid rgba(212,175,55,0.22)",
+              "linear-gradient(180deg, #fffdf7 0%, rgba(245,241,228,0.85) 52%, rgba(186,154,99,0.15) 100%)",
+            border: "1px solid rgba(186,154,99,0.3)",
             backdropFilter: "blur(10px)",
             borderRadius: "15px",
             boxShadow:
-              "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(212,175,55,0.10)",
+              "0 18px 46px rgba(163,105,32,0.10), 0 0 0 1px rgba(186,154,99,0.12)",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
@@ -606,8 +614,8 @@ const Finanzas = () => {
             sx={{
               p: 2.5,
               borderRadius: 3,
-              background: "linear-gradient(135deg, rgba(163,105,32,0.03) 0%, rgba(212,175,55,0.06) 100%)",
-              border: "1px solid rgba(163,105,32,0.15)",
+              background: "linear-gradient(135deg, #f5f1e4 0%, rgba(245,241,228,0.6) 100%)",
+              border: "1px solid rgba(186,154,99,0.35)",
               mb: 1,
             }}
           >
@@ -624,18 +632,19 @@ const Finanzas = () => {
                   size="small"
                   onClick={btn.action}
                   sx={{
-                    backgroundColor: filtroRapido === btn.key ? colorPrincipal : "white",
-                    borderColor: filtroRapido === btn.key ? colorPrincipal : "rgba(163,105,32,0.3)",
-                    color: filtroRapido === btn.key ? "white" : colorPrincipal,
+                    backgroundColor: filtroRapido === btn.key ? colorPrincipal : "#fffdf7",
+                    borderColor: filtroRapido === btn.key ? colorPrincipal : "#ba9a63",
+                    color: filtroRapido === btn.key ? "#f5f1e4" : colorPrincipal,
                     fontWeight: 700,
                     fontSize: "0.8rem",
                     px: 2.5,
                     py: 0.8,
                     borderRadius: 2.5,
                     textTransform: "none",
-                    boxShadow: filtroRapido === btn.key ? "0 2px 8px rgba(163,105,32,0.3)" : "0 1px 3px rgba(0,0,0,0.06)",
+                    boxShadow: filtroRapido === btn.key ? "0 2px 8px rgba(163,105,32,0.35)" : "0 1px 3px rgba(186,154,99,0.15)",
                     "&:hover": { 
-                      backgroundColor: filtroRapido === btn.key ? "#8a5a1a" : "rgba(163,105,32,0.06)",
+                      backgroundColor: filtroRapido === btn.key ? "#8a5a1a" : "#f5f1e4",
+                      borderColor: colorPrincipal,
                       boxShadow: "0 2px 8px rgba(163,105,32,0.2)",
                     },
                   }}
@@ -648,17 +657,17 @@ const Finanzas = () => {
                 size="small"
                 onClick={() => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("caja"); }}
                 sx={{
-                  backgroundColor: filtroRapido === "caja" ? "#2e7d32" : "white",
-                  borderColor: filtroRapido === "caja" ? "#2e7d32" : "rgba(46,125,50,0.3)",
-                  color: filtroRapido === "caja" ? "white" : "#2e7d32",
+                  backgroundColor: filtroRapido === "caja" ? "#ba9a63" : "#fffdf7",
+                  borderColor: filtroRapido === "caja" ? "#ba9a63" : "#ba9a63",
+                  color: filtroRapido === "caja" ? "#fff" : "#ba9a63",
                   fontWeight: 700,
                   fontSize: "0.8rem",
                   px: 2.5,
                   py: 0.8,
                   borderRadius: 2.5,
                   textTransform: "none",
-                  boxShadow: filtroRapido === "caja" ? "0 2px 8px rgba(46,125,50,0.3)" : "0 1px 3px rgba(0,0,0,0.06)",
-                  "&:hover": { backgroundColor: filtroRapido === "caja" ? "#1b5e20" : "rgba(46,125,50,0.06)" },
+                  boxShadow: filtroRapido === "caja" ? "0 2px 8px rgba(186,154,99,0.35)" : "0 1px 3px rgba(186,154,99,0.15)",
+                  "&:hover": { backgroundColor: filtroRapido === "caja" ? "#a38b55" : "#f5f1e4", borderColor: "#a36920" },
                 }}
               >
                 💰 Cierre de caja
@@ -683,8 +692,8 @@ const Finanzas = () => {
                     aplicarFiltroInteligente(d ? Number(d) : "", filtroMes ? Number(filtroMes) : "", filtroAnio ? Number(filtroAnio) : "");
                   }}
                   sx={{ 
-                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
-                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: "#ba9a63" }, "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
                   }}
                 >
                   <MenuItem value="">Todos</MenuItem>
@@ -712,8 +721,8 @@ const Finanzas = () => {
                     aplicarFiltroInteligente(diaActual ? Number(diaActual) : "", m ? Number(m) : "", filtroAnio ? Number(filtroAnio) : "");
                   }}
                   sx={{ 
-                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
-                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: "#ba9a63" }, "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
                   }}
                 >
                   <MenuItem value="">Todos</MenuItem>
@@ -738,8 +747,8 @@ const Finanzas = () => {
                     aplicarFiltroInteligente(filtroDia ? Number(filtroDia) : "", filtroMes ? Number(filtroMes) : "", a ? Number(a) : "");
                   }}
                   sx={{ 
-                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
-                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: "#ba9a63" }, "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
                   }}
                 >
                   <MenuItem value="">Todos</MenuItem>
@@ -759,8 +768,8 @@ const Finanzas = () => {
                   onChange={(e) => setPaciente(e.target.value)}
                   fullWidth
                   sx={{ 
-                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
-                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: "#ba9a63" }, "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
                   }}
                 />
               </Grid>
@@ -775,8 +784,8 @@ const Finanzas = () => {
                   onChange={(e) => setMetodoPago(e.target.value)}
                   fullWidth
                   sx={{ 
-                    "& .MuiInputBase-root": { backgroundColor: "white", borderRadius: 2, fontSize: "0.85rem", height: 40 },
-                    "& .MuiOutlinedInput-root": { "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
+                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 2, fontSize: "0.85rem", height: 40 },
+                    "& .MuiOutlinedInput-root": { "& fieldset": { borderColor: "#ba9a63" }, "&:hover fieldset": { borderColor: colorPrincipal }, "&.Mui-focused fieldset": { borderColor: colorPrincipal } },
                   }}
                 >
                   <MenuItem value="">Todos</MenuItem>
@@ -797,12 +806,12 @@ const Finanzas = () => {
                 startIcon={<SwapVert />}
                 onClick={toggleOrden}
                 sx={{
-                  color: "#666",
+                  color: "#ba9a63",
                   fontWeight: 600,
                   textTransform: "none",
                   fontSize: "0.8rem",
                   mr: "auto",
-                  "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
+                  "&:hover": { backgroundColor: "rgba(186,154,99,0.08)", color: colorPrincipal },
                 }}
               >
                 {ordenDescendente ? "Más recientes primero" : "Más antiguos primero"}
@@ -816,13 +825,13 @@ const Finanzas = () => {
                   setReporte([]); setTotalGeneral(0); setTotalBruto(0); setTotalComision(0); setTotalesMetodo({});
                 }}
                 sx={{
-                  borderColor: "#bbb",
-                  color: "#777",
+                  borderColor: "#ba9a63",
+                  color: "#ba9a63",
                   fontWeight: 600,
                   borderRadius: 2,
                   textTransform: "none",
                   fontSize: "0.8rem",
-                  "&:hover": { backgroundColor: "rgba(0,0,0,0.04)", borderColor: "#999" },
+                  "&:hover": { backgroundColor: "#f5f1e4", borderColor: colorPrincipal, color: colorPrincipal },
                 }}
               >
                 Limpiar
@@ -839,8 +848,8 @@ const Finanzas = () => {
                   textTransform: "none",
                   fontSize: "0.85rem",
                   px: 3,
-                  boxShadow: "0 2px 8px rgba(163,105,32,0.25)",
-                  "&:hover": { backgroundColor: "#8a5a1a" },
+                  boxShadow: "0 2px 8px rgba(163,105,32,0.3)",
+                  "&:hover": { backgroundColor: "#8a5a1a", boxShadow: "0 3px 12px rgba(163,105,32,0.4)" },
                 }}
               >
                 🔍 Buscar
@@ -858,15 +867,15 @@ const Finanzas = () => {
             <>
               <Table>
                 <TableHead>
-                  <TableRow>
-                    <TableCell>Fecha</TableCell>
-                    <TableCell sx={{ minWidth: 220, maxWidth: 320 }}>Paciente</TableCell>
-                    <TableCell sx={{ minWidth: 220, maxWidth: 340 }}>Tratamiento</TableCell>
-                    <TableCell>Método de Pago</TableCell>
-                    <TableCell sx={{ minWidth: 130, textAlign: "right" }}>Monto bruto (S/)</TableCell>
-                    <TableCell sx={{ minWidth: 110, textAlign: "center" }}>Descuento (%)</TableCell>
-                    <TableCell sx={{ minWidth: 100, textAlign: "center" }}>Estado</TableCell>
-                    {canDoActions && <TableCell align="center">Acciones</TableCell>}
+                  <TableRow sx={{ backgroundColor: "#f5f1e4" }}>
+                    <TableCell sx={{ fontWeight: 700, color: colorPrincipal, borderBottom: "2px solid #ba9a63" }}>Fecha</TableCell>
+                    <TableCell sx={{ minWidth: 220, maxWidth: 320, fontWeight: 700, color: colorPrincipal, borderBottom: "2px solid #ba9a63" }}>Paciente</TableCell>
+                    <TableCell sx={{ minWidth: 220, maxWidth: 340, fontWeight: 700, color: colorPrincipal, borderBottom: "2px solid #ba9a63" }}>Tratamiento</TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: colorPrincipal, borderBottom: "2px solid #ba9a63" }}>Método de Pago</TableCell>
+                    <TableCell sx={{ minWidth: 130, textAlign: "right", fontWeight: 700, color: colorPrincipal, borderBottom: "2px solid #ba9a63" }}>Monto bruto (S/)</TableCell>
+                    <TableCell sx={{ minWidth: 110, textAlign: "center", fontWeight: 700, color: colorPrincipal, borderBottom: "2px solid #ba9a63" }}>Descuento (%)</TableCell>
+                    <TableCell sx={{ minWidth: 100, textAlign: "center", fontWeight: 700, color: colorPrincipal, borderBottom: "2px solid #ba9a63" }}>Estado</TableCell>
+                    {canDoActions && <TableCell align="center" sx={{ fontWeight: 700, color: colorPrincipal, borderBottom: "2px solid #ba9a63" }}>Acciones</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -912,7 +921,7 @@ const Finanzas = () => {
                             <IconButton
                               size="small"
                               onClick={() => abrirDialogoPago(r)}
-                              sx={{ color: "#2e7d32" }}
+                              sx={{ color: "#ba9a63" }}
                             >
                               <CheckCircle fontSize="small" />
                             </IconButton>
@@ -923,7 +932,7 @@ const Finanzas = () => {
                                 <IconButton
                                   size="small"
                                   onClick={() => abrirEditarMetodo(r)}
-                                  sx={{ color: "#1565c0" }}
+                                  sx={{ color: "#ba9a63" }}
                                 >
                                   <Edit fontSize="small" />
                                 </IconButton>
@@ -932,7 +941,7 @@ const Finanzas = () => {
                                 <IconButton
                                   size="small"
                                   onClick={() => abrirEditarMonto(r)}
-                                  sx={{ color: "#e65100" }}
+                                  sx={{ color: colorPrincipal }}
                                 >
                                   <AttachMoney fontSize="small" />
                                 </IconButton>
@@ -941,7 +950,7 @@ const Finanzas = () => {
                                 <IconButton
                                   size="small"
                                   onClick={() => abrirEditarFecha(r)}
-                                  sx={{ color: "#6a1b9a" }}
+                                  sx={{ color: "#a36920" }}
                                 >
                                   <CalendarMonth fontSize="small" />
                                 </IconButton>
@@ -950,7 +959,7 @@ const Finanzas = () => {
                                 <IconButton
                                   size="small"
                                   onClick={() => eliminarRegistro(r)}
-                                  sx={{ color: "#b71c1c" }}
+                                  sx={{ color: "#8a5a1a" }}
                                 >
                                   <Delete fontSize="small" />
                                 </IconButton>
@@ -972,8 +981,8 @@ const Finanzas = () => {
                 sx={{
                   p: 3,
                   borderRadius: 3,
-                  background: "linear-gradient(135deg, rgba(163,105,32,0.06) 0%, rgba(212,175,55,0.08) 100%)",
-                  border: "1px solid rgba(163,105,32,0.18)",
+                  background: "linear-gradient(135deg, #f5f1e4 0%, rgba(245,241,228,0.7) 100%)",
+                  border: "1px solid rgba(186,154,99,0.3)",
                 }}
               >
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5, flexWrap: "wrap", gap: 1 }}>
@@ -981,7 +990,7 @@ const Finanzas = () => {
                     <AttachMoney /> Total del Período Filtrado
                   </Typography>
                   {(fechaInicio || fechaFin) && (
-                    <Typography variant="body2" sx={{ color: "#666", fontWeight: 600, backgroundColor: "rgba(163,105,32,0.08)", px: 1.5, py: 0.5, borderRadius: 2, fontSize: "0.8rem" }}>
+                    <Typography variant="body2" sx={{ color: colorPrincipal, fontWeight: 600, backgroundColor: "#f5f1e4", border: "1px solid #ba9a63", px: 1.5, py: 0.5, borderRadius: 2, fontSize: "0.8rem" }}>
                       {fechaInicio === fechaFin ? fechaInicio : `${fechaInicio || '...'} — ${fechaFin || '...'}`}
                       {` (${reporte.length} registro${reporte.length !== 1 ? 's' : ''})`}
                     </Typography>
@@ -996,8 +1005,8 @@ const Finanzas = () => {
                       sx={{
                         p: 2,
                         borderRadius: 2.5,
-                        backgroundColor: "rgba(46,125,50,0.08)",
-                        border: "1px solid rgba(46,125,50,0.25)",
+                        backgroundColor: "rgba(186,154,99,0.12)",
+                        border: "1px solid rgba(186,154,99,0.35)",
                         textAlign: "center",
                         height: "100%",
                         display: "flex",
@@ -1008,7 +1017,7 @@ const Finanzas = () => {
                       <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Total Bruto
                       </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#2e7d32", mt: 0.5 }}>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#ba9a63", mt: 0.5 }}>
                         S/ {Number(totalBruto || 0).toFixed(2)}
                       </Typography>
                     </Paper>
@@ -1020,8 +1029,8 @@ const Finanzas = () => {
                       sx={{
                         p: 2,
                         borderRadius: 2.5,
-                        backgroundColor: "rgba(163,105,32,0.08)",
-                        border: "1px solid rgba(163,105,32,0.25)",
+                        backgroundColor: "rgba(163,105,32,0.06)",
+                        border: "1px solid rgba(163,105,32,0.3)",
                         textAlign: "center",
                         height: "100%",
                         display: "flex",
@@ -1044,8 +1053,8 @@ const Finanzas = () => {
                       sx={{
                         p: 2,
                         borderRadius: 2.5,
-                        backgroundColor: "rgba(198,40,40,0.06)",
-                        border: "1px solid rgba(198,40,40,0.18)",
+                        backgroundColor: "rgba(245,241,228,0.6)",
+                        border: "1px solid rgba(186,154,99,0.3)",
                         textAlign: "center",
                         height: "100%",
                         display: "flex",
@@ -1056,7 +1065,7 @@ const Finanzas = () => {
                       <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Comisión POS (4%)
                       </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#c62828", mt: 0.5 }}>
+                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#a36920", mt: 0.5, fontSize: "1.3rem" }}>
                         S/ {Number(totalComision || 0).toFixed(2)}
                       </Typography>
                     </Paper>
@@ -1070,11 +1079,11 @@ const Finanzas = () => {
                     sx={{
                       p: 2,
                       borderRadius: 2,
-                      backgroundColor: "rgba(255,255,255,0.7)",
-                      border: "1px solid rgba(163,105,32,0.12)",
+                      backgroundColor: "#fffdf7",
+                      border: "1px solid rgba(186,154,99,0.25)",
                     }}
                   >
-                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#555", mb: 1.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: colorPrincipal, mb: 1.5 }}>
                       Desglose por Método de Pago
                     </Typography>
                     <Grid container spacing={1}>
@@ -1087,11 +1096,11 @@ const Finanzas = () => {
                               alignItems: "center",
                               p: 1.2,
                               borderRadius: 1.5,
-                              backgroundColor: "rgba(163,105,32,0.04)",
-                              border: "1px solid rgba(163,105,32,0.10)",
+                              backgroundColor: "#f5f1e4",
+                              border: "1px solid rgba(186,154,99,0.25)",
                             }}
                           >
-                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#555" }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: "#6b5a3e" }}>
                               {metodo}
                             </Typography>
                             <Typography variant="body2" sx={{ fontWeight: "bold", color: colorPrincipal }}>
@@ -1113,7 +1122,7 @@ const Finanzas = () => {
                       color: colorPrincipal,
                       fontWeight: "bold",
                       px: 3,
-                      "&:hover": { backgroundColor: "#f6e3c5" },
+                      "&:hover": { backgroundColor: "#f5f1e4" },
                     }}
                   >
                     Exportar PDF
@@ -1124,8 +1133,8 @@ const Finanzas = () => {
           )}
         </Paper>
 
-        <Dialog open={pagoDialogOpen} onClose={() => setPagoDialogOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold" }}>Registrar Pago</DialogTitle>
+        <Dialog open={pagoDialogOpen} onClose={() => setPagoDialogOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderTop: "3px solid #a36920" } }}>
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Registrar Pago</DialogTitle>
           <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
             {pagoRegistro && (
               <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
@@ -1156,20 +1165,20 @@ const Finanzas = () => {
             </TextField>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setPagoDialogOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+            <Button onClick={() => setPagoDialogOpen(false)} sx={{ color: "#ba9a63" }}>Cancelar</Button>
             <Button
               variant="contained"
               onClick={registrarPago}
               disabled={guardandoPago}
-              sx={{ backgroundColor: "#2e7d32", "&:hover": { backgroundColor: "#1b5e20" } }}
+              sx={{ backgroundColor: colorPrincipal, "&:hover": { backgroundColor: "#8a5a1a" } }}
             >
               {guardandoPago ? "Guardando..." : "Registrar Pago"}
             </Button>
           </DialogActions>
         </Dialog>
 
-        <Dialog open={editMetodoOpen} onClose={() => setEditMetodoOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={{ color: "#1565c0", fontWeight: "bold" }}>Editar Método de Pago</DialogTitle>
+        <Dialog open={editMetodoOpen} onClose={() => setEditMetodoOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderTop: "3px solid #ba9a63" } }}>
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Editar Método de Pago</DialogTitle>
           <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
             {editMetodoRegistro && (
               <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
@@ -1193,19 +1202,19 @@ const Finanzas = () => {
             </TextField>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setEditMetodoOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+            <Button onClick={() => setEditMetodoOpen(false)} sx={{ color: "#ba9a63" }}>Cancelar</Button>
             <Button
               variant="contained"
               onClick={guardarMetodoPago}
               disabled={guardandoMetodo}
-              sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
+              sx={{ backgroundColor: "#ba9a63", "&:hover": { backgroundColor: "#a38b55" } }}
             >
               {guardandoMetodo ? "Guardando..." : "Guardar Cambio"}
             </Button>
           </DialogActions>
         </Dialog>
-        <Dialog open={editFechaOpen} onClose={() => setEditFechaOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={{ color: "#6a1b9a", fontWeight: "bold" }}>Editar Fecha de Pago</DialogTitle>
+        <Dialog open={editFechaOpen} onClose={() => setEditFechaOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderTop: "3px solid #ba9a63" } }}>
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Editar Fecha de Pago</DialogTitle>
           <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
             {editFechaRegistro && (
               <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
@@ -1225,19 +1234,19 @@ const Finanzas = () => {
             />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setEditFechaOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+            <Button onClick={() => setEditFechaOpen(false)} sx={{ color: "#ba9a63" }}>Cancelar</Button>
             <Button
               variant="contained"
               onClick={guardarFechaPago}
               disabled={guardandoFecha}
-              sx={{ backgroundColor: "#6a1b9a", "&:hover": { backgroundColor: "#4a148c" } }}
+              sx={{ backgroundColor: colorPrincipal, "&:hover": { backgroundColor: "#8a5a1a" } }}
             >
               {guardandoFecha ? "Guardando..." : "Guardar Cambio"}
             </Button>
           </DialogActions>
         </Dialog>
-        <Dialog open={editMontoOpen} onClose={() => setEditMontoOpen(false)} maxWidth="xs" fullWidth>
-          <DialogTitle sx={{ color: "#e65100", fontWeight: "bold" }}>Editar Monto Pagado</DialogTitle>
+        <Dialog open={editMontoOpen} onClose={() => setEditMontoOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderTop: "3px solid #ba9a63" } }}>
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Editar Monto Pagado</DialogTitle>
           <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
             {editMontoRegistro && (
               <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
@@ -1257,12 +1266,12 @@ const Finanzas = () => {
             />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setEditMontoOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+            <Button onClick={() => setEditMontoOpen(false)} sx={{ color: "#ba9a63" }}>Cancelar</Button>
             <Button
               variant="contained"
               onClick={guardarMontoPago}
               disabled={guardandoMonto}
-              sx={{ backgroundColor: "#e65100", "&:hover": { backgroundColor: "#bf360c" } }}
+              sx={{ backgroundColor: colorPrincipal, "&:hover": { backgroundColor: "#8a5a1a" } }}
             >
               {guardandoMonto ? "Guardando..." : "Guardar Cambio"}
             </Button>

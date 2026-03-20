@@ -16,10 +16,10 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       return;
     }
 
-    // Verificar rol si es requerido
+    // Verificar rol si es requerido (master tiene acceso total)
     if (requiredRole) {
       const userRole = localStorage.getItem("role");
-      if (userRole !== requiredRole) {
+      if (userRole !== "master" && userRole !== requiredRole) {
         showToast({ severity: "error", message: "No tienes permisos para acceder a esta sección" });
         navigate("/dashboard", { replace: true });
       }
@@ -29,10 +29,10 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   const token = localStorage.getItem("token");
   if (!token) return null;
 
-  // Verificar rol si es requerido
+  // Verificar rol si es requerido (master tiene acceso total)
   if (requiredRole) {
     const userRole = localStorage.getItem("role");
-    if (userRole !== requiredRole) return null;
+    if (userRole !== "master" && userRole !== requiredRole) return null;
   }
 
   const logout = () => {

@@ -5,6 +5,8 @@ import bodyParser from "body-parser";
 import sqlite3 from "sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 import authRoutes from "./routes/auth.js";
 import patientRoutes from "./routes/patientRoutes.js";
@@ -21,11 +23,31 @@ import whatsappRoutes from "./routes/whatsappRoutes.js";
 import n8nIntegrationRoutes from "./routes/n8nIntegrationRoutes.js";
 import gestionClinicaRoutes from "./routes/gestionClinicaRoutes.js";
 import bcrypt from "bcryptjs";
+import { autoEmitMiddleware } from "./utils/socketEmitter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = createServer(app);
+
+// Socket.IO — sincronización en tiempo real entre dispositivos
+const io = new Server(httpServer, {
+  cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] },
+  pingInterval: 10000,
+  pingTimeout: 5000,
+});
+
+io.on("connection", (socket) => {
+  console.log(`🔌 Cliente conectado: ${socket.id}`);
+  socket.on("disconnect", () => {
+    console.log(`⚡ Cliente desconectado: ${socket.id}`);
+  });
+});
+
+// Hacer io accesible desde las rutas via req.app
+app.set("io", io);
+
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
@@ -958,6 +980,9 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
   }
 });
 
+// ✅ Middleware de sincronización en tiempo real (auto-emit socket events)
+app.use(autoEmitMiddleware);
+
 // ✅ Rutas de la API
 app.use("/api/auth", authRoutes);
 app.use("/api/pacientes", patientRoutes);
@@ -985,6 +1010,8 @@ app.get(/^(?!\/api\/)(?!\/uploads\/).*/, (req, res) => {
 
 // ✅ Servidor en puerto configurable (default 4000)
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, "0.0.0.0", () =>
+httpServer.listen(PORT, "0.0.0.0", () =>
   console.log(`🚀 Servidor backend disponible en red en http://0.0.0.0:${PORT}`)
 );
+
+export { io };

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import useSocket from "../hooks/useSocket";
 import {
   Box,
   Typography,
@@ -96,6 +97,11 @@ export default function PacientesConDeudas() {
     cargarDeudas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sincronización en tiempo real
+  useSocket(["deudas:updated", "finanzas:updated", "paquetes:updated"], () => {
+    cargarDeudas();
+  });
 
   const abrirCancelar = (row) => {
     if (!canModifyDeudas) {

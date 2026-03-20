@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import useSocket from "../hooks/useSocket";
 import {
   Container,
   Typography,
@@ -56,7 +57,9 @@ import {
   Save,
   Edit,
   AccountBalance,
-  MoneyOff
+  MoneyOff,
+  VpnKey,
+  VisibilityOff
 } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -94,14 +97,59 @@ const GestionClinica = () => {
   const [modalDetalle, setModalDetalle] = useState({ abierto: false, especialista: null, datos: null });
   const [loadingDetalle, setLoadingDetalle] = useState(false);
 
+  // Estados para gestión de contraseñas
+  const [usuarios, setUsuarios] = useState([]);
+  const [passwordEditing, setPasswordEditing] = useState(null); // userId
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
   const token = localStorage.getItem("token");
+  const userRole = localStorage.getItem("role");
+  const isMaster = userRole === "master";
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
   useEffect(() => {
     cargarEspecialistas();
     cargarTratamientos();
     cargarEstadisticas();
+    if (isMaster) cargarUsuarios();
   }, []);
+
+  // Sincronización en tiempo real
+  useSocket(["gestion:updated", "especialistas:updated", "tratamientos:updated"], () => {
+    cargarEspecialistas();
+    cargarTratamientos();
+    cargarEstadisticas();
+  });
+
+  const cargarUsuarios = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/admin/users`, { headers: authHeaders });
+      setUsuarios(res.data || []);
+    } catch (err) {
+      console.error("Error al cargar usuarios:", err);
+    }
+  };
+
+  const cambiarPassword = async (userId) => {
+    if (!newPassword || newPassword.length < 4) {
+      showToast({ severity: "warning", message: "La contraseña debe tener al menos 4 caracteres" });
+      return;
+    }
+    try {
+      setSavingPassword(true);
+      const res = await axios.put(`${API_BASE_URL}/api/admin/users/${userId}/password`, { newPassword }, { headers: authHeaders });
+      showToast({ severity: "success", message: res.data.message || "Contraseña actualizada" });
+      setPasswordEditing(null);
+      setNewPassword("");
+      setShowPassword(false);
+    } catch (err) {
+      showToast({ severity: "error", message: err.response?.data?.message || "Error al cambiar contraseña" });
+    } finally {
+      setSavingPassword(false);
+    }
+  };
 
   const cargarEspecialistas = async () => {
     try {
@@ -750,6 +798,69 @@ const GestionClinica = () => {
           </TableContainer>
         )}
       </Paper>
+
+
+      {/* Gestión de Contraseñas (solo master) */}
+      {isMaster && (
+        <Paper elevation={0} sx={{ p: 3, mt: 4, borderRadius: 3, border: "1px solid rgba(163,105,32,0.2)", backgroundColor: "#fffdf7" }}>
+          <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920", mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
+            <VpnKey /> Gestión de Contraseñas
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          {usuarios.length === 0 ? (
+            <Typography color="text.secondary">No se encontraron usuarios.</Typography>
+          ) : (
+            <Grid container spacing={2}>
+              {usuarios.map((u) => (
+                <Grid item xs={12} sm={6} md={4} key={u.id}>
+                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid #e0d6c2", backgroundColor: "#f5f1e4" }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                      <Box>
+                        <Typography sx={{ fontWeight: "bold", color: "#333" }}>{u.username}</Typography>
+                        <Chip label={u.role} size="small" sx={{ mt: 0.5, backgroundColor: u.role === "master" ? "#a36920" : u.role === "doctor" ? "#ba9a63" : "#e0d6c2", color: u.role === "master" || u.role === "doctor" ? "white" : "#555", fontWeight: 600, fontSize: "0.7rem" }} />
+                      </Box>
+                      {passwordEditing !== u.id && (
+                        <IconButton size="small" onClick={() => { setPasswordEditing(u.id); setNewPassword(""); setShowPassword(false); }} sx={{ color: "#a36920" }}>
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                    {passwordEditing === u.id && (
+                      <Box sx={{ mt: 1.5 }}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          type={showPassword ? "text" : "password"}
+                          label="Nueva contraseña"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") cambiarPassword(u.id); }}
+                          InputProps={{
+                            endAdornment: (
+                              <IconButton size="small" onClick={() => setShowPassword(!showPassword)}>
+                                {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                              </IconButton>
+                            ),
+                          }}
+                          sx={{ mb: 1, "& .MuiInputBase-root": { backgroundColor: "white" } }}
+                        />
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          <Button size="small" variant="contained" onClick={() => cambiarPassword(u.id)} disabled={savingPassword} sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" }, fontSize: "0.75rem" }}>
+                            {savingPassword ? "Guardando..." : "Guardar"}
+                          </Button>
+                          <Button size="small" onClick={() => { setPasswordEditing(null); setNewPassword(""); }} sx={{ color: "#ba9a63", fontSize: "0.75rem" }}>
+                            Cancelar
+                          </Button>
+                        </Box>
+                      </Box>
+                    )}
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          )}
+        </Paper>
+      )}
 
 
       {/* Modal de Detalle */}

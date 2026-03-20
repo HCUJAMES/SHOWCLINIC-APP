@@ -63,9 +63,9 @@ export default function Especialistas() {
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
-  // Verificar que solo doctor puede acceder
+  // Verificar que solo doctor o master puede acceder
   useEffect(() => {
-    if (role !== "doctor") {
+    if (role !== "doctor" && role !== "master") {
       showToast({ severity: "error", message: "No tienes permisos para acceder a esta sección" });
       navigate("/dashboard");
     }
@@ -127,7 +127,7 @@ export default function Especialistas() {
     }
   };
 
-  if (role !== "doctor") return null;
+  if (role !== "doctor" && role !== "master") return null;
 
   return (
     <Box

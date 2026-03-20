@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import useSocket from "../../hooks/useSocket";
 import {
   Box,
   Paper,
@@ -365,6 +366,13 @@ export default function Inventario() {
     obtenerVariantes();
     obtenerStockLotes();
   }, []);
+
+  // Sincronización en tiempo real
+  useSocket(["inventario:updated"], () => {
+    obtenerProductosBase();
+    obtenerVariantes();
+    obtenerStockLotes();
+  });
 
   const normalizar = (s) => (typeof s === "string" ? s.trim() : "");
 

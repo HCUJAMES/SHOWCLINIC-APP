@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import useSocket from "../hooks/useSocket";
 import {
   Container,
   Typography,
@@ -84,6 +85,11 @@ const Paquetes = () => {
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // Sincronización en tiempo real
+  useSocket(["paquetes:updated", "tratamientos:updated"], () => {
+    cargarDatos();
+  });
 
   const cargarDatos = async () => {
     setLoading(true);

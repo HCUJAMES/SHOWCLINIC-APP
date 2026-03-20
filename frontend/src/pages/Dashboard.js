@@ -87,6 +87,8 @@ export default function Dashboard() {
       { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
       { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
+      { title: "Especialistas", image: "/images/especialista.png", path: "/especialistas", description: "Equipo médico" },
+      { title: "Gestión Clínica", image: "/images/finanzas.jpeg", path: "/gestion-clinica", description: "Gestión de atenciones" },
       { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },
       { title: "Gestionar", image: "/images/inventario.jpeg", path: "/gestion", description: "Administración del sistema" },
     ],
@@ -103,27 +105,23 @@ export default function Dashboard() {
 
   const menuItems = menuItemsByRole[role] || [];
 
+  const username = localStorage.getItem("username") || role;
+  const hora = new Date().getHours();
+  const saludo = hora < 12 ? "Buenos días" : hora < 18 ? "Buenas tardes" : "Buenas noches";
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        backgroundImage: "url('/images/background-showclinic.jpg')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
+        background: "linear-gradient(160deg, #faf8f5 0%, #f0ebe0 40%, #e8dfd0 100%)",
         position: "relative",
         display: "flex",
         flexDirection: "column",
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(135deg, rgba(255,255,255,0.75), rgba(250,240,210,0.6))",
-          zIndex: 0,
-        },
-        "& > *": { position: "relative", zIndex: 1 },
       }}
     >
+      {/* Decorative top bar */}
+      <Box sx={{ height: 4, background: "linear-gradient(90deg, #a36920 0%, #d4af37 50%, #a36920 100%)" }} />
+
       {/* Main Content */}
       <Box
         sx={{
@@ -131,119 +129,96 @@ export default function Dashboard() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          py: { xs: 4, sm: 6 },
+          py: { xs: 3, sm: 5 },
           px: 2,
         }}
       >
-        <Fade in timeout={600}>
-          <Box
-            sx={{
-              width: "100%",
-              maxWidth: 1100,
-              px: { xs: 2, sm: 5 },
-              py: { xs: 4, sm: 5 },
-              borderRadius: 4,
-              border: "1px solid rgba(163,105,32,0.15)",
-              backgroundColor: "rgba(255,255,255,0.88)",
-              backdropFilter: "blur(12px)",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.12)",
-            }}
-          >
-            {/* Header con logo */}
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 2,
-                mb: 1,
-              }}
-            >
+        <Fade in timeout={500}>
+          <Box sx={{ width: "100%", maxWidth: 1200 }}>
+
+            {/* Header */}
+            <Box sx={{ textAlign: "center", mb: { xs: 3, sm: 4 } }}>
               <Box
                 component="img"
                 src="/logo-showclinic.png"
                 alt="ShowClinic"
                 sx={{
-                  width: 56,
-                  height: 56,
+                  width: 80,
+                  height: 80,
                   objectFit: "cover",
                   borderRadius: "50%",
-                  backgroundColor: "rgba(255,255,255,0.96)",
-                  border: "2px solid rgba(163,105,32,0.4)",
-                  boxShadow: "0 8px 24px rgba(163,105,32,0.15)",
-                  transition: "transform 0.3s ease",
-                  "&:hover": {
-                    transform: "scale(1.05)",
-                  },
+                  border: "3px solid rgba(163,105,32,0.25)",
+                  boxShadow: "0 8px 28px rgba(163,105,32,0.18)",
+                  mb: 2,
                 }}
               />
               <Typography
                 variant="h3"
-                align="center"
                 sx={{
                   fontFamily: "'Playfair Display', serif",
                   fontWeight: 700,
-                  color: "#A36920",
-                  letterSpacing: 2,
-                  textShadow: "0px 2px 4px rgba(0,0,0,0.08)",
+                  color: "#a36920",
+                  letterSpacing: 4,
+                  fontSize: { xs: "1.8rem", sm: "2.4rem", md: "2.8rem" },
                 }}
               >
                 SHOWCLINIC
               </Typography>
+              <Typography
+                sx={{ color: "#ba9a63", letterSpacing: 2.5, fontWeight: 500, fontSize: { xs: "0.7rem", sm: "0.85rem" }, mt: 0.5 }}
+              >
+                ESTÉTICA AVANZADA & BIENESTAR
+              </Typography>
+              <Box sx={{ mt: 2.5, display: "inline-flex", alignItems: "center", gap: 1, px: 3, py: 1, borderRadius: 50, backgroundColor: "rgba(163,105,32,0.06)", border: "1px solid rgba(186,154,99,0.15)" }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#4CAF50", boxShadow: "0 0 8px rgba(76,175,80,0.5)" }} />
+                <Typography
+                  variant="body1"
+                  sx={{ color: "#6B6B6B", fontWeight: 400, fontSize: { xs: "0.9rem", sm: "1rem" } }}
+                >
+                  {saludo}, <strong style={{ color: "#a36920" }}>{username}</strong>
+                </Typography>
+              </Box>
             </Box>
 
-            <Typography
-              variant="subtitle1"
-              align="center"
-              sx={{ 
-                color: "#6B6B6B", 
-                mb: 4,
-                fontWeight: 400,
-                letterSpacing: 0.5,
-              }}
-            >
-              Estética Avanzada & Bienestar
-            </Typography>
-
             {/* Grid de módulos */}
-            <Grid container spacing={3} justifyContent="center" alignItems="stretch">
+            <Grid container spacing={3} justifyContent="center">
               {menuItems.map((item, index) => {
                 const IconComponent = moduleIcons[item.title];
+                const isLocked = item.hasAccess === false;
                 return (
-                  <Grow in timeout={400 + index * 150} key={index}>
-                    <Grid item xs={12} sm={6} md={4} lg={menuItems.length === 5 ? 2.4 : 3}>
+                  <Grow in timeout={300 + index * 100} key={index}>
+                    <Grid item xs={6} sm={4} md={4}>
                       <Card
                         sx={{
                           height: "100%",
                           borderRadius: 4,
                           position: "relative",
                           overflow: "hidden",
-                          backgroundColor: item.hasAccess === false ? "rgba(200,200,200,0.3)" : "rgba(255,255,255,0.95)",
-                          border: item.hasAccess === false ? "1px solid rgba(150,150,150,0.3)" : "1px solid rgba(163,105,32,0.12)",
-                          boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
-                          opacity: item.hasAccess === false ? 0.6 : 1,
+                          backgroundColor: isLocked ? "rgba(240,238,234,0.6)" : "#fffdf7",
+                          border: isLocked ? "1px solid #e0dcd5" : "1px solid rgba(186,154,99,0.18)",
+                          boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+                          opacity: isLocked ? 0.55 : 1,
                           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                          "&:hover": {
+                          "&:hover": isLocked ? {} : {
                             transform: "translateY(-8px)",
-                            boxShadow: "0 20px 40px rgba(163,105,32,0.2)",
-                            border: "1px solid rgba(163,105,32,0.3)",
-                            "& .module-icon": {
-                              transform: "scale(1.1)",
-                              backgroundColor: "rgba(163,105,32,0.15)",
-                              boxShadow: "0 8px 24px rgba(163,105,32,0.25)",
+                            boxShadow: "0 16px 48px rgba(163,105,32,0.2)",
+                            border: "1px solid rgba(163,105,32,0.4)",
+                            "& .mod-icon-wrap": {
+                              background: "linear-gradient(135deg, #a36920 0%, #d4af37 100%)",
+                              boxShadow: "0 6px 16px rgba(163,105,32,0.3)",
                             },
-                            "& .module-icon svg": {
-                              color: "#8A5A1A",
+                            "& .mod-icon-wrap svg": {
+                              color: "white",
                             },
-                            "& .module-title": {
-                              color: "#A36920",
+                            "& .mod-title": {
+                              color: "#a36920",
                             },
                           },
                         }}
                       >
                         <CardActionArea
                           onClick={() => {
-                            if (item.hasAccess === false) {
+                            if (isLocked) {
                               setDeniedModule(item.title);
                               setOpenAccessDenied(true);
                             } else {
@@ -253,27 +228,26 @@ export default function Dashboard() {
                           sx={{
                             height: "100%",
                             textAlign: "center",
-                            py: 4,
-                            px: 3,
-                            minHeight: 220,
+                            py: { xs: 3.5, sm: 4.5 },
+                            px: 2.5,
+                            minHeight: { xs: 180, sm: 220 },
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
                             justifyContent: "center",
+                            gap: 1.5,
                           }}
                         >
-                          {/* Icono del módulo */}
                           <Box
-                            className="module-icon"
+                            className="mod-icon-wrap"
                             sx={{
-                              width: 110,
-                              height: 110,
+                              width: 80,
+                              height: 80,
                               borderRadius: "50%",
-                              backgroundColor: "rgba(163,105,32,0.08)",
+                              background: "linear-gradient(135deg, rgba(163,105,32,0.07) 0%, rgba(212,175,55,0.14) 100%)",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              mb: 2.5,
                               transition: "all 0.3s ease",
                               position: "relative",
                             }}
@@ -281,51 +255,53 @@ export default function Dashboard() {
                             {IconComponent && (
                               <IconComponent
                                 sx={{
-                                  fontSize: 52,
-                                  color: "#A36920",
+                                  fontSize: 38,
+                                  color: "#a36920",
                                   transition: "color 0.3s ease",
                                 }}
                               />
                             )}
-                            {item.hasAccess === false && (
+                            {isLocked && (
                               <Box
                                 sx={{
                                   position: "absolute",
-                                  top: -5,
-                                  right: -5,
-                                  backgroundColor: "#d32f2f",
+                                  top: -6,
+                                  right: -6,
+                                  backgroundColor: "#b71c1c",
                                   borderRadius: "50%",
-                                  width: 35,
-                                  height: 35,
+                                  width: 26,
+                                  height: 26,
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
-                                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                                  border: "2px solid white",
                                 }}
                               >
-                                <Lock sx={{ fontSize: 18, color: "white" }} />
+                                <Lock sx={{ fontSize: 14, color: "white" }} />
                               </Box>
                             )}
                           </Box>
 
-                          <CardContent sx={{ p: 0 }}>
+                          <CardContent sx={{ p: "0 !important" }}>
                             <Typography
-                              className="module-title"
-                              variant="h6"
+                              className="mod-title"
                               sx={{
-                                fontWeight: 600,
-                                color: "#2E2E2E",
-                                mb: 0.5,
+                                fontWeight: 700,
+                                color: "#2e2e2e",
+                                fontSize: { xs: "0.9rem", sm: "1.05rem" },
+                                lineHeight: 1.3,
                                 transition: "color 0.3s ease",
+                                mb: 0.5,
                               }}
                             >
                               {item.title}
                             </Typography>
                             <Typography
-                              variant="body2"
+                              variant="caption"
                               sx={{
-                                color: "#6B6B6B",
-                                fontSize: "0.85rem",
+                                color: "#9a9a9a",
+                                fontSize: "0.8rem",
+                                display: "block",
                               }}
                             >
                               {item.description}
@@ -339,33 +315,11 @@ export default function Dashboard() {
               })}
             </Grid>
 
-            {/* Info del usuario */}
-            <Fade in timeout={1000}>
-              <Box
-                sx={{
-                  mt: 4,
-                  pt: 3,
-                  borderTop: "1px solid rgba(163,105,32,0.1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 1,
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    backgroundColor: "#4CAF50",
-                    boxShadow: "0 0 8px rgba(76,175,80,0.5)",
-                  }}
-                />
-                <Typography
-                  variant="body2"
-                  sx={{ color: "#6B6B6B" }}
-                >
-                  Sesión activa como <strong style={{ color: "#A36920" }}>{role}</strong>
+            {/* Session info */}
+            <Fade in timeout={800}>
+              <Box sx={{ mt: 5, textAlign: "center" }}>
+                <Typography variant="caption" sx={{ color: "#bbb", fontWeight: 400, fontSize: "0.75rem" }}>
+                  Panel de administración • Sesión activa
                 </Typography>
               </Box>
             </Fade>
@@ -373,15 +327,14 @@ export default function Dashboard() {
         </Fade>
       </Box>
 
-      {/* Footer elegante */}
+      {/* Footer */}
       <Box
         component="footer"
         sx={{
-          py: 2.5,
+          py: 2,
           px: 3,
-          backgroundColor: "rgba(26,26,26,0.95)",
-          backdropFilter: "blur(10px)",
-          borderTop: "1px solid rgba(163,105,32,0.3)",
+          borderTop: "1px solid rgba(186,154,99,0.15)",
+          backgroundColor: "rgba(255,253,247,0.8)",
         }}
       >
         <Box
@@ -392,52 +345,25 @@ export default function Dashboard() {
             flexDirection: { xs: "column", sm: "row" },
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 2,
+            gap: 1,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Box
               component="img"
               src="/logo-showclinic.png"
               alt="ShowClinic"
-              sx={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                opacity: 0.9,
-              }}
+              sx={{ width: 24, height: 24, borderRadius: "50%", opacity: 0.7 }}
             />
-            <Typography
-              variant="body2"
-              sx={{
-                color: "rgba(255,255,255,0.7)",
-                fontWeight: 500,
-                letterSpacing: 0.5,
-              }}
-            >
+            <Typography variant="caption" sx={{ color: "#ba9a63", fontWeight: 600, letterSpacing: 0.5, fontSize: "0.72rem" }}>
               ShowClinic
             </Typography>
           </Box>
-
-          <Typography
-            variant="body2"
-            sx={{
-              color: "rgba(255,255,255,0.5)",
-              fontSize: "0.8rem",
-              textAlign: "center",
-            }}
-          >
+          <Typography variant="caption" sx={{ color: "#c4b89a", fontSize: "0.7rem" }}>
             Estética Avanzada & Bienestar • Arequipa, Perú
           </Typography>
-
-          <Typography
-            variant="body2"
-            sx={{
-              color: "rgba(255,255,255,0.4)",
-              fontSize: "0.75rem",
-            }}
-          >
-            © {new Date().getFullYear()} ShowClinic. Todos los derechos reservados.
+          <Typography variant="caption" sx={{ color: "#d0c8b8", fontSize: "0.68rem" }}>
+            © {new Date().getFullYear()} Todos los derechos reservados
           </Typography>
         </Box>
       </Box>
@@ -448,31 +374,33 @@ export default function Dashboard() {
         onClose={() => setOpenAccessDenied(false)}
         maxWidth="xs"
         fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
       >
-        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white", textAlign: "center" }}>
-          🚫 Acceso Denegado
+        <DialogTitle sx={{ background: "linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%)", color: "white", textAlign: "center", py: 2 }}>
+          Acceso Restringido
         </DialogTitle>
-        <DialogContent sx={{ mt: 3, textAlign: "center" }}>
-          <Typography variant="h6" sx={{ mb: 2, color: "#333", fontWeight: "bold" }}>
+        <DialogContent sx={{ mt: 3, textAlign: "center", pb: 1 }}>
+          <Lock sx={{ fontSize: 48, color: "#d32f2f", mb: 1, opacity: 0.6 }} />
+          <Typography variant="h6" sx={{ mb: 1, color: "#333", fontWeight: 700 }}>
             {deniedModule}
           </Typography>
-          <Typography variant="body1" sx={{ color: "#666" }}>
-            Este usuario no tiene acceso a este módulo.
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 2, color: "#999" }}>
-            Contacta al administrador si necesitas permisos adicionales.
+          <Typography variant="body2" sx={{ color: "#888" }}>
+            No tienes permisos para acceder a este módulo. Contacta al administrador.
           </Typography>
         </DialogContent>
-        <DialogActions sx={{ p: 2, justifyContent: "center" }}>
+        <DialogActions sx={{ p: 2.5, justifyContent: "center" }}>
           <Button 
             onClick={() => setOpenAccessDenied(false)}
             variant="contained"
             sx={{
               backgroundColor: "#a36920",
-              "&:hover": { backgroundColor: "#8a541a" },
-              px: 4,
+              "&:hover": { backgroundColor: "#8a5a1a" },
+              px: 5,
               py: 1,
               borderRadius: 2,
+              fontWeight: 600,
+              textTransform: "none",
+              fontSize: "0.9rem",
             }}
           >
             Entendido

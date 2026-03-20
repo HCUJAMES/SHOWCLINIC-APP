@@ -1,13 +1,49 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
+import bcrypt from "bcryptjs";
 import db, { dbAll, dbRun } from "../db/database.js";
-import { authMiddleware, requireDoctor } from "../middleware/auth.js";
+import { authMiddleware, requireDoctor, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
 router.use(express.json());
 router.use(authMiddleware);
+
+// Listar usuarios (solo master)
+router.get("/users", requireRole("master"), async (req, res) => {
+  try {
+    const users = await dbAll("SELECT id, username, role FROM users ORDER BY username");
+    res.json(users || []);
+  } catch (err) {
+    console.error("Error al listar usuarios:", err);
+    res.status(500).json({ message: "Error al listar usuarios" });
+  }
+});
+
+// Cambiar contraseña de un usuario (solo master)
+router.put("/users/:id/password", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.length < 4) {
+    return res.status(400).json({ message: "La contraseña debe tener al menos 4 caracteres" });
+  }
+  try {
+    const user = await new Promise((resolve, reject) => {
+      db.get("SELECT id, username FROM users WHERE id = ?", [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await dbRun("UPDATE users SET password = ? WHERE id = ?", [hash, id]);
+    res.json({ message: `Contraseña de "${user.username}" actualizada correctamente` });
+  } catch (err) {
+    console.error("Error al cambiar contraseña:", err);
+    res.status(500).json({ message: "Error al cambiar contraseña" });
+  }
+});
 
 const fechaStamp = () => {
   const s = new Date().toISOString().replace(/[:.]/g, "-");

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import useSocket from "../hooks/useSocket";
 import {
   Box,
   Typography,
@@ -90,6 +91,11 @@ export default function Estadisticas() {
     if (canViewStats) cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, month, canViewStats]);
+
+  // Sincronización en tiempo real
+  useSocket(["finanzas:updated", "pacientes:updated", "tratamientos:updated", "paquetes:updated"], () => {
+    if (canViewStats) cargar();
+  });
 
   if (!canViewStats) return null;
 
