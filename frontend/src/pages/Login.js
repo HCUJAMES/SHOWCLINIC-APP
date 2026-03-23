@@ -98,7 +98,7 @@ export default function Login() {
               lineHeight: 1.6,
             }}
           >
-            Sistema de gestión clínica para ShowClinic. Inicia sesión para acceder a tu panel de control.
+            Sistema de gestión clínica para ShowClinic. Inicia sesión para acceder a tu panel de control, creado para ti.
           </Typography>
         </Box>
       </Box>
