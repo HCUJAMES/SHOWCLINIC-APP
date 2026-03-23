@@ -1374,6 +1374,11 @@ const HistorialClinico = () => {
     doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.text("ShowClinic - Tu belleza, nuestra pasión", pageWidth / 2, y, { align: "center" });
+    y += 6;
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(120, 120, 120);
+    doc.text("Documento informativo. No es comprobante fiscal.", pageWidth / 2, y, { align: "center" });
 
     // Abrir en nueva ventana para imprimir
     const pdfBlob = doc.output("blob");
