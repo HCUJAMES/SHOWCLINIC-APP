@@ -1186,7 +1186,10 @@ const HistorialClinico = () => {
   const generarReciboPresupuesto = (presupuesto) => {
     if (!pacienteSeleccionado || !presupuesto) return;
 
-    const doc = new jsPDF("p", "mm", [80, 250]);
+    let numTrats = 0;
+    try { numTrats = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json).length : 0; } catch(e) { numTrats = 1; }
+    const pageHeight = Math.max(260, 190 + numTrats * 16);
+    const doc = new jsPDF("p", "mm", [80, pageHeight]);
     const pageWidth = 80;
     let y = 5;
 
@@ -1721,16 +1724,34 @@ const HistorialClinico = () => {
       ["Número de hijos", p.numeroHijos ?? "No registrado"],
     ];
 
-    const tabla = tratamientos.map((t) => [
-      t.fecha ? t.fecha.split(" ")[0] : "-",
-      t.nombreTratamiento || "—",
-      t.tipoAtencion || "-",
-      t.especialista || "No especificado",
-      `S/ ${(t.precio_total || 0).toFixed(2)}`,
-      `${t.descuento || 0}%`,
-      t.pagoMetodo || "-",
-      t.sesion ?? "-",
-    ]);
+    const tabla = tratamientos.map((t) => {
+      let productoUsadoPDF = "-";
+      try {
+        if (t.productos) {
+          const productosArray = typeof t.productos === 'string' ? JSON.parse(t.productos) : t.productos;
+          if (Array.isArray(productosArray) && productosArray.length > 0) {
+            const prod = productosArray[0];
+            if (prod.variante_nombre) {
+              productoUsadoPDF = `${prod.nombre || ''} ${prod.variante_nombre}`.trim();
+            } else if (prod.nombre) {
+              productoUsadoPDF = prod.nombre;
+            } else if (prod.producto) {
+              productoUsadoPDF = prod.producto;
+            }
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return [
+        t.fecha ? t.fecha.split(" ")[0] : "-",
+        t.nombreTratamiento || "—",
+        t.cantidad_total || "-",
+        productoUsadoPDF,
+        t.tipoAtencion || "-",
+        t.especialista || "No especificado",
+        t.sesion ?? "-",
+        `S/ ${(t.precio_total || 0).toFixed(2)}`,
+      ];
+    });
 
     const didDrawHeaderFooter = (data) => {
       doc.setFillColor(...colorPrincipal);
@@ -1822,24 +1843,24 @@ const HistorialClinico = () => {
         [
           "Fecha",
           "Tratamiento",
+          "Cant.",
+          "Producto Usado",
           "Tipo Atención",
           "Especialista",
-          "Total",
-          "Desc.",
-          "Pago",
           "Sesión",
+          "Total",
         ],
       ],
       body: tabla,
       theme: "striped",
-      headStyles: { fillColor: colorPrincipal, textColor: 255, fontStyle: "bold" },
-      styles: { fontSize: 9, cellPadding: 4, valign: "middle" },
+      headStyles: { fillColor: colorPrincipal, textColor: 255, fontStyle: "bold", fontSize: 8 },
+      styles: { fontSize: 8, cellPadding: 3, valign: "middle" },
       alternateRowStyles: { fillColor: [247, 242, 234] },
       columnStyles: {
-        0: { cellWidth: 60 },
-        4: { halign: "right", cellWidth: 55 },
-        5: { halign: "center", cellWidth: 40 },
-        7: { halign: "center", cellWidth: 40 },
+        0: { cellWidth: 55 },
+        2: { halign: "center", cellWidth: 32 },
+        6: { halign: "center", cellWidth: 36 },
+        7: { halign: "right", cellWidth: 52 },
       },
       didDrawPage: didDrawHeaderFooter,
     });
