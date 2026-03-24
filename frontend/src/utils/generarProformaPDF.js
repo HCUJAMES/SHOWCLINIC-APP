@@ -186,12 +186,19 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     // ============================================
     // RESUMEN DE TOTALES (Cuadro elegante)
     // ============================================
-    const finalY = doc.lastAutoTable.finalY + 10;
+    let finalY = doc.lastAutoTable.finalY + 10;
     const boxWidth = 100;
     const boxX = pageWidth - boxWidth - 15;
 
     // Altura del cuadro depende de si hay descuento
     const boxHeight = descuento > 0 ? 50 : 30;
+    const footerHeight = 20;
+
+    // Si el cuadro de totales no cabe antes del footer, agregar nueva página
+    if (finalY + boxHeight + footerHeight + 5 > pageHeight) {
+      doc.addPage();
+      finalY = 20;
+    }
 
     // Fondo del cuadro de totales
     doc.setFillColor(248, 248, 248);
@@ -199,30 +206,29 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
 
     let totalY = finalY + 10;
 
-    if (descuento > 0) {
-      // Subtotal
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(80, 80, 80);
-      doc.text("Subtotal:", boxX + 5, totalY);
-      doc.text(`S/ ${subtotal.toFixed(2)}`, boxX + boxWidth - 5, totalY, { align: "right" });
+    // Siempre mostrar subtotal
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text("Subtotal:", boxX + 5, totalY);
+    doc.text(`S/ ${subtotal.toFixed(2)}`, boxX + boxWidth - 5, totalY, { align: "right" });
 
+    if (descuento > 0) {
       // Descuento
       totalY += 8;
       doc.setTextColor(46, 125, 50); // Verde
       doc.text("Descuento:", boxX + 5, totalY);
       doc.text(`- S/ ${descuento.toFixed(2)}`, boxX + boxWidth - 5, totalY, { align: "right" });
-
-      // Línea separadora
-      totalY += 5;
-      doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
-      doc.setLineWidth(0.5);
-      doc.line(boxX + 5, totalY, boxX + boxWidth - 5, totalY);
-
-      totalY += 8;
     }
 
+    // Línea separadora
+    totalY += 5;
+    doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+    doc.setLineWidth(0.5);
+    doc.line(boxX + 5, totalY, boxX + boxWidth - 5, totalY);
+
     // Total final
+    totalY += 8;
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(dorado[0], dorado[1], dorado[2]);
@@ -232,7 +238,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     // ============================================
     // FOOTER - Franja dorada inferior
     // ============================================
-    const footerY = pageHeight - 20;
+    const footerY = pageHeight - footerHeight;
     
     doc.setFillColor(dorado[0], dorado[1], dorado[2]);
     doc.rect(0, footerY, pageWidth, 20, "F");
