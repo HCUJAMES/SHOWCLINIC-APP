@@ -1186,202 +1186,233 @@ const HistorialClinico = () => {
   const generarReciboPresupuesto = (presupuesto) => {
     if (!pacienteSeleccionado || !presupuesto) return;
 
-    let numTrats = 0;
-    try { numTrats = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json).length : 0; } catch(e) { numTrats = 1; }
-    const pageHeight = Math.max(260, 190 + numTrats * 16);
+    // Clasificar tratamientos según marcas de color (gold=pagado, purple=pendiente, gray/sin marca=no se hará)
+    // Agrupar sesiones del mismo tratamiento para no duplicar precios
+    const sesiones = presupuesto.sesiones || [];
+    let tratamientosJSON = [];
+    try { tratamientosJSON = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : []; } catch(e) {}
+
+    // Agrupar por nombre de tratamiento para evitar duplicar precios
+    const tratamientosAgrupados = {};
+    let totalGold = 0;
+    let totalPurple = 0;
+
+    if (sesiones.length > 0) {
+      sesiones.forEach((sesion) => {
+        const key = `asig-${presupuesto.id}-${sesion.id}`;
+        const estado = tratamientosMarcados[key];
+        if (estado === "gold" || estado === "purple") {
+          const nombre = sesion.tratamiento_nombre || 'Tratamiento';
+          if (!tratamientosAgrupados[nombre]) {
+            tratamientosAgrupados[nombre] = { nombre, sesiones: 0, precioTotal: 0, estado };
+          }
+          tratamientosAgrupados[nombre].sesiones += 1;
+          tratamientosAgrupados[nombre].precioTotal += parseFloat(sesion.precio_sesion) || 0;
+          // Si hay mix de gold/purple en sesiones del mismo tratamiento, priorizar gold
+          if (estado === "gold") tratamientosAgrupados[nombre].estado = "gold";
+        }
+      });
+      Object.values(tratamientosAgrupados).forEach(t => {
+        if (t.estado === "gold") totalGold += t.precioTotal;
+        else totalPurple += t.precioTotal;
+      });
+    } else if (tratamientosJSON.length > 0) {
+      tratamientosJSON.forEach((trat, idx) => {
+        const key = presupuesto.oferta_id ? `${presupuesto.oferta_id}-${idx}` : null;
+        const estado = key ? tratamientosMarcados[key] : "gold";
+        if (estado === "gold" || estado === "purple" || !key) {
+          const precio = parseFloat(trat.precio) || 0;
+          const nombre = trat.nombre || trat.tratamiento || 'Tratamiento';
+          const numSes = Number(trat.sesiones) || 1;
+          tratamientosAgrupados[`${nombre}-${idx}`] = { nombre, sesiones: numSes, precioTotal: precio, estado: estado || "gold" };
+          if (estado === "purple") totalPurple += precio;
+          else totalGold += precio;
+        }
+      });
+    }
+
+    const itemsBoleta = Object.values(tratamientosAgrupados);
+    const totalActivo = totalGold + totalPurple;
+    const descuento = parseFloat(presupuesto.descuento) || 0;
+    const totalFinal = totalActivo - descuento;
+
+    const numItems = itemsBoleta.length || 1;
+    const pageHeight = Math.max(280, 210 + numItems * 18);
     const doc = new jsPDF("p", "mm", [80, pageHeight]);
     const pageWidth = 80;
-    let y = 5;
+    let y = 6;
 
-    // Color dorado para elementos destacados
-    const colorDorado = [163, 105, 32];
-
-    // Logo más grande y centrado
+    // Logo
     try {
       const logoImg = new Image();
       logoImg.src = '/logo-showclinic.png';
-      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 15, y, 30, 30);
-      y += 32;
+      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 12, y, 24, 24);
+      y += 27;
     } catch (e) {
       y += 2;
     }
 
-    // Encabezado con mejor tipografía
+    // ── Encabezado ──
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(20);
-    doc.setFont("times", "bold");
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
     doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
+    y += 5;
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Centro de Estetica Avanzada", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    doc.text("Av. Ejercito 616, Yanahuara, Arequipa", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    doc.setFont("helvetica", "bold");
+    doc.text("Tel: 974 212 114", pageWidth / 2, y, { align: "center" });
     y += 6;
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("Centro de Estética Avanzada", pageWidth / 2, y, { align: "center" });
-    y += 5;
-    
-    // Dirección con mejor espaciado
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text("Av. Ejército 616, Centro de Negocios", pageWidth / 2, y, { align: "center" });
-    y += 3.5;
-    doc.text("Yanahuara, Arequipa - Perú", pageWidth / 2, y, { align: "center" });
-    y += 4.5;
-    
-    // Teléfono destacado y centrado
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    const telText2 = "Tel: 974 212 114";
-    const telWidth2 = doc.getTextWidth(telText2);
-    doc.text(telText2, (pageWidth - telWidth2) / 2, y);
-    y += 7;
-
-    // Línea separadora
+    // ── Separador ──
     doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(5, y, pageWidth - 5, y);
+    doc.setLineWidth(0.4);
+    doc.line(4, y, pageWidth - 4, y);
     y += 5;
 
-    // Datos del paciente con mejor formato
+    // ── Datos del paciente ──
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
     doc.text("Cliente:", 5, y);
-    doc.text(nombrePaciente, 20, y);
-    y += 4.5;
+    doc.setFont("helvetica", "normal");
+    doc.text(nombrePaciente, 22, y);
+    y += 5;
     
-    doc.text("Documento:", 5, y);
-    doc.text(`${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 25, y);
-    y += 4.5;
+    doc.setFont("helvetica", "bold");
+    doc.text("Doc:", 5, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 15, y);
+    y += 5;
     
+    doc.setFont("helvetica", "bold");
     doc.text("Fecha:", 5, y);
-    doc.text(new Date().toLocaleDateString("es-PE", { year: 'numeric', month: 'long', day: 'numeric' }), 18, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(new Date().toLocaleDateString("es-PE", { day: '2-digit', month: '2-digit', year: 'numeric' }), 19, y);
     y += 6;
 
-    // Línea separadora
+    // ── Separador ──
     doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(5, y, pageWidth - 5, y);
+    doc.setLineWidth(0.4);
+    doc.line(4, y, pageWidth - 4, y);
     y += 5;
 
-    // Tratamientos incluidos con mejor diseño
+    // ── Tratamientos ──
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("TRATAMIENTOS INCLUIDOS:", 5, y);
-    y += 5;
-    
-    doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    try {
-      const tratamientos = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : [];
-      if (tratamientos.length > 0) {
-        tratamientos.forEach((trat) => {
-          const nombreTrat = trat.nombre || trat.tratamiento || 'Tratamiento';
-          const precio = parseFloat(trat.precio) || 0;
-          doc.text(`- ${nombreTrat}`, 7, y);
-          y += 3.5;
-          doc.text(`S/ ${precio.toFixed(2)}`, 9, y);
-          y += 4;
-        });
-      }
-    } catch (e) {
-      doc.text("- Tratamientos del presupuesto", 7, y);
-      y += 3.5;
+    doc.setFont("helvetica", "bold");
+    doc.text("TRATAMIENTOS", pageWidth / 2, y, { align: "center" });
+    y += 6;
+
+    doc.setFontSize(8);
+    if (itemsBoleta.length > 0) {
+      itemsBoleta.forEach((item) => {
+        const etiqueta = item.estado === "gold" ? "PAGADO" : "PEND.";
+        const sesInfo = item.sesiones > 1 ? ` (${item.sesiones} ses.)` : "";
+        doc.setFont("helvetica", "bold");
+        doc.text(`${item.nombre}${sesInfo}`, 5, y);
+        y += 4;
+        doc.setFont("helvetica", "normal");
+        doc.text(`S/ ${item.precioTotal.toFixed(2)}`, 7, y);
+        doc.setFont("helvetica", "bold");
+        doc.text(etiqueta, pageWidth - 5, y, { align: "right" });
+        y += 5;
+      });
+    } else {
+      doc.setFont("helvetica", "normal");
+      doc.text("Sin tratamientos seleccionados", 5, y);
+      y += 5;
     }
 
     y += 2;
-    // Línea separadora
+    // ── Separador ──
     doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(5, y, pageWidth - 5, y);
+    doc.setLineWidth(0.4);
+    doc.line(4, y, pageWidth - 4, y);
     y += 5;
 
-    // Detalles de precio con mejor formato
+    // ── Resumen de precios ──
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    
-    const subtotal = parseFloat(presupuesto.precio_total) || 0;
-    const descuento = parseFloat(presupuesto.descuento) || 0;
-    const montoConsulta = parseFloat(presupuesto.monto_consulta) || 0;
-    const total = subtotal - descuento;
-    
-    doc.text("Subtotal:", 5, y);
-    doc.text(`S/ ${subtotal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    y += 4;
+    doc.setFontSize(8);
 
-    if (descuento > 0) {
-      doc.text("Descuento:", 5, y);
-      doc.text(`- S/ ${descuento.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      y += 4;
+    if (totalGold > 0) {
+      doc.setFont("helvetica", "normal");
+      doc.text("Cobrado:", 5, y);
+      doc.setFont("helvetica", "bold");
+      doc.text(`S/ ${totalGold.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 5;
     }
 
-    // Mostrar consulta si fue pagada
+    if (totalPurple > 0) {
+      doc.setFont("helvetica", "normal");
+      doc.text("Por cobrar:", 5, y);
+      doc.setFont("helvetica", "bold");
+      doc.text(`S/ ${totalPurple.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 5;
+    }
+
+    if (descuento > 0) {
+      doc.setFont("helvetica", "normal");
+      doc.text("Descuento:", 5, y);
+      doc.setFont("helvetica", "bold");
+      doc.text(`-S/ ${descuento.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 5;
+    }
+
+    const montoConsulta = parseFloat(presupuesto.monto_consulta) || 0;
     if (presupuesto.consulta_pagada === 1 && montoConsulta > 0) {
-      doc.text("(Incluye consulta):", 5, y);
+      doc.setFont("helvetica", "normal");
+      doc.text("Consulta:", 5, y);
+      doc.setFont("helvetica", "bold");
       doc.text(`S/ ${montoConsulta.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
       y += 5;
     }
 
-    // Información de pagos
-    const montoPagado = parseFloat(presupuesto.monto_pagado) || 0;
-    const saldoPendiente = parseFloat(presupuesto.saldo_pendiente) || (total - montoPagado);
-
-    if (montoPagado > 0) {
-      doc.text("Pagado:", 5, y);
-      doc.text(`S/ ${montoPagado.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      y += 4;
-    }
-
-    if (saldoPendiente > 0 && presupuesto.estado_pago !== 'pagado') {
-      doc.text("Saldo pendiente:", 5, y);
-      doc.text(`S/ ${saldoPendiente.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      y += 4;
-    }
-
     y += 2;
-    // Línea separadora doble
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.6);
-    doc.line(5, y, pageWidth - 5, y);
-    y += 1.5;
-    doc.setLineWidth(0.3);
-    doc.line(5, y, pageWidth - 5, y);
-    y += 5;
-
-    // Total destacado con fondo
-    doc.setFillColor(220, 220, 220);
-    doc.rect(5, y - 3, pageWidth - 10, 8, 'F');
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.text("TOTAL:", 7, y + 1);
-    doc.text(`S/ ${total.toFixed(2)}`, pageWidth - 7, y + 1, { align: "right" });
-    y += 8;
-
-    y += 2;
-
-    // Línea separadora
+    // ── Separador doble ──
     doc.setDrawColor(0, 0, 0);
     doc.setLineWidth(0.5);
-    doc.line(5, y, pageWidth - 5, y);
+    doc.line(4, y, pageWidth - 4, y);
+    y += 1.5;
+    doc.setLineWidth(0.2);
+    doc.line(4, y, pageWidth - 4, y);
     y += 5;
 
-    // Mensaje de agradecimiento elegante
+    // ── TOTAL destacado ──
+    doc.setFillColor(200, 200, 200);
+    doc.rect(4, y - 3.5, pageWidth - 8, 9, 'F');
     doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("¡Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
-    y += 4.5;
+    doc.text("TOTAL:", 7, y + 1.5);
+    doc.text(`S/ ${totalFinal.toFixed(2)}`, pageWidth - 7, y + 1.5, { align: "right" });
+    y += 10;
+
+    y += 4;
+
+    // ── Pie de pagina ──
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.line(4, y, pageWidth - 4, y);
+    y += 5;
+
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
-    doc.text("ShowClinic - Tu belleza, nuestra pasión", pageWidth / 2, y, { align: "center" });
-    y += 6;
-    doc.setFontSize(7.5);
+    doc.text("Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
+    y += 4;
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text("ShowClinic - Tu belleza, nuestra pasion", pageWidth / 2, y, { align: "center" });
+    y += 5;
+    doc.setFontSize(6.5);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(0, 0, 0);
     doc.text("Documento informativo. No es comprobante fiscal.", pageWidth / 2, y, { align: "center" });
 
     // Abrir en nueva ventana para imprimir
@@ -3283,24 +3314,26 @@ const HistorialClinico = () => {
                                 checked={yaAsignado}
                                 onChange={async () => {
                                   if (!yaAsignado) {
-                                    // Capturar qué tratamientos fueron marcados antes de asignar
-                                    const marcadosDeEstaOferta = {};
+                                    // Capturar marcas por nombre de tratamiento (gold/purple/false)
+                                    const marcasPorNombre = {};
                                     (o.items || []).forEach((it, idx) => {
-                                      if (tratamientosMarcados[`${o.id}-${idx}`]) {
-                                        marcadosDeEstaOferta[idx] = true;
+                                      const estado = tratamientosMarcados[`${o.id}-${idx}`];
+                                      if (estado === "gold" || estado === "purple") {
+                                        marcasPorNombre[it.nombre] = estado;
                                       }
                                     });
                                     await asignarPresupuesto(o);
                                     // Transferir marcas al presupuesto asignado
-                                    // Los presupuestos asignados usan sesiones, mapear por índice
+                                    // Mapear por nombre de tratamiento ya que las sesiones se expanden
                                     setTimeout(() => {
                                       setPresupuestosAsignados(prev => {
                                         const nuevo = prev.find(p => p.oferta_id === o.id);
                                         if (nuevo && nuevo.sesiones) {
                                           const newMarcados = { ...tratamientosMarcados };
-                                          nuevo.sesiones.forEach((sesion, idx) => {
-                                            if (marcadosDeEstaOferta[idx]) {
-                                              newMarcados[`asig-${nuevo.id}-${sesion.id}`] = true;
+                                          nuevo.sesiones.forEach((sesion) => {
+                                            const estado = marcasPorNombre[sesion.tratamiento_nombre];
+                                            if (estado) {
+                                              newMarcados[`asig-${nuevo.id}-${sesion.id}`] = estado;
                                             }
                                           });
                                           setTratamientosMarcados(newMarcados);
@@ -4072,34 +4105,56 @@ const HistorialClinico = () => {
                           )}
 
                           {/* Total del presupuesto y estado de pago */}
+                          {(() => {
+                            // Calcular total basado en marcas de color (gold+purple)
+                            const sesionesP = presupuesto.sesiones || [];
+                            const hayMarcas = sesionesP.some(s => {
+                              const mk = tratamientosMarcados[`asig-${presupuesto.id}-${s.id}`];
+                              return mk === "gold" || mk === "purple";
+                            });
+                            let totalMarcado = 0;
+                            let totalGoldP = 0;
+                            let totalPurpleP = 0;
+                            if (hayMarcas) {
+                              sesionesP.forEach(s => {
+                                const mk = tratamientosMarcados[`asig-${presupuesto.id}-${s.id}`];
+                                const precio = Number(s.precio_sesion || 0);
+                                if (mk === "gold") { totalGoldP += precio; totalMarcado += precio; }
+                                else if (mk === "purple") { totalPurpleP += precio; totalMarcado += precio; }
+                              });
+                            } else {
+                              totalMarcado = Number(presupuesto.precio_total || 0);
+                            }
+                            const descuentoP = Number(presupuesto.descuento || 0);
+                            const totalFinalP = totalMarcado - descuentoP;
+                            return (
                           <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0" }}>
                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1 }}>
                               <Box>
-                                {Number(presupuesto.descuento || 0) > 0 ? (
-                                  <>
-                                    <Typography variant="body2" color="text.secondary">
-                                      Subtotal:
-                                    </Typography>
-                                    <Typography sx={{ fontWeight: "bold", color: "#666", fontSize: "0.95rem" }}>
-                                      S/ {Number(presupuesto.precio_total || 0).toFixed(2)}
-                                    </Typography>
-                                    <Typography variant="body2" color="error" sx={{ fontSize: "0.85rem" }}>
-                                      Descuento: -S/ {Number(presupuesto.descuento).toFixed(2)}
-                                    </Typography>
-                                    <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
-                                      Total: S/ {(Number(presupuesto.precio_total || 0) - Number(presupuesto.descuento || 0)).toFixed(2)}
-                                    </Typography>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Typography variant="body2" color="text.secondary">
-                                      Total del presupuesto:
-                                    </Typography>
-                                    <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
-                                      S/ {Number(presupuesto.precio_total || 0).toFixed(2)}
-                                    </Typography>
-                                  </>
+                                {hayMarcas && totalGoldP > 0 && (
+                                  <Typography variant="body2" sx={{ color: "#b8860b", fontSize: "0.85rem" }}>
+                                    Pagado (dorado): S/ {totalGoldP.toFixed(2)}
+                                  </Typography>
                                 )}
+                                {hayMarcas && totalPurpleP > 0 && (
+                                  <Typography variant="body2" sx={{ color: "#7b1fa2", fontSize: "0.85rem" }}>
+                                    Pendiente (morado): S/ {totalPurpleP.toFixed(2)}
+                                  </Typography>
+                                )}
+                                <Typography variant="body2" color="text.secondary">
+                                  Subtotal{hayMarcas ? " seleccionado" : ""}:
+                                </Typography>
+                                <Typography sx={{ fontWeight: "bold", color: "#666", fontSize: "0.95rem" }}>
+                                  S/ {totalMarcado.toFixed(2)}
+                                </Typography>
+                                {descuentoP > 0 && (
+                                  <Typography variant="body2" color="error" sx={{ fontSize: "0.85rem" }}>
+                                    Descuento: -S/ {descuentoP.toFixed(2)}
+                                  </Typography>
+                                )}
+                                <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>
+                                  Total: S/ {totalFinalP.toFixed(2)}
+                                </Typography>
                               </Box>
                               
                               {/* Estado de pago con colores */}
@@ -4288,6 +4343,8 @@ const HistorialClinico = () => {
                               </Button>
                             </Box>
                           </Box>
+                            );
+                          })()}
                           </>
                           )}
                         </Paper>

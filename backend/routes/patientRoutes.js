@@ -448,6 +448,8 @@ router.put("/:id/ofertas/:ofertaId", requirePatientWrite, async (req, res) => {
       const ahora = new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
       for (const item of normalized) {
         const numSesiones = Number(item.sesiones) >= 1 ? Number(item.sesiones) : 1;
+        const precioTotal = Number(item.precio) || 0;
+        const precioPorSesion = precioTotal / numSesiones;
         const completadas = completadasPorTrat[item.nombre] || 0;
         const pendientes = Math.max(0, numSesiones - completadas);
 
@@ -462,7 +464,7 @@ router.put("/:id/ofertas/:ofertaId", requirePatientWrite, async (req, res) => {
               item.tratamientoId || item.tratamiento_id || null,
               item.nombre,
               completadas + s,
-              Number(item.precio) || 0,
+              precioPorSesion,
               ahora
             ]
           );

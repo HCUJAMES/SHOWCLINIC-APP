@@ -961,6 +961,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
     for (const item of items) {
       const numSesiones = Number(item.sesiones) >= 1 ? Number(item.sesiones) : 1;
       const precioTotal = Number(item.precio) || 0;
+      const precioPorSesion = precioTotal / numSesiones;
 
       for (let s = 1; s <= numSesiones; s++) {
         await dbRun(
@@ -973,7 +974,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
             item.tratamientoId || item.tratamiento_id || null,
             item.nombre,
             s,
-            precioTotal,
+            precioPorSesion,
             ahora
           ]
         );

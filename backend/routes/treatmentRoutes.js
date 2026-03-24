@@ -9,6 +9,13 @@ import { authMiddleware, requireDoctor, requireRole } from "../middleware/auth.j
 
 const router = express.Router();
 
+// Helper: parsear número que puede tener coma como separador decimal
+const parseNum = (val) => {
+  if (val == null || val === "") return 0;
+  const str = String(val).replace(",", ".");
+  return parseFloat(str) || 0;
+};
+
 // Middlewares específicos de tratamientos
 const requireTreatmentBaseCreate = (req, res, next) => {
   const role = req.user?.role;
@@ -359,10 +366,10 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       if (!recetas || recetas.length === 0) continue; // tratamiento sin receta, flujo clásico
 
       const factorCantidad =
-        parseFloat(b.dosis_unidades) > 0
-          ? parseFloat(b.dosis_unidades)
-          : parseFloat(b.cantidad) > 0
-            ? parseFloat(b.cantidad)
+        parseNum(b.dosis_unidades) > 0
+          ? parseNum(b.dosis_unidades)
+          : parseNum(b.cantidad) > 0
+            ? parseNum(b.cantidad)
             : 1;
 
       for (const receta of recetas) {
@@ -403,10 +410,10 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       if (!varianteId) continue;
 
       const cantidadNecesaria =
-        parseFloat(b.dosis_unidades) > 0
-          ? parseFloat(b.dosis_unidades)
-          : parseFloat(b.cantidad) > 0
-            ? parseFloat(b.cantidad)
+        parseNum(b.dosis_unidades) > 0
+          ? parseNum(b.dosis_unidades)
+          : parseNum(b.cantidad) > 0
+            ? parseNum(b.cantidad)
             : 0;
       if (!(cantidadNecesaria > 0)) continue;
 
@@ -460,9 +467,9 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         : [];
 
       // Usar el total calculado por el frontend (precio * cantidad - descuento)
-      const precioUnitario = parseFloat(b.precio) || 0;
-      const cantidadMl = parseFloat(b.cantidad) || 1;
-      const totalDelFrontend = parseFloat(b.total) || 0;
+      const precioUnitario = parseNum(b.precio);
+      const cantidadMl = parseNum(b.cantidad) || 1;
+      const totalDelFrontend = parseNum(b.total);
       
       // Si el frontend envía total, usarlo; sino calcular
       let subtotal = totalDelFrontend > 0 ? totalDelFrontend : precioUnitario * cantidadMl;
@@ -639,7 +646,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           usoReceta = true;
 
           // Usar cantidad (ml) directamente
-          const cantidadParaStock = parseFloat(b.cantidad) || 1;
+          const cantidadParaStock = parseNum(b.cantidad) || 1;
 
           // Por cada ingrediente de la receta, aplicar FEFO y descontar lotes
           for (const receta of recetas) {
@@ -675,9 +682,9 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       // Esto evita descuento doble cuando hay receta Y variante seleccionada.
       const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
       const cantidadElegida =
-        parseFloat(b.dosis_unidades) > 0
-          ? parseFloat(b.dosis_unidades)
-          : parseFloat(b.cantidad) || 0;
+        parseNum(b.dosis_unidades) > 0
+          ? parseNum(b.dosis_unidades)
+          : parseNum(b.cantidad) || 0;
 
       if (!usoReceta && varianteIdElegida && cantidadElegida > 0) {
         const movimiento = await dbRun(

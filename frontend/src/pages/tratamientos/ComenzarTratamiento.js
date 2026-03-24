@@ -846,27 +846,28 @@ const ComenzarTratamiento = () => {
                         {(() => {
                           const varSel = b.variante_id ? variantesInv.find(v => String(v.id) === String(b.variante_id)) : null;
                           const unidadVar = varSel?.unidad_base || "ml";
-                          const esEntera = unidadVar === "U" || unidadVar === "frasco";
                           const labelCantidad = unidadVar === "U" ? "Unidades (U)" : unidadVar === "frasco" ? "Frascos" : "Cantidad (ml)";
-                          const helperCantidad = unidadVar === "U" ? "Unidades a usar (ej: 50U)" : unidadVar === "frasco" ? "Frascos a usar" : "ml a descontar del inventario";
+                          const helperCantidad = unidadVar === "U" ? "Unidades a usar (ej: 24,5)" : unidadVar === "frasco" ? "Frascos a usar" : "ml a descontar (ej: 2,5)";
+                          const valorMostrar = b.dosis_unidades || b.cantidad || "";
                           return (
                             <TextField
                               label={labelCantidad}
-                              type="number"
-                              value={esEntera ? (b.dosis_unidades || b.cantidad) : b.cantidad}
+                              type="text"
+                              inputMode="decimal"
+                              value={valorMostrar}
                               onChange={(e) => {
-                                const val = e.target.value;
-                                if (esEntera) {
-                                  setBloques(prev => {
-                                    const copia = [...prev];
-                                    copia[index] = { ...copia[index], dosis_unidades: val, cantidad: val };
-                                    return copia;
-                                  });
-                                } else {
-                                  actualizarBloque(index, "cantidad", val);
-                                }
+                                // Permitir comas y puntos como separador decimal
+                                let raw = e.target.value;
+                                // Solo permitir números, comas y puntos
+                                raw = raw.replace(/[^0-9.,]/g, "");
+                                // Reemplazar coma por punto para el valor interno
+                                const valNormalizado = raw.replace(",", ".");
+                                setBloques(prev => {
+                                  const copia = [...prev];
+                                  copia[index] = { ...copia[index], dosis_unidades: raw, cantidad: valNormalizado };
+                                  return copia;
+                                });
                               }}
-                              inputProps={{ min: esEntera ? 1 : 0.1, step: esEntera ? 1 : 0.1 }}
                               sx={{
                                 "& .MuiInputBase-root": {
                                   backgroundColor: "rgba(255,255,255,0.95)",
