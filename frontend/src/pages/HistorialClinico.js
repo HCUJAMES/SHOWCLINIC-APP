@@ -167,6 +167,8 @@ const HistorialClinico = () => {
   const [editPagoMetodo, setEditPagoMetodo] = useState("Efectivo");
   const [editTipoAtencion, setEditTipoAtencion] = useState("Tratamiento");
   const [editFecha, setEditFecha] = useState("");
+  const [editNombreTratamiento, setEditNombreTratamiento] = useState("");
+  const [editCantidad, setEditCantidad] = useState("");
   const [modalDescuento, setModalDescuento] = useState(false);
   const [descuentoProforma, setDescuentoProforma] = useState("");
   const [presupuestoParaProforma, setPresupuestoParaProforma] = useState(null);
@@ -185,6 +187,18 @@ const HistorialClinico = () => {
   const [carruselImagenes, setCarruselImagenes] = useState([]);
   const [carruselIdx, setCarruselIdx] = useState(0);
   const [carruselNombre, setCarruselNombre] = useState("");
+
+  // Estados para presupuesto corporal
+  const [modalCorporal, setModalCorporal] = useState(false);
+  const [corporalRegistros, setCorporalRegistros] = useState([]);
+  const [corporalEditId, setCorporalEditId] = useState(null);
+  const [corporalTipo, setCorporalTipo] = useState("evaluacion");
+  const [corporalTablas, setCorporalTablas] = useState([
+    { titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: "1ra sesión", datos: "" }] }
+  ]);
+  const [corporalActividad, setCorporalActividad] = useState("");
+  const [corporalObservaciones, setCorporalObservaciones] = useState("");
+  const [guardandoCorporal, setGuardandoCorporal] = useState(false);
 
   // Estados para modal de pago de presupuesto
   const [modalPagoPresupuesto, setModalPagoPresupuesto] = useState(false);
@@ -593,6 +607,77 @@ const HistorialClinico = () => {
     } catch (error) {
       console.error("Error al eliminar paquete:", error);
       showToast({ severity: "error", message: error.response?.data?.message || "Error al eliminar paquete" });
+    }
+  };
+
+  // === PRESUPUESTO CORPORAL ===
+  const cargarCorporal = async () => {
+    if (!pacienteSeleccionado?.id) return;
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/corporal`, { headers: authHeaders });
+      setCorporalRegistros(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Error al cargar corporal:", err);
+    }
+  };
+
+  const resetCorporalForm = () => {
+    setCorporalEditId(null);
+    setCorporalTipo("evaluacion");
+    setCorporalTablas([{ titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: "1ra sesión", datos: "" }] }]);
+    setCorporalActividad("");
+    setCorporalObservaciones("");
+  };
+
+  const abrirModalCorporal = () => {
+    resetCorporalForm();
+    cargarCorporal();
+    setModalCorporal(true);
+  };
+
+  const editarCorporal = (registro) => {
+    setCorporalEditId(registro.id);
+    setCorporalTipo(registro.tipo || "evaluacion");
+    setCorporalTablas(registro.tablas_json || [{ titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: "1ra sesión", datos: "" }] }]);
+    setCorporalActividad(registro.actividad_fisica || "");
+    setCorporalObservaciones(registro.observaciones || "");
+  };
+
+  const guardarCorporal = async () => {
+    if (!pacienteSeleccionado?.id) return;
+    setGuardandoCorporal(true);
+    try {
+      const payload = {
+        tipo: corporalTipo,
+        tablas_json: corporalTablas,
+        actividad_fisica: corporalActividad,
+        observaciones: corporalObservaciones,
+      };
+      if (corporalEditId) {
+        await axios.put(`${API_BASE_URL}/api/pacientes/corporal/${corporalEditId}`, payload, { headers: authHeaders });
+        showToast({ severity: "success", message: "Registro corporal actualizado" });
+      } else {
+        await axios.post(`${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/corporal`, payload, { headers: authHeaders });
+        showToast({ severity: "success", message: "Registro corporal creado" });
+      }
+      resetCorporalForm();
+      await cargarCorporal();
+    } catch (err) {
+      console.error("Error al guardar corporal:", err);
+      showToast({ severity: "error", message: "Error al guardar registro corporal" });
+    } finally {
+      setGuardandoCorporal(false);
+    }
+  };
+
+  const eliminarCorporal = async (corporalId) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/api/pacientes/corporal/${corporalId}`, { headers: authHeaders });
+      showToast({ severity: "success", message: "Registro eliminado" });
+      await cargarCorporal();
+    } catch (err) {
+      console.error("Error al eliminar corporal:", err);
+      showToast({ severity: "error", message: "Error al eliminar" });
     }
   };
 
@@ -2043,6 +2128,8 @@ const HistorialClinico = () => {
     setEditDescuento(tratamiento.descuento || "");
     setEditPagoMetodo(tratamiento.pagoMetodo || "Efectivo");
     setEditTipoAtencion(tratamiento.tipoAtencion || "Tratamiento");
+    setEditNombreTratamiento(tratamiento.nombreTratamiento || "");
+    setEditCantidad(tratamiento.cantidad_total || "");
     // Extraer solo la fecha (YYYY-MM-DD) del timestamp
     const fechaSolo = tratamiento.fecha ? tratamiento.fecha.split(" ")[0] : "";
     setEditFecha(fechaSolo);
@@ -2064,6 +2151,8 @@ const HistorialClinico = () => {
           pagoMetodo: editPagoMetodo,
           tipoAtencion: editTipoAtencion,
           fecha: editFecha,
+          nombreTratamiento: editNombreTratamiento,
+          cantidad_total: editCantidad,
         },
         { headers: authHeaders }
       );
@@ -3032,6 +3121,20 @@ const HistorialClinico = () => {
                   disabled={!pacienteSeleccionado}
                 >
                   📦 Agregar Paquete
+                </Button>
+                <Button
+                  variant="contained"
+                  sx={{
+                    backgroundColor: "#e91e63",
+                    color: "white",
+                    fontWeight: "bold",
+                    borderRadius: 3,
+                    "&:hover": { backgroundColor: "#c2185b" },
+                  }}
+                  onClick={abrirModalCorporal}
+                  disabled={!pacienteSeleccionado}
+                >
+                  🏋️ Presupuesto Corporal
                 </Button>
               </Box>
 
@@ -5171,7 +5274,27 @@ const HistorialClinico = () => {
                 helperText="Puedes cambiar la fecha para registrar tratamientos históricos"
               />
             </Grid>
-            <Grid item xs={12}>
+            {(isAdmin || isMaster) && (
+              <>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Nombre del Tratamiento"
+                    value={editNombreTratamiento}
+                    onChange={(e) => setEditNombreTratamiento(e.target.value)}
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="Cantidad (ml/unidades)"
+                    value={editCantidad}
+                    onChange={(e) => setEditCantidad(e.target.value)}
+                  />
+                </Grid>
+              </>
+            )}
+            <Grid item xs={(isAdmin || isMaster) ? 6 : 12}>
               <TextField
                 fullWidth
                 label="Especialista"
@@ -6241,6 +6364,414 @@ const HistorialClinico = () => {
             {guardandoEditPagoPaquete ? "Guardando..." : "Guardar Cambio"}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Modal Presupuesto Corporal */}
+      <Dialog
+        open={modalCorporal}
+        onClose={() => setModalCorporal(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 4, minHeight: "70vh" } }}
+      >
+        <DialogTitle sx={{
+          backgroundColor: "#e91e63",
+          color: "white",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          py: 1.5,
+        }}>
+          <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+            🏋️ Presupuesto Corporal — {pacienteSeleccionado?.nombre} {pacienteSeleccionado?.apellido}
+          </Typography>
+          <IconButton onClick={() => setModalCorporal(false)} sx={{ color: "white" }}>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, backgroundColor: "#fafafa" }}>
+          {/* Tabs Evaluación / Tratamiento */}
+          <Box sx={{ display: "flex", gap: 1, mb: 3, mt: 1 }}>
+            <Button
+              variant={corporalTipo === "evaluacion" ? "contained" : "outlined"}
+              onClick={() => setCorporalTipo("evaluacion")}
+              sx={{
+                backgroundColor: corporalTipo === "evaluacion" ? "#e91e63" : "transparent",
+                color: corporalTipo === "evaluacion" ? "white" : "#e91e63",
+                borderColor: "#e91e63",
+                fontWeight: "bold",
+                borderRadius: 3,
+                px: 4,
+                "&:hover": {
+                  backgroundColor: corporalTipo === "evaluacion" ? "#c2185b" : "rgba(233,30,99,0.08)",
+                  borderColor: "#e91e63",
+                },
+              }}
+            >
+              📋 Evaluación
+            </Button>
+            <Button
+              variant={corporalTipo === "tratamiento" ? "contained" : "outlined"}
+              onClick={() => setCorporalTipo("tratamiento")}
+              sx={{
+                backgroundColor: corporalTipo === "tratamiento" ? "#7b1fa2" : "transparent",
+                color: corporalTipo === "tratamiento" ? "white" : "#7b1fa2",
+                borderColor: "#7b1fa2",
+                fontWeight: "bold",
+                borderRadius: 3,
+                px: 4,
+                "&:hover": {
+                  backgroundColor: corporalTipo === "tratamiento" ? "#6a1b9a" : "rgba(123,31,162,0.08)",
+                  borderColor: "#7b1fa2",
+                },
+              }}
+            >
+              💉 Tratamiento
+            </Button>
+          </Box>
+
+          {/* Tablas de mediciones */}
+          {corporalTablas.map((tabla, tIdx) => (
+            <Paper key={tIdx} elevation={1} sx={{ mb: 3, borderRadius: 3, overflow: "hidden", border: "1px solid #e0e0e0" }}>
+              <Box sx={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                px: 2, py: 1.5,
+                backgroundColor: corporalTipo === "evaluacion" ? "#fce4ec" : "#f3e5f5",
+                borderBottom: "1px solid #e0e0e0",
+              }}>
+                <TextField
+                  variant="standard"
+                  value={tabla.titulo}
+                  onChange={(e) => {
+                    const nuevo = [...corporalTablas];
+                    nuevo[tIdx].titulo = e.target.value;
+                    setCorporalTablas(nuevo);
+                  }}
+                  InputProps={{ disableUnderline: true, sx: { fontWeight: "bold", fontSize: "1rem", color: corporalTipo === "evaluacion" ? "#c2185b" : "#7b1fa2" } }}
+                  placeholder="Título de la tabla"
+                />
+                <Box sx={{ display: "flex", gap: 0.5 }}>
+                  {corporalTablas.length > 1 && (
+                    <IconButton
+                      size="small"
+                      onClick={() => setCorporalTablas(prev => prev.filter((_, i) => i !== tIdx))}
+                      sx={{ color: "#f44336" }}
+                    >
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  )}
+                </Box>
+              </Box>
+              <TableContainer>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Cintura</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Cadera</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Muslos</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Glúteos</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Brazos</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 110 }}>Sesión</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 140 }}>Datos</TableCell>
+                      <TableCell sx={{ width: 40 }}></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {tabla.filas.map((fila, fIdx) => (
+                      <TableRow key={fIdx} sx={{ "&:hover": { backgroundColor: "rgba(233,30,99,0.03)" } }}>
+                        {["cintura", "cadera", "muslos", "gluteos", "brazos"].map((campo) => (
+                          <TableCell key={campo} sx={{ p: 0.5 }}>
+                            <TextField
+                              variant="outlined"
+                              size="small"
+                              value={fila[campo] || ""}
+                              onChange={(e) => {
+                                const nuevo = [...corporalTablas];
+                                nuevo[tIdx].filas[fIdx][campo] = e.target.value;
+                                setCorporalTablas(nuevo);
+                              }}
+                              placeholder="cm"
+                              sx={{
+                                "& .MuiOutlinedInput-root": {
+                                  borderRadius: 2,
+                                  backgroundColor: "white",
+                                  fontSize: "0.85rem",
+                                },
+                              }}
+                              inputProps={{ style: { padding: "6px 8px", textAlign: "center" } }}
+                            />
+                          </TableCell>
+                        ))}
+                        <TableCell sx={{ p: 0.5 }}>
+                          <TextField
+                            variant="outlined"
+                            size="small"
+                            value={fila.sesion || ""}
+                            onChange={(e) => {
+                              const nuevo = [...corporalTablas];
+                              nuevo[tIdx].filas[fIdx].sesion = e.target.value;
+                              setCorporalTablas(nuevo);
+                            }}
+                            placeholder="Ej: 1ra sesión"
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                borderRadius: 2,
+                                backgroundColor: "white",
+                                fontSize: "0.85rem",
+                              },
+                            }}
+                            inputProps={{ style: { padding: "6px 8px" } }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ p: 0.5 }}>
+                          <TextField
+                            variant="outlined"
+                            size="small"
+                            value={fila.datos || ""}
+                            onChange={(e) => {
+                              const nuevo = [...corporalTablas];
+                              nuevo[tIdx].filas[fIdx].datos = e.target.value;
+                              setCorporalTablas(nuevo);
+                            }}
+                            placeholder="Datos adicionales"
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                borderRadius: 2,
+                                backgroundColor: "white",
+                                fontSize: "0.85rem",
+                              },
+                            }}
+                            inputProps={{ style: { padding: "6px 8px" } }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ p: 0.5 }}>
+                          {tabla.filas.length > 1 && (
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                const nuevo = [...corporalTablas];
+                                nuevo[tIdx].filas = nuevo[tIdx].filas.filter((_, i) => i !== fIdx);
+                                setCorporalTablas(nuevo);
+                              }}
+                              sx={{ color: "#bbb", "&:hover": { color: "#f44336" } }}
+                            >
+                              <Close fontSize="small" />
+                            </IconButton>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Box sx={{ p: 1, display: "flex", justifyContent: "center" }}>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    const nuevo = [...corporalTablas];
+                    const numFila = nuevo[tIdx].filas.length + 1;
+                    const sesionLabel = numFila === 1 ? "1ra sesión" : numFila === 2 ? "2da sesión" : numFila === 3 ? "3ra sesión" : `${numFila}ta sesión`;
+                    nuevo[tIdx].filas.push({ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: sesionLabel, datos: "" });
+                    setCorporalTablas(nuevo);
+                  }}
+                  sx={{ color: "#e91e63", fontWeight: "bold", fontSize: "0.8rem" }}
+                >
+                  + Agregar fila
+                </Button>
+              </Box>
+            </Paper>
+          ))}
+
+          <Button
+            variant="outlined"
+            onClick={() => {
+              setCorporalTablas(prev => [...prev, {
+                titulo: `Tabla ${prev.length + 1}`,
+                filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: "1ra sesión", datos: "" }]
+              }]);
+            }}
+            sx={{
+              borderColor: "#e91e63",
+              color: "#e91e63",
+              fontWeight: "bold",
+              borderRadius: 3,
+              mb: 3,
+              "&:hover": { backgroundColor: "rgba(233,30,99,0.08)", borderColor: "#e91e63" },
+            }}
+          >
+            + Agregar nueva tabla
+          </Button>
+
+          {/* Actividad Física */}
+          <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#e91e63", mb: 1.5 }}>
+              🏃 Actividad Física
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              value={corporalActividad}
+              onChange={(e) => setCorporalActividad(e.target.value)}
+              placeholder="Describe la actividad física del paciente: tipo, frecuencia, duración..."
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  backgroundColor: "white",
+                },
+              }}
+            />
+          </Paper>
+
+          {/* Observaciones */}
+          <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#e91e63", mb: 1.5 }}>
+              📝 Observaciones
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              value={corporalObservaciones}
+              onChange={(e) => setCorporalObservaciones(e.target.value)}
+              placeholder="Observaciones generales sobre el estado corporal del paciente..."
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  backgroundColor: "white",
+                },
+              }}
+            />
+          </Paper>
+
+          {/* Botón Guardar */}
+          <Box sx={{ display: "flex", justifyContent: "center", gap: 2, mb: 4 }}>
+            {corporalEditId && (
+              <Button
+                variant="outlined"
+                onClick={resetCorporalForm}
+                sx={{ borderColor: "#999", color: "#666", borderRadius: 3, px: 4 }}
+              >
+                Cancelar edición
+              </Button>
+            )}
+            <Button
+              variant="contained"
+              onClick={guardarCorporal}
+              disabled={guardandoCorporal}
+              sx={{
+                backgroundColor: "#e91e63",
+                fontWeight: "bold",
+                borderRadius: 3,
+                px: 5,
+                py: 1.2,
+                fontSize: "1rem",
+                "&:hover": { backgroundColor: "#c2185b" },
+              }}
+            >
+              {guardandoCorporal ? "Guardando..." : corporalEditId ? "Actualizar Registro" : "Guardar Registro"}
+            </Button>
+          </Box>
+
+          <Divider sx={{ mb: 3 }} />
+
+          {/* Historial de registros corporales */}
+          <Typography variant="h6" sx={{ fontWeight: "bold", color: "#555", mb: 2 }}>
+            📄 Registros guardados
+          </Typography>
+          {corporalRegistros.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 3 }}>
+              No hay registros corporales para este paciente
+            </Typography>
+          ) : (
+            corporalRegistros.map((reg) => (
+              <Paper
+                key={reg.id}
+                elevation={0}
+                sx={{
+                  mb: 2, p: 2, borderRadius: 3,
+                  border: `1px solid ${reg.tipo === "evaluacion" ? "#f48fb1" : "#ce93d8"}`,
+                  backgroundColor: reg.tipo === "evaluacion" ? "#fce4ec" : "#f3e5f5",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  "&:hover": { transform: "translateY(-1px)", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" },
+                }}
+              >
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Chip
+                      label={reg.tipo === "evaluacion" ? "Evaluación" : "Tratamiento"}
+                      size="small"
+                      sx={{
+                        backgroundColor: reg.tipo === "evaluacion" ? "#e91e63" : "#7b1fa2",
+                        color: "white",
+                        fontWeight: "bold",
+                        fontSize: "0.75rem",
+                      }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {reg.creado_en?.split(" ")[0]} | por {reg.creado_por || "sistema"}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                    <IconButton size="small" onClick={() => editarCorporal(reg)} sx={{ color: "#a36920" }}>
+                      <Edit fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" onClick={() => eliminarCorporal(reg.id)} sx={{ color: "#f44336" }}>
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </Box>
+
+                {/* Preview de tablas */}
+                {(reg.tablas_json || []).map((t, ti) => (
+                  <Box key={ti} sx={{ mb: 1 }}>
+                    <Typography variant="caption" sx={{ fontWeight: "bold", color: "#777" }}>{t.titulo}:</Typography>
+                    <TableContainer sx={{ mt: 0.5 }}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Cintura</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Cadera</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Muslos</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Glúteos</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Brazos</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Sesión</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Datos</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {(t.filas || []).map((f, fi) => (
+                            <TableRow key={fi}>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.cintura || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.cadera || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.muslos || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.gluteos || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.brazos || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.sesion || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.datos || "-"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                ))}
+
+                {reg.actividad_fisica && (
+                  <Typography variant="caption" sx={{ display: "block", mt: 1, color: "#555" }}>
+                    <strong>🏃 Actividad:</strong> {reg.actividad_fisica}
+                  </Typography>
+                )}
+                {reg.observaciones && (
+                  <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "#555" }}>
+                    <strong>📝 Observaciones:</strong> {reg.observaciones}
+                  </Typography>
+                )}
+              </Paper>
+            ))
+          )}
+        </DialogContent>
       </Dialog>
 
       {/* Modal Carrusel de Imágenes del Tratamiento */}

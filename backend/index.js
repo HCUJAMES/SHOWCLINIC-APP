@@ -251,6 +251,22 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       )
     `);
 
+    // 🏋️ Tabla de presupuesto corporal (evaluaciones y tratamientos corporales)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS presupuesto_corporal (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        tipo TEXT NOT NULL DEFAULT 'evaluacion',
+        tablas_json TEXT NOT NULL DEFAULT '[]',
+        actividad_fisica TEXT,
+        observaciones TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        creado_por TEXT,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id)
+      )
+    `);
+
     // 🧱 Tabla de tratamientos base
     db.run(`
       CREATE TABLE IF NOT EXISTS tratamientos (

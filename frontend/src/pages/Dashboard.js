@@ -122,6 +122,48 @@ export default function Dashboard() {
       {/* Decorative top bar */}
       <Box sx={{ height: 4, background: "linear-gradient(90deg, #a36920 0%, #d4af37 50%, #a36920 100%)" }} />
 
+      {/* Decorative model images */}
+      <Box
+        component="img"
+        src="/images/modeloladoizquierdo.jpg"
+        alt=""
+        sx={{
+          position: "fixed",
+          left: 0,
+          bottom: 0,
+          height: { xs: "45vh", md: "70vh" },
+          width: "auto",
+          opacity: 0.10,
+          pointerEvents: "none",
+          zIndex: 0,
+          objectFit: "contain",
+          objectPosition: "left bottom",
+          filter: "grayscale(20%)",
+          maskImage: "linear-gradient(to right, rgba(0,0,0,1) 60%, rgba(0,0,0,0))",
+          WebkitMaskImage: "linear-gradient(to right, rgba(0,0,0,1) 60%, rgba(0,0,0,0))",
+        }}
+      />
+      <Box
+        component="img"
+        src="/images/modelomodulosderecha.jpg"
+        alt=""
+        sx={{
+          position: "fixed",
+          right: 0,
+          bottom: 0,
+          height: { xs: "45vh", md: "70vh" },
+          width: "auto",
+          opacity: 0.10,
+          pointerEvents: "none",
+          zIndex: 0,
+          objectFit: "contain",
+          objectPosition: "right bottom",
+          filter: "grayscale(20%)",
+          maskImage: "linear-gradient(to left, rgba(0,0,0,1) 60%, rgba(0,0,0,0))",
+          WebkitMaskImage: "linear-gradient(to left, rgba(0,0,0,1) 60%, rgba(0,0,0,0))",
+        }}
+      />
+
       {/* Main Content */}
       <Box
         sx={{
@@ -131,6 +173,8 @@ export default function Dashboard() {
           justifyContent: "center",
           py: { xs: 3, sm: 5 },
           px: 2,
+          position: "relative",
+          zIndex: 1,
         }}
       >
         <Fade in timeout={500}>
@@ -286,10 +330,12 @@ export default function Dashboard() {
                             <Typography
                               className="mod-title"
                               sx={{
+                                fontFamily: "'Playfair Display', serif",
                                 fontWeight: 700,
                                 color: "#2e2e2e",
-                                fontSize: { xs: "0.9rem", sm: "1.05rem" },
+                                fontSize: { xs: "0.95rem", sm: "1.1rem" },
                                 lineHeight: 1.3,
+                                letterSpacing: 0.5,
                                 transition: "color 0.3s ease",
                                 mb: 0.5,
                               }}

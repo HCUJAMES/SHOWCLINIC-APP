@@ -919,4 +919,80 @@ router.put("/:id/marcados", (req, res) => {
   );
 });
 
+// ==============================
+// 🏋️ PRESUPUESTO CORPORAL
+// ==============================
+
+// Obtener todos los registros corporales de un paciente
+router.get("/:id/corporal", (req, res) => {
+  const { id } = req.params;
+  db.all(
+    `SELECT * FROM presupuesto_corporal WHERE paciente_id = ? ORDER BY creado_en DESC`,
+    [id],
+    (err, rows) => {
+      if (err) {
+        console.error("❌ Error al obtener corporal:", err.message);
+        return res.status(500).json({ message: "Error al obtener datos corporales" });
+      }
+      const parsed = (rows || []).map(r => ({
+        ...r,
+        tablas_json: JSON.parse(r.tablas_json || "[]"),
+      }));
+      res.json(parsed);
+    }
+  );
+});
+
+// Crear nuevo registro corporal
+router.post("/:id/corporal", requirePatientWrite, (req, res) => {
+  const { id } = req.params;
+  const { tipo, tablas_json, actividad_fisica, observaciones } = req.body;
+  const ahora = new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+  const username = req.user?.username || "sistema";
+
+  db.run(
+    `INSERT INTO presupuesto_corporal (paciente_id, tipo, tablas_json, actividad_fisica, observaciones, creado_en, actualizado_en, creado_por)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, tipo || "evaluacion", JSON.stringify(tablas_json || []), actividad_fisica || "", observaciones || "", ahora, ahora, username],
+    function (err) {
+      if (err) {
+        console.error("❌ Error al crear corporal:", err.message);
+        return res.status(500).json({ message: "Error al crear registro corporal" });
+      }
+      res.json({ id: this.lastID, message: "Registro corporal creado" });
+    }
+  );
+});
+
+// Actualizar registro corporal
+router.put("/corporal/:corporalId", requirePatientWrite, (req, res) => {
+  const { corporalId } = req.params;
+  const { tipo, tablas_json, actividad_fisica, observaciones } = req.body;
+  const ahora = new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+
+  db.run(
+    `UPDATE presupuesto_corporal SET tipo = ?, tablas_json = ?, actividad_fisica = ?, observaciones = ?, actualizado_en = ? WHERE id = ?`,
+    [tipo || "evaluacion", JSON.stringify(tablas_json || []), actividad_fisica || "", observaciones || "", ahora, corporalId],
+    function (err) {
+      if (err) {
+        console.error("❌ Error al actualizar corporal:", err.message);
+        return res.status(500).json({ message: "Error al actualizar registro corporal" });
+      }
+      res.json({ message: "Registro corporal actualizado" });
+    }
+  );
+});
+
+// Eliminar registro corporal
+router.delete("/corporal/:corporalId", requirePatientWrite, (req, res) => {
+  const { corporalId } = req.params;
+  db.run(`DELETE FROM presupuesto_corporal WHERE id = ?`, [corporalId], function (err) {
+    if (err) {
+      console.error("❌ Error al eliminar corporal:", err.message);
+      return res.status(500).json({ message: "Error al eliminar registro corporal" });
+    }
+    res.json({ message: "Registro corporal eliminado" });
+  });
+});
+
 export default router;

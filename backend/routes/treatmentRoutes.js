@@ -1085,6 +1085,8 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     pagoMetodo,
     tipoAtencion,
     fecha,
+    nombreTratamiento,
+    cantidad_total,
   } = req.body;
 
   try {
@@ -1105,6 +1107,8 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     const descuentoNum = descuento != null ? Number(descuento) : tratamiento.descuento;
     const pagoMetodoStr = typeof pagoMetodo === "string" ? pagoMetodo.trim() : tratamiento.pagoMetodo;
     const tipoAtencionStr = typeof tipoAtencion === "string" ? tipoAtencion.trim() : tratamiento.tipoAtencion;
+    const nombreStr = typeof nombreTratamiento === "string" && nombreTratamiento.trim() ? nombreTratamiento.trim() : tratamiento.nombreTratamiento;
+    const cantidadStr = cantidad_total != null && String(cantidad_total).trim() !== "" ? String(cantidad_total).trim() : tratamiento.cantidad_total;
     
     // Validar y formatear fecha (zona horaria Perú GMT-5)
     let fechaStr = tratamiento.fecha;
@@ -1138,9 +1142,10 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     await dbRun(
       `UPDATE tratamientos_realizados 
        SET especialista = ?, sesion = ?, precio_total = ?, descuento = ?, 
-           pagoMetodo = ?, tipoAtencion = ?, fecha = ?
+           pagoMetodo = ?, tipoAtencion = ?, fecha = ?,
+           nombreTratamiento = ?, cantidad_total = ?
        WHERE id = ?`,
-      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, tratamientoId]
+      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, nombreStr, cantidadStr, tratamientoId]
     );
 
     // Si hay deuda asociada, actualizar el monto total
