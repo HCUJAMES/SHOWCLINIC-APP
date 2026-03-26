@@ -225,8 +225,31 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
             }
           });
         }
+
+        const tieneEspecial = rows.some((col) => col.name === "especial");
+        if (!tieneEspecial) {
+          db.run("ALTER TABLE patients ADD COLUMN especial INTEGER DEFAULT 0", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna especial:", alterErr.message);
+            } else {
+              console.log("✅ Columna especial agregada a patients");
+            }
+          });
+        }
       }
     });
+
+    // 📸 Tabla de imágenes de tratamientos (protocolos)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS tratamiento_imagenes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tratamiento_id INTEGER NOT NULL,
+        imagen_url TEXT NOT NULL,
+        orden INTEGER DEFAULT 0,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(tratamiento_id) REFERENCES tratamientos(id)
+      )
+    `);
 
     // 🧱 Tabla de tratamientos base
     db.run(`

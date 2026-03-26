@@ -59,6 +59,7 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     referencia,
     referenciaDetalle,
     numeroHijos,
+    especial,
   } = req.body;
 
   const dniStr = typeof dni === "string" ? dni.trim() : String(dni || "").trim();
@@ -93,7 +94,7 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     UPDATE patients
     SET tipoDocumento=?, dni=?, nombre=?, apellido=?, edad=?, sexo=?, direccion=?, ocupacion=?,
         fechaNacimiento=?, ciudadNacimiento=?, ciudadResidencia=?, alergias=?, enfermedad=?,
-        correo=?, celular=?, cirugiaEstetica=?, embarazada=?, drogas=?, tabaco=?, alcohol=?, referencia=?, referenciaDetalle=?, numeroHijos=?
+        correo=?, celular=?, cirugiaEstetica=?, embarazada=?, drogas=?, tabaco=?, alcohol=?, referencia=?, referenciaDetalle=?, numeroHijos=?, especial=?
     WHERE id=?
   `;
 
@@ -123,6 +124,7 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
       referencia,
       referenciaDetalle,
       numeroHijos,
+      especial ? 1 : 0,
       id,
     ],
     function (err) {
@@ -183,6 +185,7 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
     referencia,
     referenciaDetalle,
     numeroHijos,
+    especial,
   } = req.body;
 
   const query = `
@@ -190,8 +193,8 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
       tipoDocumento, dni, nombre, apellido, edad, sexo, direccion, ocupacion,
       fechaNacimiento, ciudadNacimiento, ciudadResidencia,
       alergias, enfermedad, correo, celular,
-      cirugiaEstetica, embarazada, drogas, tabaco, alcohol, referencia, referenciaDetalle, numeroHijos
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      cirugiaEstetica, embarazada, drogas, tabaco, alcohol, referencia, referenciaDetalle, numeroHijos, especial
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `;
 
   db.run(
@@ -220,6 +223,7 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
       referencia,
       referenciaDetalle,
       numeroHijos,
+      especial ? 1 : 0,
     ],
     function (err) {
       if (err) {
@@ -787,6 +791,19 @@ router.post("/:id/observaciones", requirePatientWrite, (req, res) => {
       return res.status(500).json({ message: "Error al crear observación" });
     }
     res.json({ id: this.lastID, paciente_id: Number(id), texto: textoTrim, creado_en: creadoEn });
+  });
+});
+
+// ✅ Actualizar campo especial de un paciente
+router.patch("/:id/especial", requirePatientWrite, (req, res) => {
+  const { id } = req.params;
+  const { especial } = req.body;
+  db.run(`UPDATE patients SET especial = ? WHERE id = ?`, [especial ? 1 : 0, id], function (err) {
+    if (err) {
+      console.error("❌ Error al actualizar especial:", err.message);
+      return res.status(500).json({ message: "Error al actualizar especial" });
+    }
+    res.json({ message: "Estado especial actualizado correctamente" });
   });
 });
 

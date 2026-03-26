@@ -874,7 +874,107 @@ router.post(
 );
 
 /* ==============================
-   📋 HISTORIAL CLÍNICO
+   � IMÁGENES DE PROTOCOLOS (tratamientos base)
+============================== */
+
+// Configurar almacenamiento para imágenes de protocolos
+const storageTratamientos = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = "./uploads/tratamientos";
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `trat_${req.params.tratamientoId}_${Date.now()}${path.extname(file.originalname)}`);
+  },
+});
+const uploadTratamientoImg = multer({ storage: storageTratamientos });
+
+// Subir imágenes a un tratamiento (máximo 6)
+router.post(
+  "/protocolo/:tratamientoId/imagenes",
+  requireTreatmentBaseCreate,
+  uploadTratamientoImg.array("imagenes", 6),
+  async (req, res) => {
+    const { tratamientoId } = req.params;
+    const archivos = req.files || [];
+
+    if (!archivos.length) {
+      return res.status(400).json({ message: "No se han subido imágenes" });
+    }
+
+    // Verificar cuántas imágenes ya tiene
+    const existentes = await dbAll(
+      `SELECT COUNT(*) as count FROM tratamiento_imagenes WHERE tratamiento_id = ?`,
+      [tratamientoId]
+    );
+    const actuales = existentes[0]?.count || 0;
+
+    if (actuales + archivos.length > 6) {
+      return res.status(400).json({
+        message: `Solo puedes tener hasta 6 imágenes. Actualmente tienes ${actuales}.`,
+      });
+    }
+
+    try {
+      for (let i = 0; i < archivos.length; i++) {
+        const url = `/uploads/tratamientos/${archivos[i].filename}`;
+        await dbRun(
+          `INSERT INTO tratamiento_imagenes (tratamiento_id, imagen_url, orden) VALUES (?, ?, ?)`,
+          [tratamientoId, url, actuales + i]
+        );
+      }
+      res.json({ message: `${archivos.length} imagen(es) subida(s) correctamente` });
+    } catch (err) {
+      console.error("❌ Error al guardar imágenes de tratamiento:", err.message);
+      res.status(500).json({ message: "Error al guardar imágenes" });
+    }
+  }
+);
+
+// Obtener imágenes de un tratamiento
+router.get("/protocolo/:tratamientoId/imagenes", async (req, res) => {
+  const { tratamientoId } = req.params;
+  try {
+    const imagenes = await dbAll(
+      `SELECT * FROM tratamiento_imagenes WHERE tratamiento_id = ? ORDER BY orden ASC`,
+      [tratamientoId]
+    );
+    res.json(imagenes);
+  } catch (err) {
+    console.error("❌ Error al obtener imágenes:", err.message);
+    res.status(500).json({ message: "Error al obtener imágenes" });
+  }
+});
+
+// Eliminar una imagen de un tratamiento
+router.delete("/protocolo/imagen/:imagenId", requireTreatmentBaseCreate, async (req, res) => {
+  const { imagenId } = req.params;
+  try {
+    const imagen = await dbGet(
+      `SELECT * FROM tratamiento_imagenes WHERE id = ?`,
+      [imagenId]
+    );
+    if (!imagen) {
+      return res.status(404).json({ message: "Imagen no encontrada" });
+    }
+
+    // Eliminar archivo físico
+    const filePath = path.join(".", imagen.imagen_url);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    await dbRun(`DELETE FROM tratamiento_imagenes WHERE id = ?`, [imagenId]);
+    res.json({ message: "Imagen eliminada correctamente" });
+  } catch (err) {
+    console.error("❌ Error al eliminar imagen:", err.message);
+    res.status(500).json({ message: "Error al eliminar imagen" });
+  }
+});
+
+/* ==============================
+   �📋 HISTORIAL CLÍNICO
 ============================== */
 
 router.get("/historial/:paciente_id", (req, res) => {

@@ -8,6 +8,8 @@ import {
   Paper,
   MenuItem,
   IconButton,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import { ArrowBack, Home } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -45,6 +47,7 @@ export default function RegistrarPaciente() {
     referencia: "",
     referenciaDetalle: "",
     numeroHijos: "",
+    especial: false,
   });
 
   const [errors, setErrors] = useState({});
@@ -456,6 +459,26 @@ export default function RegistrarPaciente() {
               InputProps={{ inputProps: { min: 0 } }}
             />
           </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={formData.especial}
+                  onChange={(e) => setFormData({ ...formData, especial: e.target.checked })}
+                  sx={{
+                    "& .MuiSwitch-switchBase.Mui-checked": { color: "#d32f2f" },
+                    "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#d32f2f" },
+                  }}
+                />
+              }
+              label={
+                <Typography sx={{ fontWeight: formData.especial ? "bold" : "normal", color: formData.especial ? "#d32f2f" : "inherit" }}>
+                  {formData.especial ? "⭐ Cliente Especial" : "Cliente Normal"}
+                </Typography>
+              }
+            />
+          </Grid>
         </Grid>
 
         <Box textAlign="center" mt={3}>
@@ -515,6 +538,7 @@ export default function RegistrarPaciente() {
                     referencia: "",
                     referenciaDetalle: "",
                     numeroHijos: "",
+                    especial: false,
                   });
                   setErrors({});
                 } else {

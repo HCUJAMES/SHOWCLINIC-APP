@@ -29,6 +29,8 @@ import {
   Chip,
   Checkbox,
   Collapse,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -177,6 +179,12 @@ const HistorialClinico = () => {
   // Estados para confirmar cancelación
   const [openConfirmarCancelar, setOpenConfirmarCancelar] = useState(false);
   const [tratamientoCancelar, setTratamientoCancelar] = useState(null);
+
+  // Estados para carrusel de imágenes de tratamiento
+  const [modalCarrusel, setModalCarrusel] = useState(false);
+  const [carruselImagenes, setCarruselImagenes] = useState([]);
+  const [carruselIdx, setCarruselIdx] = useState(0);
+  const [carruselNombre, setCarruselNombre] = useState("");
 
   // Estados para modal de pago de presupuesto
   const [modalPagoPresupuesto, setModalPagoPresupuesto] = useState(false);
@@ -588,8 +596,29 @@ const HistorialClinico = () => {
     }
   };
 
+  // Abrir carrusel de imágenes del tratamiento
+  const abrirCarruselTratamiento = async (tratamientoId, nombreTratamiento) => {
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/tratamientos/protocolo/${tratamientoId}/imagenes`,
+        { headers: authHeaders }
+      );
+      const imgs = Array.isArray(res.data) ? res.data : [];
+      if (imgs.length === 0) {
+        showToast({ severity: "info", message: "Este tratamiento no tiene imágenes" });
+        return;
+      }
+      setCarruselImagenes(imgs);
+      setCarruselIdx(0);
+      setCarruselNombre(nombreTratamiento);
+      setModalCarrusel(true);
+    } catch (err) {
+      console.error("Error al cargar imágenes:", err);
+    }
+  };
+
   // Asignar presupuesto al paciente
-  const asignarPresupuesto = async (oferta) => {
+  const asignarPresupuesto = async (oferta, marcas) => {
     if (!pacienteSeleccionado?.id) return;
     
     setAsignandoPresupuesto(true);
@@ -599,6 +628,7 @@ const HistorialClinico = () => {
         {
           paciente_id: pacienteSeleccionado.id,
           oferta_id: oferta.id,
+          marcas: marcas || {},
         },
         { headers: authHeaders }
       );
@@ -2409,12 +2439,45 @@ const HistorialClinico = () => {
               </Box>
 
               {/* Información completa del paciente */}
-              <Typography
-                variant="h6"
-                sx={{ color: "#a36920", fontWeight: "bold", mb: 2 }}
-              >
-                Información completa del paciente
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                <Typography
+                  variant="h6"
+                  sx={{ color: "#a36920", fontWeight: "bold" }}
+                >
+                  Información completa del paciente
+                </Typography>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={Boolean(pacienteSeleccionado.especial)}
+                      onChange={async (e) => {
+                        const nuevoValor = e.target.checked;
+                        try {
+                          await axios.patch(
+                            `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/especial`,
+                            { especial: nuevoValor },
+                            { headers: authHeaders }
+                          );
+                          setPacienteSeleccionado(prev => ({ ...prev, especial: nuevoValor ? 1 : 0 }));
+                          showToast({ severity: "success", message: nuevoValor ? "⭐ Marcado como cliente especial" : "Cliente normal" });
+                        } catch (err) {
+                          console.error("Error actualizando especial:", err);
+                          showToast({ severity: "error", message: "Error al actualizar" });
+                        }
+                      }}
+                      sx={{
+                        "& .MuiSwitch-switchBase.Mui-checked": { color: "#d32f2f" },
+                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#d32f2f" },
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography sx={{ fontWeight: pacienteSeleccionado.especial ? "bold" : "normal", color: pacienteSeleccionado.especial ? "#d32f2f" : "#888", fontSize: "0.85rem" }}>
+                      {pacienteSeleccionado.especial ? "⭐ Cliente Especial" : "Cliente Normal"}
+                    </Typography>
+                  }
+                />
+              </Box>
 
               <Paper
                 elevation={0}
@@ -3322,7 +3385,7 @@ const HistorialClinico = () => {
                                         marcasPorNombre[it.nombre] = estado;
                                       }
                                     });
-                                    await asignarPresupuesto(o);
+                                    await asignarPresupuesto(o, marcasPorNombre);
                                     // Transferir marcas al presupuesto asignado
                                     // Mapear por nombre de tratamiento ya que las sesiones se expanden
                                     setTimeout(() => {
@@ -3459,7 +3522,22 @@ const HistorialClinico = () => {
                                           : tratamientosMarcados[`${o.id}-${idx}`] === "purple" ? "#7b1fa2" 
                                           : "inherit",
                                       }}>
-                                        {it.nombre}
+                                        <Typography
+                                          component="span"
+                                          sx={{
+                                            cursor: "pointer",
+                                            "&:hover": { textDecoration: "underline", color: "#a36920" },
+                                            fontWeight: "inherit",
+                                            fontSize: "inherit",
+                                          }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            const tId = it.tratamientoId || it.tratamiento_id;
+                                            if (tId) abrirCarruselTratamiento(tId, it.nombre);
+                                          }}
+                                        >
+                                          {it.nombre}
+                                        </Typography>
                                         {editandoSesiones?.ofertaId === o.id && editandoSesiones?.itemIdx === idx ? (
                                           <Box component="span" sx={{ ml: 0.5, display: "inline-flex", alignItems: "center", gap: 0.3 }}>
                                             <input
@@ -6163,6 +6241,132 @@ const HistorialClinico = () => {
             {guardandoEditPagoPaquete ? "Guardando..." : "Guardar Cambio"}
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Modal Carrusel de Imágenes del Tratamiento */}
+      <Dialog
+        open={modalCarrusel}
+        onClose={() => setModalCarrusel(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 4,
+            overflow: "hidden",
+            backgroundColor: "#1a1a1a",
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            backgroundColor: "#a36920",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            py: 1.5,
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: "bold" }}>
+            📸 {carruselNombre}
+          </Typography>
+          <IconButton onClick={() => setModalCarrusel(false)} sx={{ color: "white" }}>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, position: "relative", backgroundColor: "#1a1a1a" }}>
+          {carruselImagenes.length > 0 && (
+            <Box sx={{ position: "relative", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+              {/* Flecha izquierda */}
+              {carruselImagenes.length > 1 && (
+                <IconButton
+                  onClick={() => setCarruselIdx((prev) => (prev - 1 + carruselImagenes.length) % carruselImagenes.length)}
+                  sx={{
+                    position: "absolute",
+                    left: 8,
+                    zIndex: 2,
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    color: "white",
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.3)" },
+                    width: 44,
+                    height: 44,
+                  }}
+                >
+                  <Typography sx={{ fontSize: 24, fontWeight: "bold" }}>‹</Typography>
+                </IconButton>
+              )}
+
+              {/* Imagen */}
+              <Box
+                sx={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  py: 2,
+                  px: 6,
+                }}
+              >
+                <img
+                  src={`${API_BASE_URL}${carruselImagenes[carruselIdx]?.imagen_url}`}
+                  alt={`${carruselNombre} ${carruselIdx + 1}`}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "60vh",
+                    objectFit: "contain",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+                  }}
+                />
+              </Box>
+
+              {/* Flecha derecha */}
+              {carruselImagenes.length > 1 && (
+                <IconButton
+                  onClick={() => setCarruselIdx((prev) => (prev + 1) % carruselImagenes.length)}
+                  sx={{
+                    position: "absolute",
+                    right: 8,
+                    zIndex: 2,
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    color: "white",
+                    "&:hover": { backgroundColor: "rgba(255,255,255,0.3)" },
+                    width: 44,
+                    height: 44,
+                  }}
+                >
+                  <Typography sx={{ fontSize: 24, fontWeight: "bold" }}>›</Typography>
+                </IconButton>
+              )}
+            </Box>
+          )}
+
+          {/* Indicadores de puntos */}
+          {carruselImagenes.length > 1 && (
+            <Box sx={{ display: "flex", justifyContent: "center", gap: 1, pb: 2 }}>
+              {carruselImagenes.map((_, i) => (
+                <Box
+                  key={i}
+                  onClick={() => setCarruselIdx(i)}
+                  sx={{
+                    width: i === carruselIdx ? 24 : 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: i === carruselIdx ? "#a36920" : "rgba(255,255,255,0.3)",
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                    "&:hover": { backgroundColor: i === carruselIdx ? "#a36920" : "rgba(255,255,255,0.5)" },
+                  }}
+                />
+              ))}
+            </Box>
+          )}
+
+          {/* Contador */}
+          <Typography sx={{ textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: "0.8rem", pb: 2 }}>
+            {carruselIdx + 1} / {carruselImagenes.length}
+          </Typography>
+        </DialogContent>
       </Dialog>
     </div>
   );

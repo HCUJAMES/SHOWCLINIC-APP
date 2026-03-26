@@ -19,7 +19,7 @@ import {
   Chip,
   Divider,
 } from "@mui/material";
-import { ArrowBack, Home, Settings, Add, Delete } from "@mui/icons-material";
+import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/ToastProvider";
 import { useAuth } from "../../hooks/useAuth";
@@ -44,6 +44,10 @@ export default function CrearTratamiento() {
   const [variantes, setVariantes] = useState([]);
   const [varianteSeleccionada, setVarianteSeleccionada] = useState(null);
   const [cantidadProducto, setCantidadProducto] = useState(1);
+
+  // Estados para imágenes de tratamientos
+  const [imagenesTratamiento, setImagenesTratamiento] = useState([]);
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
 
   const cargarTratamientos = async () => {
     const res = await fetch(`${API_BASE_URL}/api/tratamientos/listar`, {
@@ -84,7 +88,76 @@ export default function CrearTratamiento() {
   const abrirConfigProductos = async (tratamiento) => {
     setTratamientoSeleccionado(tratamiento);
     await cargarProductosDelTratamiento(tratamiento.id);
+    await cargarImagenesTratamiento(tratamiento.id);
     setModalProductos(true);
+  };
+
+  const cargarImagenesTratamiento = async (tratamientoId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tratamientos/protocolo/${tratamientoId}/imagenes`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      setImagenesTratamiento(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error al cargar imágenes:", err);
+      setImagenesTratamiento([]);
+    }
+  };
+
+  const subirImagenes = async (e) => {
+    if (!tratamientoSeleccionado) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (imagenesTratamiento.length + files.length > 6) {
+      showToast({ severity: "warning", message: `Solo puedes tener hasta 6 imágenes. Tienes ${imagenesTratamiento.length}.` });
+      return;
+    }
+
+    setSubiendoImagen(true);
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append("imagenes", files[i]);
+    }
+
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/tratamientos/protocolo/${tratamientoSeleccionado.id}/imagenes`,
+        {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        }
+      );
+      if (res.ok) {
+        showToast({ severity: "success", message: "Imágenes subidas correctamente" });
+        await cargarImagenesTratamiento(tratamientoSeleccionado.id);
+      } else {
+        const err = await res.json();
+        showToast({ severity: "error", message: err.message || "Error al subir imágenes" });
+      }
+    } catch (err) {
+      console.error(err);
+      showToast({ severity: "error", message: "Error al subir imágenes" });
+    }
+    setSubiendoImagen(false);
+    e.target.value = "";
+  };
+
+  const eliminarImagen = async (imagenId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tratamientos/protocolo/imagen/${imagenId}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        showToast({ severity: "success", message: "Imagen eliminada" });
+        await cargarImagenesTratamiento(tratamientoSeleccionado.id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const agregarProductoATratamiento = async () => {
@@ -449,6 +522,80 @@ export default function CrearTratamiento() {
                 />
               ))}
             </Box>
+          )}
+
+          {/* Sección de imágenes del tratamiento */}
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1, color: colorPrincipal }}>
+            📸 Imágenes del tratamiento ({imagenesTratamiento.length}/6):
+          </Typography>
+
+          {imagenesTratamiento.length > 0 ? (
+            <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mb: 2 }}>
+              {imagenesTratamiento.map((img) => (
+                <Box
+                  key={img.id}
+                  sx={{
+                    position: "relative",
+                    width: 110,
+                    height: 110,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    border: "2px solid rgba(163,105,32,0.2)",
+                    "&:hover .delete-btn": { opacity: 1 },
+                  }}
+                >
+                  <img
+                    src={`${API_BASE_URL}${img.imagen_url}`}
+                    alt="Tratamiento"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  {isDoctor && (
+                    <IconButton
+                      className="delete-btn"
+                      size="small"
+                      onClick={() => eliminarImagen(img.id)}
+                      sx={{
+                        position: "absolute",
+                        top: 2,
+                        right: 2,
+                        backgroundColor: "rgba(211,47,47,0.85)",
+                        color: "white",
+                        opacity: 0,
+                        transition: "opacity 0.2s",
+                        "&:hover": { backgroundColor: "#d32f2f" },
+                        padding: "2px",
+                      }}
+                    >
+                      <Close sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: "italic" }}>
+              No hay imágenes. Sube fotos para mostrar en el historial del paciente.
+            </Typography>
+          )}
+
+          {isDoctor && imagenesTratamiento.length < 6 && (
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={<PhotoCamera />}
+              disabled={subiendoImagen}
+              sx={{ borderColor: colorPrincipal, color: colorPrincipal, mb: 2 }}
+            >
+              {subiendoImagen ? "Subiendo..." : "Subir imágenes"}
+              <input
+                type="file"
+                hidden
+                multiple
+                accept="image/*"
+                onChange={subirImagenes}
+              />
+            </Button>
           )}
 
           {isDoctor && (

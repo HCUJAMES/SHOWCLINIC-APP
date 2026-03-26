@@ -904,7 +904,7 @@ router.post("/paquete-paciente/:paquete_paciente_id/consulta", requirePaquetesAs
    🎁 ASIGNAR PRESUPUESTO A PACIENTE
 ============================== */
 router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => {
-  const { paciente_id, oferta_id, notas } = req.body;
+  const { paciente_id, oferta_id, notas, marcas } = req.body;
 
   if (!paciente_id || !oferta_id) {
     return res.status(400).json({ message: "paciente_id y oferta_id son requeridos" });
@@ -932,8 +932,19 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
     const ahora = fechaLima();
     const username = req.user?.username || "sistema";
 
-    // Calcular precio total y obtener descuento
-    const precioTotal = items.reduce((sum, it) => sum + Number(it.precio || 0), 0);
+    // Marcar cada item con su estado (gold = se hará y cobrará, purple = se hará sin cobrar, gray = pendiente)
+    // marcas es un objeto { nombreTratamiento: "gold" | "purple" }
+    const tieneMarcas = marcas && typeof marcas === 'object' && Object.keys(marcas).length > 0;
+    
+    const itemsConMarca = items.map((it) => {
+      const marca = tieneMarcas ? (marcas[it.nombre] || null) : "gold";
+      return { ...it, marca: marca };
+    });
+
+    // precio_total solo cuenta items marcados como "gold" (se hará y se cobrará)
+    const precioTotal = itemsConMarca
+      .filter(it => it.marca === "gold")
+      .reduce((sum, it) => sum + Number(it.precio || 0), 0);
     const descuento = Number(oferta.descuento) || 0;
 
     // Crear registro de presupuesto asignado (incluyendo descuento)
@@ -945,7 +956,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
       [
         paciente_id,
         oferta_id,
-        JSON.stringify(items),
+        JSON.stringify(itemsConMarca),
         precioTotal,
         descuento,
         ahora,
@@ -958,10 +969,10 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
     const presupuestoAsignadoId = result.lastID;
 
     // Crear las sesiones individuales (N sesiones por tratamiento según lo configurado)
-    for (const item of items) {
+    for (const item of itemsConMarca) {
       const numSesiones = Number(item.sesiones) >= 1 ? Number(item.sesiones) : 1;
-      const precioTotal = Number(item.precio) || 0;
-      const precioPorSesion = precioTotal / numSesiones;
+      const precioItem = Number(item.precio) || 0;
+      const precioPorSesion = precioItem / numSesiones;
 
       for (let s = 1; s <= numSesiones; s++) {
         await dbRun(
