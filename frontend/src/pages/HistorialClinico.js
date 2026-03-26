@@ -5274,7 +5274,7 @@ const HistorialClinico = () => {
                 helperText="Puedes cambiar la fecha para registrar tratamientos históricos"
               />
             </Grid>
-            {(isAdmin || isMaster) && (
+            {(isAdmin || isMaster || isDoctor) && (
               <>
                 <Grid item xs={12}>
                   <TextField
@@ -5294,7 +5294,7 @@ const HistorialClinico = () => {
                 </Grid>
               </>
             )}
-            <Grid item xs={(isAdmin || isMaster) ? 6 : 12}>
+            <Grid item xs={(isAdmin || isMaster || isDoctor) ? 6 : 12}>
               <TextField
                 fullWidth
                 label="Especialista"
