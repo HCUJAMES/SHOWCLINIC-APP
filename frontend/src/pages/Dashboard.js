@@ -335,9 +335,10 @@ export default function Dashboard() {
                                 color: "#2e2e2e",
                                 fontSize: { xs: "0.95rem", sm: "1.1rem" },
                                 lineHeight: 1.3,
-                                letterSpacing: 0.5,
+                                letterSpacing: 4,
                                 transition: "color 0.3s ease",
                                 mb: 0.5,
+                                textTransform: "uppercase",
                               }}
                             >
                               {item.title}

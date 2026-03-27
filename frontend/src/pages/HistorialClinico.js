@@ -374,6 +374,7 @@ const HistorialClinico = () => {
     try {
       const paciente = pacientes.find((p) => p.id === id) || null;
       setPacienteSeleccionado(paciente);
+      setTratamientos([]);
       setResumenDeuda({ cantidad_pendiente: 0, total_pendiente: 0 });
 
       setNuevaObservacion("");
@@ -424,10 +425,15 @@ const HistorialClinico = () => {
         setResumenDeuda({ cantidad_pendiente: 0, total_pendiente: 0 });
       }
 
-      const res = await axios.get(`${API_BASE_URL}/api/tratamientos/historial/${id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      setTratamientos(res.data);
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/tratamientos/historial/${id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        setTratamientos(Array.isArray(res.data) ? res.data : []);
+      } catch (e) {
+        console.error("Error al obtener tratamientos del historial:", e);
+        setTratamientos([]);
+      }
 
       // Cargar paquetes asignados al paciente
       try {
@@ -2222,7 +2228,15 @@ const HistorialClinico = () => {
             </IconButton>
             <Typography
               variant="h5"
-              sx={{ flex: 1, color: "#a36920", fontWeight: "bold", textAlign: "center" }}
+              sx={{ 
+                flex: 1, 
+                color: "#a36920", 
+                fontWeight: 700, 
+                textAlign: "center",
+                fontFamily: "'Playfair Display', serif",
+                letterSpacing: 4,
+                textTransform: "uppercase"
+              }}
             >
               Historial Clínico de Pacientes
             </Typography>
