@@ -10,6 +10,26 @@ const router = express.Router();
 router.use(express.json());
 router.use(authMiddleware);
 
+// Obtener permisos del usuario actual
+router.get("/my-permissions", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "No autenticado" });
+    }
+    
+    const permissions = await dbAll(
+      "SELECT module_name, can_access, can_edit FROM user_permissions WHERE user_id = ?",
+      [userId]
+    );
+    
+    res.json(permissions || []);
+  } catch (err) {
+    console.error("Error al obtener permisos:", err);
+    res.status(500).json({ message: "Error al obtener permisos" });
+  }
+});
+
 // Listar usuarios (solo master)
 router.get("/users", requireRole("master"), async (req, res) => {
   try {
@@ -42,6 +62,184 @@ router.put("/users/:id/password", requireRole("master"), async (req, res) => {
   } catch (err) {
     console.error("Error al cambiar contraseña:", err);
     res.status(500).json({ message: "Error al cambiar contraseña" });
+  }
+});
+
+// Crear nuevo usuario (solo master)
+router.post("/users", requireRole("master"), async (req, res) => {
+  const { username, password, role, permissions } = req.body;
+  
+  if (!username || !password || !role) {
+    return res.status(400).json({ message: "Username, password y role son requeridos" });
+  }
+  
+  if (password.length < 4) {
+    return res.status(400).json({ message: "La contraseña debe tener al menos 4 caracteres" });
+  }
+  
+  try {
+    const existingUser = await new Promise((resolve, reject) => {
+      db.get("SELECT id FROM users WHERE username = ?", [username], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ message: "El nombre de usuario ya existe" });
+    }
+    
+    const hash = bcrypt.hashSync(password, 10);
+    
+    await dbRun("BEGIN TRANSACTION");
+    
+    try {
+      const result = await dbRun(
+        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+        [username, hash, role]
+      );
+      
+      const userId = result.lastID;
+      
+      if (permissions && Array.isArray(permissions)) {
+        for (const perm of permissions) {
+          await dbRun(
+            "INSERT INTO user_permissions (user_id, module_name, can_access, can_edit) VALUES (?, ?, ?, ?)",
+            [userId, perm.module_name, perm.can_access ? 1 : 0, perm.can_edit ? 1 : 0]
+          );
+        }
+      }
+      
+      await dbRun("COMMIT");
+      
+      res.status(201).json({ 
+        message: "Usuario creado exitosamente",
+        userId 
+      });
+    } catch (err) {
+      await dbRun("ROLLBACK");
+      throw err;
+    }
+  } catch (err) {
+    console.error("Error al crear usuario:", err);
+    res.status(500).json({ message: "Error al crear usuario" });
+  }
+});
+
+// Obtener permisos de un usuario
+router.get("/users/:id/permissions", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const permissions = await dbAll(
+      "SELECT module_name, can_access, can_edit FROM user_permissions WHERE user_id = ?",
+      [id]
+    );
+    
+    res.json(permissions || []);
+  } catch (err) {
+    console.error("Error al obtener permisos:", err);
+    res.status(500).json({ message: "Error al obtener permisos" });
+  }
+});
+
+// Actualizar permisos de un usuario
+router.put("/users/:id/permissions", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  const { permissions } = req.body;
+  
+  if (!permissions || !Array.isArray(permissions)) {
+    return res.status(400).json({ message: "Permisos inválidos" });
+  }
+  
+  try {
+    await dbRun("BEGIN TRANSACTION");
+    
+    try {
+      await dbRun("DELETE FROM user_permissions WHERE user_id = ?", [id]);
+      
+      for (const perm of permissions) {
+        await dbRun(
+          "INSERT INTO user_permissions (user_id, module_name, can_access, can_edit) VALUES (?, ?, ?, ?)",
+          [id, perm.module_name, perm.can_access ? 1 : 0, perm.can_edit ? 1 : 0]
+        );
+      }
+      
+      await dbRun("COMMIT");
+      
+      res.json({ message: "Permisos actualizados exitosamente" });
+    } catch (err) {
+      await dbRun("ROLLBACK");
+      throw err;
+    }
+  } catch (err) {
+    console.error("Error al actualizar permisos:", err);
+    res.status(500).json({ message: "Error al actualizar permisos" });
+  }
+});
+
+// Eliminar usuario (solo master)
+router.delete("/users/:id", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const user = await new Promise((resolve, reject) => {
+      db.get("SELECT id, username, role FROM users WHERE id = ?", [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+    
+    if (user.role === "master") {
+      return res.status(403).json({ message: "No se puede eliminar un usuario master" });
+    }
+    
+    await dbRun("BEGIN TRANSACTION");
+    
+    try {
+      await dbRun("DELETE FROM user_permissions WHERE user_id = ?", [id]);
+      await dbRun("DELETE FROM users WHERE id = ?", [id]);
+      
+      await dbRun("COMMIT");
+      
+      res.json({ message: `Usuario "${user.username}" eliminado exitosamente` });
+    } catch (err) {
+      await dbRun("ROLLBACK");
+      throw err;
+    }
+  } catch (err) {
+    console.error("Error al eliminar usuario:", err);
+    res.status(500).json({ message: "Error al eliminar usuario" });
+  }
+});
+
+// Listar usuarios con sus permisos (solo master)
+router.get("/users-with-permissions", requireRole("master"), async (req, res) => {
+  try {
+    const users = await dbAll("SELECT id, username, role FROM users ORDER BY username");
+    
+    const usersWithPermissions = await Promise.all(
+      users.map(async (user) => {
+        const permissions = await dbAll(
+          "SELECT module_name, can_access, can_edit FROM user_permissions WHERE user_id = ?",
+          [user.id]
+        );
+        
+        return {
+          ...user,
+          permissions: permissions || []
+        };
+      })
+    );
+    
+    res.json(usersWithPermissions);
+  } catch (err) {
+    console.error("Error al listar usuarios con permisos:", err);
+    res.status(500).json({ message: "Error al listar usuarios" });
   }
 });
 

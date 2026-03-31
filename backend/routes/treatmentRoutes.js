@@ -1087,6 +1087,7 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     fecha,
     nombreTratamiento,
     cantidad_total,
+    producto_usado,
   } = req.body;
 
   try {
@@ -1109,6 +1110,20 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     const tipoAtencionStr = typeof tipoAtencion === "string" ? tipoAtencion.trim() : tratamiento.tipoAtencion;
     const nombreStr = typeof nombreTratamiento === "string" && nombreTratamiento.trim() ? nombreTratamiento.trim() : tratamiento.nombreTratamiento;
     const cantidadStr = cantidad_total != null && String(cantidad_total).trim() !== "" ? String(cantidad_total).trim() : tratamiento.cantidad_total;
+    
+    // Actualizar productos si se proporciona producto_usado
+    let productosJSON = tratamiento.productos;
+    if (producto_usado !== undefined && producto_usado !== null) {
+      const productoStr = typeof producto_usado === "string" ? producto_usado.trim() : "";
+      if (productoStr) {
+        // Crear o actualizar el array de productos
+        productosJSON = JSON.stringify([{
+          nombre: productoStr,
+          producto: productoStr,
+          cantidad: cantidadStr || ""
+        }]);
+      }
+    }
     
     // Validar y formatear fecha (zona horaria Perú GMT-5)
     let fechaStr = tratamiento.fecha;
@@ -1143,9 +1158,9 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
       `UPDATE tratamientos_realizados 
        SET especialista = ?, sesion = ?, precio_total = ?, descuento = ?, 
            pagoMetodo = ?, tipoAtencion = ?, fecha = ?,
-           nombreTratamiento = ?, cantidad_total = ?
+           nombreTratamiento = ?, cantidad_total = ?, productos = ?
        WHERE id = ?`,
-      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, nombreStr, cantidadStr, tratamientoId]
+      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, nombreStr, cantidadStr, productosJSON, tratamientoId]
     );
 
     // Si hay deuda asociada, actualizar el monto total

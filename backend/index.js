@@ -656,6 +656,20 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 
     console.log("✅ Tablas de presupuestos asignados creadas");
 
+    // Agregar columna total_sesiones a presupuestos_sesiones si no existe
+    db.run(`ALTER TABLE presupuestos_sesiones ADD COLUMN total_sesiones INTEGER DEFAULT 1`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna total_sesiones:", err.message);
+      }
+    });
+
+    // Agregar columna especialista_id a presupuestos_sesiones si no existe
+    db.run(`ALTER TABLE presupuestos_sesiones ADD COLUMN especialista_id INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna especialista_id:", err.message);
+      }
+    });
+
     // Agregar columnas de pago a presupuestos_asignados si no existen
     db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN pagado INTEGER DEFAULT 0`, (err) => {
       if (err && !err.message.includes('duplicate column')) {
@@ -1047,6 +1061,37 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       )
     `);
     db.run("CREATE INDEX IF NOT EXISTS idx_patient_marcados_paciente ON patient_marcados(paciente_id)");
+
+    // 🛒 Tabla de carritos de pacientes
+    db.run(`
+      CREATE TABLE IF NOT EXISTS carritos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        nombre TEXT DEFAULT 'Mi carrito',
+        estado TEXT DEFAULT 'activo',
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        creado_por TEXT,
+        FOREIGN KEY(paciente_id) REFERENCES patients(id)
+      )
+    `);
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS carrito_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        carrito_id INTEGER NOT NULL,
+        tratamiento_id INTEGER,
+        tratamiento_nombre TEXT NOT NULL,
+        precio REAL DEFAULT 0,
+        sesiones INTEGER DEFAULT 1,
+        notas TEXT,
+        agregado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(carrito_id) REFERENCES carritos(id)
+      )
+    `);
+
+    db.run("CREATE INDEX IF NOT EXISTS idx_carritos_paciente ON carritos(paciente_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_carrito_items_carrito ON carrito_items(carrito_id)");
+    console.log("✅ Tablas de carritos creadas");
 
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");

@@ -969,23 +969,28 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
     const presupuestoAsignadoId = result.lastID;
 
     // Crear las sesiones individuales (N sesiones por tratamiento según lo configurado)
+    // El precio NO se divide — cada sesión guarda el precio total del tratamiento
+    // y sesion_numero indica cuál sesión es (1/4, 2/4, etc.)
     for (const item of itemsConMarca) {
       const numSesiones = Number(item.sesiones) >= 1 ? Number(item.sesiones) : 1;
       const precioItem = Number(item.precio) || 0;
-      const precioPorSesion = precioItem / numSesiones;
 
       for (let s = 1; s <= numSesiones; s++) {
+        // Solo la primera sesión lleva el precio completo; las demás llevan 0
+        // para que el total no se multiplique
+        const precioSesion = s === 1 ? precioItem : 0;
         await dbRun(
           `INSERT INTO presupuestos_sesiones (
             presupuesto_asignado_id, tratamiento_id, tratamiento_nombre,
-            sesion_numero, precio_sesion, estado, creado_en
-          ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
+            sesion_numero, precio_sesion, total_sesiones, estado, creado_en
+          ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)`,
           [
             presupuestoAsignadoId,
             item.tratamientoId || item.tratamiento_id || null,
             item.nombre,
             s,
-            precioPorSesion,
+            precioSesion,
+            numSesiones,
             ahora
           ]
         );
@@ -1499,6 +1504,117 @@ router.put("/paquete-paciente/:paquete_id/editar-pago", authMiddleware, requireR
   } catch (err) {
     console.error("❌ Error al editar pago de paquete:", err.message);
     res.status(500).json({ message: "Error al editar pago de paquete" });
+  }
+});
+
+/* ======================================================================
+   🛒 CARRITOS DE PACIENTES
+====================================================================== */
+
+/* Listar carritos de un paciente (con conteo de items) */
+router.get("/carritos/paciente/:paciente_id", authMiddleware, async (req, res) => {
+  try {
+    const carritos = await dbAll(
+      `SELECT c.*, 
+        (SELECT COUNT(*) FROM carrito_items ci WHERE ci.carrito_id = c.id) as total_items,
+        (SELECT COALESCE(SUM(ci.precio * ci.sesiones), 0) FROM carrito_items ci WHERE ci.carrito_id = c.id) as total_precio
+       FROM carritos c 
+       WHERE c.paciente_id = ? AND c.estado = 'activo'
+       ORDER BY c.creado_en DESC`,
+      [req.params.paciente_id]
+    );
+    res.json(carritos);
+  } catch (err) {
+    console.error("❌ Error al listar carritos:", err.message);
+    res.status(500).json({ message: "Error al listar carritos" });
+  }
+});
+
+/* Obtener un carrito con sus items */
+router.get("/carritos/:carrito_id", authMiddleware, async (req, res) => {
+  try {
+    const carrito = await dbGet(`SELECT * FROM carritos WHERE id = ?`, [req.params.carrito_id]);
+    if (!carrito) return res.status(404).json({ message: "Carrito no encontrado" });
+    
+    const items = await dbAll(
+      `SELECT * FROM carrito_items WHERE carrito_id = ? ORDER BY agregado_en DESC`,
+      [req.params.carrito_id]
+    );
+    res.json({ ...carrito, items });
+  } catch (err) {
+    console.error("❌ Error al obtener carrito:", err.message);
+    res.status(500).json({ message: "Error al obtener carrito" });
+  }
+});
+
+/* Crear carrito nuevo o obtener el activo */
+router.post("/carritos/crear", authMiddleware, async (req, res) => {
+  const { paciente_id, nombre } = req.body;
+  if (!paciente_id) return res.status(400).json({ message: "paciente_id es requerido" });
+  
+  try {
+    const ahora = fechaLima();
+    const username = req.user?.username || "sistema";
+    
+    const result = await dbRun(
+      `INSERT INTO carritos (paciente_id, nombre, estado, creado_en, creado_por)
+       VALUES (?, ?, 'activo', ?, ?)`,
+      [paciente_id, nombre || "Mi carrito", ahora, username]
+    );
+    
+    res.json({ 
+      message: "✅ Carrito creado",
+      carrito_id: result.lastID 
+    });
+  } catch (err) {
+    console.error("❌ Error al crear carrito:", err.message);
+    res.status(500).json({ message: "Error al crear carrito" });
+  }
+});
+
+/* Agregar item al carrito */
+router.post("/carritos/:carrito_id/items", authMiddleware, async (req, res) => {
+  const { tratamiento_id, tratamiento_nombre, precio, sesiones, notas } = req.body;
+  if (!tratamiento_nombre) return res.status(400).json({ message: "tratamiento_nombre es requerido" });
+  
+  try {
+    const ahora = fechaLima();
+    const result = await dbRun(
+      `INSERT INTO carrito_items (carrito_id, tratamiento_id, tratamiento_nombre, precio, sesiones, notas, agregado_en)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.params.carrito_id, tratamiento_id || null, tratamiento_nombre, precio || 0, sesiones || 1, notas || null, ahora]
+    );
+    
+    res.json({ 
+      message: "✅ Tratamiento agregado al carrito",
+      item_id: result.lastID 
+    });
+  } catch (err) {
+    console.error("❌ Error al agregar item:", err.message);
+    res.status(500).json({ message: "Error al agregar al carrito" });
+  }
+});
+
+/* Eliminar item del carrito */
+router.delete("/carritos/items/:item_id", authMiddleware, async (req, res) => {
+  try {
+    await dbRun(`DELETE FROM carrito_items WHERE id = ?`, [req.params.item_id]);
+    res.json({ message: "✅ Item eliminado del carrito" });
+  } catch (err) {
+    console.error("❌ Error al eliminar item:", err.message);
+    res.status(500).json({ message: "Error al eliminar item" });
+  }
+});
+
+/* Eliminar (desactivar) carrito completo */
+router.delete("/carritos/:carrito_id", authMiddleware, async (req, res) => {
+  try {
+    await dbRun(`DELETE FROM carrito_items WHERE carrito_id = ?`, [req.params.carrito_id]);
+    await dbRun(`DELETE FROM carritos WHERE id = ?`, [req.params.carrito_id]);
+    res.json({ message: "✅ Carrito eliminado" });
+  } catch (err) {
+    console.error("❌ Error al eliminar carrito:", err.message);
+    res.status(500).json({ message: "Error al eliminar carrito" });
   }
 });
 

@@ -33,7 +33,9 @@ import {
   Stack,
   Alert,
   TextField,
-  Tooltip
+  Tooltip,
+  DialogContentText,
+  Autocomplete
 } from "@mui/material";
 import {
   TrendingUp,
@@ -59,7 +61,13 @@ import {
   AccountBalance,
   MoneyOff,
   VpnKey,
-  VisibilityOff
+  VisibilityOff,
+  PersonAdd,
+  Delete,
+  CheckCircle,
+  Cancel,
+  Lock,
+  LockOpen
 } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -103,6 +111,34 @@ const GestionClinica = () => {
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  
+  // Estados para crear usuario
+  const [openCreateUser, setOpenCreateUser] = useState(false);
+  const [newUser, setNewUser] = useState({
+    username: "",
+    password: "",
+    role: "asistente",
+    permissions: []
+  });
+  const [creatingUser, setCreatingUser] = useState(false);
+  
+  // Estados para editar permisos
+  const [editingPermissions, setEditingPermissions] = useState(null);
+  const [openPermissionsDialog, setOpenPermissionsDialog] = useState(false);
+  const [tempPermissions, setTempPermissions] = useState([]);
+  
+  // Módulos disponibles
+  const availableModules = [
+    { name: "Pacientes", key: "pacientes" },
+    { name: "Tratamientos", key: "tratamientos" },
+    { name: "Paquetes", key: "paquetes" },
+    { name: "Inventario", key: "inventario" },
+    { name: "Finanzas", key: "finanzas" },
+    { name: "Especialistas", key: "especialistas" },
+    { name: "Gestión Clínica", key: "gestion-clinica" },
+    { name: "Estadísticas", key: "estadisticas" },
+    { name: "Historial Clínico", key: "historial-clinico" }
+  ];
 
   const token = localStorage.getItem("token");
   const userRole = localStorage.getItem("role");
@@ -125,11 +161,113 @@ const GestionClinica = () => {
 
   const cargarUsuarios = async () => {
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/admin/users`, { headers: authHeaders });
+      const res = await axios.get(`${API_BASE_URL}/api/admin/users-with-permissions`, { headers: authHeaders });
       setUsuarios(res.data || []);
     } catch (err) {
       console.error("Error al cargar usuarios:", err);
     }
+  };
+  
+  const crearUsuario = async () => {
+    if (!newUser.username || !newUser.password || !newUser.role) {
+      showToast({ severity: "warning", message: "Completa todos los campos requeridos" });
+      return;
+    }
+    
+    try {
+      setCreatingUser(true);
+      await axios.post(`${API_BASE_URL}/api/admin/users`, newUser, { headers: authHeaders });
+      showToast({ severity: "success", message: "Usuario creado exitosamente" });
+      setOpenCreateUser(false);
+      setNewUser({ username: "", password: "", role: "asistente", permissions: [] });
+      cargarUsuarios();
+    } catch (err) {
+      showToast({ severity: "error", message: err.response?.data?.message || "Error al crear usuario" });
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+  
+  const eliminarUsuario = async (userId, username) => {
+    if (!window.confirm(`¿Estás seguro de eliminar al usuario "${username}"?`)) return;
+    
+    try {
+      await axios.delete(`${API_BASE_URL}/api/admin/users/${userId}`, { headers: authHeaders });
+      showToast({ severity: "success", message: "Usuario eliminado exitosamente" });
+      cargarUsuarios();
+    } catch (err) {
+      showToast({ severity: "error", message: err.response?.data?.message || "Error al eliminar usuario" });
+    }
+  };
+  
+  const abrirEditarPermisos = (user) => {
+    setEditingPermissions(user.id);
+    const userPerms = user.permissions || [];
+    const perms = availableModules.map(mod => {
+      const existing = userPerms.find(p => p.module_name === mod.key);
+      return {
+        module_name: mod.key,
+        module_label: mod.name,
+        can_access: existing ? Boolean(existing.can_access) : false,
+        can_edit: existing ? Boolean(existing.can_edit) : false
+      };
+    });
+    setTempPermissions(perms);
+    setOpenPermissionsDialog(true);
+  };
+  
+  const guardarPermisos = async () => {
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/admin/users/${editingPermissions}/permissions`,
+        { permissions: tempPermissions },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Permisos actualizados exitosamente" });
+      setOpenPermissionsDialog(false);
+      setEditingPermissions(null);
+      cargarUsuarios();
+    } catch (err) {
+      showToast({ severity: "error", message: err.response?.data?.message || "Error al actualizar permisos" });
+    }
+  };
+  
+  const togglePermission = (moduleKey, field) => {
+    setTempPermissions(prev => 
+      prev.map(p => 
+        p.module_name === moduleKey 
+          ? { ...p, [field]: !p[field] }
+          : p
+      )
+    );
+  };
+  
+  const toggleNewUserPermission = (moduleKey, field) => {
+    setNewUser(prev => {
+      const perms = prev.permissions || [];
+      const existing = perms.find(p => p.module_name === moduleKey);
+      
+      if (existing) {
+        return {
+          ...prev,
+          permissions: perms.map(p => 
+            p.module_name === moduleKey 
+              ? { ...p, [field]: !p[field] }
+              : p
+          )
+        };
+      } else {
+        return {
+          ...prev,
+          permissions: [...perms, { module_name: moduleKey, can_access: field === 'can_access', can_edit: field === 'can_edit' }]
+        };
+      }
+    });
+  };
+  
+  const getNewUserPermission = (moduleKey, field) => {
+    const perm = newUser.permissions.find(p => p.module_name === moduleKey);
+    return perm ? Boolean(perm[field]) : false;
   };
 
   const cambiarPassword = async (userId) => {
@@ -800,12 +938,22 @@ const GestionClinica = () => {
       </Paper>
 
 
-      {/* Gestión de Contraseñas (solo master) */}
+      {/* Gestión de Usuarios (solo master) */}
       {isMaster && (
         <Paper elevation={0} sx={{ p: 3, mt: 4, borderRadius: 3, border: "1px solid rgba(163,105,32,0.2)", backgroundColor: "#fffdf7" }}>
-          <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920", mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
-            <VpnKey /> Gestión de Contraseñas
-          </Typography>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920", display: "flex", alignItems: "center", gap: 1 }}>
+              <VpnKey /> Gestión de Usuarios
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<PersonAdd />}
+              onClick={() => setOpenCreateUser(true)}
+              sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" } }}
+            >
+              Crear Usuario
+            </Button>
+          </Box>
           <Divider sx={{ mb: 2 }} />
           {usuarios.length === 0 ? (
             <Typography color="text.secondary">No se encontraron usuarios.</Typography>
@@ -813,20 +961,71 @@ const GestionClinica = () => {
             <Grid container spacing={2}>
               {usuarios.map((u) => (
                 <Grid item xs={12} sm={6} md={4} key={u.id}>
-                  <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: "1px solid #e0d6c2", backgroundColor: "#f5f1e4" }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+                  <Paper elevation={2} sx={{ p: 2, borderRadius: 2, border: "1px solid #e0d6c2", backgroundColor: "#f5f1e4" }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.5 }}>
                       <Box>
-                        <Typography sx={{ fontWeight: "bold", color: "#333" }}>{u.username}</Typography>
-                        <Chip label={u.role} size="small" sx={{ mt: 0.5, backgroundColor: u.role === "master" ? "#a36920" : u.role === "doctor" ? "#ba9a63" : "#e0d6c2", color: u.role === "master" || u.role === "doctor" ? "white" : "#555", fontWeight: 600, fontSize: "0.7rem" }} />
+                        <Typography sx={{ fontWeight: "bold", color: "#333", fontSize: "1rem" }}>{u.username}</Typography>
+                        <Chip 
+                          label={u.role} 
+                          size="small" 
+                          sx={{ 
+                            mt: 0.5, 
+                            backgroundColor: u.role === "master" ? "#a36920" : u.role === "doctor" ? "#ba9a63" : "#e0d6c2", 
+                            color: u.role === "master" || u.role === "doctor" ? "white" : "#555", 
+                            fontWeight: 600, 
+                            fontSize: "0.7rem" 
+                          }} 
+                        />
                       </Box>
-                      {passwordEditing !== u.id && (
-                        <IconButton size="small" onClick={() => { setPasswordEditing(u.id); setNewPassword(""); setShowPassword(false); }} sx={{ color: "#a36920" }}>
-                          <Edit fontSize="small" />
+                      {u.role !== "master" && (
+                        <IconButton 
+                          size="small" 
+                          onClick={() => eliminarUsuario(u.id, u.username)} 
+                          sx={{ color: "#d32f2f" }}
+                        >
+                          <Delete fontSize="small" />
                         </IconButton>
                       )}
                     </Box>
+                    
+                    <Divider sx={{ my: 1.5 }} />
+                    
+                    <Stack spacing={1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Lock />}
+                        fullWidth
+                        onClick={() => { setPasswordEditing(u.id); setNewPassword(""); setShowPassword(false); }}
+                        sx={{ 
+                          borderColor: "#a36920", 
+                          color: "#a36920",
+                          fontSize: "0.75rem",
+                          "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(163,105,32,0.05)" }
+                        }}
+                      >
+                        Cambiar Contraseña
+                      </Button>
+                      
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<LockOpen />}
+                        fullWidth
+                        onClick={() => abrirEditarPermisos(u)}
+                        sx={{ 
+                          borderColor: "#ba9a63", 
+                          color: "#ba9a63",
+                          fontSize: "0.75rem",
+                          "&:hover": { borderColor: "#a36920", backgroundColor: "rgba(186,154,99,0.05)" }
+                        }}
+                      >
+                        Gestionar Permisos
+                      </Button>
+                    </Stack>
+                    
                     {passwordEditing === u.id && (
-                      <Box sx={{ mt: 1.5 }}>
+                      <Box sx={{ mt: 1.5, p: 1.5, backgroundColor: "white", borderRadius: 1, border: "1px solid #e0d6c2" }}>
                         <TextField
                           size="small"
                           fullWidth
@@ -842,15 +1041,49 @@ const GestionClinica = () => {
                               </IconButton>
                             ),
                           }}
-                          sx={{ mb: 1, "& .MuiInputBase-root": { backgroundColor: "white" } }}
+                          sx={{ mb: 1 }}
                         />
                         <Box sx={{ display: "flex", gap: 1 }}>
-                          <Button size="small" variant="contained" onClick={() => cambiarPassword(u.id)} disabled={savingPassword} sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" }, fontSize: "0.75rem" }}>
+                          <Button 
+                            size="small" 
+                            variant="contained" 
+                            onClick={() => cambiarPassword(u.id)} 
+                            disabled={savingPassword} 
+                            sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" }, fontSize: "0.75rem" }}
+                          >
                             {savingPassword ? "Guardando..." : "Guardar"}
                           </Button>
-                          <Button size="small" onClick={() => { setPasswordEditing(null); setNewPassword(""); }} sx={{ color: "#ba9a63", fontSize: "0.75rem" }}>
+                          <Button 
+                            size="small" 
+                            onClick={() => { setPasswordEditing(null); setNewPassword(""); }} 
+                            sx={{ color: "#ba9a63", fontSize: "0.75rem" }}
+                          >
                             Cancelar
                           </Button>
+                        </Box>
+                      </Box>
+                    )}
+                    
+                    {u.permissions && u.permissions.length > 0 && (
+                      <Box sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid #e0d6c2" }}>
+                        <Typography variant="caption" sx={{ color: "#666", fontWeight: "bold", display: "block", mb: 0.5 }}>
+                          Permisos activos:
+                        </Typography>
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                          {u.permissions.filter(p => p.can_access).map((perm, idx) => (
+                            <Chip
+                              key={idx}
+                              label={availableModules.find(m => m.key === perm.module_name)?.name || perm.module_name}
+                              size="small"
+                              icon={perm.can_edit ? <CheckCircle /> : undefined}
+                              sx={{ 
+                                fontSize: "0.65rem", 
+                                height: 20,
+                                backgroundColor: perm.can_edit ? "#4caf50" : "#ba9a63",
+                                color: "white"
+                              }}
+                            />
+                          ))}
                         </Box>
                       </Box>
                     )}
@@ -861,6 +1094,177 @@ const GestionClinica = () => {
           )}
         </Paper>
       )}
+
+      {/* Dialog: Crear Usuario */}
+      <Dialog open={openCreateUser} onClose={() => setOpenCreateUser(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ background: "linear-gradient(135deg, #a36920 0%, #c48a3a 100%)", color: "white" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <PersonAdd />
+            <Typography variant="h6">Crear Nuevo Usuario</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Nombre de usuario"
+                value={newUser.username}
+                onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                size="small"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                type={showPassword ? "text" : "password"}
+                label="Contraseña"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                size="small"
+                InputProps={{
+                  endAdornment: (
+                    <IconButton size="small" onClick={() => setShowPassword(!showPassword)}>
+                      {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                    </IconButton>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Rol</InputLabel>
+                <Select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                  label="Rol"
+                >
+                  <MenuItem value="asistente">Asistente</MenuItem>
+                  <MenuItem value="logistica">Logística</MenuItem>
+                  <MenuItem value="doctor">Doctor</MenuItem>
+                  <MenuItem value="doctora">Doctora</MenuItem>
+                  <MenuItem value="admin">Admin</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <Divider sx={{ my: 1 }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#a36920", mb: 1.5 }}>
+                Permisos de Módulos
+              </Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Módulo</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Acceso</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Edición</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {availableModules.map((mod) => (
+                      <TableRow key={mod.key} hover>
+                        <TableCell>{mod.name}</TableCell>
+                        <TableCell align="center">
+                          <IconButton
+                            size="small"
+                            onClick={() => toggleNewUserPermission(mod.key, 'can_access')}
+                            sx={{ color: getNewUserPermission(mod.key, 'can_access') ? "#4caf50" : "#ccc" }}
+                          >
+                            {getNewUserPermission(mod.key, 'can_access') ? <CheckCircle /> : <Cancel />}
+                          </IconButton>
+                        </TableCell>
+                        <TableCell align="center">
+                          <IconButton
+                            size="small"
+                            onClick={() => toggleNewUserPermission(mod.key, 'can_edit')}
+                            sx={{ color: getNewUserPermission(mod.key, 'can_edit') ? "#4caf50" : "#ccc" }}
+                          >
+                            {getNewUserPermission(mod.key, 'can_edit') ? <CheckCircle /> : <Cancel />}
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenCreateUser(false)} sx={{ color: "#ba9a63" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={crearUsuario}
+            disabled={creatingUser}
+            sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" } }}
+          >
+            {creatingUser ? "Creando..." : "Crear Usuario"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog: Editar Permisos */}
+      <Dialog open={openPermissionsDialog} onClose={() => setOpenPermissionsDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ background: "linear-gradient(135deg, #a36920 0%, #c48a3a 100%)", color: "white" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <LockOpen />
+            <Typography variant="h6">Gestionar Permisos</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Módulo</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Acceso</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: "bold", backgroundColor: "#f5f1e4" }}>Edición</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {tempPermissions.map((perm) => (
+                  <TableRow key={perm.module_name} hover>
+                    <TableCell>{perm.module_label}</TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        onClick={() => togglePermission(perm.module_name, 'can_access')}
+                        sx={{ color: perm.can_access ? "#4caf50" : "#ccc" }}
+                      >
+                        {perm.can_access ? <CheckCircle /> : <Cancel />}
+                      </IconButton>
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        onClick={() => togglePermission(perm.module_name, 'can_edit')}
+                        sx={{ color: perm.can_edit ? "#4caf50" : "#ccc" }}
+                      >
+                        {perm.can_edit ? <CheckCircle /> : <Cancel />}
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenPermissionsDialog(false)} sx={{ color: "#ba9a63" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={guardarPermisos}
+            sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" } }}
+          >
+            Guardar Permisos
+          </Button>
+        </DialogActions>
+      </Dialog>
 
 
       {/* Modal de Detalle */}
