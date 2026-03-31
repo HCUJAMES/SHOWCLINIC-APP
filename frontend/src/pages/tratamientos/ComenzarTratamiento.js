@@ -68,41 +68,57 @@ const ComenzarTratamiento = () => {
 
 
   // Cargar datos iniciales
+  const cargarDatos = async () => {
+    try {
+      const [pacientesRes, tratamientosRes, variantesRes, especialistasRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/pacientes/listar`, { headers: authHeaders }),
+        axios.get(`${API_BASE_URL}/api/tratamientos/listar`, { headers: authHeaders }),
+        axios.get(`${API_BASE_URL}/api/inventario/variantes`, { headers: authHeaders }).catch(() => ({ data: [] })),
+        axios.get(`${API_BASE_URL}/api/especialistas/listar`, { headers: authHeaders }),
+      ]);
+      
+      const pacientesOrdenados = Array.isArray(pacientesRes.data) ? pacientesRes.data.sort((a, b) => {
+        const nombreA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
+        const nombreB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
+        return nombreA.localeCompare(nombreB);
+      }) : [];
+      const tratamientosOrdenados = Array.isArray(tratamientosRes.data) ? tratamientosRes.data.sort((a, b) => {
+        return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+      }) : [];
+      const especialistasOrdenados = Array.isArray(especialistasRes.data) ? especialistasRes.data.sort((a, b) => {
+        const nombreA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
+        const nombreB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
+        return nombreA.localeCompare(nombreB);
+      }) : [];
+      
+      setPacientes(pacientesOrdenados);
+      setTratamientos(tratamientosOrdenados);
+      setVariantesInv(Array.isArray(variantesRes.data) ? variantesRes.data : []);
+      setEspecialistas(especialistasOrdenados);
+      setCargaInicial(true);
+    } catch (err) {
+      console.error("Error cargando datos iniciales:", err);
+      setCargaInicial(true);
+    }
+  };
+
   useEffect(() => {
-    const cargarDatos = async () => {
-      try {
-        const [pacientesRes, tratamientosRes, variantesRes, especialistasRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/pacientes/listar`, { headers: authHeaders }),
-          axios.get(`${API_BASE_URL}/api/tratamientos/listar`, { headers: authHeaders }),
-          axios.get(`${API_BASE_URL}/api/inventario/variantes`, { headers: authHeaders }).catch(() => ({ data: [] })),
-          axios.get(`${API_BASE_URL}/api/especialistas/listar`, { headers: authHeaders }),
-        ]);
-        
-        const pacientesOrdenados = Array.isArray(pacientesRes.data) ? pacientesRes.data.sort((a, b) => {
-          const nombreA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
-          const nombreB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
-          return nombreA.localeCompare(nombreB);
-        }) : [];
-        const tratamientosOrdenados = Array.isArray(tratamientosRes.data) ? tratamientosRes.data.sort((a, b) => {
-          return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
-        }) : [];
-        const especialistasOrdenados = Array.isArray(especialistasRes.data) ? especialistasRes.data.sort((a, b) => {
-          const nombreA = `${a.nombre || ''} ${a.apellido || ''}`.trim().toLowerCase();
-          const nombreB = `${b.nombre || ''} ${b.apellido || ''}`.trim().toLowerCase();
-          return nombreA.localeCompare(nombreB);
-        }) : [];
-        
-        setPacientes(pacientesOrdenados);
-        setTratamientos(tratamientosOrdenados);
-        setVariantesInv(Array.isArray(variantesRes.data) ? variantesRes.data : []);
-        setEspecialistas(especialistasOrdenados);
-        setCargaInicial(true);
-      } catch (err) {
-        console.error("Error cargando datos iniciales:", err);
-        setCargaInicial(true);
-      }
-    };
     cargarDatos();
+    // Recargar tratamientos e inventario al volver a la página
+    const handleFocus = () => {
+      axios.get(`${API_BASE_URL}/api/tratamientos/listar`, { headers: authHeaders })
+        .then((res) => {
+          const sorted = Array.isArray(res.data) ? res.data.sort((a, b) =>
+            (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase())
+          ) : [];
+          setTratamientos(sorted);
+        }).catch(() => {});
+      axios.get(`${API_BASE_URL}/api/inventario/variantes`, { headers: authHeaders })
+        .then((res) => setVariantesInv(Array.isArray(res.data) ? res.data : []))
+        .catch(() => {});
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
   // Cargar paciente y presupuesto/paquete desde URL
@@ -778,109 +794,114 @@ const ComenzarTratamiento = () => {
                         </FormControl>
                       </Grid>
 
-                      <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 260 }}>
-                        {(() => {
-                          // Filtrar productos según la receta del tratamiento
-                          const receta = b.tratamiento_id ? recetasPorTratamiento[b.tratamiento_id] || [] : [];
-                          const tieneReceta = Array.isArray(receta) && receta.length > 0;
-                          
-                          // Si hay receta, solo mostrar los productos de la receta
-                          // Si no hay receta, mostrar todos los productos
-                          const opcionesProductos = tieneReceta
-                            ? variantesInv.filter(v => receta.some(r => String(r.variante_id) === String(v.id)))
-                            : variantesInv;
+                      {/* Solo mostrar productos y cantidad si NO es Retoque */}
+                      {tipoAtencion !== "Retoque" && (
+                        <>
+                          <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 260 }}>
+                            {(() => {
+                              // Filtrar productos según la receta del tratamiento
+                              const receta = b.tratamiento_id ? recetasPorTratamiento[b.tratamiento_id] || [] : [];
+                              const tieneReceta = Array.isArray(receta) && receta.length > 0;
+                              
+                              // Si hay receta, solo mostrar los productos de la receta
+                              // Si no hay receta, mostrar todos los productos
+                              const opcionesProductos = tieneReceta
+                                ? variantesInv.filter(v => receta.some(r => String(r.variante_id) === String(v.id)))
+                                : variantesInv;
 
-                          return (
-                            <Autocomplete
-                              fullWidth
-                              options={opcionesProductos}
-                              value={
-                                b.variante_id
-                                  ? variantesInv.find((v) => String(v.id) === String(b.variante_id)) || null
-                                  : null
-                              }
-                              getOptionLabel={(opt) => {
-                                if (!opt) return "";
-                                const marca = opt.producto_base_nombre || "";
-                                const nombre = opt.nombre || "";
-                                const unidad = opt.unidad_base ? ` (${opt.unidad_base})` : "";
-                                const precio = opt.precio_cliente ? ` - S/ ${Number(opt.precio_cliente).toFixed(2)}` : "";
-                                return `${marca} - ${nombre}${unidad}${precio}`.trim();
-                              }}
-                              isOptionEqualToValue={(opt, val) => String(opt.id) === String(val.id)}
-                              onChange={(_, val) => {
-                                actualizarBloque(index, "variante_id", val ? val.id : "");
-                                actualizarBloque(
-                                  index,
-                                  "producto",
-                                  val
-                                    ? `${val.producto_base_nombre || ""} - ${val.nombre || ""}`.trim()
-                                    : ""
-                                );
-                              }}
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  label={tieneReceta ? "Producto (filtrado)" : "Producto"}
-                                  placeholder={tieneReceta ? "Productos configurados para este tratamiento" : "Seleccionar producto"}
+                              return (
+                                <Autocomplete
                                   fullWidth
-                                  helperText={tieneReceta ? `${opcionesProductos.length} producto(s) disponible(s)` : ""}
+                                  options={opcionesProductos}
+                                  value={
+                                    b.variante_id
+                                      ? variantesInv.find((v) => String(v.id) === String(b.variante_id)) || null
+                                      : null
+                                  }
+                                  getOptionLabel={(opt) => {
+                                    if (!opt) return "";
+                                    const marca = opt.producto_base_nombre || "";
+                                    const nombre = opt.nombre || "";
+                                    const unidad = opt.unidad_base ? ` (${opt.unidad_base})` : "";
+                                    const precio = opt.precio_cliente ? ` - S/ ${Number(opt.precio_cliente).toFixed(2)}` : "";
+                                    return `${marca} - ${nombre}${unidad}${precio}`.trim();
+                                  }}
+                                  isOptionEqualToValue={(opt, val) => String(opt.id) === String(val.id)}
+                                  onChange={(_, val) => {
+                                    actualizarBloque(index, "variante_id", val ? val.id : "");
+                                    actualizarBloque(
+                                      index,
+                                      "producto",
+                                      val
+                                        ? `${val.producto_base_nombre || ""} - ${val.nombre || ""}`.trim()
+                                        : ""
+                                    );
+                                  }}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      label={tieneReceta ? "Producto (filtrado)" : "Producto"}
+                                      placeholder={tieneReceta ? "Productos configurados para este tratamiento" : "Seleccionar producto"}
+                                      fullWidth
+                                      helperText={tieneReceta ? `${opcionesProductos.length} producto(s) disponible(s)` : ""}
+                                      sx={{
+                                        "& .MuiInputBase-root": {
+                                          backgroundColor: "rgba(255,255,255,0.95)",
+                                          borderRadius: 3,
+                                          minHeight: "56px",
+                                        },
+                                        "& .MuiInputBase-input": {
+                                          textOverflow: "clip",
+                                        },
+                                      }}
+                                    />
+                                  )}
+                                />
+                              );
+                            })()}
+                          </Grid>
+
+                          <Grid item xs={12} sm="auto" md="auto">
+                            {(() => {
+                              const varSel = b.variante_id ? variantesInv.find(v => String(v.id) === String(b.variante_id)) : null;
+                              const unidadVar = varSel?.unidad_base || "ml";
+                              const labelCantidad = unidadVar === "U" ? "Unidades (U)" : unidadVar === "frasco" ? "Frascos" : "Cantidad (ml)";
+                              const helperCantidad = unidadVar === "U" ? "Unidades a usar (ej: 24,5)" : unidadVar === "frasco" ? "Frascos a usar" : "ml a descontar (ej: 2,5)";
+                              const valorMostrar = b.dosis_unidades || b.cantidad || "";
+                              return (
+                                <TextField
+                                  label={labelCantidad}
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={valorMostrar}
+                                  onChange={(e) => {
+                                    // Permitir comas y puntos como separador decimal
+                                    let raw = e.target.value;
+                                    // Solo permitir números, comas y puntos
+                                    raw = raw.replace(/[^0-9.,]/g, "");
+                                    // Reemplazar coma por punto para el valor interno
+                                    const valNormalizado = raw.replace(",", ".");
+                                    setBloques(prev => {
+                                      const copia = [...prev];
+                                      copia[index] = { ...copia[index], dosis_unidades: raw, cantidad: valNormalizado };
+                                      return copia;
+                                    });
+                                  }}
                                   sx={{
                                     "& .MuiInputBase-root": {
                                       backgroundColor: "rgba(255,255,255,0.95)",
                                       borderRadius: 3,
                                       minHeight: "56px",
                                     },
-                                    "& .MuiInputBase-input": {
-                                      textOverflow: "clip",
-                                    },
+                                    width: { xs: "100%", sm: 160 },
                                   }}
-                                />
-                              )}
-                            />
-                          );
-                        })()}
-                      </Grid>
-
-                      <Grid item xs={12} sm="auto" md="auto">
-                        {(() => {
-                          const varSel = b.variante_id ? variantesInv.find(v => String(v.id) === String(b.variante_id)) : null;
-                          const unidadVar = varSel?.unidad_base || "ml";
-                          const labelCantidad = unidadVar === "U" ? "Unidades (U)" : unidadVar === "frasco" ? "Frascos" : "Cantidad (ml)";
-                          const helperCantidad = unidadVar === "U" ? "Unidades a usar (ej: 24,5)" : unidadVar === "frasco" ? "Frascos a usar" : "ml a descontar (ej: 2,5)";
-                          const valorMostrar = b.dosis_unidades || b.cantidad || "";
-                          return (
-                            <TextField
-                              label={labelCantidad}
-                              type="text"
-                              inputMode="decimal"
-                              value={valorMostrar}
-                              onChange={(e) => {
-                                // Permitir comas y puntos como separador decimal
-                                let raw = e.target.value;
-                                // Solo permitir números, comas y puntos
-                                raw = raw.replace(/[^0-9.,]/g, "");
-                                // Reemplazar coma por punto para el valor interno
-                                const valNormalizado = raw.replace(",", ".");
-                                setBloques(prev => {
-                                  const copia = [...prev];
-                                  copia[index] = { ...copia[index], dosis_unidades: raw, cantidad: valNormalizado };
-                                  return copia;
-                                });
-                              }}
-                              sx={{
-                                "& .MuiInputBase-root": {
-                                  backgroundColor: "rgba(255,255,255,0.95)",
-                                  borderRadius: 3,
-                                  minHeight: "56px",
-                                },
-                                width: { xs: "100%", sm: 160 },
-                              }}
                               helperText={helperCantidad}
                             />
                           );
                         })()}
                       </Grid>
+                        </>
+                      )}
 
                     </Grid>
                   </Paper>

@@ -3369,7 +3369,24 @@ const HistorialClinico = () => {
                       color: "#ccc",
                     },
                   }}
-                  onClick={() => setShowOferta((v) => !v)}
+                  onClick={() => {
+                    setShowOferta((v) => {
+                      if (!v) {
+                        // Recargar tratamientos al abrir para que aparezcan nuevos protocolos
+                        axios.get(`${API_BASE_URL}/api/tratamientos/listar`, {
+                          headers: authHeaders,
+                        }).then((res) => {
+                          const tratamientosOrdenados = Array.isArray(res.data) ? res.data.sort((a, b) => {
+                            return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+                          }) : [];
+                          setTratamientosBase(tratamientosOrdenados);
+                        }).catch(() => {});
+                        setCatalogoCarouselIdx(0);
+                        setCatalogoFiltro("");
+                      }
+                      return !v;
+                    });
+                  }}
                   disabled={!pacienteSeleccionado}
                 >
                   <Typography sx={{ fontSize: 24, fontWeight: "bold", lineHeight: 1 }}>
@@ -4579,6 +4596,14 @@ const HistorialClinico = () => {
                                       ml: it.ml || "",
                                     }))
                                   );
+                                  // Recargar tratamientos para que aparezcan nuevos protocolos
+                                  axios.get(`${API_BASE_URL}/api/tratamientos/listar`, { headers: authHeaders })
+                                    .then((res) => {
+                                      const sorted = Array.isArray(res.data) ? res.data.sort((a, b) =>
+                                        (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase())
+                                      ) : [];
+                                      setTratamientosBase(sorted);
+                                    }).catch(() => {});
                                   setShowOferta(true);
                                 }}
                                 sx={{
