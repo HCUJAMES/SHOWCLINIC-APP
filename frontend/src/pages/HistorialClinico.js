@@ -143,6 +143,7 @@ const HistorialClinico = () => {
   const [presupuestoCarouselIdx, setPresupuestoCarouselIdx] = useState(0);
   const [catalogoFiltro, setCatalogoFiltro] = useState("");
   const [catalogoCarouselIdx, setCatalogoCarouselIdx] = useState(0);
+  const [catalogoImagenIdx, setCatalogoImagenIdx] = useState({}); // { tratamientoId: currentImageIndex }
   const [fotosTratamiento, setFotosTratamiento] = useState([]);
   const [tratamientoSeleccionado, setTratamientoSeleccionado] = useState(null);
 
@@ -848,7 +849,7 @@ const HistorialClinico = () => {
     }
   };
 
-  // Cargar primera imagen de cada tratamiento para mostrar en cards del presupuesto
+  // Cargar TODAS las imágenes de cada tratamiento para mostrar en cards del presupuesto
   const cargarImagenesPresupuesto = useCallback(async (sesiones) => {
     if (!sesiones || sesiones.length === 0) return;
     const idsUnicos = [...new Set(sesiones.map(s => s.tratamiento_id).filter(Boolean))];
@@ -863,9 +864,10 @@ const HistorialClinico = () => {
           { headers: authHeaders }
         );
         const imgs = Array.isArray(res.data) ? res.data : [];
-        nuevasImagenes[tId] = imgs.length > 0 ? `${API_BASE_URL}${imgs[0].imagen_url}` : null;
+        // Store array of all image URLs
+        nuevasImagenes[tId] = imgs.length > 0 ? imgs.map(img => `${API_BASE_URL}${img.imagen_url}`) : [];
       } catch {
-        nuevasImagenes[tId] = null;
+        nuevasImagenes[tId] = [];
       }
     }));
     
@@ -3555,7 +3557,10 @@ const HistorialClinico = () => {
                         }}
                       >
                         {catVisible.map((t) => {
-                          const imgUrl = t.id ? tratamientoImagenCache[t.id] : null;
+                          const imgArray = t.id ? tratamientoImagenCache[t.id] : null;
+                          const currentImgIdx = catalogoImagenIdx[t.id] || 0;
+                          const imgUrl = Array.isArray(imgArray) && imgArray.length > 0 ? imgArray[currentImgIdx] : null;
+                          const hasMultipleImages = Array.isArray(imgArray) && imgArray.length > 1;
                           const isSelected = ofertaItems.some(x => x.tratamientoId === t.id);
                           return (
                             <Box
@@ -3581,7 +3586,7 @@ const HistorialClinico = () => {
                                 },
                               }}
                             >
-                              {/* Imagen */}
+                              {/* Imagen con flechas de navegación */}
                               <Box sx={{
                                 width: "100%",
                                 height: 400,
@@ -3597,6 +3602,81 @@ const HistorialClinico = () => {
                                 ) : (
                                   <Typography sx={{ fontSize: "2.5rem", opacity: 0.25 }}>💉</Typography>
                                 )}
+                                
+                                {/* Flechas de navegación de imágenes */}
+                                {hasMultipleImages && (
+                                  <>
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCatalogoImagenIdx(prev => ({
+                                          ...prev,
+                                          [t.id]: currentImgIdx > 0 ? currentImgIdx - 1 : imgArray.length - 1
+                                        }));
+                                      }}
+                                      sx={{
+                                        position: "absolute",
+                                        left: 8,
+                                        top: "50%",
+                                        transform: "translateY(-50%)",
+                                        backgroundColor: "rgba(255,255,255,0.9)",
+                                        width: 32,
+                                        height: 32,
+                                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                        "&:hover": { 
+                                          backgroundColor: "white",
+                                          boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+                                        },
+                                      }}
+                                    >
+                                      <Typography sx={{ fontSize: 18, fontWeight: "bold", color: "#a36920" }}>‹</Typography>
+                                    </IconButton>
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setCatalogoImagenIdx(prev => ({
+                                          ...prev,
+                                          [t.id]: currentImgIdx < imgArray.length - 1 ? currentImgIdx + 1 : 0
+                                        }));
+                                      }}
+                                      sx={{
+                                        position: "absolute",
+                                        right: 8,
+                                        top: "50%",
+                                        transform: "translateY(-50%)",
+                                        backgroundColor: "rgba(255,255,255,0.9)",
+                                        width: 32,
+                                        height: 32,
+                                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                        "&:hover": { 
+                                          backgroundColor: "white",
+                                          boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+                                        },
+                                      }}
+                                    >
+                                      <Typography sx={{ fontSize: 18, fontWeight: "bold", color: "#a36920" }}>›</Typography>
+                                    </IconButton>
+                                    {/* Indicador de imagen actual */}
+                                    <Box sx={{
+                                      position: "absolute",
+                                      bottom: 8,
+                                      left: "50%",
+                                      transform: "translateX(-50%)",
+                                      backgroundColor: "rgba(0,0,0,0.6)",
+                                      color: "white",
+                                      px: 1.5,
+                                      py: 0.5,
+                                      borderRadius: 2,
+                                      fontSize: "0.75rem",
+                                      fontWeight: 600,
+                                    }}>
+                                      {currentImgIdx + 1} / {imgArray.length}
+                                    </Box>
+                                  </>
+                                )}
+
                                 {isSelected && (
                                   <Box sx={{
                                     position: "absolute",
@@ -3705,7 +3785,8 @@ const HistorialClinico = () => {
                         {visibleItems.map((item) => {
                           const t = tratamientosBase.find(x => x.id === item.tratamientoId);
                           if (!t) return null;
-                          const imgUrl = item.tratamientoId ? tratamientoImagenCache[item.tratamientoId] : null;
+                          const imgArray = item.tratamientoId ? tratamientoImagenCache[item.tratamientoId] : null;
+                          const imgUrl = Array.isArray(imgArray) && imgArray.length > 0 ? imgArray[0] : null;
                           return (
                             <Box
                               key={t.id}
@@ -4178,7 +4259,8 @@ const HistorialClinico = () => {
                             }}>
                               {items.map((it, idx) => {
                                 const tId = it.tratamientoId || it.tratamiento_id;
-                                const imgUrl = tId ? tratamientoImagenCache[tId] : null;
+                                const imgArray = tId ? tratamientoImagenCache[tId] : null;
+                                const imgUrl = Array.isArray(imgArray) && imgArray.length > 0 ? imgArray[0] : null;
                                 const marcaKey = `${o.id}-${idx}`;
                                 const marca = tratamientosMarcados[marcaKey];
                                 return (
@@ -7740,7 +7822,8 @@ const HistorialClinico = () => {
           {carritoActivo && carritoActivo.items && carritoActivo.items.length > 0 ? (
             <Box sx={{ px: 3, pt: 1, pb: 2 }}>
               {carritoActivo.items.map((item, idx) => {
-                const imgUrl = item.tratamiento_id ? tratamientoImagenCache[item.tratamiento_id] : null;
+                const imgArray = item.tratamiento_id ? tratamientoImagenCache[item.tratamiento_id] : null;
+                const imgUrl = Array.isArray(imgArray) && imgArray.length > 0 ? imgArray[0] : null;
                 return (
                 <Box key={item.id}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2, py: 2 }}>
