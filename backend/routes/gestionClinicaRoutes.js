@@ -1,53 +1,10 @@
 import express from "express";
-import db, { dbAll, dbGet, dbRun } from "../db/database.js";
+import db, { dbAll, dbGet } from "../db/database.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 const router = express.Router();
 
 console.log("✅ Módulo de Gestión Clínica cargado");
-
-// ✅ Backfill: corregir especialista_id NULL en sesiones completadas que tienen especialista texto
-(async () => {
-  try {
-    // Paquetes sesiones
-    await dbRun(`
-      UPDATE paquetes_sesiones SET especialista_id = (
-        SELECT e.id FROM especialistas e 
-        WHERE LOWER(TRIM(e.nombre)) = LOWER(TRIM(paquetes_sesiones.especialista))
-      )
-      WHERE estado = 'completada' 
-      AND especialista_id IS NULL 
-      AND especialista IS NOT NULL 
-      AND especialista != '' 
-      AND especialista != 'No especificado'
-      AND EXISTS (
-        SELECT 1 FROM especialistas e 
-        WHERE LOWER(TRIM(e.nombre)) = LOWER(TRIM(paquetes_sesiones.especialista))
-      )
-    `);
-    
-    // Presupuestos sesiones
-    await dbRun(`
-      UPDATE presupuestos_sesiones SET especialista_id = (
-        SELECT e.id FROM especialistas e 
-        WHERE LOWER(TRIM(e.nombre)) = LOWER(TRIM(presupuestos_sesiones.especialista))
-      )
-      WHERE estado = 'completada' 
-      AND especialista_id IS NULL 
-      AND especialista IS NOT NULL 
-      AND especialista != '' 
-      AND especialista != 'No especificado'
-      AND EXISTS (
-        SELECT 1 FROM especialistas e 
-        WHERE LOWER(TRIM(e.nombre)) = LOWER(TRIM(presupuestos_sesiones.especialista))
-      )
-    `);
-    
-    console.log("✅ Backfill especialista_id completado");
-  } catch (err) {
-    console.error("⚠️ Error en backfill especialista_id:", err.message);
-  }
-})();
 
 // ✅ Endpoint de prueba (sin autenticación)
 router.get("/test", (req, res) => {
@@ -63,7 +20,7 @@ router.get("/tratamientos", authMiddleware, async (req, res) => {
       FROM paquetes_sesiones 
       WHERE tratamiento_nombre IS NOT NULL 
       AND tratamiento_nombre != ''
-      AND especialista_id IS NOT NULL
+      AND estado = 'completada'
       ORDER BY tratamiento_nombre
     `);
 
@@ -72,7 +29,7 @@ router.get("/tratamientos", authMiddleware, async (req, res) => {
       FROM presupuestos_sesiones 
       WHERE tratamiento_nombre IS NOT NULL 
       AND tratamiento_nombre != ''
-      AND especialista_id IS NOT NULL
+      AND estado = 'completada'
       ORDER BY tratamiento_nombre
     `);
 
@@ -101,38 +58,38 @@ router.get("/tratamientos", authMiddleware, async (req, res) => {
   }
 });
 
+// Función helper para normalizar nombre de especialista en código (sin modificar BD)
+// Mapea variantes conocidas al nombre canónico en la tabla especialistas
+function normalizarEspecialista(nombre) {
+  if (!nombre) return nombre;
+  const n = nombre.trim().toLowerCase();
+  // Mapeo de variantes conocidas
+  const variantes = {
+    'doctor': 'dr. erick espetia',
+    'dr erick espetia': 'dr. erick espetia',
+    'dr. erick espetia': 'dr. erick espetia',
+    'dra alicia paez': 'dra. alicia paez',
+    'dra edith carpio': 'dra. edith carpio',
+    'romina': 'romina carbajal',
+    'cost. romina': 'romina carbajal',
+    'yuny': 'yunianly rodriguez',
+    'yuny rodriguez': 'yunianly rodriguez',
+  };
+  return variantes[n] || n;
+}
+
 // ✅ Obtener estadísticas de gestión clínica
-// FUENTE ÚNICA DE VERDAD: tratamientos_realizados (todas las atenciones se registran ahí)
+// ENFOQUE HÍBRIDO:
+//   - Atenciones y pacientes_unicos: desde tratamientos_realizados (fuente única de registros de atención)
+//   - Ingresos: desde paquetes_sesiones + presupuestos_sesiones + tratamientos individuales con precio>0
+//   - Matching de especialista: por texto normalizado (sin depender de especialista_id que suele ser NULL)
 router.get("/estadisticas", authMiddleware, async (req, res) => {
   console.log("📊 Solicitud de estadísticas recibida");
   
   try {
     const { fecha_inicio, fecha_fin, especialista_id, tratamiento } = req.query;
 
-    // Construir condiciones WHERE sobre tratamientos_realizados
-    let conditions = ["tr.especialista IS NOT NULL", "tr.especialista != ''", "tr.especialista != 'No especificado'"];
-    let params = [];
-
-    if (fecha_inicio) {
-      conditions.push("DATE(tr.fecha) >= ?");
-      params.push(fecha_inicio);
-    }
-    if (fecha_fin) {
-      conditions.push("DATE(tr.fecha) <= ?");
-      params.push(fecha_fin);
-    }
-    if (especialista_id) {
-      conditions.push("e.id = ?");
-      params.push(especialista_id);
-    }
-    if (tratamiento) {
-      conditions.push("(t.nombre LIKE ? OR tr.productos LIKE ?)");
-      params.push(`%${tratamiento}%`, `%${tratamiento}%`);
-    }
-
-    const whereClause = `WHERE ${conditions.join(" AND ")}`;
-
-    // Obtener TODOS los especialistas (con comisión y pago fijo)
+    // ── Obtener TODOS los especialistas con comisión y pago fijo ──
     const todosEspecialistas = await dbAll(`
       SELECT id as especialista_id, nombre as especialista_nombre,
         COALESCE(comision_porcentaje, 20) as comision_porcentaje,
@@ -142,60 +99,137 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
     `);
     todosEspecialistas.forEach(esp => { esp.tipo = esp.tipo || 'doctor'; });
 
-    // Estadísticas por especialista (fuente única: tratamientos_realizados)
-    const statsEspecialistas = await dbAll(`
-      SELECT 
-        e.id as especialista_id,
-        e.nombre as especialista_nombre,
-        COUNT(tr.id) as total_atenciones,
-        COALESCE(SUM(tr.precio_total), 0) as total_ingresos,
-        COUNT(DISTINCT tr.paciente_id) as pacientes_unicos
-      FROM tratamientos_realizados tr
-      INNER JOIN especialistas e ON LOWER(TRIM(tr.especialista)) = LOWER(TRIM(e.nombre))
-      LEFT JOIN tratamientos t ON tr.tratamiento_id = t.id
-      ${whereClause}
-      GROUP BY e.id, e.nombre
-    `, params);
+    // Crear mapa nombre_normalizado -> especialista_id para resolver variantes
+    const nombreToId = new Map();
+    todosEspecialistas.forEach(esp => {
+      nombreToId.set(esp.especialista_nombre.trim().toLowerCase(), esp.especialista_id);
+    });
 
-    // Detalle por tratamiento
-    const detalleTratamientos = await dbAll(`
-      SELECT 
-        e.id as especialista_id,
-        e.nombre as especialista_nombre,
-        COALESCE(t.nombre, 'Sin tratamiento') as tratamiento_nombre,
-        COUNT(tr.id) as cantidad_sesiones,
-        COALESCE(SUM(tr.precio_total), 0) as total_tratamiento
-      FROM tratamientos_realizados tr
-      INNER JOIN especialistas e ON LOWER(TRIM(tr.especialista)) = LOWER(TRIM(e.nombre))
-      LEFT JOIN tratamientos t ON tr.tratamiento_id = t.id
-      ${whereClause}
-      GROUP BY e.id, e.nombre, t.nombre
-      ORDER BY e.nombre, t.nombre
-    `, params);
+    // ── 1) ATENCIONES Y PACIENTES: desde tratamientos_realizados ──
+    let condTR = ["tr.especialista IS NOT NULL", "tr.especialista != ''", "tr.especialista != 'No especificado'"];
+    let paramsTR = [];
+    if (fecha_inicio) { condTR.push("DATE(tr.fecha) >= ?"); paramsTR.push(fecha_inicio); }
+    if (fecha_fin) { condTR.push("DATE(tr.fecha) <= ?"); paramsTR.push(fecha_fin); }
+    if (tratamiento) { condTR.push("(t.nombre LIKE ?)"); paramsTR.push(`%${tratamiento}%`); }
+    // No filtrar por especialista_id aquí, lo hacemos en código después de normalizar
+    const whereTR = `WHERE ${condTR.join(" AND ")}`;
 
-    // Inicializar mapa con TODOS los especialistas
+    const rawTratamientos = await dbAll(`
+      SELECT 
+        tr.especialista,
+        tr.paciente_id,
+        tr.precio_total,
+        t.nombre as tratamiento_nombre
+      FROM tratamientos_realizados tr
+      LEFT JOIN tratamientos t ON tr.tratamiento_id = t.id
+      ${whereTR}
+    `, paramsTR);
+
+    // Agrupar atenciones por especialista normalizado
+    const atencionesMap = new Map(); // especialista_id -> { atenciones, pacientes Set, ingresos_individuales }
+    rawTratamientos.forEach(row => {
+      const espNorm = normalizarEspecialista(row.especialista);
+      const espId = nombreToId.get(espNorm);
+      if (!espId) return; // No matchea ningún especialista conocido
+      if (especialista_id && espId !== parseInt(especialista_id)) return; // Filtro de especialista
+
+      if (!atencionesMap.has(espId)) {
+        atencionesMap.set(espId, { atenciones: 0, pacientes: new Set(), ingresos_ind: 0, tratamientos: new Map() });
+      }
+      const data = atencionesMap.get(espId);
+      data.atenciones++;
+      if (row.paciente_id) data.pacientes.add(row.paciente_id);
+      // Sumar solo tratamientos individuales con precio > 0
+      const precio = parseFloat(row.precio_total) || 0;
+      if (precio > 0) data.ingresos_ind += precio;
+      // Detalle por tratamiento
+      const tratNombre = row.tratamiento_nombre || 'Sin tratamiento';
+      if (!data.tratamientos.has(tratNombre)) {
+        data.tratamientos.set(tratNombre, { cantidad_sesiones: 0, total_tratamiento: 0 });
+      }
+      const td = data.tratamientos.get(tratNombre);
+      td.cantidad_sesiones++;
+      td.total_tratamiento += precio;
+    });
+
+    // ── 2) INGRESOS PAQUETES: desde paquetes_sesiones completadas ──
+    let condPaq = ["ps.estado = 'completada'", "(ps.especialista IS NOT NULL AND ps.especialista != '' AND ps.especialista != 'No especificado')"];
+    let paramsPaq = [];
+    if (fecha_inicio) { condPaq.push("DATE(ps.fecha_realizada) >= ?"); paramsPaq.push(fecha_inicio); }
+    if (fecha_fin) { condPaq.push("DATE(ps.fecha_realizada) <= ?"); paramsPaq.push(fecha_fin); }
+    if (tratamiento) { condPaq.push("ps.tratamiento_nombre LIKE ?"); paramsPaq.push(`%${tratamiento}%`); }
+    const wherePaq = `WHERE ${condPaq.join(" AND ")}`;
+
+    const rawPaquetes = await dbAll(`
+      SELECT ps.especialista, ps.especialista_id, COALESCE(ps.precio_sesion, 0) as precio_sesion
+      FROM paquetes_sesiones ps
+      ${wherePaq}
+    `, paramsPaq);
+
+    // Agrupar ingresos paquetes por especialista
+    const ingresosPaqMap = new Map(); // especialista_id -> total
+    rawPaquetes.forEach(row => {
+      // Intentar resolver por especialista_id primero, luego por nombre normalizado
+      let espId = row.especialista_id;
+      if (!espId) {
+        const espNorm = normalizarEspecialista(row.especialista);
+        espId = nombreToId.get(espNorm);
+      }
+      if (!espId) return;
+      if (especialista_id && espId !== parseInt(especialista_id)) return;
+      ingresosPaqMap.set(espId, (ingresosPaqMap.get(espId) || 0) + (parseFloat(row.precio_sesion) || 0));
+    });
+
+    // ── 3) INGRESOS PRESUPUESTOS: desde presupuestos_sesiones completadas ──
+    let condPres = ["prs.estado = 'completada'", "(prs.especialista IS NOT NULL AND prs.especialista != '' AND prs.especialista != 'No especificado')"];
+    let paramsPres = [];
+    if (fecha_inicio) { condPres.push("DATE(prs.fecha_realizada) >= ?"); paramsPres.push(fecha_inicio); }
+    if (fecha_fin) { condPres.push("DATE(prs.fecha_realizada) <= ?"); paramsPres.push(fecha_fin); }
+    if (tratamiento) { condPres.push("prs.tratamiento_nombre LIKE ?"); paramsPres.push(`%${tratamiento}%`); }
+    const wherePres = `WHERE ${condPres.join(" AND ")}`;
+
+    const rawPresupuestos = await dbAll(`
+      SELECT prs.especialista, prs.especialista_id, COALESCE(prs.precio_sesion, 0) as precio_sesion
+      FROM presupuestos_sesiones prs
+      ${wherePres}
+    `, paramsPres);
+
+    const ingresosPresMap = new Map();
+    rawPresupuestos.forEach(row => {
+      let espId = row.especialista_id;
+      if (!espId) {
+        const espNorm = normalizarEspecialista(row.especialista);
+        espId = nombreToId.get(espNorm);
+      }
+      if (!espId) return;
+      if (especialista_id && espId !== parseInt(especialista_id)) return;
+      ingresosPresMap.set(espId, (ingresosPresMap.get(espId) || 0) + (parseFloat(row.precio_sesion) || 0));
+    });
+
+    // ── COMBINAR TODO ──
     const especialistasMap = new Map();
     todosEspecialistas.forEach(esp => {
-      especialistasMap.set(esp.especialista_id, {
-        especialista_id: esp.especialista_id,
+      const espId = esp.especialista_id;
+      if (especialista_id && espId !== parseInt(especialista_id)) return;
+      const atenData = atencionesMap.get(espId) || { atenciones: 0, pacientes: new Set(), ingresos_ind: 0 };
+      const ingPaq = ingresosPaqMap.get(espId) || 0;
+      const ingPres = ingresosPresMap.get(espId) || 0;
+      const ingInd = atenData.ingresos_ind || 0;
+      const totalIngresos = ingPaq + ingPres + ingInd;
+
+      especialistasMap.set(espId, {
+        especialista_id: espId,
         especialista_nombre: esp.especialista_nombre,
         tipo: esp.tipo,
         comision_porcentaje: esp.comision_porcentaje,
         pago_fijo: esp.pago_fijo,
-        total_atenciones: 0,
-        total_ingresos: 0,
-        pacientes_unicos: 0
+        total_atenciones: atenData.atenciones,
+        total_ingresos: totalIngresos,
+        ingresos_paquetes: ingPaq,
+        ingresos_presupuestos: ingPres,
+        ingresos_individuales: ingInd,
+        pacientes_unicos: atenData.pacientes.size
       });
-    });
-
-    // Agregar estadísticas reales
-    statsEspecialistas.forEach(stat => {
-      if (especialistasMap.has(stat.especialista_id)) {
-        const esp = especialistasMap.get(stat.especialista_id);
-        esp.total_atenciones = stat.total_atenciones || 0;
-        esp.total_ingresos = parseFloat(stat.total_ingresos) || 0;
-        esp.pacientes_unicos = stat.pacientes_unicos || 0;
-      }
     });
 
     // Calcular comisiones y ganancias
@@ -219,6 +253,22 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
 
     estadisticas.sort((a, b) => b.total_ingresos - a.total_ingresos);
 
+    // Detalle por tratamiento (para la tabla de desglose)
+    const detalleTratamientos = [];
+    atencionesMap.forEach((data, espId) => {
+      const espInfo = especialistasMap.get(espId);
+      if (!espInfo) return;
+      data.tratamientos.forEach((tData, tratNombre) => {
+        detalleTratamientos.push({
+          especialista_id: espId,
+          especialista_nombre: espInfo.especialista_nombre,
+          tratamiento_nombre: tratNombre,
+          cantidad_sesiones: tData.cantidad_sesiones,
+          total_tratamiento: tData.total_tratamiento
+        });
+      });
+    });
+
     // Calcular resumen general
     const resumen = {
       total_atenciones: estadisticas.reduce((sum, e) => sum + e.total_atenciones, 0),
@@ -233,7 +283,7 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       resumen.promedio_por_sesion = resumen.total_ingresos / resumen.total_atenciones;
     }
 
-    console.log(`✅ Estadísticas: ${estadisticas.length} especialistas, ${resumen.total_atenciones} atenciones, S/ ${resumen.total_ingresos.toFixed(2)}`);
+    console.log(`✅ Estadísticas: ${estadisticas.length} esp, ${resumen.total_atenciones} atenciones, S/ ${resumen.total_ingresos.toFixed(2)}`);
 
     res.json({ estadisticas, tratamientos: detalleTratamientos, resumen });
 
@@ -273,11 +323,13 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
     const pagoFijo = parseFloat(especialistaData.pago_fijo) || 0;
 
     // Construir condiciones WHERE sobre tratamientos_realizados
+    // Usamos filtro amplio y luego filtramos en código con normalizarEspecialista()
     let conditions = [
-      "LOWER(TRIM(tr.especialista)) = LOWER(TRIM(?))",
+      "tr.especialista IS NOT NULL",
+      "tr.especialista != ''",
       "tr.especialista != 'No especificado'"
     ];
-    let params = [nombreEspecialista];
+    let params = [];
 
     if (fecha_inicio) {
       conditions.push("DATE(tr.fecha) >= ?");
@@ -288,14 +340,14 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
       params.push(fecha_fin);
     }
     if (tratamiento) {
-      conditions.push("(t.nombre LIKE ? OR tr.productos LIKE ?)");
-      params.push(`%${tratamiento}%`, `%${tratamiento}%`);
+      conditions.push("(t.nombre LIKE ?)");
+      params.push(`%${tratamiento}%`);
     }
 
     const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
-    // Obtener TODOS los tratamientos realizados por este especialista
-    const sesiones = await dbAll(`
+    // Obtener tratamientos y filtrar por especialista normalizado en código
+    const allSesiones = await dbAll(`
       SELECT 
         tr.id as sesion_id,
         COALESCE(t.nombre, 'Sin tratamiento') as tratamiento_nombre,
@@ -304,6 +356,7 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
         tr.precio_total as precio_sesion,
         tr.sesion as sesion_numero,
         tr.tipoAtencion,
+        tr.especialista as especialista_raw,
         tr.productos as productos_usados_json,
         tr.descuento as tratamiento_descuento,
         tr.pagoMetodo as metodo_pago,
@@ -316,6 +369,10 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
       ${whereClause}
       ORDER BY tr.fecha DESC
     `, params);
+
+    // Filtrar por especialista normalizado
+    const nombreNorm = nombreEspecialista.trim().toLowerCase();
+    const sesiones = allSesiones.filter(s => normalizarEspecialista(s.especialista_raw) === nombreNorm);
 
     console.log(`✅ Encontrados ${sesiones.length} tratamientos para ${nombreEspecialista}`);
 
@@ -362,8 +419,55 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
 
     const tratamientos = Array.from(tratamientosMap.values());
 
-    // Calcular totales con comisión real del especialista
-    const totalIngresos = todasSesiones.reduce((sum, s) => sum + parseFloat(s.precio_sesion || 0), 0);
+    // ── INGRESOS HÍBRIDOS: paquetes + presupuestos + individuales (consistente con /estadisticas) ──
+    // Ingresos individuales (tratamientos con precio > 0)
+    const ingresosIndividuales = todasSesiones.reduce((sum, s) => sum + (parseFloat(s.precio_sesion) > 0 ? parseFloat(s.precio_sesion) : 0), 0);
+
+    // Ingresos de paquetes completados por este especialista
+    let condPaqDet = ["ps.estado = 'completada'", "(ps.especialista IS NOT NULL AND ps.especialista != '')"];
+    let paramsPaqDet = [];
+    if (fecha_inicio) { condPaqDet.push("DATE(ps.fecha_realizada) >= ?"); paramsPaqDet.push(fecha_inicio); }
+    if (fecha_fin) { condPaqDet.push("DATE(ps.fecha_realizada) <= ?"); paramsPaqDet.push(fecha_fin); }
+    if (tratamiento) { condPaqDet.push("ps.tratamiento_nombre LIKE ?"); paramsPaqDet.push(`%${tratamiento}%`); }
+
+    const rawPaqDet = await dbAll(`
+      SELECT ps.especialista, ps.especialista_id, COALESCE(ps.precio_sesion, 0) as precio_sesion
+      FROM paquetes_sesiones ps WHERE ${condPaqDet.join(" AND ")}
+    `, paramsPaqDet);
+
+    let ingresosPaquetes = 0;
+    rawPaqDet.forEach(row => {
+      let matchId = row.especialista_id;
+      if (!matchId) {
+        const norm = normalizarEspecialista(row.especialista);
+        if (norm === nombreNorm) matchId = especialistaId;
+      }
+      if (matchId === especialistaId) ingresosPaquetes += parseFloat(row.precio_sesion) || 0;
+    });
+
+    // Ingresos de presupuestos completados por este especialista
+    let condPresDet = ["prs.estado = 'completada'", "(prs.especialista IS NOT NULL AND prs.especialista != '')"];
+    let paramsPresDet = [];
+    if (fecha_inicio) { condPresDet.push("DATE(prs.fecha_realizada) >= ?"); paramsPresDet.push(fecha_inicio); }
+    if (fecha_fin) { condPresDet.push("DATE(prs.fecha_realizada) <= ?"); paramsPresDet.push(fecha_fin); }
+    if (tratamiento) { condPresDet.push("prs.tratamiento_nombre LIKE ?"); paramsPresDet.push(`%${tratamiento}%`); }
+
+    const rawPresDet = await dbAll(`
+      SELECT prs.especialista, prs.especialista_id, COALESCE(prs.precio_sesion, 0) as precio_sesion
+      FROM presupuestos_sesiones prs WHERE ${condPresDet.join(" AND ")}
+    `, paramsPresDet);
+
+    let ingresosPresupuestos = 0;
+    rawPresDet.forEach(row => {
+      let matchId = row.especialista_id;
+      if (!matchId) {
+        const norm = normalizarEspecialista(row.especialista);
+        if (norm === nombreNorm) matchId = especialistaId;
+      }
+      if (matchId === especialistaId) ingresosPresupuestos += parseFloat(row.precio_sesion) || 0;
+    });
+
+    const totalIngresos = ingresosPaquetes + ingresosPresupuestos + ingresosIndividuales;
     const comisionCalculada = totalIngresos * (comisionPorcentaje / 100);
     const pagoTotalEspecialista = comisionCalculada + pagoFijo;
     const gananciaClinica = Math.max(0, totalIngresos - pagoTotalEspecialista);
@@ -371,6 +475,9 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
     const totales = {
       total_sesiones: todasSesiones.length,
       total_ingresos: totalIngresos,
+      ingresos_paquetes: ingresosPaquetes,
+      ingresos_presupuestos: ingresosPresupuestos,
+      ingresos_individuales: ingresosIndividuales,
       total_ahorro: todasSesiones.reduce((sum, s) => sum + parseFloat(s.ahorro || 0), 0),
       comision_porcentaje: comisionPorcentaje,
       pago_fijo: pagoFijo,
@@ -380,7 +487,7 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
       comision_20: comisionCalculada
     };
 
-    console.log(`📊 Detalle ${nombreEspecialista}: ${totales.total_sesiones} sesiones, S/ ${totales.total_ingresos.toFixed(2)}`);
+    console.log(`📊 Detalle ${nombreEspecialista}: ${totales.total_sesiones} sesiones, S/ ${totales.total_ingresos.toFixed(2)} (paq:${ingresosPaquetes} pres:${ingresosPresupuestos} ind:${ingresosIndividuales})`);
 
     res.json({
       sesiones: todasSesiones,
