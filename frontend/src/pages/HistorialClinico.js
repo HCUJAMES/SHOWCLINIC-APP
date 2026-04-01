@@ -5849,7 +5849,7 @@ const HistorialClinico = () => {
                     elevation={0}
                     sx={{
                       borderRadius: 3,
-                      overflow: "hidden",
+                      overflow: "auto",
                       border: "1px solid rgba(212,175,55,0.18)",
                       backgroundColor: "rgba(255,255,255,0.68)",
                     }}
