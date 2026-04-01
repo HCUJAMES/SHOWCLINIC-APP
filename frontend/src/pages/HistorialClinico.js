@@ -296,6 +296,7 @@ const HistorialClinico = () => {
   const isMaster = userRole === "master";
   const isAdmin = userRole === "admin";
   const isDoctor = userRole === "doctor";
+  const isAsistente = userRole === "asistente";
   const canDoActions = isMaster || isAdmin;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   
@@ -6005,7 +6006,7 @@ const HistorialClinico = () => {
 
                             {/* Columna de Acciones */}
                             <TableCell>
-                              {(isMaster || isAdmin || isDoctor || canEditHistorial) ? (
+                              {(isMaster || isAdmin || isDoctor || isAsistente || canEditHistorial) ? (
                                 <Box sx={{ display: "flex", gap: 0.5 }}>
                                   <IconButton
                                     size="small"
