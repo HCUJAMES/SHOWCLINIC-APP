@@ -1097,7 +1097,6 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     pagoMetodo,
     tipoAtencion,
     fecha,
-    nombreTratamiento,
     cantidad_total,
     producto_usado,
   } = req.body;
@@ -1120,7 +1119,6 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     const descuentoNum = descuento != null ? Number(descuento) : tratamiento.descuento;
     const pagoMetodoStr = typeof pagoMetodo === "string" ? pagoMetodo.trim() : tratamiento.pagoMetodo;
     const tipoAtencionStr = typeof tipoAtencion === "string" ? tipoAtencion.trim() : tratamiento.tipoAtencion;
-    const nombreStr = typeof nombreTratamiento === "string" && nombreTratamiento.trim() ? nombreTratamiento.trim() : tratamiento.nombreTratamiento;
     const cantidadStr = cantidad_total != null && String(cantidad_total).trim() !== "" ? String(cantidad_total).trim() : tratamiento.cantidad_total;
     
     // Actualizar productos si se proporciona producto_usado
@@ -1170,9 +1168,9 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
       `UPDATE tratamientos_realizados 
        SET especialista = ?, sesion = ?, precio_total = ?, descuento = ?, 
            pagoMetodo = ?, tipoAtencion = ?, fecha = ?,
-           nombreTratamiento = ?, cantidad_total = ?, productos = ?
+           cantidad_total = ?, productos = ?
        WHERE id = ?`,
-      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, nombreStr, cantidadStr, productosJSON, tratamientoId]
+      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, cantidadStr, productosJSON, tratamientoId]
     );
 
     // Si hay deuda asociada, actualizar el monto total
@@ -1196,7 +1194,8 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     res.json({ message: "✅ Tratamiento actualizado correctamente" });
   } catch (err) {
     console.error("❌ Error al editar tratamiento:", err.message);
-    res.status(500).json({ message: "Error al editar tratamiento" });
+    console.error("Stack trace:", err.stack);
+    res.status(500).json({ message: "Error al editar tratamiento: " + err.message });
   }
 });
 
