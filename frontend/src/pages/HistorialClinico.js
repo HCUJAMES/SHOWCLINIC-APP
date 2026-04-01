@@ -300,6 +300,9 @@ const HistorialClinico = () => {
   const canDoActions = isMaster || isAdmin;
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   
+  // Debug: verificar roles
+  console.log("🔍 Debug roles:", { userRole, isMaster, isAdmin, isDoctor, isAsistente });
+  
   // Estados para permisos de usuario
   const [userPermissions, setUserPermissions] = useState([]);
   const [canEditHistorial, setCanEditHistorial] = useState(false);
