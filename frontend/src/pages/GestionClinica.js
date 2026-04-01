@@ -1309,13 +1309,16 @@ const GestionClinica = () => {
               {(() => {
                 const esp = modalDetalle.especialista;
                 const totales = modalDetalle.datos.totales || {};
-                const porcentaje = esp?.comision_porcentaje || 20;
-                const pagoFijo = esp?.pago_fijo || 0;
+                const espBackend = modalDetalle.datos.especialista || {};
+                // Preferir datos del backend (actualizados) sobre los del frontend (pueden estar desactualizados)
+                const porcentaje = espBackend.comision_porcentaje ?? esp?.comision_porcentaje ?? 20;
+                const pagoFijo = espBackend.pago_fijo ?? esp?.pago_fijo ?? 0;
                 const ingresos = Number(totales.total_ingresos || 0);
                 const sesiones = totales.total_sesiones || 0;
-                const comisionCalc = ingresos * (porcentaje / 100);
-                const pagoTotalEsp = comisionCalc + pagoFijo;
-                const ganancia = Math.max(0, ingresos - pagoTotalEsp);
+                // Usar cálculos del backend si están disponibles, sino calcular localmente
+                const comisionCalc = totales.comision_calculada != null ? Number(totales.comision_calculada) : ingresos * (porcentaje / 100);
+                const pagoTotalEsp = totales.pago_total_especialista != null ? Number(totales.pago_total_especialista) : comisionCalc + pagoFijo;
+                const ganancia = totales.ganancia_clinica != null ? Number(totales.ganancia_clinica) : Math.max(0, ingresos - pagoTotalEsp);
                 return (
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={6} sm={2.4}>

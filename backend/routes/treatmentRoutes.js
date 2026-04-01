@@ -720,6 +720,16 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
     // 3) MARCAR AUTOMÁTICAMENTE LAS SESIONES DE PAQUETES/PRESUPUESTOS COMO COMPLETADAS
     console.log("🔍 Buscando sesiones de paquetes/presupuestos para marcar como completadas...");
     
+    // Resolver especialista_id a partir del nombre
+    let especialistaIdResuelto = null;
+    if (especialista && especialista !== 'No especificado') {
+      const espRow = await dbGet(
+        `SELECT id FROM especialistas WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?))`,
+        [especialista]
+      );
+      if (espRow) especialistaIdResuelto = espRow.id;
+    }
+
     for (const b of productosData) {
       const tratamientoId = b.tratamiento_id;
       if (!tratamientoId) continue;
@@ -746,9 +756,10 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
            SET estado = 'completada', 
                fecha_realizada = datetime('now', 'localtime'),
                especialista = ?,
+               especialista_id = ?,
                notas = ?
            WHERE id = ?`,
-          [especialista || "No especificado", `Sesión ${sesion || 1}`, sesionPaquete.id]
+          [especialista || "No especificado", especialistaIdResuelto, `Sesión ${sesion || 1}`, sesionPaquete.id]
         );
 
         // Verificar si todas las sesiones del paquete están completadas
@@ -795,9 +806,10 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
            SET estado = 'completada', 
                fecha_realizada = datetime('now', 'localtime'),
                especialista = ?,
+               especialista_id = ?,
                notas = ?
            WHERE id = ?`,
-          [especialista || "No especificado", `Sesión ${sesion || 1}`, sesionPresupuesto.id]
+          [especialista || "No especificado", especialistaIdResuelto, `Sesión ${sesion || 1}`, sesionPresupuesto.id]
         );
 
         // Verificar si todas las sesiones del presupuesto están completadas

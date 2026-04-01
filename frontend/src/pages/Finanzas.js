@@ -27,6 +27,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 import { useToast } from "../components/ToastProvider";
 import { formatearFechaCorta } from "../utils/dateUtils";
 
@@ -436,6 +437,70 @@ const Finanzas = () => {
       console.error("Error al obtener reporte financiero:", error);
       showToast({ severity: "error", message: "Error al obtener reporte financiero" });
     }
+  };
+
+  const exportarExcel = () => {
+    // Preparar datos para Excel
+    const datosTabla = (reporte || []).map((r) => ({
+      Fecha: formatearFechaCorta(r.fecha),
+      Paciente: r.deuda_pendiente > 0
+        ? `${r.paciente || "-"} (Deuda: S/ ${Number(r.deuda_pendiente || 0).toFixed(2)})`
+        : r.paciente || "-",
+      Tratamiento: r.tratamiento || "-",
+      "Método de Pago": r.pagoMetodo_mostrado || r.pagoMetodo || "-",
+      "Monto Bruto (S/)": Number(r.monto_bruto ?? r.precio_total ?? 0).toFixed(2),
+      "Descuento (%)": r.descuento || 0,
+      "Monto Neto (S/)": Number(r.precio_total ?? r.monto_bruto ?? 0).toFixed(2),
+    }));
+
+    // Crear hoja de trabajo
+    const ws = XLSX.utils.json_to_sheet(datosTabla);
+
+    // Ajustar anchos de columna
+    ws['!cols'] = [
+      { wch: 12 }, // Fecha
+      { wch: 30 }, // Paciente
+      { wch: 30 }, // Tratamiento
+      { wch: 18 }, // Método de Pago
+      { wch: 16 }, // Monto Bruto
+      { wch: 14 }, // Descuento
+      { wch: 16 }, // Monto Neto
+    ];
+
+    // Agregar resumen al final
+    const filaResumenInicio = datosTabla.length + 3;
+    
+    XLSX.utils.sheet_add_aoa(ws, [
+      [""],
+      ["RESUMEN FINANCIERO"],
+      [""],
+      ["Total Bruto (S/)", Number(totalBruto || 0).toFixed(2)],
+      ["Comisión POS (S/)", Number(totalComision || 0).toFixed(2)],
+      ["Total Neto (S/)", Number(totalGeneral || 0).toFixed(2)],
+      [""],
+      ["DESGLOSE POR MÉTODO DE PAGO"],
+    ], { origin: `A${filaResumenInicio}` });
+
+    // Agregar totales por método
+    let filaMetodo = filaResumenInicio + 8;
+    Object.entries(totalesMetodo || {}).forEach(([metodo, total]) => {
+      XLSX.utils.sheet_add_aoa(ws, [
+        [metodo, `S/ ${Number(total || 0).toFixed(2)}`]
+      ], { origin: `A${filaMetodo}` });
+      filaMetodo++;
+    });
+
+    // Crear libro de trabajo
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Finanzas");
+
+    // Generar nombre de archivo con fecha
+    const fecha = new Date().toLocaleDateString('es-PE').replace(/\//g, '-');
+    const nombreArchivo = `Reporte_Finanzas_ShowClinic_${fecha}.xlsx`;
+
+    // Descargar archivo
+    XLSX.writeFile(wb, nombreArchivo);
+    showToast({ severity: "success", message: "Excel exportado correctamente" });
   };
 
   const generarPDF = () => {
@@ -1113,7 +1178,23 @@ const Finanzas = () => {
                   </Paper>
                 )}
 
-                <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2.5 }}>
+                <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, mt: 2.5 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={exportarExcel}
+                    sx={{
+                      borderColor: "#2e7d32",
+                      color: "#2e7d32",
+                      fontWeight: "bold",
+                      px: 3,
+                      "&:hover": { 
+                        backgroundColor: "#e8f5e9",
+                        borderColor: "#1b5e20",
+                      },
+                    }}
+                  >
+                    Exportar Excel
+                  </Button>
                   <Button
                     variant="outlined"
                     onClick={generarPDF}
