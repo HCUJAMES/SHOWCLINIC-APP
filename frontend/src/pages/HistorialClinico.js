@@ -5854,21 +5854,22 @@ const HistorialClinico = () => {
                       backgroundColor: "rgba(255,255,255,0.68)",
                     }}
                   >
-                    <Table stickyHeader>
+                    <Table stickyHeader size="small">
                       <TableHead>
                         <TableRow>
-                          {["Fecha", "Tratamiento", "Cantidad (ml)", "Producto Usado", "Tipo Atención", "Especialista", "Sesión", "Fotos", "Recibo", "Acciones"].map((header) => (
+                          {["Fecha", "Tratamiento", "Cant.", "Producto", "Tipo", "Especialista", "Ses.", "Fotos", "Recibo", "Acciones"].map((header) => (
                             <TableCell
                               key={header}
                               sx={{
                                 fontWeight: 700,
-                                fontSize: "0.8rem",
+                                fontSize: "0.7rem",
                                 color: "white",
                                 backgroundColor: "#a36920",
                                 borderBottom: "2px solid #8a5a1a",
                                 whiteSpace: "nowrap",
-                                letterSpacing: "0.03em",
-                                py: 1.5,
+                                letterSpacing: "0.02em",
+                                py: 1,
+                                px: 1,
                               }}
                             >
                               {header}
@@ -5912,20 +5913,20 @@ const HistorialClinico = () => {
                               transition: "background-color 0.15s ease",
                             }}
                           >
-                            <TableCell sx={{ whiteSpace: "nowrap", fontWeight: 600, color: "#5a3e1b", fontSize: "0.82rem" }}>{formatearFechaCorta(t.fecha)}</TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: "#333" }}>{t.nombreTratamiento}</TableCell>
-                            <TableCell sx={{ color: "#666" }}>{t.cantidad_total || "-"}</TableCell>
-                            <TableCell sx={{ color: "#666", fontSize: "0.82rem" }}>{productoUsado}</TableCell>
-                            <TableCell sx={{ color: "#555" }}>{t.tipoAtencion}</TableCell>
-                            <TableCell sx={{ color: "#555" }}>{t.especialista}</TableCell>
-                            <TableCell sx={{ fontWeight: 600, color: "#a36920" }}>{t.sesion}</TableCell>
+                            <TableCell sx={{ whiteSpace: "nowrap", fontWeight: 600, color: "#5a3e1b", fontSize: "0.75rem", px: 1 }}>{formatearFechaCorta(t.fecha)}</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: "#333", fontSize: "0.75rem", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", px: 1 }}>{t.nombreTratamiento}</TableCell>
+                            <TableCell sx={{ color: "#666", fontSize: "0.75rem", px: 1, textAlign: "center" }}>{t.cantidad_total || "-"}</TableCell>
+                            <TableCell sx={{ color: "#666", fontSize: "0.72rem", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", px: 1 }}>{productoUsado}</TableCell>
+                            <TableCell sx={{ color: "#555", fontSize: "0.75rem", px: 1 }}>{t.tipoAtencion}</TableCell>
+                            <TableCell sx={{ color: "#555", fontSize: "0.75rem", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", px: 1 }}>{t.especialista}</TableCell>
+                            <TableCell sx={{ fontWeight: 600, color: "#a36920", fontSize: "0.75rem", px: 1, textAlign: "center" }}>{t.sesion}</TableCell>
 
-                            <TableCell>
+                            <TableCell sx={{ px: 0.5 }}>
                               {tratamientoSeleccionado === t.id ? (
-                                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 100 }}>
                                   <Box>
-                                    <Typography variant="body2" fontWeight="bold" color="#a36920" sx={{ mb: 0.5 }}>
-                                      Subir fotos (máx. 3)
+                                    <Typography variant="caption" fontWeight="bold" color="#a36920" sx={{ mb: 0.3, fontSize: "0.65rem" }}>
+                                      Subir fotos
                                     </Typography>
                                     <input
                                       type="file"
@@ -5933,47 +5934,56 @@ const HistorialClinico = () => {
                                       accept="image/*"
                                       onClick={(e) => (e.target.value = null)}
                                       onChange={manejarCambioFotos}
+                                      style={{ fontSize: "0.7rem" }}
                                     />
                                   </Box>
-                                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+                                  <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
                                     <Button
                                       variant="outlined"
                                       size="small"
                                       sx={{
-                                        mt: 0.5,
                                         color: "#a36920",
                                         borderColor: "#a36920",
+                                        fontSize: "0.65rem",
+                                        py: 0.3,
+                                        px: 0.8,
                                       }}
                                       onClick={() => subirFotos(t.id)}
                                     >
-                                      Guardar Fotos
+                                      Guardar
                                     </Button>
                                     <Button
                                       variant="text"
                                       size="small"
                                       sx={{
-                                        mt: 0.5,
                                         color: "#a36920",
                                         textTransform: "none",
+                                        fontSize: "0.65rem",
+                                        py: 0.3,
+                                        px: 0.8,
                                       }}
                                       onClick={() => abrirFotosPaciente(t.id)}
                                     >
-                                      Ver fotos
+                                      Ver
                                     </Button>
                                   </Box>
                                 </Box>
                               ) : (
-                                <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.3 }}>
                                   <Button
                                     variant="text"
                                     size="small"
                                     sx={{
                                       color: "#a36920",
                                       textTransform: "none",
+                                      fontSize: "0.65rem",
+                                      py: 0.3,
+                                      px: 0.5,
+                                      minWidth: "auto",
                                     }}
                                     onClick={() => setTratamientoSeleccionado(t.id)}
                                   >
-                                    {tieneFotos ? "Actualizar fotos" : "Agregar fotos"}
+                                    {tieneFotos ? "Actualizar" : "Agregar"}
                                   </Button>
                                   <Button
                                     variant="text"
@@ -5981,17 +5991,21 @@ const HistorialClinico = () => {
                                     sx={{
                                       color: "#a36920",
                                       textTransform: "none",
+                                      fontSize: "0.65rem",
+                                      py: 0.3,
+                                      px: 0.5,
+                                      minWidth: "auto",
                                     }}
                                     onClick={() => abrirFotosPaciente(t.id)}
                                   >
-                                    Ver fotos
+                                    Ver
                                   </Button>
                                 </Box>
                               )}
                             </TableCell>
 
                             {/* Columna de Recibo */}
-                            <TableCell>
+                            <TableCell sx={{ px: 0.5, textAlign: "center" }}>
                               <IconButton
                                 size="small"
                                 sx={{
@@ -5999,18 +6013,19 @@ const HistorialClinico = () => {
                                   "&:hover": {
                                     backgroundColor: "rgba(212,175,55,0.1)",
                                   },
+                                  p: 0.5,
                                 }}
                                 onClick={() => abrirReciboTratamiento(t)}
                                 title="Imprimir recibo"
                               >
-                                <Receipt />
+                                <Receipt sx={{ fontSize: "1.2rem" }} />
                               </IconButton>
                             </TableCell>
 
                             {/* Columna de Acciones */}
-                            <TableCell>
+                            <TableCell sx={{ px: 0.5 }}>
                               {(isMaster || isAdmin || isDoctor || isAsistente || canEditHistorial) ? (
-                                <Box sx={{ display: "flex", gap: 0.5 }}>
+                                <Box sx={{ display: "flex", gap: 0.3 }}>
                                   <IconButton
                                     size="small"
                                     sx={{
@@ -6018,11 +6033,12 @@ const HistorialClinico = () => {
                                       "&:hover": {
                                         backgroundColor: "rgba(25,118,210,0.1)",
                                       },
+                                      p: 0.5,
                                     }}
                                     onClick={() => abrirEditarTratamiento(t)}
                                     title="Editar tratamiento"
                                   >
-                                    <Edit />
+                                    <Edit sx={{ fontSize: "1.2rem" }} />
                                   </IconButton>
                                   <IconButton
                                     size="small"
@@ -6031,15 +6047,16 @@ const HistorialClinico = () => {
                                       "&:hover": {
                                         backgroundColor: "rgba(211,47,47,0.1)",
                                       },
+                                      p: 0.5,
                                     }}
                                     onClick={() => abrirConfirmacionCancelar(t)}
                                     title="Cancelar tratamiento"
                                   >
-                                    <Delete />
+                                    <Delete sx={{ fontSize: "1.2rem" }} />
                                   </IconButton>
                                 </Box>
                               ) : (
-                                <Typography variant="caption" sx={{ color: "#999", fontStyle: "italic" }}>
+                                <Typography variant="caption" sx={{ color: "#999", fontStyle: "italic", fontSize: "0.65rem" }}>
                                   Sin permisos
                                 </Typography>
                               )}
