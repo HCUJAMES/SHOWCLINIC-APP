@@ -527,36 +527,24 @@ router.get("/paciente/:paciente_id", requirePaquetesRead, async (req, res) => {
         [paquete.id]
       );
 
-      // Verificar coherencia: si monto_pagado < precio_total, no puede estar como 'pagado'
+      // Siempre recalcular estado de pago basado en monto_pagado vs precio_total
       const montoPagado = parseFloat(paquete.monto_pagado) || 0;
       const precioTotal = parseFloat(paquete.precio_total) || 0;
+      const saldoCorrecto = (montoPagado >= precioTotal - 0.01 && precioTotal > 0) ? 0 : Math.max(0, precioTotal - montoPagado);
+      const estadoCorrecto = (montoPagado >= precioTotal - 0.01 && precioTotal > 0) ? 'pagado' : (montoPagado > 0 ? 'adelanto' : 'pendiente_pago');
+      const pagadoCorrecto = estadoCorrecto === 'pagado' ? 1 : 0;
 
-      let estadoCorrecto = 'pendiente_pago';
-      let pagadoCorrecto = 0;
-      let saldoCorrecto = Math.max(0, precioTotal - montoPagado);
+      // Actualizar en BD y en el objeto para devolver datos correctos
+      await dbRun(
+        `UPDATE paquetes_pacientes 
+         SET saldo_pendiente = ?, estado_pago = ?, pagado = ?
+         WHERE id = ?`,
+        [saldoCorrecto, estadoCorrecto, pagadoCorrecto, paquete.id]
+      );
 
-      if (montoPagado >= precioTotal - 0.01 && precioTotal > 0) {
-        estadoCorrecto = 'pagado';
-        pagadoCorrecto = 1;
-        saldoCorrecto = 0;
-      } else if (montoPagado > 0) {
-        estadoCorrecto = 'adelanto';
-        pagadoCorrecto = 0;
-      }
-
-      // Si el estado guardado no es coherente con el monto, corregir
-      if (paquete.estado_pago !== estadoCorrecto || paquete.pagado !== pagadoCorrecto) {
-        await dbRun(
-          `UPDATE paquetes_pacientes 
-           SET saldo_pendiente = ?, estado_pago = ?, pagado = ?
-           WHERE id = ?`,
-          [saldoCorrecto, estadoCorrecto, pagadoCorrecto, paquete.id]
-        );
-
-        paquete.saldo_pendiente = saldoCorrecto;
-        paquete.estado_pago = estadoCorrecto;
-        paquete.pagado = pagadoCorrecto;
-      }
+      paquete.saldo_pendiente = saldoCorrecto;
+      paquete.estado_pago = estadoCorrecto;
+      paquete.pagado = pagadoCorrecto;
     }
 
     res.json(paquetes);
@@ -1064,8 +1052,22 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
       const precioTotal = parseFloat(p.precio_total) || 0;
       const descuento = parseFloat(p.descuento) || 0;
       const montoPagado = parseFloat(p.monto_pagado) || 0;
-      p.saldo_pendiente = (precioTotal - descuento) - montoPagado;
-      if (p.saldo_pendiente < 0) p.saldo_pendiente = 0;
+      const precioConDescuento = precioTotal - descuento;
+      p.saldo_pendiente = Math.max(0, precioConDescuento - montoPagado);
+
+      // Siempre recalcular estado de pago basado en monto_pagado vs precio real
+      const estadoCorrecto = (montoPagado >= precioConDescuento - 0.01 && precioConDescuento > 0) ? 'pagado' : (montoPagado > 0 ? 'adelanto' : 'pendiente_pago');
+      const pagadoCorrecto = estadoCorrecto === 'pagado' ? 1 : 0;
+
+      await dbRun(
+        `UPDATE presupuestos_asignados 
+         SET saldo_pendiente = ?, estado_pago = ?, pagado = ?
+         WHERE id = ?`,
+        [p.saldo_pendiente, estadoCorrecto, pagadoCorrecto, p.id]
+      );
+
+      p.estado_pago = estadoCorrecto;
+      p.pagado = pagadoCorrecto;
     }
 
     res.json(presupuestos);
@@ -1336,8 +1338,8 @@ router.post("/presupuesto/:presupuesto_asignado_id/pago", requirePaquetesAsignar
       nuevoAdelanto = adelantoAnterior + montoRecibido;
       estadoPago = 'adelanto';
       pagadoFlag = 0;
-    } else if (tipo_pago === 'saldo' || nuevoMontoPagado >= precioConDescuento) {
-      // Pago del saldo restante o pago total (comparar con precio con descuento)
+    } else if (nuevoMontoPagado >= precioConDescuento - 0.01 && precioConDescuento > 0) {
+      // Pago total cubierto (comparar con precio con descuento)
       estadoPago = 'pagado';
       pagadoFlag = 1;
       nuevoSaldo = 0;
