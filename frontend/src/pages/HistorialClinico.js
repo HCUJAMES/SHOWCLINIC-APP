@@ -5201,27 +5201,43 @@ const HistorialClinico = () => {
                               </Box>
                             )}
 
-                            {/* Detalles de pago */}
+                            {/* Detalles de pago - Historial individual de pagos */}
                             {(presupuesto.monto_pagado > 0 || presupuesto.estado_pago === 'adelanto') && (
                               <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(0,0,0,0.02)", borderRadius: 1 }}>
-                                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                                  <Typography variant="caption" color="text.secondary">Pagado:</Typography>
-                                  <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
-                                    S/ {(presupuesto.monto_pagado || 0).toFixed(2)}
-                                  </Typography>
-                                </Box>
-                                {presupuesto.estado_pago !== 'pagado' && presupuesto.pagado !== 1 && (
+                                {/* Mostrar cada pago individual si hay registros en finanzas */}
+                                {presupuesto.pagos && presupuesto.pagos.length > 0 ? (
+                                  <>
+                                    {presupuesto.pagos.map((pago, pagoIdx) => (
+                                      <Box key={pago.id || pagoIdx} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: 0.3, borderBottom: pagoIdx < presupuesto.pagos.length - 1 ? "1px dashed #e0e0e0" : "none" }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                          Pagado:
+                                        </Typography>
+                                        <Box sx={{ textAlign: "right" }}>
+                                          <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
+                                            S/ {Number(pago.monto || 0).toFixed(2)}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem" }}>
+                                            Método: {pago.metodo_pago} | {pago.fecha || pago.creado_en?.split(' ')[0]}
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+                                    ))}
+                                  </>
+                                ) : (
                                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                    <Typography variant="caption" color="text.secondary">Pagado:</Typography>
+                                    <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
+                                      S/ {(presupuesto.monto_pagado || 0).toFixed(2)}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                {presupuesto.estado_pago !== 'pagado' && presupuesto.pagado !== 1 && (
+                                  <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5, pt: 0.5, borderTop: "1px solid #e0e0e0" }}>
                                     <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
                                     <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
                                       S/ {(presupuesto.saldo_pendiente || ((presupuesto.precio_total || 0) - (presupuesto.descuento || 0) - (presupuesto.monto_pagado || 0))).toFixed(2)}
                                     </Typography>
                                   </Box>
-                                )}
-                                {presupuesto.metodo_pago && (
-                                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-                                    Método: {presupuesto.metodo_pago} | {presupuesto.fecha_pago?.split(' ')[0]}
-                                  </Typography>
                                 )}
                               </Box>
                             )}
@@ -5645,27 +5661,43 @@ const HistorialClinico = () => {
                               </Box>
                             )}
 
-                            {/* Detalles de pago */}
+                            {/* Detalles de pago - Historial individual de pagos */}
                             {(paquete.monto_pagado > 0 || paquete.estado_pago === 'adelanto') && (
                               <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(0,0,0,0.02)", borderRadius: 1 }}>
-                                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                                  <Typography variant="caption" color="text.secondary">Pagado:</Typography>
-                                  <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
-                                    S/ {(paquete.monto_pagado || 0).toFixed(2)}
-                                  </Typography>
-                                </Box>
-                                {paquete.estado_pago !== 'pagado' && paquete.pagado !== 1 && (
+                                {/* Mostrar cada pago individual si hay registros en finanzas */}
+                                {paquete.pagos && paquete.pagos.length > 0 ? (
+                                  <>
+                                    {paquete.pagos.map((pago, pagoIdx) => (
+                                      <Box key={pago.id || pagoIdx} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: 0.3, borderBottom: pagoIdx < paquete.pagos.length - 1 ? "1px dashed #e0e0e0" : "none" }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                          Pagado:
+                                        </Typography>
+                                        <Box sx={{ textAlign: "right" }}>
+                                          <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
+                                            S/ {Number(pago.monto || 0).toFixed(2)}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.65rem" }}>
+                                            Método: {pago.metodo_pago} | {pago.fecha || pago.creado_en?.split(' ')[0]}
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+                                    ))}
+                                  </>
+                                ) : (
                                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                                    <Typography variant="caption" color="text.secondary">Pagado:</Typography>
+                                    <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
+                                      S/ {(paquete.monto_pagado || 0).toFixed(2)}
+                                    </Typography>
+                                  </Box>
+                                )}
+                                {paquete.estado_pago !== 'pagado' && paquete.pagado !== 1 && (
+                                  <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5, pt: 0.5, borderTop: "1px solid #e0e0e0" }}>
                                     <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
                                     <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
                                       S/ {(paquete.saldo_pendiente || (paquete.precio_total - (paquete.monto_pagado || 0))).toFixed(2)}
                                     </Typography>
                                   </Box>
-                                )}
-                                {paquete.metodo_pago && (
-                                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-                                    Método: {paquete.metodo_pago} | {paquete.fecha_pago?.split(' ')[0]}
-                                  </Typography>
                                 )}
                               </Box>
                             )}

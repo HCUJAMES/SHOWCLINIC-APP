@@ -520,12 +520,22 @@ router.get("/paciente/:paciente_id", requirePaquetesRead, async (req, res) => {
       [paciente_id]
     );
 
-    // Obtener sesiones de cada paquete y verificar coherencia del estado de pago
+    // Obtener sesiones y pagos individuales de cada paquete y verificar coherencia del estado de pago
     for (const paquete of paquetes) {
       paquete.sesiones = await dbAll(
         `SELECT * FROM paquetes_sesiones WHERE paquete_paciente_id = ? ORDER BY tratamiento_nombre, sesion_numero`,
         [paquete.id]
       );
+
+      // Obtener historial de pagos individuales desde finanzas
+      const pagosIndividuales = await dbAll(
+        `SELECT id, monto, metodo_pago, fecha, descripcion, creado_en 
+         FROM finanzas 
+         WHERE referencia_id = ? AND referencia_tipo = 'paquete_paciente' AND tipo = 'ingreso'
+         ORDER BY creado_en ASC`,
+        [paquete.id]
+      );
+      paquete.pagos = pagosIndividuales || [];
 
       // Siempre recalcular estado de pago basado en monto_pagado vs precio_total
       const montoPagado = parseFloat(paquete.monto_pagado) || 0;
@@ -1038,7 +1048,7 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
       [paciente_id]
     );
 
-    // Para cada presupuesto, obtener sus sesiones y calcular saldo correctamente
+    // Para cada presupuesto, obtener sus sesiones, pagos individuales y calcular saldo correctamente
     for (const p of presupuestos) {
       const sesiones = await dbAll(
         `SELECT * FROM presupuestos_sesiones WHERE presupuesto_asignado_id = ? ORDER BY id ASC`,
@@ -1047,6 +1057,16 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
       p.sesiones = sesiones;
       p.sesiones_totales = sesiones.length;
       p.sesiones_completadas = sesiones.filter(s => s.estado === 'completada').length;
+      
+      // Obtener historial de pagos individuales desde finanzas
+      const pagosIndividuales = await dbAll(
+        `SELECT id, monto, metodo_pago, fecha, descripcion, creado_en 
+         FROM finanzas 
+         WHERE referencia_id = ? AND referencia_tipo = 'presupuesto_asignado' AND tipo = 'ingreso'
+         ORDER BY creado_en ASC`,
+        [p.id]
+      );
+      p.pagos = pagosIndividuales || [];
       
       // Calcular saldo pendiente considerando el descuento
       const precioTotal = parseFloat(p.precio_total) || 0;
