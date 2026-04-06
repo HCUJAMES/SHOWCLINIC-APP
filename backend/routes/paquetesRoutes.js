@@ -520,38 +520,37 @@ router.get("/paciente/:paciente_id", requirePaquetesRead, async (req, res) => {
       [paciente_id]
     );
 
-    // Obtener sesiones y pagos individuales de cada paquete y verificar coherencia del estado de pago
+    // Obtener sesiones de cada paquete y verificar coherencia del estado de pago
     for (const paquete of paquetes) {
       paquete.sesiones = await dbAll(
         `SELECT * FROM paquetes_sesiones WHERE paquete_paciente_id = ? ORDER BY tratamiento_nombre, sesion_numero`,
         [paquete.id]
       );
 
-      // Obtener historial de pagos individuales desde finanzas
-      const pagosIndividuales = await dbAll(
-        `SELECT id, monto, metodo_pago, fecha, descripcion, creado_en 
-         FROM finanzas 
-         WHERE referencia_id = ? AND referencia_tipo = 'paquete_paciente' AND tipo = 'ingreso'
-         ORDER BY creado_en ASC`,
+      // Recalcular monto_pagado desde finanzas (fuente de verdad)
+      const sumaPagos = await dbGet(
+        `SELECT COALESCE(SUM(monto), 0) as total_pagado FROM finanzas 
+         WHERE referencia_id = ? AND referencia_tipo = 'paquete_paciente' AND tipo = 'ingreso'`,
         [paquete.id]
       );
-      paquete.pagos = pagosIndividuales || [];
+      const montoPagadoReal = parseFloat(sumaPagos?.total_pagado) || 0;
+      const montoPagadoAnterior = parseFloat(paquete.monto_pagado) || 0;
+      const montoPagado = Math.max(montoPagadoReal, montoPagadoAnterior);
 
-      // Siempre recalcular estado de pago basado en monto_pagado vs precio_total
-      const montoPagado = parseFloat(paquete.monto_pagado) || 0;
       const precioTotal = parseFloat(paquete.precio_total) || 0;
       const saldoCorrecto = (montoPagado >= precioTotal - 0.01 && precioTotal > 0) ? 0 : Math.max(0, precioTotal - montoPagado);
       const estadoCorrecto = (montoPagado >= precioTotal - 0.01 && precioTotal > 0) ? 'pagado' : (montoPagado > 0 ? 'adelanto' : 'pendiente_pago');
       const pagadoCorrecto = estadoCorrecto === 'pagado' ? 1 : 0;
 
-      // Actualizar en BD y en el objeto para devolver datos correctos
+      // Sincronizar paquetes_pacientes con los datos reales de finanzas
       await dbRun(
         `UPDATE paquetes_pacientes 
-         SET saldo_pendiente = ?, estado_pago = ?, pagado = ?
+         SET monto_pagado = ?, saldo_pendiente = ?, estado_pago = ?, pagado = ?
          WHERE id = ?`,
-        [saldoCorrecto, estadoCorrecto, pagadoCorrecto, paquete.id]
+        [montoPagado, saldoCorrecto, estadoCorrecto, pagadoCorrecto, paquete.id]
       );
 
+      paquete.monto_pagado = montoPagado;
       paquete.saldo_pendiente = saldoCorrecto;
       paquete.estado_pago = estadoCorrecto;
       paquete.pagado = pagadoCorrecto;
@@ -1048,7 +1047,7 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
       [paciente_id]
     );
 
-    // Para cada presupuesto, obtener sus sesiones, pagos individuales y calcular saldo correctamente
+    // Para cada presupuesto, obtener sus sesiones y calcular saldo correctamente
     for (const p of presupuestos) {
       const sesiones = await dbAll(
         `SELECT * FROM presupuestos_sesiones WHERE presupuesto_asignado_id = ? ORDER BY id ASC`,
@@ -1058,32 +1057,34 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
       p.sesiones_totales = sesiones.length;
       p.sesiones_completadas = sesiones.filter(s => s.estado === 'completada').length;
       
-      // Obtener historial de pagos individuales desde finanzas
-      const pagosIndividuales = await dbAll(
-        `SELECT id, monto, metodo_pago, fecha, descripcion, creado_en 
-         FROM finanzas 
-         WHERE referencia_id = ? AND referencia_tipo = 'presupuesto_asignado' AND tipo = 'ingreso'
-         ORDER BY creado_en ASC`,
+      // Recalcular monto_pagado desde finanzas (fuente de verdad)
+      const sumaPagos = await dbGet(
+        `SELECT COALESCE(SUM(monto), 0) as total_pagado FROM finanzas 
+         WHERE referencia_id = ? AND referencia_tipo = 'presupuesto_asignado' AND tipo = 'ingreso'`,
         [p.id]
       );
-      p.pagos = pagosIndividuales || [];
-      
+      const montoPagadoReal = parseFloat(sumaPagos?.total_pagado) || 0;
+      const montoPagadoAnterior = parseFloat(p.monto_pagado) || 0;
+      // Usar el mayor entre lo registrado en presupuestos_asignados y lo sumado de finanzas
+      const montoPagado = Math.max(montoPagadoReal, montoPagadoAnterior);
+
       // Calcular saldo pendiente considerando el descuento
       const precioTotal = parseFloat(p.precio_total) || 0;
       const descuento = parseFloat(p.descuento) || 0;
-      const montoPagado = parseFloat(p.monto_pagado) || 0;
       const precioConDescuento = precioTotal - descuento;
       p.saldo_pendiente = Math.max(0, precioConDescuento - montoPagado);
+      p.monto_pagado = montoPagado;
 
       // Siempre recalcular estado de pago basado en monto_pagado vs precio real
       const estadoCorrecto = (montoPagado >= precioConDescuento - 0.01 && precioConDescuento > 0) ? 'pagado' : (montoPagado > 0 ? 'adelanto' : 'pendiente_pago');
       const pagadoCorrecto = estadoCorrecto === 'pagado' ? 1 : 0;
 
+      // Sincronizar presupuestos_asignados con los datos reales de finanzas
       await dbRun(
         `UPDATE presupuestos_asignados 
-         SET saldo_pendiente = ?, estado_pago = ?, pagado = ?
+         SET monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, estado_pago = ?, pagado = ?
          WHERE id = ?`,
-        [p.saldo_pendiente, estadoCorrecto, pagadoCorrecto, p.id]
+        [montoPagado, montoPagado, p.saldo_pendiente, estadoCorrecto, pagadoCorrecto, p.id]
       );
 
       p.estado_pago = estadoCorrecto;
