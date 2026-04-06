@@ -520,12 +520,55 @@ router.get("/paciente/:paciente_id", requirePaquetesRead, async (req, res) => {
       [paciente_id]
     );
 
-    // Obtener sesiones de cada paquete
+    // Obtener sesiones de cada paquete y recalcular monto_pagado real desde finanzas
     for (const paquete of paquetes) {
       paquete.sesiones = await dbAll(
         `SELECT * FROM paquetes_sesiones WHERE paquete_paciente_id = ? ORDER BY tratamiento_nombre, sesion_numero`,
         [paquete.id]
       );
+
+      // Calcular monto_pagado real sumando TODOS los pagos de finanzas para este paquete
+      const sumFinanzas = await dbGet(
+        `SELECT COALESCE(SUM(monto), 0) as total_pagado
+         FROM finanzas
+         WHERE referencia_id = ? AND referencia_tipo = 'paquete_paciente' AND tipo = 'ingreso'`,
+        [paquete.id]
+      );
+
+      const totalPagadoReal = parseFloat(sumFinanzas?.total_pagado) || 0;
+      const montoPagadoActual = parseFloat(paquete.monto_pagado) || 0;
+
+      // Si hay discrepancia entre lo guardado y lo real de finanzas, corregir
+      if (Math.abs(totalPagadoReal - montoPagadoActual) > 0.01 && totalPagadoReal > 0) {
+        const precioTotal = parseFloat(paquete.precio_total) || 0;
+        const nuevoSaldo = Math.max(0, precioTotal - totalPagadoReal);
+        let estadoPago = 'pendiente_pago';
+        let pagadoFlag = 0;
+
+        if (totalPagadoReal >= precioTotal - 0.01 && precioTotal > 0) {
+          estadoPago = 'pagado';
+          pagadoFlag = 1;
+        } else if (totalPagadoReal > 0) {
+          estadoPago = 'adelanto';
+          pagadoFlag = 0;
+        }
+
+        // Sincronizar la tabla paquetes_pacientes con el valor real
+        await dbRun(
+          `UPDATE paquetes_pacientes 
+           SET monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, 
+               estado_pago = ?, pagado = ?
+           WHERE id = ?`,
+          [totalPagadoReal, totalPagadoReal, nuevoSaldo, estadoPago, pagadoFlag, paquete.id]
+        );
+
+        // Actualizar el objeto en memoria para devolver datos correctos
+        paquete.monto_pagado = totalPagadoReal;
+        paquete.monto_adelanto = totalPagadoReal;
+        paquete.saldo_pendiente = nuevoSaldo;
+        paquete.estado_pago = estadoPago;
+        paquete.pagado = pagadoFlag;
+      }
     }
 
     res.json(paquetes);
