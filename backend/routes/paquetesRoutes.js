@@ -520,54 +520,42 @@ router.get("/paciente/:paciente_id", requirePaquetesRead, async (req, res) => {
       [paciente_id]
     );
 
-    // Obtener sesiones de cada paquete y recalcular monto_pagado real desde finanzas
+    // Obtener sesiones de cada paquete y verificar coherencia del estado de pago
     for (const paquete of paquetes) {
       paquete.sesiones = await dbAll(
         `SELECT * FROM paquetes_sesiones WHERE paquete_paciente_id = ? ORDER BY tratamiento_nombre, sesion_numero`,
         [paquete.id]
       );
 
-      // Calcular monto_pagado real sumando TODOS los pagos de finanzas para este paquete
-      const sumFinanzas = await dbGet(
-        `SELECT COALESCE(SUM(monto), 0) as total_pagado
-         FROM finanzas
-         WHERE referencia_id = ? AND referencia_tipo = 'paquete_paciente' AND tipo = 'ingreso'`,
-        [paquete.id]
-      );
+      // Verificar coherencia: si monto_pagado < precio_total, no puede estar como 'pagado'
+      const montoPagado = parseFloat(paquete.monto_pagado) || 0;
+      const precioTotal = parseFloat(paquete.precio_total) || 0;
 
-      const totalPagadoReal = parseFloat(sumFinanzas?.total_pagado) || 0;
-      const montoPagadoActual = parseFloat(paquete.monto_pagado) || 0;
+      let estadoCorrecto = 'pendiente_pago';
+      let pagadoCorrecto = 0;
+      let saldoCorrecto = Math.max(0, precioTotal - montoPagado);
 
-      // Si hay discrepancia entre lo guardado y lo real de finanzas, corregir
-      if (Math.abs(totalPagadoReal - montoPagadoActual) > 0.01 && totalPagadoReal > 0) {
-        const precioTotal = parseFloat(paquete.precio_total) || 0;
-        const nuevoSaldo = Math.max(0, precioTotal - totalPagadoReal);
-        let estadoPago = 'pendiente_pago';
-        let pagadoFlag = 0;
+      if (montoPagado >= precioTotal - 0.01 && precioTotal > 0) {
+        estadoCorrecto = 'pagado';
+        pagadoCorrecto = 1;
+        saldoCorrecto = 0;
+      } else if (montoPagado > 0) {
+        estadoCorrecto = 'adelanto';
+        pagadoCorrecto = 0;
+      }
 
-        if (totalPagadoReal >= precioTotal - 0.01 && precioTotal > 0) {
-          estadoPago = 'pagado';
-          pagadoFlag = 1;
-        } else if (totalPagadoReal > 0) {
-          estadoPago = 'adelanto';
-          pagadoFlag = 0;
-        }
-
-        // Sincronizar la tabla paquetes_pacientes con el valor real
+      // Si el estado guardado no es coherente con el monto, corregir
+      if (paquete.estado_pago !== estadoCorrecto || paquete.pagado !== pagadoCorrecto) {
         await dbRun(
           `UPDATE paquetes_pacientes 
-           SET monto_pagado = ?, monto_adelanto = ?, saldo_pendiente = ?, 
-               estado_pago = ?, pagado = ?
+           SET saldo_pendiente = ?, estado_pago = ?, pagado = ?
            WHERE id = ?`,
-          [totalPagadoReal, totalPagadoReal, nuevoSaldo, estadoPago, pagadoFlag, paquete.id]
+          [saldoCorrecto, estadoCorrecto, pagadoCorrecto, paquete.id]
         );
 
-        // Actualizar el objeto en memoria para devolver datos correctos
-        paquete.monto_pagado = totalPagadoReal;
-        paquete.monto_adelanto = totalPagadoReal;
-        paquete.saldo_pendiente = nuevoSaldo;
-        paquete.estado_pago = estadoPago;
-        paquete.pagado = pagadoFlag;
+        paquete.saldo_pendiente = saldoCorrecto;
+        paquete.estado_pago = estadoCorrecto;
+        paquete.pagado = pagadoCorrecto;
       }
     }
 
@@ -776,7 +764,7 @@ router.post("/paquete-paciente/:paquete_paciente_id/pago", requirePaquetesAsigna
       nuevoAdelanto = adelantoAnterior + montoRecibido;
       estadoPago = 'adelanto';
       pagadoFlag = 0;
-    } else if (tipo_pago === 'saldo' || nuevoMontoPagado >= precioTotal) {
+    } else if (nuevoMontoPagado >= precioTotal - 0.01 && precioTotal > 0) {
       estadoPago = 'pagado';
       pagadoFlag = 1;
       nuevoSaldo = 0;
