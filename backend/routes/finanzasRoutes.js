@@ -392,39 +392,8 @@ router.get("/reporte", (req, res) => {
       console.log("📋 Registros de finanzas encontrados:", rowsFinanzas?.length || 0);
       console.log("📋 Tratamientos encontrados:", resultados?.length || 0);
       
-      // AGRUPAR pagos por referencia_id para evitar duplicación
-      const pagosAgrupados = new Map();
-      
-      (rowsFinanzas || []).forEach((r) => {
-        const key = `${r.referencia_tipo}_${r.referencia_id}`;
-        
-        // Si es presupuesto o paquete, agrupar por referencia
-        if ((r.referencia_tipo === 'presupuesto_asignado' || r.referencia_tipo === 'paquete_paciente') && r.referencia_id) {
-          if (!pagosAgrupados.has(key)) {
-            pagosAgrupados.set(key, r);
-          } else {
-            // Ya existe, actualizar con el registro más reciente
-            const existente = pagosAgrupados.get(key);
-            if (new Date(r.creado_en || r.fecha) > new Date(existente.creado_en || existente.fecha)) {
-              pagosAgrupados.set(key, r);
-            }
-          }
-        } else {
-          // Para consultas y otros, mantener cada registro individual
-          pagosAgrupados.set(`${key}_${r.id}`, r);
-        }
-      });
-      
-      const pagosFinanzas = Array.from(pagosAgrupados.values()).map((r) => {
-        // Para presupuestos y paquetes, usar el monto_pagado real, no el monto del registro individual
-        let montoReal = parseFloat(r.precio_total) || 0;
-        
-        if (r.referencia_tipo === 'presupuesto_asignado' && r.presupuesto_monto_pagado !== null) {
-          montoReal = parseFloat(r.presupuesto_monto_pagado) || 0;
-        } else if (r.referencia_tipo === 'paquete_paciente' && r.paquete_monto_pagado !== null) {
-          montoReal = parseFloat(r.paquete_monto_pagado) || 0;
-        }
-        
+      const pagosFinanzas = (rowsFinanzas || []).map((r) => {
+        const monto = parseFloat(r.precio_total) || 0;
         const metodo = r.pagoMetodo || "efectivo";
         
         // Capitalizar método de pago
@@ -453,9 +422,9 @@ router.get("/reporte", (req, res) => {
         return {
           ...r,
           tratamiento: r.tratamiento || 'Pago',
-          monto_bruto: montoReal,
-          comision_pos: calcularComisionPOS(montoReal, metodoCapitalizado),
-          monto_cobrado: aplicarComisionPOS(montoReal, metodoCapitalizado),
+          monto_bruto: monto,
+          comision_pos: calcularComisionPOS(monto, metodoCapitalizado),
+          monto_cobrado: aplicarComisionPOS(monto, metodoCapitalizado),
           deuda_pendiente: deudaPendiente,
           pagoMetodo: metodoCapitalizado,
           pagoMetodo_mostrado: metodoCapitalizado,
@@ -479,11 +448,11 @@ router.get("/reporte", (req, res) => {
       const totalBrutoFinal = todosResultados.reduce((acc, r) => acc + (r.monto_bruto || 0), 0);
       const totalComisionFinal = todosResultados.reduce((acc, r) => acc + (r.comision_pos || 0), 0);
 
-      // Agregar pagos de finanzas a totales por método (usar monto_bruto que ya está agrupado)
+      // Agregar pagos de finanzas a totales por método
       pagosFinanzas.forEach((r) => {
         let metodo = r.pagoMetodo || "efectivo";
         metodo = metodo.charAt(0).toUpperCase() + metodo.slice(1).toLowerCase();
-        const monto = parseFloat(r.monto_bruto) || 0;
+        const monto = parseFloat(r.precio_total) || 0;
         if (!totalesPorMetodo[metodo]) totalesPorMetodo[metodo] = 0;
         totalesPorMetodo[metodo] += aplicarComisionPOS(monto, metodo);
       });
