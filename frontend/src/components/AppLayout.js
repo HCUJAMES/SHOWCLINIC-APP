@@ -34,6 +34,7 @@ const AppLayout = () => {
   }, [navigate, showToast]);
 
   const role = localStorage.getItem("role") || "";
+  const username = localStorage.getItem("username") || role;
 
   const items = useMemo(() => {
     const base = [
@@ -73,7 +74,7 @@ const AppLayout = () => {
           <Box>
             <Typography sx={{ fontWeight: 800, color: "#a36920" }}>ShowClinic</Typography>
             <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.62)" }}>
-              Rol: {role || "-"}
+              {username || role || "-"}
             </Typography>
           </Box>
         </Box>
