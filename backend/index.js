@@ -718,41 +718,6 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
-    // 🔧 Migración: corregir precio_sesion duplicado en sesiones existentes
-    // Antes se guardaba el precio total del tratamiento en CADA sesión, ahora se divide
-    db.all(
-      `SELECT ps.id, ps.presupuesto_asignado_id, ps.tratamiento_nombre, ps.precio_sesion,
-        (SELECT COUNT(*) FROM presupuestos_sesiones ps2 
-         WHERE ps2.presupuesto_asignado_id = ps.presupuesto_asignado_id 
-         AND ps2.tratamiento_nombre = ps.tratamiento_nombre) as num_sesiones
-       FROM presupuestos_sesiones ps
-       WHERE (SELECT COUNT(*) FROM presupuestos_sesiones ps2 
-              WHERE ps2.presupuesto_asignado_id = ps.presupuesto_asignado_id 
-              AND ps2.tratamiento_nombre = ps.tratamiento_nombre) > 1`,
-      [],
-      (err, rows) => {
-        if (!err && rows && rows.length > 0) {
-          // Verificar si los precios parecen duplicados (todas las sesiones del mismo tratamiento tienen el mismo precio)
-          const grupos = {};
-          rows.forEach(r => {
-            const key = `${r.presupuesto_asignado_id}-${r.tratamiento_nombre}`;
-            if (!grupos[key]) grupos[key] = [];
-            grupos[key].push(r);
-          });
-          Object.values(grupos).forEach(sesiones => {
-            const precios = sesiones.map(s => s.precio_sesion);
-            const todosIguales = precios.every(p => p === precios[0]);
-            if (todosIguales && precios[0] > 0) {
-              const precioCorrecto = precios[0] / sesiones.length;
-              sesiones.forEach(s => {
-                db.run(`UPDATE presupuestos_sesiones SET precio_sesion = ? WHERE id = ?`, [precioCorrecto, s.id]);
-              });
-              console.log(`🔧 Corregido precio sesiones de "${sesiones[0].tratamiento_nombre}": ${precios[0]} → ${precioCorrecto} x${sesiones.length}`);
-            }
-          });
-        }
-      }
-    );
 
     // 🧱 Tabla de especialistas
     db.run(`

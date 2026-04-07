@@ -91,35 +91,26 @@ router.post("/users", requireRole("master"), async (req, res) => {
     
     const hash = bcrypt.hashSync(password, 10);
     
-    await dbRun("BEGIN TRANSACTION");
+    const result = await dbRun(
+      "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+      [username, hash, role]
+    );
     
-    try {
-      const result = await dbRun(
-        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-        [username, hash, role]
-      );
-      
-      const userId = result.lastID;
-      
-      if (permissions && Array.isArray(permissions)) {
-        for (const perm of permissions) {
-          await dbRun(
-            "INSERT INTO user_permissions (user_id, module_name, can_access, can_edit) VALUES (?, ?, ?, ?)",
-            [userId, perm.module_name, perm.can_access ? 1 : 0, perm.can_edit ? 1 : 0]
-          );
-        }
+    const userId = result.lastID;
+    
+    if (permissions && Array.isArray(permissions)) {
+      for (const perm of permissions) {
+        await dbRun(
+          "INSERT INTO user_permissions (user_id, module_name, can_access, can_edit) VALUES (?, ?, ?, ?)",
+          [userId, perm.module_name, perm.can_access ? 1 : 0, perm.can_edit ? 1 : 0]
+        );
       }
-      
-      await dbRun("COMMIT");
-      
-      res.status(201).json({ 
-        message: "Usuario creado exitosamente",
-        userId 
-      });
-    } catch (err) {
-      await dbRun("ROLLBACK");
-      throw err;
     }
+    
+    res.status(201).json({ 
+      message: "Usuario creado exitosamente",
+      userId 
+    });
   } catch (err) {
     console.error("Error al crear usuario:", err);
     res.status(500).json({ message: "Error al crear usuario" });
@@ -153,25 +144,16 @@ router.put("/users/:id/permissions", requireRole("master"), async (req, res) => 
   }
   
   try {
-    await dbRun("BEGIN TRANSACTION");
+    await dbRun("DELETE FROM user_permissions WHERE user_id = ?", [id]);
     
-    try {
-      await dbRun("DELETE FROM user_permissions WHERE user_id = ?", [id]);
-      
-      for (const perm of permissions) {
-        await dbRun(
-          "INSERT INTO user_permissions (user_id, module_name, can_access, can_edit) VALUES (?, ?, ?, ?)",
-          [id, perm.module_name, perm.can_access ? 1 : 0, perm.can_edit ? 1 : 0]
-        );
-      }
-      
-      await dbRun("COMMIT");
-      
-      res.json({ message: "Permisos actualizados exitosamente" });
-    } catch (err) {
-      await dbRun("ROLLBACK");
-      throw err;
+    for (const perm of permissions) {
+      await dbRun(
+        "INSERT INTO user_permissions (user_id, module_name, can_access, can_edit) VALUES (?, ?, ?, ?)",
+        [id, perm.module_name, perm.can_access ? 1 : 0, perm.can_edit ? 1 : 0]
+      );
     }
+    
+    res.json({ message: "Permisos actualizados exitosamente" });
   } catch (err) {
     console.error("Error al actualizar permisos:", err);
     res.status(500).json({ message: "Error al actualizar permisos" });
@@ -198,19 +180,10 @@ router.delete("/users/:id", requireRole("master"), async (req, res) => {
       return res.status(403).json({ message: "No se puede eliminar un usuario master" });
     }
     
-    await dbRun("BEGIN TRANSACTION");
+    await dbRun("DELETE FROM user_permissions WHERE user_id = ?", [id]);
+    await dbRun("DELETE FROM users WHERE id = ?", [id]);
     
-    try {
-      await dbRun("DELETE FROM user_permissions WHERE user_id = ?", [id]);
-      await dbRun("DELETE FROM users WHERE id = ?", [id]);
-      
-      await dbRun("COMMIT");
-      
-      res.json({ message: `Usuario "${user.username}" eliminado exitosamente` });
-    } catch (err) {
-      await dbRun("ROLLBACK");
-      throw err;
-    }
+    res.json({ message: `Usuario "${user.username}" eliminado exitosamente` });
   } catch (err) {
     console.error("Error al eliminar usuario:", err);
     res.status(500).json({ message: "Error al eliminar usuario" });
