@@ -28,7 +28,10 @@ export default function Login() {
       });
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("role", res.data.role);
-      showToast({ severity: "success", message: "Bienvenido" });
+      localStorage.setItem("username", username.trim());
+      const hora = new Date().getHours();
+      const saludo = hora < 12 ? "Buenos días" : hora < 18 ? "Buenas tardes" : "Buenas noches";
+      showToast({ severity: "success", message: `${saludo}, ${username.trim()}` });
       navigate("/dashboard");
     } catch (e) {
       const status = e.response?.status;
