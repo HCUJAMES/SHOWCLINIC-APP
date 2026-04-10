@@ -995,4 +995,81 @@ router.delete("/corporal/:corporalId", requirePatientWrite, (req, res) => {
   });
 });
 
+// ==============================
+// 🎭 MAPA FACIAL 3D
+// ==============================
+
+// Obtener todos los registros de mapa facial de un paciente
+router.get("/:id/mapa-facial", (req, res) => {
+  const { id } = req.params;
+  db.all(
+    `SELECT * FROM mapa_facial_3d WHERE paciente_id = ? ORDER BY creado_en DESC`,
+    [id],
+    (err, rows) => {
+      if (err) {
+        console.error("❌ Error al obtener mapa facial:", err.message);
+        return res.status(500).json({ message: "Error al obtener mapa facial" });
+      }
+      const parsed = (rows || []).map(r => ({
+        ...r,
+        zonas_json: JSON.parse(r.zonas_json || "{}"),
+        notas_json: JSON.parse(r.notas_json || "{}"),
+      }));
+      res.json(parsed);
+    }
+  );
+});
+
+// Crear nuevo registro de mapa facial
+router.post("/:id/mapa-facial", requirePatientWrite, (req, res) => {
+  const { id } = req.params;
+  const { zonas_json, notas_json, nombre } = req.body;
+  const ahora = new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+  const username = req.user?.username || "sistema";
+
+  db.run(
+    `INSERT INTO mapa_facial_3d (paciente_id, zonas_json, notas_json, nombre, creado_en, actualizado_en, creado_por)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, JSON.stringify(zonas_json || {}), JSON.stringify(notas_json || {}), nombre || "Sesión", ahora, ahora, username],
+    function (err) {
+      if (err) {
+        console.error("❌ Error al crear mapa facial:", err.message);
+        return res.status(500).json({ message: "Error al crear mapa facial" });
+      }
+      res.json({ id: this.lastID, message: "Mapa facial creado" });
+    }
+  );
+});
+
+// Actualizar registro de mapa facial
+router.put("/mapa-facial/:mapaId", requirePatientWrite, (req, res) => {
+  const { mapaId } = req.params;
+  const { zonas_json, notas_json, nombre } = req.body;
+  const ahora = new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
+
+  db.run(
+    `UPDATE mapa_facial_3d SET zonas_json = ?, notas_json = ?, nombre = ?, actualizado_en = ? WHERE id = ?`,
+    [JSON.stringify(zonas_json || {}), JSON.stringify(notas_json || {}), nombre || "Sesión", ahora, mapaId],
+    function (err) {
+      if (err) {
+        console.error("❌ Error al actualizar mapa facial:", err.message);
+        return res.status(500).json({ message: "Error al actualizar mapa facial" });
+      }
+      res.json({ message: "Mapa facial actualizado" });
+    }
+  );
+});
+
+// Eliminar registro de mapa facial
+router.delete("/mapa-facial/:mapaId", requirePatientWrite, (req, res) => {
+  const { mapaId } = req.params;
+  db.run(`DELETE FROM mapa_facial_3d WHERE id = ?`, [mapaId], function (err) {
+    if (err) {
+      console.error("❌ Error al eliminar mapa facial:", err.message);
+      return res.status(500).json({ message: "Error al eliminar mapa facial" });
+    }
+    res.json({ message: "Mapa facial eliminado" });
+  });
+});
+
 export default router;

@@ -44,6 +44,7 @@ import autoTable from "jspdf-autotable";
 import { useToast } from "../components/ToastProvider";
 import ReciboTicket from "../components/ReciboTicket";
 import ReciboConsolidado from "../components/ReciboConsolidado";
+import FacialMap3D from "../components/FacialMap3D";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -211,6 +212,11 @@ const HistorialClinico = () => {
   const [corporalActividad, setCorporalActividad] = useState("");
   const [corporalObservaciones, setCorporalObservaciones] = useState("");
   const [guardandoCorporal, setGuardandoCorporal] = useState(false);
+
+  // Estados para mapa facial 3D
+  const [modalFacial, setModalFacial] = useState(false);
+  const [facialRegistros, setFacialRegistros] = useState([]);
+  const [guardandoFacial, setGuardandoFacial] = useState(false);
 
   // Estados para carrito de tratamientos
   const [carritoPaciente, setCarritoPaciente] = useState([]); // lista de carritos
@@ -731,6 +737,62 @@ const HistorialClinico = () => {
       await cargarCorporal();
     } catch (err) {
       console.error("Error al eliminar corporal:", err);
+      showToast({ severity: "error", message: "Error al eliminar" });
+    }
+  };
+
+  // === MAPA FACIAL 3D ===
+  const cargarFacial = async () => {
+    if (!pacienteSeleccionado?.id) return;
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/mapa-facial`, { headers: authHeaders });
+      setFacialRegistros(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Error al cargar mapa facial:", err);
+    }
+  };
+
+  const abrirModalFacial = () => {
+    cargarFacial();
+    setModalFacial(true);
+  };
+
+  const guardarFacial = async (payload) => {
+    if (!pacienteSeleccionado?.id) return;
+    setGuardandoFacial(true);
+    try {
+      await axios.post(`${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/mapa-facial`, payload, { headers: authHeaders });
+      showToast({ severity: "success", message: "Mapa facial guardado" });
+      await cargarFacial();
+    } catch (err) {
+      console.error("Error al guardar mapa facial:", err);
+      showToast({ severity: "error", message: "Error al guardar mapa facial" });
+    } finally {
+      setGuardandoFacial(false);
+    }
+  };
+
+  const actualizarFacial = async (mapaId, payload) => {
+    setGuardandoFacial(true);
+    try {
+      await axios.put(`${API_BASE_URL}/api/pacientes/mapa-facial/${mapaId}`, payload, { headers: authHeaders });
+      showToast({ severity: "success", message: "Mapa facial actualizado" });
+      await cargarFacial();
+    } catch (err) {
+      console.error("Error al actualizar mapa facial:", err);
+      showToast({ severity: "error", message: "Error al actualizar mapa facial" });
+    } finally {
+      setGuardandoFacial(false);
+    }
+  };
+
+  const eliminarFacial = async (mapaId) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/api/pacientes/mapa-facial/${mapaId}`, { headers: authHeaders });
+      showToast({ severity: "success", message: "Registro facial eliminado" });
+      await cargarFacial();
+    } catch (err) {
+      console.error("Error al eliminar mapa facial:", err);
       showToast({ severity: "error", message: "Error al eliminar" });
     }
   };
@@ -3433,8 +3495,8 @@ const HistorialClinico = () => {
                 <Button
                   variant="outlined"
                   sx={{
-                    borderColor: "#e91e63",
-                    color: "#e91e63",
+                    borderColor: "#757575",
+                    color: "#757575",
                     fontWeight: 700,
                     borderRadius: 3,
                     px: 2.5,
@@ -3444,8 +3506,8 @@ const HistorialClinico = () => {
                     borderWidth: 2,
                     transition: "all 0.2s ease",
                     "&:hover": { 
-                      backgroundColor: "rgba(233,30,99,0.08)",
-                      borderColor: "#c2185b",
+                      backgroundColor: "rgba(117,117,117,0.08)",
+                      borderColor: "#616161",
                       borderWidth: 2,
                       transform: "translateY(-1px)",
                     },
@@ -3457,7 +3519,36 @@ const HistorialClinico = () => {
                   onClick={abrirModalCorporal}
                   disabled={!pacienteSeleccionado}
                 >
-                  🏋️ Corporal
+                  📏 Corporal
+                </Button>
+                <Button
+                  variant="outlined"
+                  sx={{
+                    borderColor: "#757575",
+                    color: "#757575",
+                    fontWeight: 700,
+                    borderRadius: 3,
+                    px: 2.5,
+                    py: 1,
+                    textTransform: "none",
+                    fontSize: "0.9rem",
+                    borderWidth: 2,
+                    transition: "all 0.2s ease",
+                    "&:hover": { 
+                      backgroundColor: "rgba(117,117,117,0.08)",
+                      borderColor: "#616161",
+                      borderWidth: 2,
+                      transform: "translateY(-1px)",
+                    },
+                    "&.Mui-disabled": {
+                      borderColor: "#e0e0e0",
+                      color: "#999",
+                    },
+                  }}
+                  onClick={abrirModalFacial}
+                  disabled={!pacienteSeleccionado}
+                >
+                  📊 Mapa Facial 3D
                 </Button>
               </Box>
 
@@ -7975,6 +8066,72 @@ const HistorialClinico = () => {
             </Button>
           </Box>
         )}
+      </Dialog>
+
+      {/* Modal Mapa Facial 3D */}
+      <Dialog
+        open={modalFacial}
+        onClose={() => setModalFacial(false)}
+        maxWidth={false}
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            maxWidth: "95vw",
+            width: "95vw",
+            height: "90vh",
+            maxHeight: "90vh",
+            m: 1,
+            backgroundColor: "#0F0F14",
+          },
+        }}
+      >
+        <DialogTitle sx={{
+          backgroundColor: "#a36920",
+          color: "white",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          py: 1.2,
+          px: 2.5,
+          borderBottom: "1px solid rgba(255,255,255,0.1)",
+          background: "linear-gradient(135deg, #a36920 0%, #ba9a63 100%)",
+          position: "relative",
+        }}>
+          <Box
+            component="img"
+            src="/images/ISOLOGO SHOWCLINIC-05.png"
+            alt="ShowClinic"
+            sx={{
+              width: 70,
+              height: 70,
+              objectFit: "contain",
+            }}
+          />
+          <IconButton 
+            onClick={() => setModalFacial(false)} 
+            sx={{ 
+              position: "absolute",
+              right: 16,
+              color: "white", 
+              "&:hover": { backgroundColor: "rgba(255,255,255,0.1)" } 
+            }}
+          >
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, overflow: "hidden", height: "100%" }}>
+          <FacialMap3D
+            paciente={pacienteSeleccionado}
+            registros={facialRegistros}
+            onGuardar={guardarFacial}
+            onActualizar={actualizarFacial}
+            onEliminar={eliminarFacial}
+            onCargar={cargarFacial}
+            guardando={guardandoFacial}
+          />
+        </DialogContent>
       </Dialog>
     </div>
   );

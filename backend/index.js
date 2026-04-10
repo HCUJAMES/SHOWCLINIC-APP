@@ -1058,6 +1058,23 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE INDEX IF NOT EXISTS idx_carrito_items_carrito ON carrito_items(carrito_id)");
     console.log("✅ Tablas de carritos creadas");
 
+    // 🎭 Tabla de mapa facial 3D (marcaciones faciales por paciente)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS mapa_facial_3d (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER NOT NULL,
+        zonas_json TEXT NOT NULL DEFAULT '{}',
+        notas_json TEXT NOT NULL DEFAULT '{}',
+        nombre TEXT DEFAULT 'Sesión',
+        creado_en TEXT,
+        actualizado_en TEXT,
+        creado_por TEXT DEFAULT 'sistema',
+        FOREIGN KEY(paciente_id) REFERENCES patients(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_mapa_facial_paciente ON mapa_facial_3d(paciente_id)");
+    console.log("✅ Tabla mapa_facial_3d creada");
+
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
 
