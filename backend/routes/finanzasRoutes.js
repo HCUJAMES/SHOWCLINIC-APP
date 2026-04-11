@@ -1189,4 +1189,143 @@ router.put("/editar-fecha-pago", authMiddleware, requireRole("master"), (req, re
   }
 });
 
+// 💸 OBTENER EGRESOS FILTRADOS
+router.get("/egresos", (req, res) => {
+  const { fechaInicio, fechaFin, categoria, metodoPago } = req.query;
+
+  let query = `
+    SELECT 
+      id,
+      fecha,
+      monto,
+      descripcion,
+      categoria,
+      metodo_pago,
+      creado_en
+    FROM finanzas
+    WHERE tipo = 'egreso'
+  `;
+  const params = [];
+
+  if (fechaInicio && fechaFin) {
+    query += " AND DATE(fecha) BETWEEN ? AND ?";
+    params.push(fechaInicio, fechaFin);
+  } else if (fechaInicio) {
+    query += " AND DATE(fecha) = ?";
+    params.push(fechaInicio);
+  }
+
+  if (categoria) {
+    query += " AND categoria = ?";
+    params.push(categoria);
+  }
+
+  if (metodoPago) {
+    query += " AND metodo_pago = ?";
+    params.push(metodoPago);
+  }
+
+  query += " ORDER BY fecha DESC, creado_en DESC";
+
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error("❌ Error al obtener egresos:", err.message);
+      return res.status(500).json({ message: "Error al obtener egresos" });
+    }
+
+    const egresos = (rows || []).map(r => ({
+      ...r,
+      monto: parseFloat(r.monto) || 0
+    }));
+
+    const totalEgresos = egresos.reduce((acc, e) => acc + e.monto, 0);
+
+    res.json({
+      egresos,
+      totalEgresos
+    });
+  });
+});
+
+// 💸 CREAR NUEVO EGRESO
+router.post("/egresos", (req, res) => {
+  const { fecha, monto, descripcion, categoria, metodo_pago } = req.body;
+
+  if (!fecha || !monto || !descripcion || !categoria || !metodo_pago) {
+    return res.status(400).json({ message: "Todos los campos son obligatorios" });
+  }
+
+  const montoNum = parseFloat(monto);
+  if (isNaN(montoNum) || montoNum <= 0) {
+    return res.status(400).json({ message: "Monto inválido" });
+  }
+
+  const creado_por = req.user?.username || "sistema";
+
+  db.run(
+    `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, creado_por)
+     VALUES ('egreso', ?, ?, ?, ?, ?, ?)`,
+    [categoria, montoNum, descripcion.trim(), fecha, metodo_pago, creado_por],
+    function (err) {
+      if (err) {
+        console.error("❌ Error creando egreso:", err.message);
+        return res.status(500).json({ message: "Error al crear egreso" });
+      }
+      res.json({ message: "✅ Egreso registrado correctamente", id: this.lastID });
+    }
+  );
+});
+
+// 💸 ACTUALIZAR EGRESO
+router.put("/egresos/:id", (req, res) => {
+  const { id } = req.params;
+  const { fecha, monto, descripcion, categoria, metodo_pago } = req.body;
+
+  if (!fecha || !monto || !descripcion || !categoria || !metodo_pago) {
+    return res.status(400).json({ message: "Todos los campos son obligatorios" });
+  }
+
+  const montoNum = parseFloat(monto);
+  if (isNaN(montoNum) || montoNum <= 0) {
+    return res.status(400).json({ message: "Monto inválido" });
+  }
+
+  db.run(
+    `UPDATE finanzas 
+     SET fecha = ?, monto = ?, descripcion = ?, categoria = ?, metodo_pago = ?
+     WHERE id = ? AND tipo = 'egreso'`,
+    [fecha, montoNum, descripcion.trim(), categoria, metodo_pago, id],
+    function (err) {
+      if (err) {
+        console.error("❌ Error actualizando egreso:", err.message);
+        return res.status(500).json({ message: "Error al actualizar egreso" });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ message: "Egreso no encontrado" });
+      }
+      res.json({ message: "✅ Egreso actualizado correctamente" });
+    }
+  );
+});
+
+// 💸 ELIMINAR EGRESO
+router.delete("/egresos/:id", (req, res) => {
+  const { id } = req.params;
+
+  db.run(
+    `DELETE FROM finanzas WHERE id = ? AND tipo = 'egreso'`,
+    [id],
+    function (err) {
+      if (err) {
+        console.error("❌ Error eliminando egreso:", err.message);
+        return res.status(500).json({ message: "Error al eliminar egreso" });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ message: "Egreso no encontrado" });
+      }
+      res.json({ message: "✅ Egreso eliminado correctamente" });
+    }
+  );
+});
+
 export default router;

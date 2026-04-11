@@ -125,6 +125,18 @@ const Finanzas = () => {
   const [filtroAnio, setFiltroAnio] = useState("");
   const [filtroRapido, setFiltroRapido] = useState("");
   const [fetchTrigger, setFetchTrigger] = useState(0);
+  const [egresosDialogOpen, setEgresosDialogOpen] = useState(false);
+  const [egresoFecha, setEgresoFecha] = useState("");
+  const [egresoMonto, setEgresoMonto] = useState("");
+  const [egresoDescripcion, setEgresoDescripcion] = useState("");
+  const [egresoCategoria, setEgresoCategoria] = useState("Servicios");
+  const [egresoMetodoPago, setEgresoMetodoPago] = useState("Efectivo");
+  const [guardandoEgreso, setGuardandoEgreso] = useState(false);
+  const [egresos, setEgresos] = useState([]);
+  const [totalEgresos, setTotalEgresos] = useState(0);
+  const [editandoEgreso, setEditandoEgreso] = useState(null);
+  const [egresosFechaInicio, setEgresosFechaInicio] = useState("");
+  const [egresosFechaFin, setEgresosFechaFin] = useState("");
 
   const { showToast } = useToast();
 
@@ -277,6 +289,111 @@ const Finanzas = () => {
     }
   };
 
+  // ===== FUNCIONES DE EGRESOS =====
+  const abrirDialogoEgreso = () => {
+    setEditandoEgreso(null);
+    setEgresoFecha(hoyISO());
+    setEgresoMonto("");
+    setEgresoDescripcion("");
+    setEgresoCategoria("Servicios");
+    setEgresoMetodoPago("Efectivo");
+    setEgresosDialogOpen(true);
+  };
+
+  const abrirEditarEgreso = (egreso) => {
+    setEditandoEgreso(egreso);
+    setEgresoFecha(egreso.fecha ? egreso.fecha.split(" ")[0] : hoyISO());
+    setEgresoMonto(String(egreso.monto || ""));
+    setEgresoDescripcion(egreso.descripcion || "");
+    setEgresoCategoria(egreso.categoria || "Servicios");
+    setEgresoMetodoPago(egreso.metodo_pago || "Efectivo");
+    setEgresosDialogOpen(true);
+  };
+
+  const guardarEgreso = async () => {
+    const monto = parseFloat(egresoMonto);
+    if (isNaN(monto) || monto <= 0) {
+      showToast({ severity: "warning", message: "Ingresa un monto válido" });
+      return;
+    }
+    if (!egresoDescripcion.trim()) {
+      showToast({ severity: "warning", message: "Ingresa una descripción" });
+      return;
+    }
+    if (!egresoFecha) {
+      showToast({ severity: "warning", message: "Selecciona una fecha" });
+      return;
+    }
+
+    try {
+      setGuardandoEgreso(true);
+      const token = localStorage.getItem("token");
+      const body = {
+        fecha: egresoFecha,
+        monto,
+        descripcion: egresoDescripcion.trim(),
+        categoria: egresoCategoria,
+        metodo_pago: egresoMetodoPago,
+      };
+
+      if (editandoEgreso) {
+        await axios.put(`${API_BASE_URL}/api/finanzas/egresos/${editandoEgreso.id}`, body, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        showToast({ severity: "success", message: "Egreso actualizado correctamente" });
+      } else {
+        await axios.post(`${API_BASE_URL}/api/finanzas/egresos`, body, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        showToast({ severity: "success", message: "Egreso registrado correctamente" });
+      }
+
+      setEgresosDialogOpen(false);
+      obtenerEgresos();
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: e.response?.data?.message || "Error al guardar egreso" });
+    } finally {
+      setGuardandoEgreso(false);
+    }
+  };
+
+  const eliminarEgreso = async (egreso) => {
+    if (!window.confirm(`¿Eliminar el egreso "${egreso.descripcion}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(`${API_BASE_URL}/api/finanzas/egresos/${egreso.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      showToast({ severity: "success", message: "Egreso eliminado" });
+      obtenerEgresos();
+    } catch (e) {
+      console.error(e);
+      showToast({ severity: "error", message: e.response?.data?.message || "Error al eliminar egreso" });
+    }
+  };
+
+  const obtenerEgresos = async () => {
+    try {
+      const params = {};
+      if (egresosFechaInicio) params.fechaInicio = egresosFechaInicio;
+      if (egresosFechaFin) params.fechaFin = egresosFechaFin;
+
+      const res = await axios.get(`${API_BASE_URL}/api/finanzas/egresos`, { params });
+      setEgresos(res.data.egresos || []);
+      setTotalEgresos(res.data.totalEgresos || 0);
+    } catch (e) {
+      console.error("Error obteniendo egresos:", e);
+      setEgresos([]);
+      setTotalEgresos(0);
+    }
+  };
+
+  const abrirModalEgresos = () => {
+    setEgresosDialogOpen(true);
+    obtenerEgresos();
+  };
+
   const eliminarRegistro = async (r) => {
     const tipoRaw = r.tipo_registro || "tratamiento";
     const tipo = tipoRaw === "tratamiento" ? "tratamiento" : "finanza";
@@ -407,7 +524,6 @@ const Finanzas = () => {
     if (fetchTrigger > 0) {
       obtenerReporte();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchTrigger]);
 
   // Sincronización en tiempo real: refrescar reporte si hay datos visibles
@@ -736,6 +852,28 @@ const Finanzas = () => {
                 }}
               >
                 💰 Cierre de caja
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={abrirModalEgresos}
+                disabled={!canDoActions}
+                sx={{
+                  backgroundColor: "#fffdf7",
+                  borderColor: "#ba9a63",
+                  color: "#ba9a63",
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  px: 2,
+                  py: 0.8,
+                  borderRadius: 2.5,
+                  textTransform: "none",
+                  boxShadow: "0 1px 3px rgba(186,154,99,0.15)",
+                  "&:hover": { backgroundColor: "#f5f1e4", borderColor: "#a36920" },
+                  "&:disabled": { backgroundColor: "#eee", borderColor: "#ccc", color: "#999" },
+                }}
+              >
+                💸 Egresos
               </Button>
             </Box>
 
@@ -1195,19 +1333,19 @@ const Finanzas = () => {
                   >
                     Exportar Excel
                   </Button>
-                  <Button
-                    variant="outlined"
-                    onClick={generarPDF}
-                    sx={{
-                      borderColor: colorPrincipal,
-                      color: colorPrincipal,
-                      fontWeight: "bold",
-                      px: 3,
-                      "&:hover": { backgroundColor: "#f5f1e4" },
-                    }}
-                  >
-                    Exportar PDF
-                  </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={generarPDF}
+                      sx={{
+                        borderColor: colorPrincipal,
+                        color: colorPrincipal,
+                        fontWeight: "bold",
+                        px: 3,
+                        "&:hover": { backgroundColor: "#f5f1e4" },
+                      }}
+                    >
+                      Exportar PDF
+                    </Button>
                 </Box>
               </Paper>
             </>
@@ -1357,6 +1495,317 @@ const Finanzas = () => {
               {guardandoMonto ? "Guardando..." : "Guardar Cambio"}
             </Button>
           </DialogActions>
+        </Dialog>
+
+        {/* Modal de Egresos Completo */}
+        <Dialog 
+          open={egresosDialogOpen} 
+          onClose={() => setEgresosDialogOpen(false)} 
+          maxWidth="md" 
+          fullWidth 
+          PaperProps={{ 
+            sx: { 
+              borderTop: "3px solid #ba9a63",
+              maxHeight: "90vh"
+            } 
+          }}
+        >
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold", backgroundColor: "#f5f1e4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>💸 Gestión de Egresos</span>
+            <IconButton onClick={() => setEgresosDialogOpen(false)} size="small">
+              <Delete sx={{ fontSize: 20 }} />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent sx={{ pt: "20px !important" }}>
+            {/* Formulario de Nuevo Egreso */}
+            <Paper elevation={2} sx={{ p: 2.5, mb: 3, backgroundColor: "#fffdf7", border: "1px solid #ba9a63" }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colorPrincipal, mb: 2 }}>
+                {editandoEgreso ? "Editar Egreso" : "Registrar Nuevo Egreso"}
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Fecha"
+                    type="date"
+                    fullWidth
+                    size="small"
+                    value={egresoFecha}
+                    onChange={(e) => setEgresoFecha(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      "& .MuiInputBase-root": { backgroundColor: "#fff" },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "#ba9a63" },
+                        "&:hover fieldset": { borderColor: colorPrincipal },
+                        "&.Mui-focused fieldset": { borderColor: colorPrincipal },
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Monto (S/)"
+                    type="number"
+                    fullWidth
+                    size="small"
+                    value={egresoMonto}
+                    onChange={(e) => setEgresoMonto(e.target.value)}
+                    inputProps={{ min: 0, step: 0.01 }}
+                    sx={{
+                      "& .MuiInputBase-root": { backgroundColor: "#fff" },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "#ba9a63" },
+                        "&:hover fieldset": { borderColor: colorPrincipal },
+                        "&.Mui-focused fieldset": { borderColor: colorPrincipal },
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Descripción"
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={2}
+                    value={egresoDescripcion}
+                    onChange={(e) => setEgresoDescripcion(e.target.value)}
+                    placeholder="Describe el egreso..."
+                    sx={{
+                      "& .MuiInputBase-root": { backgroundColor: "#fff" },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "#ba9a63" },
+                        "&:hover fieldset": { borderColor: colorPrincipal },
+                        "&.Mui-focused fieldset": { borderColor: colorPrincipal },
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    select
+                    label="Categoría"
+                    fullWidth
+                    size="small"
+                    value={egresoCategoria}
+                    onChange={(e) => setEgresoCategoria(e.target.value)}
+                    sx={{
+                      "& .MuiInputBase-root": { backgroundColor: "#fff" },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "#ba9a63" },
+                        "&:hover fieldset": { borderColor: colorPrincipal },
+                        "&.Mui-focused fieldset": { borderColor: colorPrincipal },
+                      },
+                    }}
+                  >
+                    <MenuItem value="Servicios">Servicios</MenuItem>
+                    <MenuItem value="Insumos">Insumos</MenuItem>
+                    <MenuItem value="Mantenimiento">Mantenimiento</MenuItem>
+                    <MenuItem value="Salarios">Salarios</MenuItem>
+                    <MenuItem value="Alquiler">Alquiler</MenuItem>
+                    <MenuItem value="Impuestos">Impuestos</MenuItem>
+                    <MenuItem value="Marketing">Marketing</MenuItem>
+                    <MenuItem value="Otros">Otros</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    select
+                    label="Método de Pago"
+                    fullWidth
+                    size="small"
+                    value={egresoMetodoPago}
+                    onChange={(e) => setEgresoMetodoPago(e.target.value)}
+                    sx={{
+                      "& .MuiInputBase-root": { backgroundColor: "#fff" },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "#ba9a63" },
+                        "&:hover fieldset": { borderColor: colorPrincipal },
+                        "&.Mui-focused fieldset": { borderColor: colorPrincipal },
+                      },
+                    }}
+                  >
+                    <MenuItem value="Efectivo">Efectivo</MenuItem>
+                    <MenuItem value="Tarjeta">Tarjeta</MenuItem>
+                    <MenuItem value="Transferencia">Transferencia</MenuItem>
+                    <MenuItem value="Yape">Yape</MenuItem>
+                    <MenuItem value="Plin">Plin</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12}>
+                  <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                    {editandoEgreso && (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setEditandoEgreso(null);
+                          setEgresoFecha(hoyISO());
+                          setEgresoMonto("");
+                          setEgresoDescripcion("");
+                          setEgresoCategoria("Servicios");
+                          setEgresoMetodoPago("Efectivo");
+                        }}
+                        sx={{ borderColor: "#ba9a63", color: "#ba9a63" }}
+                      >
+                        Cancelar Edición
+                      </Button>
+                    )}
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={guardarEgreso}
+                      disabled={guardandoEgreso}
+                      sx={{
+                        backgroundColor: colorPrincipal,
+                        "&:hover": { backgroundColor: "#8a5a1a" },
+                      }}
+                    >
+                      {guardandoEgreso ? "Guardando..." : editandoEgreso ? "Actualizar" : "Guardar Egreso"}
+                    </Button>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* Filtros de Fecha */}
+            <Paper elevation={1} sx={{ p: 2, mb: 2, backgroundColor: "#f5f1e4" }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colorPrincipal, mb: 1.5 }}>
+                Filtrar por Fechas
+              </Typography>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    label="Fecha Inicio"
+                    type="date"
+                    fullWidth
+                    size="small"
+                    value={egresosFechaInicio}
+                    onChange={(e) => setEgresosFechaInicio(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      "& .MuiInputBase-root": { backgroundColor: "#fff" },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "#ba9a63" },
+                        "&:hover fieldset": { borderColor: colorPrincipal },
+                        "&.Mui-focused fieldset": { borderColor: colorPrincipal },
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    label="Fecha Fin"
+                    type="date"
+                    fullWidth
+                    size="small"
+                    value={egresosFechaFin}
+                    onChange={(e) => setEgresosFechaFin(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      "& .MuiInputBase-root": { backgroundColor: "#fff" },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "#ba9a63" },
+                        "&:hover fieldset": { borderColor: colorPrincipal },
+                        "&.Mui-focused fieldset": { borderColor: colorPrincipal },
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      fullWidth
+                      onClick={obtenerEgresos}
+                      sx={{
+                        backgroundColor: colorPrincipal,
+                        "&:hover": { backgroundColor: "#8a5a1a" },
+                      }}
+                    >
+                      Buscar
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => {
+                        setEgresosFechaInicio("");
+                        setEgresosFechaFin("");
+                        obtenerEgresos();
+                      }}
+                      sx={{ borderColor: "#ba9a63", color: "#ba9a63" }}
+                    >
+                      Limpiar
+                    </Button>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* Lista de Egresos */}
+            <Paper elevation={2} sx={{ p: 2, backgroundColor: "#fff" }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colorPrincipal, mb: 2 }}>
+                Egresos Registrados
+              </Typography>
+              {egresos.length === 0 ? (
+                <Typography align="center" color="textSecondary" sx={{ py: 3 }}>
+                  No hay egresos registrados
+                </Typography>
+              ) : (
+                <>
+                  <Box sx={{ maxHeight: 300, overflowY: "auto" }}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: "#f5f1e4" }}>
+                          <TableCell sx={{ fontWeight: 700, color: colorPrincipal }}>Fecha</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: colorPrincipal }}>Descripción</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: colorPrincipal }}>Categoría</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: colorPrincipal }}>Método</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: colorPrincipal, textAlign: "right" }}>Monto</TableCell>
+                          <TableCell sx={{ fontWeight: 700, color: colorPrincipal, textAlign: "center" }}>Acciones</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {egresos.map((egreso) => (
+                          <TableRow key={egreso.id} sx={{ "&:hover": { backgroundColor: "#f5f1e4" } }}>
+                            <TableCell sx={{ fontSize: "0.85rem" }}>{formatearFechaCorta(egreso.fecha)}</TableCell>
+                            <TableCell sx={{ fontSize: "0.85rem" }}>{egreso.descripcion}</TableCell>
+                            <TableCell sx={{ fontSize: "0.85rem" }}>{egreso.categoria}</TableCell>
+                            <TableCell sx={{ fontSize: "0.85rem" }}>{egreso.metodo_pago}</TableCell>
+                            <TableCell sx={{ textAlign: "right", fontWeight: 600, color: colorPrincipal, fontSize: "0.85rem" }}>
+                              S/ {Number(egreso.monto).toFixed(2)}
+                            </TableCell>
+                            <TableCell sx={{ textAlign: "center" }}>
+                              <Tooltip title="Editar">
+                                <IconButton size="small" onClick={() => abrirEditarEgreso(egreso)} sx={{ color: "#ba9a63" }}>
+                                  <Edit sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Eliminar">
+                                <IconButton size="small" onClick={() => eliminarEgreso(egreso)} sx={{ color: "#f44336" }}>
+                                  <Delete sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                  {/* Total */}
+                  <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f1e4", borderRadius: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: colorPrincipal }}>
+                      TOTAL EGRESOS:
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 700, color: colorPrincipal }}>
+                      S/ {Number(totalEgresos).toFixed(2)}
+                    </Typography>
+                  </Box>
+                </>
+              )}
+            </Paper>
+          </DialogContent>
         </Dialog>
       </Container>
     </div>
