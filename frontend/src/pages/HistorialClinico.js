@@ -3516,10 +3516,10 @@ const HistorialClinico = () => {
                       color: "#999",
                     },
                   }}
-                  onClick={abrirModalCorporal}
+                  onClick={abrirModalFacial}
                   disabled={!pacienteSeleccionado}
                 >
-                  📏 Corporal
+                  📊 Mapa Facial 3D
                 </Button>
                 <Button
                   variant="outlined"
@@ -3545,10 +3545,10 @@ const HistorialClinico = () => {
                       color: "#999",
                     },
                   }}
-                  onClick={abrirModalFacial}
+                  onClick={abrirModalCorporal}
                   disabled={!pacienteSeleccionado}
                 >
-                  📊 Mapa Facial 3D
+                  📏 Corporal
                 </Button>
               </Box>
 

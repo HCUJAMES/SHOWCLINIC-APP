@@ -173,7 +173,7 @@ function HeadModel({ markedPoints, onPointClick, showWireframe }) {
 // =============================================
 // ESCENA 3D SIMPLE
 // =============================================
-function FacialScene({ markedPoints, onPointClick, showWireframe }) {
+function FacialScene({ markedPoints, onPointClick, showWireframe, controlsRef }) {
   return (
     <>
       <ambientLight intensity={0.6} />
@@ -188,6 +188,7 @@ function FacialScene({ markedPoints, onPointClick, showWireframe }) {
       />
       
       <OrbitControls
+        ref={controlsRef}
         enablePan={false}
         enableZoom={true}
         minDistance={2.5}
@@ -226,6 +227,9 @@ export default function FacialMap3D({
   // Modo borrador y wireframe
   const [eraserMode, setEraserMode] = useState(false);
   const [showWireframe, setShowWireframe] = useState(false);
+  
+  // Ref para controlar OrbitControls
+  const controlsRef = useRef();
 
   // Cargar tratamientos desde la API
   useEffect(() => {
@@ -386,6 +390,32 @@ export default function FacialMap3D({
     setSelectedTreatments([]);
     setMapTitle("");
     setEditingId(null);
+  };
+  
+  // Funciones para controlar la cámara
+  const handleRotate = () => {
+    if (controlsRef.current) {
+      controlsRef.current.autoRotate = !controlsRef.current.autoRotate;
+      controlsRef.current.autoRotateSpeed = 2.0;
+    }
+  };
+  
+  const handleFrontView = () => {
+    if (controlsRef.current) {
+      const camera = controlsRef.current.object;
+      camera.position.set(0, 0.5, 2.5);
+      controlsRef.current.target.set(0, 0.4, 0);
+      controlsRef.current.update();
+    }
+  };
+  
+  const handleProfileView = () => {
+    if (controlsRef.current) {
+      const camera = controlsRef.current.object;
+      camera.position.set(2.5, 0.5, 0);
+      controlsRef.current.target.set(0, 0.4, 0);
+      controlsRef.current.update();
+    }
   };
 
   // Agrupar puntos por tratamiento
@@ -735,6 +765,7 @@ export default function FacialMap3D({
               markedPoints={markedPoints}
               onPointClick={handlePointClick}
               showWireframe={showWireframe}
+              controlsRef={controlsRef}
             />
           </Suspense>
         </Canvas>
@@ -768,17 +799,17 @@ export default function FacialMap3D({
           border: "1px solid rgba(255,255,255,0.06)",
         }}>
           <MuiTooltip title="Rotar" arrow>
-            <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "rgba(200,169,110,1)" } }}>
+            <IconButton onClick={handleRotate} size="small" sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "rgba(200,169,110,1)" } }}>
               <Refresh sx={{ fontSize: "1rem" }} />
             </IconButton>
           </MuiTooltip>
           <MuiTooltip title="Vista Frontal" arrow>
-            <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "rgba(200,169,110,1)" } }}>
+            <IconButton onClick={handleFrontView} size="small" sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "rgba(200,169,110,1)" } }}>
               <Typography sx={{ fontSize: "0.7rem" }}>●</Typography>
             </IconButton>
           </MuiTooltip>
           <MuiTooltip title="Vista Perfil" arrow>
-            <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "rgba(200,169,110,1)" } }}>
+            <IconButton onClick={handleProfileView} size="small" sx={{ color: "rgba(255,255,255,0.5)", "&:hover": { color: "rgba(200,169,110,1)" } }}>
               <Typography sx={{ fontSize: "0.7rem" }}>◐</Typography>
             </IconButton>
           </MuiTooltip>
