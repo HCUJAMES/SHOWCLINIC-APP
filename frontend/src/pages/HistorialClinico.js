@@ -1705,9 +1705,9 @@ const HistorialClinico = () => {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(8);
 
-    // Subtotal
+    // Total (subtotal sin descuento)
     doc.setFont("helvetica", "normal");
-    doc.text("Subtotal:", 5, y);
+    doc.text("Total:", 5, y);
     doc.setFont("helvetica", "bold");
     doc.text(`S/ ${totalActivo.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
     y += 5;
@@ -1717,11 +1717,21 @@ const HistorialClinico = () => {
       doc.setFont("helvetica", "normal");
       doc.text("Descuento:", 5, y);
       doc.setFont("helvetica", "bold");
+      doc.setTextColor(211, 47, 47);
       doc.text(`-S/ ${descuento.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      doc.setTextColor(0, 0, 0);
       y += 5;
     }
 
-    // Consulta
+    // Total con Descuento
+    const totalConDescuento = totalActivo - descuento;
+    doc.setFont("helvetica", "normal");
+    doc.text("Total con Descuento:", 5, y);
+    doc.setFont("helvetica", "bold");
+    doc.text(`S/ ${totalConDescuento.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    y += 5;
+
+    // Consulta (si aplica)
     const montoConsulta = parseFloat(presupuesto.monto_consulta) || 0;
     if (presupuesto.consulta_pagada === 1 && montoConsulta > 0) {
       doc.setFont("helvetica", "normal");
@@ -1731,27 +1741,25 @@ const HistorialClinico = () => {
       y += 5;
     }
 
+    y += 2;
+
     // Monto Pagado
-    if (totalGold > 0) {
-      doc.setFont("helvetica", "normal");
-      doc.text("Monto Pagado:", 5, y);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(34, 139, 34);
-      doc.text(`S/ ${totalGold.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      doc.setTextColor(0, 0, 0);
-      y += 5;
-    }
+    doc.setFont("helvetica", "normal");
+    doc.text("Pagado:", 5, y);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(34, 139, 34);
+    doc.text(`S/ ${totalGold.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    doc.setTextColor(0, 0, 0);
+    y += 5;
 
     // Saldo Pendiente
-    if (totalPurple > 0) {
-      doc.setFont("helvetica", "normal");
-      doc.text("Saldo Pendiente:", 5, y);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(211, 47, 47);
-      doc.text(`S/ ${totalPurple.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      doc.setTextColor(0, 0, 0);
-      y += 5;
-    }
+    doc.setFont("helvetica", "normal");
+    doc.text("Saldo Pendiente:", 5, y);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(211, 47, 47);
+    doc.text(`S/ ${totalPurple.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    doc.setTextColor(0, 0, 0);
+    y += 5;
 
     y += 2;
     // ── Separador doble ──
