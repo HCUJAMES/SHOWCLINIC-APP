@@ -1722,9 +1722,7 @@ const HistorialClinico = () => {
       doc.setFont("helvetica", "normal");
       doc.text("Descuento:", 5, y);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(211, 47, 47);
       doc.text(`-S/ ${descuento.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      doc.setTextColor(0, 0, 0);
       y += 5;
     }
 
@@ -1751,18 +1749,14 @@ const HistorialClinico = () => {
     doc.setFont("helvetica", "normal");
     doc.text("Pagado:", 5, y);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(34, 139, 34);
     doc.text(`S/ ${montoPagadoReal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    doc.setTextColor(0, 0, 0);
     y += 5;
 
     // Saldo Pendiente
     doc.setFont("helvetica", "normal");
     doc.text("Saldo Pendiente:", 5, y);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(211, 47, 47);
     doc.text(`S/ ${saldoPendienteReal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    doc.setTextColor(0, 0, 0);
     y += 5;
 
     y += 2;
