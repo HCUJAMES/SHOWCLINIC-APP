@@ -2502,145 +2502,264 @@ const HistorialClinico = () => {
 
           {!pacienteSeleccionado ? (
             <>
-              {/* Barra de búsqueda y filtros */}
+              {/* Header con título y estadísticas */}
+              <Box sx={{ mb: 4 }}>
+                <Box sx={{ mb: 3 }}>
+                  <Typography
+                    sx={{
+                      fontSize: "1.75rem",
+                      fontWeight: 400,
+                      color: "#2E2E2E",
+                      lineHeight: 1.2,
+                      mb: 0.5,
+                    }}
+                  >
+                    Directorio de pacientes
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: "0.9rem",
+                      color: "#999",
+                      textTransform: "uppercase",
+                      letterSpacing: 2,
+                    }}
+                  >
+                    SHOWCLINIC · AREQUIPA
+                  </Typography>
+                </Box>
+
+                {/* Tarjetas de estadísticas */}
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} md={6}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 3,
+                        borderRadius: 4,
+                        backgroundColor: "#f5f1e4",
+                        border: "1px solid rgba(163,105,32,0.15)",
+                        height: "100%",
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "2.5rem",
+                          fontWeight: 300,
+                          lineHeight: 1,
+                          mb: 0.5,
+                          color: "#5a3e1b",
+                        }}
+                      >
+                        {pacientes.length}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.85rem",
+                          textTransform: "uppercase",
+                          letterSpacing: 1.5,
+                          color: "#8b6914",
+                        }}
+                      >
+                        TOTAL PACIENTES
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 3,
+                        borderRadius: 4,
+                        backgroundColor: "white",
+                        border: "1px solid rgba(163,105,32,0.15)",
+                        height: "100%",
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "2.5rem",
+                          fontWeight: 300,
+                          lineHeight: 1,
+                          mb: 0.5,
+                          color: "#2E2E2E",
+                        }}
+                      >
+                        {(() => {
+                          const hoy = new Date();
+                          const mesActual = hoy.getMonth();
+                          const añoActual = hoy.getFullYear();
+                          return pacientes.filter(p => {
+                            if (!p.fechaRegistro) return false;
+                            const fecha = new Date(p.fechaRegistro);
+                            return fecha.getMonth() === mesActual && fecha.getFullYear() === añoActual;
+                          }).length;
+                        })()}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.85rem",
+                          textTransform: "uppercase",
+                          letterSpacing: 1.5,
+                          color: "#999",
+                        }}
+                      >
+                        NUEVOS ESTE MES
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Box>
+
+              {/* Barra de búsqueda */}
               <Paper
                 elevation={0}
                 sx={{
                   mb: 3,
-                  p: 2.5,
+                  p: 2,
                   borderRadius: 3,
-                  backgroundColor: "#fffdf7",
-                  border: "1px solid rgba(186,154,99,0.25)",
+                  backgroundColor: "white",
+                  border: "1px solid rgba(186,154,99,0.15)",
                 }}
               >
-                <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 2, alignItems: { xs: "stretch", md: "center" } }}>
-                  <TextField
-                    label="Buscar paciente"
-                    placeholder="Nombre, apellido o DNI..."
-                    fullWidth
-                    value={filtro}
-                    onChange={(e) => setFiltro(e.target.value)}
-                    size="small"
-                    sx={{
-                      flex: 1,
-                      "& .MuiInputBase-root": { backgroundColor: "#f5f1e4", borderRadius: 2 },
-                      "& .MuiOutlinedInput-root": {
-                        "&:hover fieldset": { borderColor: "#ba9a63" },
-                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                      },
-                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                    }}
-                  />
-                  <Chip
-                    label={`${pacientesFiltrados.length} paciente${pacientesFiltrados.length !== 1 ? "s" : ""}`}
-                    size="small"
-                    sx={{ backgroundColor: "rgba(163,105,32,0.12)", color: "#a36920", fontWeight: 700, fontSize: "0.8rem", minWidth: 100, justifyContent: "center" }}
-                  />
-                </Box>
-
-                {/* Filtros de orden */}
-                <Box sx={{ display: "flex", gap: 1, mt: 2, flexWrap: "wrap", alignItems: "center" }}>
-                  <Typography variant="caption" sx={{ color: "#ba9a63", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", mr: 0.5 }}>
-                    Ordenar:
-                  </Typography>
-                  {[
-                    { key: "az", label: "A → Z", icon: <SortByAlpha sx={{ fontSize: 16 }} /> },
-                    { key: "za", label: "Z → A", icon: <SortByAlpha sx={{ fontSize: 16, transform: "scaleX(-1)" }} /> },
-                    { key: "reciente", label: "Más reciente", icon: <Schedule sx={{ fontSize: 16 }} /> },
-                    { key: "antiguo", label: "Más antiguo", icon: <Schedule sx={{ fontSize: 16 }} /> },
-                  ].map((opt) => (
-                    <Chip
-                      key={opt.key}
-                      icon={opt.icon}
-                      label={opt.label}
-                      size="small"
-                      clickable
-                      onClick={() => setOrdenPacientes(opt.key)}
-                      sx={{
-                        fontWeight: ordenPacientes === opt.key ? 700 : 500,
-                        fontSize: "0.75rem",
-                        backgroundColor: ordenPacientes === opt.key ? "#a36920" : "#f5f1e4",
-                        color: ordenPacientes === opt.key ? "white" : "#5a3e1b",
-                        border: ordenPacientes === opt.key ? "1px solid #8a5a1a" : "1px solid rgba(186,154,99,0.3)",
-                        "& .MuiChip-icon": { color: ordenPacientes === opt.key ? "white" : "#a36920" },
-                        "&:hover": {
-                          backgroundColor: ordenPacientes === opt.key ? "#8a5a1a" : "rgba(163,105,32,0.12)",
-                        },
-                        transition: "all 0.2s ease",
-                      }}
-                    />
-                  ))}
-                </Box>
+                <TextField
+                  placeholder="Buscar por nombre o DNI..."
+                  fullWidth
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value)}
+                  size="small"
+                  InputProps={{
+                    startAdornment: <Typography sx={{ mr: 1, color: "#999" }}>🔍</Typography>,
+                  }}
+                  sx={{
+                    "& .MuiInputBase-root": { 
+                      backgroundColor: "transparent",
+                      borderRadius: 2,
+                      fontSize: "0.95rem",
+                    },
+                    "& .MuiOutlinedInput-root": {
+                      "& fieldset": { borderColor: "transparent" },
+                      "&:hover fieldset": { borderColor: "transparent" },
+                      "&.Mui-focused fieldset": { borderColor: "transparent" },
+                    },
+                  }}
+                />
               </Paper>
 
+              {/* Filtros de orden */}
+              <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap", alignItems: "center" }}>
+                <Typography variant="caption" sx={{ color: "#999", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", mr: 0.5 }}>
+                  ORDENAR
+                </Typography>
+                {[
+                  { key: "reciente", label: "Más reciente" },
+                  { key: "az", label: "A → Z" },
+                  { key: "za", label: "Z → A" },
+                  { key: "antiguo", label: "Más antiguo" },
+                ].map((opt) => (
+                  <Chip
+                    key={opt.key}
+                    label={opt.label}
+                    size="small"
+                    clickable
+                    onClick={() => setOrdenPacientes(opt.key)}
+                    sx={{
+                      fontWeight: 500,
+                      fontSize: "0.8rem",
+                      backgroundColor: ordenPacientes === opt.key ? "#5a3e1b" : "white",
+                      color: ordenPacientes === opt.key ? "white" : "#5a3e1b",
+                      border: "1px solid rgba(163,105,32,0.2)",
+                      borderRadius: 8,
+                      px: 1,
+                      "&:hover": {
+                        backgroundColor: ordenPacientes === opt.key ? "#4a2e0b" : "rgba(163,105,32,0.08)",
+                      },
+                      transition: "all 0.2s ease",
+                    }}
+                  />
+                ))}
+              </Box>
+
               {/* Lista de pacientes */}
-              <Grid container spacing={1.5}>
-                {pacientesFiltrados.map((pac) => (
-                  <Grid item xs={12} md={6} key={pac.id}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                {pacientesFiltrados.map((pac) => {
+                  const iniciales = `${pac.nombre?.charAt(0) || ""}${pac.apellido?.charAt(0) || ""}`.toUpperCase();
+                  const coloresAvatar = ["#5a3e1b", "#a36920", "#ba9a63", "#8b6914", "#6b4e1f"];
+                  const colorAvatar = coloresAvatar[pac.id % coloresAvatar.length];
+                  
+                  return (
                     <Paper
+                      key={pac.id}
                       elevation={0}
                       sx={{
-                        p: 2,
+                        p: 2.5,
                         display: "flex",
-                        gap: 2,
                         justifyContent: "space-between",
                         alignItems: "center",
-                        borderRadius: 2.5,
-                        border: "1px solid rgba(163,105,32,0.12)",
-                        backgroundColor: "rgba(255,255,255,0.85)",
+                        borderRadius: 3,
+                        border: "1px solid rgba(163,105,32,0.1)",
+                        backgroundColor: "white",
                         transition: "all 0.2s ease",
                         cursor: "pointer",
                         "&:hover": {
-                          borderColor: "#a36920",
-                          boxShadow: "0 4px 16px rgba(163,105,32,0.12)",
-                          transform: "translateY(-1px)",
+                          borderColor: "rgba(163,105,32,0.3)",
+                          boxShadow: "0 2px 12px rgba(163,105,32,0.08)",
                         },
                       }}
                       onClick={() => cargarHistorial(pac.id)}
                     >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 2, flex: 1, minWidth: 0 }}>
                         <Avatar
                           src={pac.fotoPerfil ? `${API_BASE_URL}${pac.fotoPerfil}` : undefined}
                           sx={{
-                            width: 42,
-                            height: 42,
-                            bgcolor: "rgba(163,105,32,0.12)",
-                            color: "#a36920",
-                            fontWeight: 700,
-                            fontSize: "0.95rem",
-                            border: "2px solid rgba(163,105,32,0.15)",
+                            width: 52,
+                            height: 52,
+                            bgcolor: colorAvatar,
+                            color: "white",
+                            fontWeight: 600,
+                            fontSize: "1.1rem",
+                            borderRadius: 2.5,
                           }}
                         >
-                          {`${pac.nombre || ""}`.charAt(0).toUpperCase()}
+                          {iniciales}
                         </Avatar>
-                        <Box sx={{ minWidth: 0 }}>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography
-                            fontWeight={700}
-                            sx={{ color: "#2E2E2E", lineHeight: 1.2, fontSize: "0.95rem" }}
-                            noWrap
+                            sx={{ 
+                              fontWeight: 600, 
+                              color: "#2E2E2E", 
+                              lineHeight: 1.3, 
+                              fontSize: "1rem",
+                              mb: 0.3,
+                            }}
                           >
                             {pac.nombre} {pac.apellido}
                           </Typography>
                           <Typography
                             variant="caption"
-                            sx={{ color: "rgba(0,0,0,0.50)" }}
+                            sx={{ color: "#999", fontSize: "0.85rem" }}
                           >
-                            {pac.tipoDocumento || "DNI"}: {pac.dni}
+                            {pac.tipoDocumento || "DNI"} {pac.dni}
                           </Typography>
                         </Box>
                       </Box>
-                      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexShrink: 0 }}>
+                      <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexShrink: 0 }}>
                         <Button
-                          variant="contained"
+                          variant="outlined"
                           size="small"
+                          endIcon={<Typography sx={{ fontSize: "1rem" }}>→</Typography>}
                           sx={{
-                            backgroundColor: "#a36920",
-                            "&:hover": { backgroundColor: "#8b581b" },
-                            borderRadius: 2,
-                            px: 2,
-                            fontWeight: 700,
+                            borderColor: "rgba(163,105,32,0.2)",
+                            color: "#5a3e1b",
+                            borderRadius: 8,
+                            px: 2.5,
+                            py: 0.8,
+                            fontWeight: 500,
                             textTransform: "none",
-                            fontSize: "0.8rem",
+                            fontSize: "0.85rem",
+                            "&:hover": { 
+                              borderColor: "#5a3e1b",
+                              backgroundColor: "rgba(163,105,32,0.05)",
+                            },
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2668,9 +2787,9 @@ const HistorialClinico = () => {
                         )}
                       </Box>
                     </Paper>
-                  </Grid>
-                ))}
-              </Grid>
+                  );
+                })}
+              </Box>
             </>
           ) : (
             <>
@@ -3715,6 +3834,76 @@ const HistorialClinico = () => {
                                   <Typography sx={{ fontSize: "2.5rem", opacity: 0.25 }}>💉</Typography>
                                 )}
                                 
+                                {/* Botón - (esquina superior izquierda) */}
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Remover una instancia del tratamiento
+                                    setOfertaItems(prev => {
+                                      const idx = prev.findIndex(x => x.tratamientoId === t.id);
+                                      if (idx !== -1) {
+                                        const newItems = [...prev];
+                                        newItems.splice(idx, 1);
+                                        return newItems;
+                                      }
+                                      return prev;
+                                    });
+                                  }}
+                                  sx={{
+                                    position: "absolute",
+                                    left: 6,
+                                    top: 6,
+                                    backgroundColor: "rgba(244,67,54,0.75)",
+                                    color: "white",
+                                    width: 24,
+                                    height: 24,
+                                    boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+                                    "&:hover": { 
+                                      backgroundColor: "rgba(244,67,54,0.9)",
+                                      boxShadow: "0 2px 6px rgba(244,67,54,0.3)",
+                                    },
+                                  }}
+                                >
+                                  <Typography sx={{ fontSize: 18, fontWeight: "bold" }}>−</Typography>
+                                </IconButton>
+                                
+                                {/* Botón + (esquina superior derecha) */}
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Agregar una instancia del tratamiento (siempre agrega, permite duplicados)
+                                    setOfertaItems(prev => [
+                                      ...prev, 
+                                      { 
+                                        tratamientoId: t.id, 
+                                        nombre: t.nombre, 
+                                        precio: t.precio ? String(t.precio) : "", 
+                                        sesiones: "1", 
+                                        producto: "", 
+                                        ml: "" 
+                                      }
+                                    ]);
+                                  }}
+                                  sx={{
+                                    position: "absolute",
+                                    right: 6,
+                                    top: 6,
+                                    backgroundColor: "rgba(76,175,80,0.75)",
+                                    color: "white",
+                                    width: 24,
+                                    height: 24,
+                                    boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+                                    "&:hover": { 
+                                      backgroundColor: "rgba(76,175,80,0.9)",
+                                      boxShadow: "0 2px 6px rgba(76,175,80,0.3)",
+                                    },
+                                  }}
+                                >
+                                  <Typography sx={{ fontSize: 18, fontWeight: "bold" }}>+</Typography>
+                                </IconButton>
+                                
                                 {/* Flechas de navegación de imágenes */}
                                 {hasMultipleImages && (
                                   <>
@@ -3789,26 +3978,31 @@ const HistorialClinico = () => {
                                   </>
                                 )}
 
-                                {isSelected && (
-                                  <Box sx={{
-                                    position: "absolute",
-                                    top: 8,
-                                    right: 8,
-                                    width: 26,
-                                    height: 26,
-                                    borderRadius: "50%",
-                                    backgroundColor: "#a36920",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    color: "white",
-                                    fontSize: "0.85rem",
-                                    fontWeight: "bold",
-                                    boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-                                  }}>
-                                    ✓
-                                  </Box>
-                                )}
+                                {/* Contador de cantidad si hay más de uno */}
+                                {(() => {
+                                  const count = ofertaItems.filter(x => x.tratamientoId === t.id).length;
+                                  return count > 0 ? (
+                                    <Box sx={{
+                                      position: "absolute",
+                                      bottom: 8,
+                                      right: 8,
+                                      minWidth: 28,
+                                      height: 28,
+                                      borderRadius: "50%",
+                                      backgroundColor: "#a36920",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      color: "white",
+                                      fontSize: "0.85rem",
+                                      fontWeight: "bold",
+                                      boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
+                                      px: count > 9 ? 1 : 0,
+                                    }}>
+                                      {count}
+                                    </Box>
+                                  ) : null;
+                                })()}
                               </Box>
                               {/* Info */}
                               <Box sx={{ p: 1.5 }}>

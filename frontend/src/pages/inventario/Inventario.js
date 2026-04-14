@@ -21,9 +21,11 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
+  Chip,
+  Collapse,
 } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
-import { ArrowBack, Home, Edit, Delete } from "@mui/icons-material";
+import { ArrowBack, Home, Edit, Delete, ExpandMore, ExpandLess } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -72,6 +74,7 @@ export default function Inventario() {
   const [editVarianteOpen, setEditVarianteOpen] = useState(false);
   const [editVarianteData, setEditVarianteData] = useState({ id: null, nombre: "", laboratorio: "", unidad_base: "ml", precio_cliente: "" });
   const [guardandoVariante, setGuardandoVariante] = useState(false);
+  const [mostrarAgregarStock, setMostrarAgregarStock] = useState(false);
   const role = localStorage.getItem("role");
   const canWriteInventory = role === "doctor" || role === "logistica" || role === "master";
   const token = localStorage.getItem("token");
@@ -734,190 +737,283 @@ export default function Inventario() {
     }
   };
 
+  const [filtroGrafico, setFiltroGrafico] = useState("todos");
+
+  const calcularPorMarca = () => {
+    const resumen = calcularResumenPorVariante();
+    const map = new Map();
+    resumen.forEach(r => {
+      const marca = r.producto_base_nombre || "Sin marca";
+      if (!map.has(marca)) map.set(marca, { marca, total: 0, count: 0 });
+      const entry = map.get(marca);
+      entry.total += r.disponible_efectivo;
+      entry.count += 1;
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  };
+
+  const calcularPorLaboratorio = () => {
+    const resumen = calcularResumenPorVariante();
+    const map = new Map();
+    resumen.forEach(r => {
+      const lab = r.laboratorio || "Otros";
+      if (!map.has(lab)) map.set(lab, { laboratorio: lab, totalStock: 0 });
+      map.get(lab).totalStock += r.disponible_efectivo;
+    });
+    return Array.from(map.values()).sort((a, b) => b.totalStock - a.totalStock);
+  };
+
+  const resumenMemo = calcularResumenPorVariante();
+  const totalProductos = resumenMemo.length;
+  const enEmergencia = resumenMemo.filter(r => r.estado === "EMERGENCIA").length;
+  const stockOK = resumenMemo.filter(r => r.estado === "OK").length;
+  const marcasUnicas = new Set(resumenMemo.map(r => r.producto_base_nombre)).size;
+
+  const resumenFiltrado = filtroGrafico === "emergencias"
+    ? resumenMemo.filter(r => r.estado === "EMERGENCIA")
+    : filtroGrafico === "ok"
+      ? resumenMemo.filter(r => r.estado === "OK")
+      : resumenMemo;
+
+  const maxStock = Math.max(1, ...resumenFiltrado.map(r => r.disponible_efectivo));
+  const maxStockMinimo = Math.max(1, ...resumenFiltrado.map(r => r.stock_minimo_final));
+  const escalaMax = Math.max(maxStock, maxStockMinimo) * 1.15;
+
   return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-        minHeight: "100vh",
-        padding: "40px 10px",
-        background:
-          "linear-gradient(rgba(255,255,255,0.9), rgba(243,226,200,0.9)), url('/images/background-showclinic.jpg')",
-        backgroundSize: "cover",
-      }}
-    >
-      <Paper
-        sx={{
-          p: 5,
-          borderRadius: 4,
-          background:
-            "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
-          border: "1px solid rgba(212,175,55,0.22)",
-          backdropFilter: "blur(10px)",
-          width: "95%",
-          maxWidth: 1100,
-          boxShadow: "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(212,175,55,0.10)",
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }}>
-            <ArrowBack />
+    <Box sx={{ minHeight: "100vh", backgroundColor: "#f5f1e4", p: { xs: 2, md: 3 } }}>
+      <Box sx={{ maxWidth: 1200, margin: "0 auto" }}>
+
+        {/* Nav */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", mb: 4 }}>
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ backgroundColor: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", "&:hover": { backgroundColor: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)" } }}>
+            <ArrowBack sx={{ color: "#5a3e1b" }} />
           </IconButton>
-          <Typography
-            variant="h5"
-            sx={{ color: colorPrincipal, fontWeight: "bold", flex: 1, textAlign: "center" }}
-          >
-            Inventario Clínico
-          </Typography>
-          <IconButton onClick={() => navigate("/dashboard")} sx={{ color: colorPrincipal }} title="Inicio">
-            <Home />
+          <IconButton onClick={() => navigate("/dashboard")} sx={{ backgroundColor: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", "&:hover": { backgroundColor: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)" } }}>
+            <Home sx={{ color: "#5a3e1b" }} />
           </IconButton>
         </Box>
 
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 2,
-            flexWrap: "wrap",
-            mb: 2,
-          }}
-        >
-          <TextField
-            label="Buscar (marca, variante, laboratorio)"
-            value={filtroTexto}
-            onChange={(e) => setFiltroTexto(e.target.value)}
-            size="small"
-            sx={{ minWidth: 280 }}
-          />
-          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <Button
-              variant="contained"
-              sx={{ backgroundColor: colorPrincipal, fontWeight: "bold" }}
-              onClick={exportarPDF}
-            >
-              Exportar inventario (PDF)
+        {/* Título + búsqueda */}
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 2, mb: 4 }}>
+          <Box>
+            <Typography sx={{ fontSize: "2rem", fontWeight: 400, color: "#2E2E2E", lineHeight: 1.2 }}>
+              Inventario clínico
+            </Typography>
+            <Typography sx={{ fontSize: "0.9rem", color: "#999", textTransform: "uppercase", letterSpacing: 2, mt: 0.5 }}>
+              Vista gráfica · ShowClinic Arequipa
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
+            <TextField
+              placeholder="Buscar producto…"
+              value={filtroTexto}
+              onChange={(e) => setFiltroTexto(e.target.value)}
+              size="small"
+              sx={{
+                minWidth: 220,
+                "& .MuiOutlinedInput-root": { backgroundColor: "white", borderRadius: 2.5, "& fieldset": { borderColor: "rgba(163,105,32,0.2)" }, "&:hover fieldset": { borderColor: "#ba9a63" } },
+              }}
+            />
+            <Button variant="outlined" size="small" onClick={exportarPDF} sx={{ borderColor: "#5a3e1b", color: "#5a3e1b", fontWeight: 600, borderRadius: 2, "&:hover": { backgroundColor: "rgba(90,62,27,0.06)", borderColor: "#5a3e1b" } }}>
+              Exportar PDF
             </Button>
           </Box>
         </Box>
 
-        {(() => {
-          const resumen = calcularResumenPorVariante();
-          const emergencias = resumen.filter((r) => r.estado === "EMERGENCIA");
-          if (emergencias.length === 0) return null;
-          return (
-            <Box
-              sx={{
-                mb: 3,
-                p: 2,
-                borderRadius: 2,
-                backgroundColor: "rgba(211,47,47,0.08)",
-                border: "1px solid rgba(211,47,47,0.30)",
-              }}
-            >
-              <Typography sx={{ fontWeight: "bold", color: "#b71c1c", mb: 0.5 }}>
-                ALERTA DE EMERGENCIA: bajo stock
-              </Typography>
-              <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.70)" }}>
-                Hay productos con stock efectivo menor al mínimo (por defecto <strong>3</strong>).
-              </Typography>
-            </Box>
-          );
-        })()}
+        {/* Estadísticas */}
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          {[
+            { valor: totalProductos, label: "TOTAL PRODUCTOS", bg: "white", color: "#2E2E2E", labelColor: "#999" },
+            { valor: enEmergencia, label: "EN EMERGENCIA", bg: "white", color: enEmergencia > 0 ? "#d32f2f" : "#2E2E2E", labelColor: enEmergencia > 0 ? "#d32f2f" : "#999" },
+            { valor: stockOK, label: "ESTADO OK", bg: "white", color: "#2E2E2E", labelColor: "#999" },
+            { valor: marcasUnicas, label: "MARCAS", bg: "white", color: "#2E2E2E", labelColor: "#999" },
+          ].map((stat, i) => (
+            <Grid item xs={6} sm={3} key={i}>
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, backgroundColor: stat.bg, border: "1px solid rgba(163,105,32,0.1)" }}>
+                <Typography sx={{ fontSize: "2.2rem", fontWeight: 300, color: stat.color, lineHeight: 1 }}>{stat.valor}</Typography>
+                <Typography sx={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: 1.5, color: stat.labelColor, mt: 0.5 }}>{stat.label}</Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
 
-        <Typography
-          variant="h6"
-          sx={{ color: colorPrincipal, mt: 2 }}
-          align="left"
-        >
-          Resumen rápido ("Tenemos X unidades")
-        </Typography>
+        {/* ═══════════ GRÁFICO 1: Stock por producto ═══════════ */}
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 4, backgroundColor: "white", border: "1px solid rgba(163,105,32,0.08)", mb: 3 }}>
+          <Typography sx={{ fontSize: "1.2rem", fontWeight: 600, color: "#2E2E2E", mb: 0.5 }}>
+            Stock disponible por producto (ml / frascos)
+          </Typography>
 
-        <Table sx={{ mt: 1 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell>Marca</TableCell>
-              <TableCell>Variante</TableCell>
-              <TableCell>Laboratorio</TableCell>
-              <TableCell>Cajas</TableCell>
-              <TableCell>Jeringas</TableCell>
-              <TableCell>Disponible</TableCell>
-              <TableCell>Mínimo</TableCell>
-              <TableCell>Estado</TableCell>
-              {canWriteInventory && <TableCell align="center">Acciones</TableCell>}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {calcularResumenPorVariante().map((r) => (
-              <TableRow
-                key={r.variante_id}
-                sx={
-                  r.estado === "EMERGENCIA"
-                    ? { backgroundColor: "rgba(211,47,47,0.08)" }
-                    : undefined
-                }
-              >
-                <TableCell>{r.producto_base_nombre}</TableCell>
-                <TableCell>{r.variante_nombre}</TableCell>
-                <TableCell>{r.laboratorio || "—"}</TableCell>
-                <TableCell>
-                  <strong>{Number(r.total_cajas || 0).toFixed(0)}</strong>
-                </TableCell>
-                <TableCell>
-                  <strong>{Number(r.total_jeringas || 0).toFixed(0)}</strong>
-                </TableCell>
-                <TableCell>
-                  <strong>
-                    {Number(r.disponible_efectivo || 0).toFixed(2)} {r.unidad_base}
-                  </strong>
-                </TableCell>
-                <TableCell>
-                  {Number(r.stock_minimo_final || 0).toFixed(2)} {r.unidad_base}
-                </TableCell>
-                <TableCell>
-                  <strong style={{ color: r.estado === "EMERGENCIA" ? "#b71c1c" : "inherit" }}>
-                    {r.estado}
-                  </strong>
-                </TableCell>
-                {canWriteInventory && (
-                  <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                    <Tooltip title="Editar producto">
-                      <IconButton size="small" onClick={() => abrirEditarVariante(r)} sx={{ color: colorPrincipal }}>
-                        <Edit fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Eliminar producto">
-                      <IconButton size="small" onClick={() => borrarVariante(r.variante_id, r.variante_nombre)} sx={{ color: "#b71c1c" }}>
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </TableCell>
-                )}
-              </TableRow>
+          {/* Filtros funcionales */}
+          <Box sx={{ display: "flex", gap: 1, mt: 1.5, mb: 2.5, flexWrap: "wrap", alignItems: "center" }}>
+            <Typography sx={{ fontSize: "0.8rem", color: "#999", mr: 1 }}>Filtrar:</Typography>
+            {[
+              { key: "todos", label: "Todos" },
+              { key: "emergencias", label: "Solo emergencia" },
+              { key: "ok", label: "Solo OK" },
+            ].map(f => (
+              <Chip
+                key={f.key}
+                label={f.label}
+                size="small"
+                onClick={() => setFiltroGrafico(f.key)}
+                sx={{
+                  backgroundColor: filtroGrafico === f.key ? "#5a3e1b" : "transparent",
+                  color: filtroGrafico === f.key ? "white" : "#5a3e1b",
+                  border: `1px solid ${filtroGrafico === f.key ? "#5a3e1b" : "rgba(90,62,27,0.3)"}`,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  "&:hover": { backgroundColor: filtroGrafico === f.key ? "#4a3015" : "rgba(90,62,27,0.08)" },
+                }}
+              />
             ))}
-          </TableBody>
-        </Table>
-
-        <Box
-          sx={{
-            mt: 3,
-            mb: 2,
-            p: 2,
-            borderRadius: 3,
-            backgroundColor: "rgba(255,255,255,0.78)",
-            border: "1px solid rgba(163,105,32,0.16)",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
-            <InfoIcon sx={{ color: colorPrincipal }} />
-            <Typography sx={{ fontWeight: "bold", color: colorPrincipal }}>
-              Ingreso rápido (suma stock automáticamente)
-            </Typography>
           </Box>
 
-          {canWriteInventory ? (
+          {/* Leyenda */}
+          <Box sx={{ display: "flex", gap: 3, mb: 3 }}>
+            {[
+              { color: "#5a3e1b", label: "Stock OK" },
+              { color: "#ba9a63", label: "Stock bajo" },
+              { color: "#d32f2f", label: "Emergencia" },
+            ].map((l, i) => (
+              <Box key={i} sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+                <Box sx={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: l.color }} />
+                <Typography sx={{ fontSize: "0.75rem", color: "#888" }}>{l.label}</Typography>
+              </Box>
+            ))}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.8 }}>
+              <Box sx={{ width: 14, height: 0, borderTop: "2px dashed #d32f2f" }} />
+              <Typography sx={{ fontSize: "0.75rem", color: "#888" }}>Mínimo (3.00)</Typography>
+            </Box>
+          </Box>
+
+          {/* Barras */}
+          {resumenFiltrado.length === 0 && (
+            <Typography sx={{ textAlign: "center", color: "#999", py: 4 }}>No hay productos en este filtro</Typography>
+          )}
+          {resumenFiltrado.map((r) => {
+            const pct = (r.disponible_efectivo / escalaMax) * 100;
+            const minPct = (r.stock_minimo_final / escalaMax) * 100;
+            const barColor = r.estado === "EMERGENCIA" ? "#d32f2f" : r.disponible_efectivo < r.stock_minimo_final * 1.5 ? "#ba9a63" : "#5a3e1b";
+            return (
+              <Box key={r.variante_id} sx={{ display: "flex", alignItems: "center", mb: 1.8, gap: 2 }}>
+                <Box sx={{ width: 180, minWidth: 180, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 500, color: "#2E2E2E", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }} title={r.variante_nombre}>
+                    {r.producto_base_nombre} — {r.variante_nombre}
+                  </Typography>
+                  {canWriteInventory && (
+                    <Box sx={{ display: "flex", ml: 0.5 }}>
+                      <IconButton size="small" onClick={() => abrirEditarVariante(r)} sx={{ p: 0.3, color: "#ba9a63" }}><Edit sx={{ fontSize: 14 }} /></IconButton>
+                      <IconButton size="small" onClick={() => borrarVariante(r.variante_id, r.variante_nombre)} sx={{ p: 0.3, color: "#d32f2f" }}><Delete sx={{ fontSize: 14 }} /></IconButton>
+                    </Box>
+                  )}
+                </Box>
+                <Box sx={{ flex: 1, position: "relative", height: 28, backgroundColor: "#f5f1e4", borderRadius: 1.5 }}>
+                  <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${Math.max(pct, 0.5)}%`, backgroundColor: barColor, borderRadius: 1.5, transition: "width 0.4s ease" }} />
+                  <Box sx={{ position: "absolute", left: `${minPct}%`, top: 0, height: "100%", borderLeft: "2px dashed #d32f2f", zIndex: 2 }} />
+                </Box>
+                <Typography sx={{ fontSize: "0.75rem", fontWeight: 600, color: "#555", minWidth: 50, textAlign: "right" }}>
+                  {r.disponible_efectivo.toFixed(1)}
+                </Typography>
+              </Box>
+            );
+          })}
+        </Paper>
+
+        {/* ═══════════ GRÁFICO 2: Distribución por marca ═══════════ */}
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 4, backgroundColor: "white", border: "1px solid rgba(163,105,32,0.08)", mb: 3 }}>
+          <Typography sx={{ fontSize: "1.2rem", fontWeight: 600, color: "#2E2E2E", mb: 3 }}>
+            Distribución por marca
+          </Typography>
+          {(() => {
+            const marcas = calcularPorMarca();
+            const maxMarca = Math.max(1, ...marcas.map(m => m.total));
+            const colores = ["#5a3e1b", "#a36920", "#ba9a63", "#8b6914", "#6b4e1f", "#d4a96a", "#3e2a0f", "#c2955a", "#7a5b2e", "#4a3318"];
+            return marcas.map((item, idx) => (
+              <Box key={idx} sx={{ display: "flex", alignItems: "center", mb: 1.5, gap: 2 }}>
+                <Typography sx={{ width: 120, minWidth: 120, fontSize: "0.82rem", fontWeight: 500, color: "#2E2E2E", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {item.marca} ({item.count})
+                </Typography>
+                <Box sx={{ flex: 1, height: 22, backgroundColor: "#f5f1e4", borderRadius: 1.5, position: "relative" }}>
+                  <Box sx={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${(item.total / maxMarca) * 100}%`, backgroundColor: colores[idx % colores.length], borderRadius: 1.5, transition: "width 0.4s ease" }} />
+                </Box>
+                <Typography sx={{ fontSize: "0.75rem", color: "#666", minWidth: 60, textAlign: "right" }}>
+                  {item.total.toFixed(1)} ml
+                </Typography>
+              </Box>
+            ));
+          })()}
+        </Paper>
+
+        {/* ═══════════ GRÁFICO 3: Stock acumulado por laboratorio (barras verticales) ═══════════ */}
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 4, backgroundColor: "white", border: "1px solid rgba(163,105,32,0.08)", mb: 3 }}>
+          <Typography sx={{ fontSize: "1.2rem", fontWeight: 600, color: "#2E2E2E", mb: 3 }}>
+            Stock acumulado por laboratorio
+          </Typography>
+          <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid #f0ece3", backgroundColor: "#fdfcf9" }}>
+            {(() => {
+              const labs = calcularPorLaboratorio();
+              const maxLab = Math.max(1, ...labs.map(l => l.totalStock));
+              return (
+                <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: 260, pt: 4 }}>
+                  {labs.map((item, idx) => {
+                    const pctH = (item.totalStock / maxLab) * 200;
+                    return (
+                      <Box key={idx} sx={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, maxWidth: 100 }}>
+                        <Typography sx={{ fontSize: "0.75rem", fontWeight: 600, color: "#2E2E2E", mb: 0.5 }}>
+                          {item.totalStock.toFixed(0)}
+                        </Typography>
+                        <Box sx={{ width: "60%", maxWidth: 50, height: `${Math.max(pctH, 4)}px`, backgroundColor: "#5a3e1b", borderRadius: "4px 4px 0 0", transition: "height 0.4s ease" }} />
+                        <Typography sx={{ fontSize: "0.65rem", color: "#888", mt: 1, textAlign: "center", wordBreak: "break-word", lineHeight: 1.2 }}>
+                          {item.laboratorio}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              );
+            })()}
+          </Paper>
+        </Paper>
+
+        {/* ═══════════ ALERTAS DE EMERGENCIA ═══════════ */}
+        {enEmergencia > 0 && (
+          <Paper elevation={0} sx={{ p: 4, borderRadius: 4, backgroundColor: "#fffbfb", border: "1px solid rgba(211,47,47,0.2)", mb: 3 }}>
+            <Typography sx={{ fontSize: "1.2rem", fontWeight: 600, color: "#d32f2f", mb: 0.5 }}>
+              Alertas de emergencia — requieren reposición inmediata
+            </Typography>
+            <Typography sx={{ fontSize: "0.85rem", color: "#999", mb: 3 }}>
+              Productos con stock por debajo del mínimo requerido
+            </Typography>
+            {resumenMemo.filter(r => r.estado === "EMERGENCIA").map((r) => (
+              <Box key={r.variante_id} sx={{ display: "flex", alignItems: "center", py: 1.8, borderBottom: "1px solid rgba(211,47,47,0.08)", gap: 2 }}>
+                <Typography sx={{ width: 200, minWidth: 200, fontSize: "0.875rem", fontWeight: 500, color: "#d32f2f" }}>
+                  {r.variante_nombre}
+                </Typography>
+                <Box sx={{ flex: 1, height: 16, backgroundColor: "#fde8e8", borderRadius: 10, overflow: "hidden" }}>
+                  <Box sx={{ height: "100%", width: `${Math.min((r.disponible_efectivo / r.stock_minimo_final) * 100, 100)}%`, backgroundColor: "#d32f2f", borderRadius: 10, transition: "width 0.4s ease" }} />
+                </Box>
+                <Typography sx={{ fontSize: "0.75rem", color: "#888", minWidth: 120, textAlign: "right" }}>
+                  {r.disponible_efectivo.toFixed(1)} {r.unidad_base} / mín {r.stock_minimo_final.toFixed(0)} {r.unidad_base}
+                </Typography>
+              </Box>
+            ))}
+          </Paper>
+        )}
+
+        {/* ═══════════ INGRESO RÁPIDO ═══════════ */}
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 4, backgroundColor: "white", border: "1px solid rgba(163,105,32,0.08)", mb: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }} onClick={() => setMostrarAgregarStock(!mostrarAgregarStock)}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <InfoIcon sx={{ color: "#5a3e1b" }} />
+              <Typography sx={{ fontWeight: 600, color: "#5a3e1b", fontSize: "1.05rem" }}>Ingreso rápido (suma stock automáticamente)</Typography>
+            </Box>
+            <IconButton size="small" sx={{ color: "#5a3e1b" }}>
+              {mostrarAgregarStock ? <ExpandLess /> : <ExpandMore />}
+            </IconButton>
+          </Box>
+          <Collapse in={mostrarAgregarStock}>
+            <Box sx={{ mt: 3 }}>
+              {canWriteInventory ? (
             <Grid container spacing={2}>
               <Grid item xs={12} md={3}>
                 <FormControl fullWidth size="small">
@@ -1176,11 +1272,12 @@ export default function Inventario() {
                     variant="outlined"
                     size="small"
                     sx={{
-                      borderColor: colorPrincipal,
-                      color: colorPrincipal,
-                      fontWeight: "bold",
+                      borderColor: "rgba(90,62,27,0.3)",
+                      color: "#5a3e1b",
+                      fontWeight: 600,
+                      borderRadius: 2,
                       backgroundColor: "rgba(255,255,255,0.85)",
-                      "&:hover": { backgroundColor: "rgba(255,255,255,0.95)" },
+                      "&:hover": { backgroundColor: "rgba(90,62,27,0.06)" },
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -1216,7 +1313,7 @@ export default function Inventario() {
                 <Box sx={{ display: "flex", justifyContent: "flex-end", height: "100%", alignItems: "center" }}>
                   <Button
                     variant="contained"
-                    sx={{ backgroundColor: colorPrincipal, fontWeight: "bold" }}
+                    sx={{ backgroundColor: "#5a3e1b", fontWeight: 600, borderRadius: 2, px: 4, "&:hover": { backgroundColor: "#4a3015" } }}
                     disabled={guardandoIngreso}
                     onClick={registrarIngresoSimple}
                   >
@@ -1230,17 +1327,17 @@ export default function Inventario() {
               El rol admin solo puede visualizar. Para modificar el inventario, ingresa como doctor.
             </Typography>
           )}
-        </Box>
+            </Box>
+          </Collapse>
+        </Paper>
 
-        <Typography
-          variant="h6"
-          sx={{ color: colorPrincipal, mt: 4 }}
-          align="left"
-        >
-          Lotes registrados
-        </Typography>
+        {/* ═══════════ TABLA: LOTES REGISTRADOS ═══════════ */}
+        <Paper elevation={0} sx={{ p: 4, borderRadius: 4, backgroundColor: "white", border: "1px solid rgba(163,105,32,0.08)", mb: 3, overflowX: "auto" }}>
+          <Typography sx={{ fontSize: "1.2rem", fontWeight: 600, color: "#2E2E2E", mb: 3 }}>
+            Lotes registrados
+          </Typography>
 
-        <Table sx={{ mt: 1 }}>
+        <Table size="small" sx={{ "& .MuiTableCell-root": { fontSize: "0.82rem", borderColor: "rgba(163,105,32,0.08)" }, "& .MuiTableHead-root .MuiTableCell-root": { fontWeight: 600, color: "#5a3e1b", textTransform: "uppercase", fontSize: "0.7rem", letterSpacing: 1 } }}>
           <TableHead>
             <TableRow>
               <TableCell>Marca</TableCell>
@@ -1331,7 +1428,7 @@ export default function Inventario() {
                         <Button
                           size="small"
                           variant="outlined"
-                          sx={{ borderColor: colorPrincipal, color: colorPrincipal, fontWeight: "bold" }}
+                          sx={{ borderColor: "#5a3e1b", color: "#5a3e1b", fontWeight: 600, borderRadius: 2, fontSize: "0.72rem" }}
                           onClick={() =>
                             window.open(`${API_BASE}/uploads/docs/${l.documento_pdf}`, "_blank")
                           }
@@ -1350,7 +1447,7 @@ export default function Inventario() {
                               size="small"
                               variant="contained"
                               disabled={guardandoEdicionLote}
-                              sx={{ backgroundColor: colorPrincipal, fontWeight: "bold" }}
+                              sx={{ backgroundColor: "#5a3e1b", fontWeight: 600, borderRadius: 2, fontSize: "0.72rem", "&:hover": { backgroundColor: "#4a3015" } }}
                               onClick={() => editarStockLote(l.id, editLote, editCantidad)}
                             >
                               Guardar
@@ -1358,7 +1455,7 @@ export default function Inventario() {
                             <Button
                               size="small"
                               variant="outlined"
-                              sx={{ borderColor: colorPrincipal, color: colorPrincipal, fontWeight: "bold" }}
+                              sx={{ borderColor: "rgba(90,62,27,0.3)", color: "#5a3e1b", fontWeight: 500, borderRadius: 2, fontSize: "0.72rem" }}
                               onClick={() => {
                                 setEditLoteId(null);
                                 setEditLote("");
@@ -1375,7 +1472,7 @@ export default function Inventario() {
                             <Button
                               size="small"
                               variant="outlined"
-                              sx={{ borderColor: colorPrincipal, color: colorPrincipal, fontWeight: "bold" }}
+                              sx={{ borderColor: "rgba(90,62,27,0.3)", color: "#5a3e1b", fontWeight: 500, borderRadius: 2, fontSize: "0.72rem" }}
                               onClick={() => {
                                 setEditLoteId(l.id);
                                 setEditLote(l.lote || "");
@@ -1389,7 +1486,7 @@ export default function Inventario() {
                             <Button
                               size="small"
                               variant="outlined"
-                              sx={{ borderColor: "#b71c1c", color: "#b71c1c", fontWeight: "bold" }}
+                              sx={{ borderColor: "rgba(211,47,47,0.3)", color: "#d32f2f", fontWeight: 500, borderRadius: 2, fontSize: "0.72rem" }}
                               onClick={() => borrarStockLote(l.id)}
                             >
                               Borrar
@@ -1403,10 +1500,12 @@ export default function Inventario() {
               })}
           </TableBody>
         </Table>
-      </Paper>
+        </Paper>
+      </Box>
 
-      <Dialog open={editVarianteOpen} onClose={() => setEditVarianteOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold" }}>Editar Producto</DialogTitle>
+      {/* Dialog para editar variante */}
+      <Dialog open={editVarianteOpen} onClose={() => setEditVarianteOpen(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 4 } }}>
+        <DialogTitle sx={{ color: "#5a3e1b", fontWeight: 600, fontSize: "1.1rem" }}>Editar Producto</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
           <TextField
             label="Nombre"
@@ -1431,13 +1530,13 @@ export default function Inventario() {
             </Select>
           </FormControl>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setEditVarianteOpen(false)} sx={{ color: "#666" }}>Cancelar</Button>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setEditVarianteOpen(false)} sx={{ color: "#999", fontWeight: 500, borderRadius: 2 }}>Cancelar</Button>
           <Button
             variant="contained"
             onClick={guardarEditVariante}
             disabled={guardandoVariante}
-            sx={{ backgroundColor: colorPrincipal, "&:hover": { backgroundColor: "#8a541a" } }}
+            sx={{ backgroundColor: "#5a3e1b", fontWeight: 600, borderRadius: 2, "&:hover": { backgroundColor: "#4a3015" } }}
           >
             {guardandoVariante ? "Guardando..." : "Guardar"}
           </Button>
