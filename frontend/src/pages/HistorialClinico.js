@@ -1601,6 +1601,11 @@ const HistorialClinico = () => {
     const itemsBoleta = Object.values(tratamientosAgrupados);
     const totalActivo = totalGold + totalPurple;
     const descuento = parseFloat(presupuesto.descuento) || 0;
+    const totalConDescuento = totalActivo - descuento;
+    
+    // Usar valores reales del presupuesto para pagado y saldo pendiente
+    const montoPagadoReal = parseFloat(presupuesto.monto_pagado) || 0;
+    const saldoPendienteReal = parseFloat(presupuesto.saldo_pendiente) || (totalConDescuento - montoPagadoReal);
     const totalFinal = totalActivo - descuento;
 
     const numItems = itemsBoleta.length || 1;
@@ -1723,8 +1728,7 @@ const HistorialClinico = () => {
       y += 5;
     }
 
-    // Total con Descuento
-    const totalConDescuento = totalActivo - descuento;
+    // Total con Descuento (usar la variable ya declarada arriba)
     doc.setFont("helvetica", "normal");
     doc.text("Total con Descuento:", 5, y);
     doc.setFont("helvetica", "bold");
@@ -1748,7 +1752,7 @@ const HistorialClinico = () => {
     doc.text("Pagado:", 5, y);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(34, 139, 34);
-    doc.text(`S/ ${totalGold.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    doc.text(`S/ ${montoPagadoReal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
     doc.setTextColor(0, 0, 0);
     y += 5;
 
@@ -1757,7 +1761,7 @@ const HistorialClinico = () => {
     doc.text("Saldo Pendiente:", 5, y);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(211, 47, 47);
-    doc.text(`S/ ${totalPurple.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    doc.text(`S/ ${saldoPendienteReal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
     doc.setTextColor(0, 0, 0);
     y += 5;
 
