@@ -1680,15 +1680,12 @@ const HistorialClinico = () => {
     doc.setFontSize(8);
     if (itemsBoleta.length > 0) {
       itemsBoleta.forEach((item) => {
-        const etiqueta = item.estado === "gold" ? "PAGADO" : "PEND.";
         const sesInfo = item.sesiones > 1 ? ` (${item.sesiones} ses.)` : "";
         doc.setFont("helvetica", "bold");
         doc.text(`${item.nombre}${sesInfo}`, 5, y);
         y += 4;
         doc.setFont("helvetica", "normal");
-        doc.text(`S/ ${item.precioTotal.toFixed(2)}`, 7, y);
-        doc.setFont("helvetica", "bold");
-        doc.text(etiqueta, pageWidth - 5, y, { align: "right" });
+        doc.text(`Precio: S/ ${item.precioTotal.toFixed(2)}`, 7, y);
         y += 5;
       });
     } else {
@@ -1708,22 +1705,14 @@ const HistorialClinico = () => {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(8);
 
-    if (totalGold > 0) {
-      doc.setFont("helvetica", "normal");
-      doc.text("Cobrado:", 5, y);
-      doc.setFont("helvetica", "bold");
-      doc.text(`S/ ${totalGold.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      y += 5;
-    }
+    // Subtotal
+    doc.setFont("helvetica", "normal");
+    doc.text("Subtotal:", 5, y);
+    doc.setFont("helvetica", "bold");
+    doc.text(`S/ ${totalActivo.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+    y += 5;
 
-    if (totalPurple > 0) {
-      doc.setFont("helvetica", "normal");
-      doc.text("Por cobrar:", 5, y);
-      doc.setFont("helvetica", "bold");
-      doc.text(`S/ ${totalPurple.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      y += 5;
-    }
-
+    // Descuento
     if (descuento > 0) {
       doc.setFont("helvetica", "normal");
       doc.text("Descuento:", 5, y);
@@ -1732,12 +1721,35 @@ const HistorialClinico = () => {
       y += 5;
     }
 
+    // Consulta
     const montoConsulta = parseFloat(presupuesto.monto_consulta) || 0;
     if (presupuesto.consulta_pagada === 1 && montoConsulta > 0) {
       doc.setFont("helvetica", "normal");
       doc.text("Consulta:", 5, y);
       doc.setFont("helvetica", "bold");
       doc.text(`S/ ${montoConsulta.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      y += 5;
+    }
+
+    // Monto Pagado
+    if (totalGold > 0) {
+      doc.setFont("helvetica", "normal");
+      doc.text("Monto Pagado:", 5, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(34, 139, 34);
+      doc.text(`S/ ${totalGold.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      doc.setTextColor(0, 0, 0);
+      y += 5;
+    }
+
+    // Saldo Pendiente
+    if (totalPurple > 0) {
+      doc.setFont("helvetica", "normal");
+      doc.text("Saldo Pendiente:", 5, y);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(211, 47, 47);
+      doc.text(`S/ ${totalPurple.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
+      doc.setTextColor(0, 0, 0);
       y += 5;
     }
 
