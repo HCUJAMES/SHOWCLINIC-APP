@@ -34,7 +34,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf } from "@mui/icons-material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
 import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProformaPDF";
@@ -114,6 +114,7 @@ const CAMPOS_FOTOS_LEGACY = [
 
 const HistorialClinico = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
   const [pacientes, setPacientes] = useState([]);
   const [filtro, setFiltro] = useState("");
@@ -398,6 +399,19 @@ const HistorialClinico = () => {
     };
     cargarProductosInventario();
   }, []);
+
+  // Seleccionar automáticamente el paciente si viene desde el Dashboard
+  useEffect(() => {
+    if (location.state?.pacienteId && pacientes.length > 0 && !pacienteSeleccionado) {
+      const pacienteId = location.state.pacienteId;
+      const paciente = pacientes.find(p => p.id === pacienteId);
+      if (paciente) {
+        cargarHistorial(pacienteId);
+        // Limpiar el state para que no se vuelva a seleccionar al navegar
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state, pacientes, pacienteSeleccionado]);
 
   const handleEliminarPaciente = async () => {
     if (!pacienteEliminar) return;

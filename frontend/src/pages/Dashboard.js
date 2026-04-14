@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Typography,
   Box,
@@ -13,6 +13,15 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  IconButton,
+  TextField,
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemText,
+  CircularProgress,
+  Collapse,
+  Paper,
 } from "@mui/material";
 import {
   People,
@@ -25,6 +34,8 @@ import {
   CardGiftcard,
   Lock,
   LocalHospital,
+  Search,
+  Close,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
@@ -41,11 +52,17 @@ const moduleIcons = {
   "Gestión Clínica": LocalHospital,
 };
 
+const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
+
 export default function Dashboard() {
   const role = localStorage.getItem("role");
   const navigate = useNavigate();
   const [openAccessDenied, setOpenAccessDenied] = useState(false);
   const [deniedModule, setDeniedModule] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
 
   // Menú según rol
   const menuItemsByRole = {
@@ -109,6 +126,57 @@ export default function Dashboard() {
   const hora = new Date().getHours();
   const saludo = hora < 12 ? "Buenos días" : hora < 18 ? "Buenas tardes" : "Buenas noches";
 
+  useEffect(() => {
+    if (searchQuery.trim().length >= 2) {
+      const timer = setTimeout(() => {
+        buscarPacientes(searchQuery);
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
+
+  const buscarPacientes = async (query) => {
+    setSearching(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE}/api/pacientes/listar`, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        
+        const filtered = (Array.isArray(data) ? data : []).filter(p => {
+          const nombre = (p.nombre || "").toLowerCase();
+          const apellido = (p.apellido || "").toLowerCase();
+          const dni = (p.dni || "").toString();
+          const queryLower = query.toLowerCase();
+          
+          return nombre.includes(queryLower) || 
+                 apellido.includes(queryLower) || 
+                 dni.includes(query);
+        }).slice(0, 5);
+        
+        setSearchResults(filtered);
+      }
+    } catch (error) {
+      console.error("Error buscando pacientes:", error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectPaciente = (paciente) => {
+    navigate("/historial-clinico", { state: { pacienteId: paciente.id } });
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
   return (
     <Box
       sx={{
@@ -121,6 +189,189 @@ export default function Dashboard() {
     >
       {/* Decorative top bar */}
       <Box sx={{ height: 4, background: "linear-gradient(90deg, #a36920 0%, #d4af37 50%, #a36920 100%)" }} />
+
+      {/* Lupa flotante de búsqueda rápida */}
+      <Box
+        sx={{
+          position: "fixed",
+          top: 20,
+          left: 20,
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+        }}
+      >
+        <IconButton
+          onClick={() => {
+            setSearchOpen(!searchOpen);
+            if (searchOpen) {
+              setSearchQuery("");
+              setSearchResults([]);
+            }
+          }}
+          sx={{
+            width: 44,
+            height: 44,
+            background: searchOpen
+              ? "rgba(211,47,47,0.75)"
+              : "rgba(163,105,32,0.65)",
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 4px 16px rgba(163,105,32,0.2)",
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            "&:hover": {
+              transform: "scale(1.1)",
+              background: searchOpen
+                ? "rgba(211,47,47,0.85)"
+                : "rgba(163,105,32,0.85)",
+              boxShadow: "0 6px 20px rgba(163,105,32,0.3)",
+            },
+          }}
+        >
+          {searchOpen ? (
+            <Close sx={{ fontSize: 22, color: "white" }} />
+          ) : (
+            <Search sx={{ fontSize: 22, color: "white" }} />
+          )}
+        </IconButton>
+
+        <Collapse in={searchOpen} orientation="horizontal" timeout={300}>
+          <Paper
+            elevation={8}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              borderRadius: 50,
+              overflow: "hidden",
+              backgroundColor: "rgba(255,255,255,0.95)",
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(163,105,32,0.2)",
+              boxShadow: "0 6px 24px rgba(163,105,32,0.2)",
+            }}
+          >
+            <TextField
+              autoFocus
+              placeholder="Buscar paciente..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              size="small"
+              sx={{
+                width: 260,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 50,
+                  "& fieldset": { border: "none" },
+                  pl: 2.5,
+                  pr: 1,
+                },
+                "& input": {
+                  fontSize: "0.85rem",
+                  color: "#2E2E2E",
+                  "&::placeholder": { color: "#999", opacity: 1 },
+                },
+              }}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    {searching && <CircularProgress size={16} sx={{ color: "#a36920" }} />}
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Paper>
+        </Collapse>
+      </Box>
+
+      {/* Resultados de búsqueda */}
+      {searchOpen && searchResults.length > 0 && (
+        <Paper
+          elevation={12}
+          sx={{
+            position: "fixed",
+            top: 76,
+            left: 20,
+            width: 320,
+            maxHeight: 380,
+            overflowY: "auto",
+            zIndex: 999,
+            borderRadius: 3,
+            backgroundColor: "rgba(255,255,255,0.96)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(163,105,32,0.15)",
+            boxShadow: "0 10px 40px rgba(163,105,32,0.18)",
+          }}
+        >
+          <List sx={{ p: 0 }}>
+            {searchResults.map((paciente, idx) => (
+              <ListItem
+                key={paciente.id}
+                button
+                onClick={() => handleSelectPaciente(paciente)}
+                sx={{
+                  borderBottom: idx < searchResults.length - 1 ? "1px solid rgba(163,105,32,0.08)" : "none",
+                  py: 1.8,
+                  px: 2.5,
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    backgroundColor: "rgba(163,105,32,0.06)",
+                    pl: 3,
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg, rgba(163,105,32,0.1) 0%, rgba(212,175,55,0.2) 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    mr: 2,
+                  }}
+                >
+                  <People sx={{ fontSize: 18, color: "#a36920" }} />
+                </Box>
+                <ListItemText
+                  primary={
+                    <Typography sx={{ fontSize: "0.9rem", fontWeight: 600, color: "#2E2E2E" }}>
+                      {paciente.nombre} {paciente.apellido}
+                    </Typography>
+                  }
+                  secondary={
+                    <Typography sx={{ fontSize: "0.75rem", color: "#999" }}>
+                      DNI: {paciente.dni || "Sin DNI"}
+                    </Typography>
+                  }
+                />
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
+      )}
+
+      {searchOpen && searchQuery.trim().length >= 2 && searchResults.length === 0 && !searching && (
+        <Paper
+          elevation={12}
+          sx={{
+            position: "fixed",
+            top: 76,
+            left: 20,
+            width: 320,
+            zIndex: 999,
+            borderRadius: 3,
+            backgroundColor: "rgba(255,255,255,0.96)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(163,105,32,0.15)",
+            boxShadow: "0 10px 40px rgba(163,105,32,0.18)",
+            p: 3,
+            textAlign: "center",
+          }}
+        >
+          <Typography sx={{ fontSize: "0.85rem", color: "#999" }}>
+            No se encontraron pacientes
+          </Typography>
+        </Paper>
+      )}
 
       {/* Decorative model images */}
       <Box
