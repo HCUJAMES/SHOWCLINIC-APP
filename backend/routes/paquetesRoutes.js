@@ -932,7 +932,7 @@ router.post("/paquete-paciente/:paquete_paciente_id/consulta", requirePaquetesAs
    🎁 ASIGNAR PRESUPUESTO A PACIENTE
 ============================== */
 router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => {
-  const { paciente_id, oferta_id, notas, marcas } = req.body;
+  const { paciente_id, oferta_id, notas, marcas, especialista_id } = req.body;
 
   if (!paciente_id || !oferta_id) {
     return res.status(400).json({ message: "paciente_id y oferta_id son requeridos" });
@@ -975,12 +975,12 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
       .reduce((sum, it) => sum + Number(it.precio || 0), 0);
     const descuento = Number(oferta.descuento) || 0;
 
-    // Crear registro de presupuesto asignado (incluyendo descuento)
+    // Crear registro de presupuesto asignado (incluyendo descuento y especialista)
     const result = await dbRun(
       `INSERT INTO presupuestos_asignados (
         paciente_id, oferta_id, tratamientos_json,
-        precio_total, descuento, estado, fecha_inicio, notas, creado_en, creado_por
-      ) VALUES (?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?)`,
+        precio_total, descuento, estado, fecha_inicio, notas, especialista_id, creado_en, creado_por
+      ) VALUES (?, ?, ?, ?, ?, 'activo', ?, ?, ?, ?, ?)`,
       [
         paciente_id,
         oferta_id,
@@ -989,6 +989,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
         descuento,
         ahora,
         notas || null,
+        especialista_id || null,
         ahora,
         username
       ]
@@ -1043,7 +1044,10 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
 
   try {
     const presupuestos = await dbAll(
-      `SELECT * FROM presupuestos_asignados WHERE paciente_id = ? ORDER BY creado_en DESC`,
+      `SELECT pa.*, e.nombre as especialista_nombre 
+       FROM presupuestos_asignados pa
+       LEFT JOIN especialistas e ON pa.especialista_id = e.id
+       WHERE pa.paciente_id = ? ORDER BY pa.creado_en DESC`,
       [paciente_id]
     );
 

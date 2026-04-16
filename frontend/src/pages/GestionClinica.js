@@ -35,7 +35,13 @@ import {
   TextField,
   Tooltip,
   DialogContentText,
-  Autocomplete
+  Autocomplete,
+  Tabs,
+  Tab,
+  Avatar,
+  InputAdornment,
+  Collapse,
+  Badge
 } from "@mui/material";
 import {
   TrendingUp,
@@ -47,6 +53,7 @@ import {
   Visibility,
   Close,
   ExpandMore,
+  ExpandLess,
   CalendarToday,
   LocalHospital,
   FilterList,
@@ -67,14 +74,33 @@ import {
   CheckCircle,
   Cancel,
   Lock,
-  LockOpen
+  LockOpen,
+  Search,
+  Payment,
+  History,
+  Settings,
+  FileDownload
 } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { formatearFechaCorta } from "../utils/dateUtils";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
+
+const BRAND_COLORS = {
+  primary: '#854F0B',
+  secondary: '#FAEEDA',
+  primaryDark: '#6B3F08',
+  secondaryLight: '#FDF8F0',
+  success: '#4CAF50',
+  warning: '#FF9800',
+  error: '#D32F2F',
+  info: '#2196F3'
+};
 
 const GestionClinica = () => {
   const navigate = useNavigate();
@@ -104,6 +130,43 @@ const GestionClinica = () => {
   const [mostrarDetalleTratamientos, setMostrarDetalleTratamientos] = useState(false);
   const [modalDetalle, setModalDetalle] = useState({ abierto: false, especialista: null, datos: null });
   const [loadingDetalle, setLoadingDetalle] = useState(false);
+  const [tabActual, setTabActual] = useState(0);
+  const [busquedaPersonal, setBusquedaPersonal] = useState("");
+  const [personalExpandido, setPersonalExpandido] = useState(null);
+  const [detallePersonalData, setDetallePersonalData] = useState(null);
+  const [presupuestosEspecialista, setPresupuestosEspecialista] = useState([]);
+  const [historialPagos, setHistorialPagos] = useState([]);
+  const [loadingDetallePersonal, setLoadingDetallePersonal] = useState(false);
+  const [tabDetalleModal, setTabDetalleModal] = useState(0);
+  const [mesSeleccionado, setMesSeleccionado] = useState(new Date().getMonth() + 1);
+  const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
+  const [rolFiltro, setRolFiltro] = useState("");
+  const [tipoPagoFiltro, setTipoPagoFiltro] = useState("");
+  
+  // Modales
+  const [modalRegistrarPago, setModalRegistrarPago] = useState({ abierto: false, trabajador: null });
+  const [modalEditarDatos, setModalEditarDatos] = useState({ abierto: false, trabajador: null });
+  const [modalHistorial, setModalHistorial] = useState({ abierto: false, trabajador: null });
+  
+  // Datos de pago
+  const [datoPago, setDatoPago] = useState({
+    monto: 0,
+    fecha: new Date().toISOString().split('T')[0],
+    metodo: 'transferencia',
+    referencia: ''
+  });
+  
+  // Datos de edición
+  const [datoEdicion, setDatoEdicion] = useState({
+    dni: '',
+    especialidad: '',
+    fecha_ingreso: '',
+    tipo_contrato: '',
+    metodo_pago: '',
+    sueldo_fijo: 0,
+    comision_porcentaje: 20,
+    cuenta_bancaria: ''
+  });
 
   // Estados para gestión de contraseñas
   const [usuarios, setUsuarios] = useState([]);
@@ -148,9 +211,30 @@ const GestionClinica = () => {
   useEffect(() => {
     cargarEspecialistas();
     cargarTratamientos();
-    cargarEstadisticas();
     if (isMaster) cargarUsuarios();
   }, []);
+
+  useEffect(() => {
+    aplicarFiltrosAutomaticos();
+  }, [mesSeleccionado, anioSeleccionado, rolFiltro, tipoPagoFiltro]);
+
+  const aplicarFiltrosAutomaticos = () => {
+    const primerDia = new Date(anioSeleccionado, mesSeleccionado - 1, 1);
+    const ultimoDia = new Date(anioSeleccionado, mesSeleccionado, 0);
+    
+    const formatoISO = (d) => {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+    
+    const fi = formatoISO(primerDia);
+    const ff = formatoISO(ultimoDia);
+    setFechaInicio(fi);
+    setFechaFin(ff);
+    cargarEstadisticas({ fechaInicio: fi, fechaFin: ff });
+  };
 
   // Sincronización en tiempo real
   useSocket(["gestion:updated", "especialistas:updated", "tratamientos:updated"], () => {
@@ -475,471 +559,984 @@ const GestionClinica = () => {
     showToast({ severity: "success", message: "Reporte exportado exitosamente" });
   };
 
+  const personalFiltrado = estadisticas.filter(esp => {
+    const nombreCompleto = esp.especialista_nombre.toLowerCase();
+    const busqueda = busquedaPersonal.toLowerCase();
+    let cumpleFiltros = nombreCompleto.includes(busqueda);
+    
+    if (rolFiltro) {
+      cumpleFiltros = cumpleFiltros && esp.tipo === rolFiltro;
+    }
+    
+    if (tipoPagoFiltro) {
+      if (tipoPagoFiltro === 'fijo') {
+        cumpleFiltros = cumpleFiltros && esp.pago_fijo > 0 && esp.comision_porcentaje === 0;
+      } else if (tipoPagoFiltro === 'comision') {
+        cumpleFiltros = cumpleFiltros && esp.comision_porcentaje > 0 && esp.pago_fijo === 0;
+      } else if (tipoPagoFiltro === 'mixto') {
+        cumpleFiltros = cumpleFiltros && esp.pago_fijo > 0 && esp.comision_porcentaje > 0;
+      }
+    }
+    
+    return cumpleFiltros;
+  });
+
+  const toggleExpandir = (espId) => {
+    setPersonalExpandido(personalExpandido === espId ? null : espId);
+  };
+
+  const abrirModalRegistrarPago = (trabajador) => {
+    setDatoPago({
+      monto: trabajador.pago_total_especialista,
+      fecha: new Date().toISOString().split('T')[0],
+      metodo: 'transferencia',
+      referencia: ''
+    });
+    setModalRegistrarPago({ abierto: true, trabajador });
+  };
+
+  const abrirModalEditarDatos = async (trabajador) => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/especialistas/${trabajador.especialista_id}`, { headers: authHeaders });
+      const datos = res.data;
+      setDatoEdicion({
+        dni: datos.dni || '',
+        especialidad: datos.especialidad || '',
+        fecha_ingreso: datos.fecha_ingreso || '',
+        tipo_contrato: datos.tipo_contrato || '',
+        metodo_pago: datos.metodo_pago || '',
+        sueldo_fijo: datos.pago_fijo || 0,
+        comision_porcentaje: datos.comision_porcentaje || 20,
+        cuenta_bancaria: datos.cuenta_bancaria || ''
+      });
+      setModalEditarDatos({ abierto: true, trabajador });
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+      setModalEditarDatos({ abierto: true, trabajador });
+    }
+  };
+
+  const abrirModalHistorial = async (trabajador) => {
+    setModalHistorial({ abierto: true, trabajador });
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/gestion-clinica/historial-pagos/${trabajador.especialista_id}`,
+        { headers: authHeaders }
+      );
+      setHistorialPagos(Array.isArray(res.data) ? res.data : []);
+    } catch (error) {
+      console.error("Error al cargar historial de pagos:", error);
+      setHistorialPagos([]);
+    }
+  };
+
+  const cargarDetallePersonalExpandido = async (espId) => {
+    setLoadingDetallePersonal(true);
+    setTabDetalleModal(0);
+    try {
+      const params = new URLSearchParams();
+      if (fechaInicio) params.append("fecha_inicio", fechaInicio);
+      if (fechaFin) params.append("fecha_fin", fechaFin);
+      const qs = params.toString() ? '?' + params.toString() : '';
+
+      const [detalleRes, presupuestosRes, historialRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/gestion-clinica/especialista/${espId}/detalle${qs}`, { headers: authHeaders }),
+        axios.get(`${API_BASE_URL}/api/gestion-clinica/especialista/${espId}/presupuestos${qs}`, { headers: authHeaders }),
+        axios.get(`${API_BASE_URL}/api/gestion-clinica/historial-pagos/${espId}`, { headers: authHeaders })
+      ]);
+
+      setDetallePersonalData(detalleRes.data);
+      setPresupuestosEspecialista(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      setHistorialPagos(Array.isArray(historialRes.data) ? historialRes.data : []);
+    } catch (error) {
+      console.error("Error al cargar detalle del especialista:", error);
+      setDetallePersonalData(null);
+      setPresupuestosEspecialista([]);
+      setHistorialPagos([]);
+    } finally {
+      setLoadingDetallePersonal(false);
+    }
+  };
+
+  const registrarPago = async () => {
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/gestion-clinica/registrar-pago`,
+        {
+          especialista_id: modalRegistrarPago.trabajador.especialista_id,
+          monto: datoPago.monto,
+          fecha: datoPago.fecha,
+          metodo: datoPago.metodo,
+          referencia: datoPago.referencia,
+          mes: mesSeleccionado,
+          anio: anioSeleccionado
+        },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Pago registrado exitosamente" });
+      setModalRegistrarPago({ abierto: false, trabajador: null });
+      aplicarFiltrosAutomaticos();
+    } catch (error) {
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al registrar pago" });
+    }
+  };
+
+  const guardarEdicionDatos = async () => {
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/especialistas/${modalEditarDatos.trabajador.especialista_id}`,
+        datoEdicion,
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Datos actualizados exitosamente" });
+      setModalEditarDatos({ abierto: false, trabajador: null });
+      aplicarFiltrosAutomaticos();
+    } catch (error) {
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al actualizar datos" });
+    }
+  };
+
+  const exportarExcel = () => {
+    if (!estadisticas || estadisticas.length === 0) {
+      showToast({ severity: "warning", message: "No hay datos para exportar" });
+      return;
+    }
+
+    const datos = estadisticas.map(stat => ({
+      'Nombre': stat.especialista_nombre,
+      'Rol': stat.tipo || 'Doctor',
+      'Tipo de Pago': stat.pago_fijo > 0 && stat.comision_porcentaje > 0 ? 'Mixto' : stat.pago_fijo > 0 ? 'Fijo' : 'Comisión',
+      'Ingresos Generados': Number(stat.total_ingresos).toFixed(2),
+      'Comisión %': Number(stat.comision_porcentaje).toFixed(0),
+      'Comisión Calculada': Number(stat.comision_calculada).toFixed(2),
+      'Sueldo Fijo': Number(stat.pago_fijo).toFixed(2),
+      'Total a Pagar': Number(stat.pago_total_especialista).toFixed(2),
+      'Estado': 'Pendiente'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(datos);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Personal");
+    const mesNombre = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][mesSeleccionado - 1];
+    XLSX.writeFile(wb, `gestion_personal_${mesNombre}_${anioSeleccionado}.xlsx`);
+    showToast({ severity: "success", message: "Exportado exitosamente" });
+  };
+
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      {/* Header */}
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          p: 3, 
-          mb: 3, 
-          background: "linear-gradient(135deg, #a36920 0%, #c48a3a 100%)",
-          color: "white"
-        }}
-      >
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      {/* Header Moderno */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: "bold", mb: 1, display: "flex", alignItems: "center" }}>
-              <Assessment sx={{ mr: 2, fontSize: 40 }} />
-              Gestión Clínica
+            <Typography variant="h4" sx={{ fontWeight: "bold", color: BRAND_COLORS.primary, mb: 0.5 }}>
+              Gestión de personal
             </Typography>
-            <Typography variant="body1">
-              Control de atenciones, productividad y liquidación mensual
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            startIcon={<Home />}
-            onClick={() => navigate("/dashboard")}
-            sx={{
-              backgroundColor: "white",
-              color: "#a36920",
-              "&:hover": {
-                backgroundColor: "#f5f5f5"
-              }
-            }}
-          >
-            Cerrar Sesión
-          </Button>
-        </Box>
-      </Paper>
-
-      {/* Filtros */}
-      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-          <FilterList sx={{ mr: 1, color: "#a36920" }} />
-          <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920" }}>
-            Filtros de Búsqueda
-          </Typography>
-        </Box>
-        <Divider sx={{ mb: 2 }} />
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12}>
-            <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#666", mb: 1 }}>
-              Filtrar por Mes (Año {new Date().getFullYear()})
-            </Typography>
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
-              {[
-                { mes: 1, nombre: "Enero" },
-                { mes: 2, nombre: "Febrero" },
-                { mes: 3, nombre: "Marzo" },
-                { mes: 4, nombre: "Abril" },
-                { mes: 5, nombre: "Mayo" },
-                { mes: 6, nombre: "Junio" },
-                { mes: 7, nombre: "Julio" },
-                { mes: 8, nombre: "Agosto" },
-                { mes: 9, nombre: "Septiembre" },
-                { mes: 10, nombre: "Octubre" },
-                { mes: 11, nombre: "Noviembre" },
-                { mes: 12, nombre: "Diciembre" }
-              ].map(({ mes, nombre }) => (
-                <Button
-                  key={mes}
-                  variant={mesFiltro === mes ? "contained" : "outlined"}
-                  size="small"
-                  onClick={() => filtrarPorMes(mes)}
-                  sx={{
-                    backgroundColor: mesFiltro === mes ? "#a36920" : "transparent",
-                    borderColor: "#a36920",
-                    color: mesFiltro === mes ? "white" : "#a36920",
-                    "&:hover": {
-                      backgroundColor: mesFiltro === mes ? "#8a5a1a" : "rgba(163, 105, 32, 0.1)"
-                    },
-                    minWidth: 90,
-                    fontWeight: "bold",
-                    fontSize: "0.75rem"
-                  }}
-                >
-                  {nombre}
-                </Button>
-              ))}
-            </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Divider sx={{ my: 1 }} />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Especialista</InputLabel>
-              <Select
-                value={especialistaFiltro}
-                onChange={(e) => setEspecialistaFiltro(e.target.value)}
-                label="Especialista"
-              >
-                <MenuItem value="">Todos</MenuItem>
-                {especialistas.map((esp) => (
-                  <MenuItem key={esp.id} value={esp.id}>
-                    {esp.nombre}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.5}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Tipo</InputLabel>
-              <Select
-                value={tipoEspecialistaFiltro}
-                onChange={(e) => setTipoEspecialistaFiltro(e.target.value)}
-                label="Tipo"
-              >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="doctor">Doctor</MenuItem>
-                <MenuItem value="cosmiatra">Cosmiatra</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3.5}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Tratamiento</InputLabel>
-              <Select
-                value={tratamientoFiltro}
-                onChange={(e) => setTratamientoFiltro(e.target.value)}
-                label="Tratamiento"
-              >
-                <MenuItem value="">Todos</MenuItem>
-                {tratamientosDisponibles.map((trat, index) => (
-                  <MenuItem key={index} value={trat}>
-                    {trat}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="contained"
-                onClick={cargarEstadisticas}
-                fullWidth
-                startIcon={<FilterList />}
-                sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" } }}
-              >
-                Aplicar
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={limpiarFiltros}
-                fullWidth
-                startIcon={<Refresh />}
-              >
-                Limpiar
-              </Button>
-            </Stack>
-          </Grid>
-        </Grid>
-      </Paper>
-
-
-      {/* Tarjetas KPI de Resumen General */}
-      {!loading && estadisticas.length > 0 && (
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card elevation={2} sx={{ borderTop: "4px solid #a36920" }}>
-              <CardContent sx={{ textAlign: "center", py: 2 }}>
-                <MedicalServices sx={{ fontSize: 32, color: "#a36920", mb: 0.5 }} />
-                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#333" }}>
-                  {resumenGeneral.total_atenciones}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "#666" }}>
-                  Total Atenciones
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card elevation={2} sx={{ borderTop: "4px solid #4caf50" }}>
-              <CardContent sx={{ textAlign: "center", py: 2 }}>
-                <AttachMoney sx={{ fontSize: 32, color: "#4caf50", mb: 0.5 }} />
-                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#333" }}>
-                  S/ {Number(resumenGeneral.total_ingresos).toFixed(2)}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "#666" }}>
-                  Ingresos Totales
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card elevation={2} sx={{ borderTop: "4px solid #ff9800" }}>
-              <CardContent sx={{ textAlign: "center", py: 2 }}>
-                <MoneyOff sx={{ fontSize: 32, color: "#ff9800", mb: 0.5 }} />
-                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#333" }}>
-                  S/ {Number(resumenGeneral.total_pago_especialistas).toFixed(2)}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "#666" }}>
-                  Pago Especialistas
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card elevation={2} sx={{ borderTop: "4px solid #2e7d32" }}>
-              <CardContent sx={{ textAlign: "center", py: 2 }}>
-                <AccountBalance sx={{ fontSize: 32, color: "#2e7d32", mb: 0.5 }} />
-                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
-                  S/ {Number(resumenGeneral.total_ganancia_clinica).toFixed(2)}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "#666" }}>
-                  Ganancia Clínica
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={2.4}>
-            <Card elevation={2} sx={{ borderTop: "4px solid #2196f3" }}>
-              <CardContent sx={{ textAlign: "center", py: 2 }}>
-                <Groups sx={{ fontSize: 32, color: "#2196f3", mb: 0.5 }} />
-                <Typography variant="h4" sx={{ fontWeight: "bold", color: "#333" }}>
-                  {resumenGeneral.total_pacientes_unicos || 0}
-                </Typography>
-                <Typography variant="caption" sx={{ color: "#666" }}>
-                  Pacientes Atendidos
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
-
-      {/* Lista de Especialistas */}
-      <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <Person sx={{ mr: 1, color: "#a36920" }} />
-            <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920" }}>
-              Lista de Especialistas
+            <Typography variant="body2" sx={{ color: "#666" }}>
+              Control financiero y operativo del equipo
             </Typography>
           </Box>
-          {estadisticas.length > 0 && (
+          <Stack direction="row" spacing={2}>
             <Button
               variant="outlined"
-              size="small"
-              startIcon={<Download />}
-              onClick={exportarCSV}
-              sx={{ borderColor: "#a36920", color: "#a36920", "&:hover": { borderColor: "#8a5a1a", backgroundColor: "#fff8f0" } }}
+              startIcon={<Home />}
+              onClick={() => navigate("/dashboard")}
+              sx={{
+                borderColor: BRAND_COLORS.primary,
+                color: BRAND_COLORS.primary,
+                "&:hover": {
+                  borderColor: BRAND_COLORS.primaryDark,
+                  backgroundColor: BRAND_COLORS.secondaryLight
+                }
+              }}
             >
-              Exportar CSV
+              Volver
             </Button>
-          )}
+            <Button
+              variant="contained"
+              startIcon={<PersonAdd />}
+              sx={{
+                backgroundColor: BRAND_COLORS.primary,
+                "&:hover": {
+                  backgroundColor: BRAND_COLORS.primaryDark
+                }
+              }}
+            >
+              + Agregar personal
+            </Button>
+          </Stack>
         </Box>
-        <Divider sx={{ mb: 2 }} />
+      </Box>
+
+      {/* Resumen del Mes */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="body2" sx={{ color: "#999", textTransform: "uppercase", mb: 2, letterSpacing: 1 }}>
+          RESUMEN DEL MES — {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase()}
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ backgroundColor: BRAND_COLORS.secondaryLight, border: `1px solid ${BRAND_COLORS.secondary}`, borderRadius: 2 }}>
+              <CardContent sx={{ py: 2 }}>
+                <Typography variant="body2" sx={{ color: "#666", mb: 1 }}>
+                  Ingresos totales
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: BRAND_COLORS.primary }}>
+                  S/ {Number(resumenGeneral.total_ingresos || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography variant="caption" sx={{ color: BRAND_COLORS.success }}>
+                  +12% vs. marzo
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ backgroundColor: BRAND_COLORS.secondaryLight, border: `1px solid ${BRAND_COLORS.secondary}`, borderRadius: 2 }}>
+              <CardContent sx={{ py: 2 }}>
+                <Typography variant="body2" sx={{ color: "#666", mb: 1 }}>
+                  Comisiones a pagar
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: BRAND_COLORS.primary }}>
+                  S/ {Number(resumenGeneral.total_pago_especialistas - estadisticas.reduce((sum, e) => sum + (e.pago_fijo || 0), 0) || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  {estadisticas.filter(e => e.comision_porcentaje > 0).length} doctores con comisión
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ backgroundColor: BRAND_COLORS.secondaryLight, border: `1px solid ${BRAND_COLORS.secondary}`, borderRadius: 2 }}>
+              <CardContent sx={{ py: 2 }}>
+                <Typography variant="body2" sx={{ color: "#666", mb: 1 }}>
+                  Sueldos fijos
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: BRAND_COLORS.primary }}>
+                  S/ {Number(estadisticas.reduce((sum, e) => sum + (e.pago_fijo || 0), 0) || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  {estadisticas.filter(e => e.pago_fijo > 0).length} trabajadores
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ backgroundColor: BRAND_COLORS.secondaryLight, border: `1px solid ${BRAND_COLORS.secondary}`, borderRadius: 2 }}>
+              <CardContent sx={{ py: 2 }}>
+                <Typography variant="body2" sx={{ color: "#666", mb: 1 }}>
+                  Personal activo
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: "bold", color: BRAND_COLORS.primary }}>
+                  {estadisticas.filter(e => e.total_atenciones > 0).length}
+                </Typography>
+                <Typography variant="caption" sx={{ color: "#666" }}>
+                  {estadisticas.filter(e => e.tipo === 'doctor' || !e.tipo).length} doctores · {estadisticas.filter(e => e.tipo === 'asistente').length} asist. · {estadisticas.filter(e => e.tipo === 'admin').length} admin
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Pestañas de Navegación */}
+      <Paper sx={{ mb: 3, borderRadius: 2 }}>
+        <Tabs 
+          value={tabActual} 
+          onChange={(e, newValue) => setTabActual(newValue)}
+          sx={{
+            borderBottom: `2px solid ${BRAND_COLORS.secondary}`,
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              color: '#666',
+              '&.Mui-selected': {
+                color: BRAND_COLORS.primary
+              }
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: BRAND_COLORS.primary,
+              height: 3
+            }
+          }}
+        >
+          <Tab label="Personal" />
+          <Tab label="Pagos del mes" />
+          <Tab label="Historial" />
+          <Tab label="Configuración" />
+        </Tabs>
+      </Paper>
+
+      {/* Contenido de Pestañas */}
+      {tabActual === 0 && (
+        <>
+          {/* Filtros Compactos */}
+          <Paper elevation={0} sx={{ p: 2, mb: 3, backgroundColor: "white", borderRadius: 2, border: `1px solid ${BRAND_COLORS.secondary}` }}>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} sm={6} md={2.5}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Mes</InputLabel>
+                  <Select
+                    value={mesSeleccionado}
+                    onChange={(e) => setMesSeleccionado(e.target.value)}
+                    label="Mes"
+                  >
+                    <MenuItem value={1}>Enero</MenuItem>
+                    <MenuItem value={2}>Febrero</MenuItem>
+                    <MenuItem value={3}>Marzo</MenuItem>
+                    <MenuItem value={4}>Abril</MenuItem>
+                    <MenuItem value={5}>Mayo</MenuItem>
+                    <MenuItem value={6}>Junio</MenuItem>
+                    <MenuItem value={7}>Julio</MenuItem>
+                    <MenuItem value={8}>Agosto</MenuItem>
+                    <MenuItem value={9}>Septiembre</MenuItem>
+                    <MenuItem value={10}>Octubre</MenuItem>
+                    <MenuItem value={11}>Noviembre</MenuItem>
+                    <MenuItem value={12}>Diciembre</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Año</InputLabel>
+                  <Select
+                    value={anioSeleccionado}
+                    onChange={(e) => setAnioSeleccionado(e.target.value)}
+                    label="Año"
+                  >
+                    <MenuItem value={2024}>2024</MenuItem>
+                    <MenuItem value={2025}>2025</MenuItem>
+                    <MenuItem value={2026}>2026</MenuItem>
+                    <MenuItem value={2027}>2027</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} md={2.5}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Rol</InputLabel>
+                  <Select
+                    value={rolFiltro}
+                    onChange={(e) => setRolFiltro(e.target.value)}
+                    label="Rol"
+                  >
+                    <MenuItem value="">Todos</MenuItem>
+                    <MenuItem value="doctor">Doctor</MenuItem>
+                    <MenuItem value="asistente">Asistente</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} md={2.5}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Tipo pago</InputLabel>
+                  <Select
+                    value={tipoPagoFiltro}
+                    onChange={(e) => setTipoPagoFiltro(e.target.value)}
+                    label="Tipo pago"
+                  >
+                    <MenuItem value="">Todos</MenuItem>
+                    <MenuItem value="fijo">Fijo</MenuItem>
+                    <MenuItem value="comision">Comisión</MenuItem>
+                    <MenuItem value="mixto">Mixto</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} sm={6} md={2.5}>
+                <Button
+                  variant="outlined"
+                  fullWidth
+                  startIcon={<FileDownload />}
+                  onClick={exportarExcel}
+                  sx={{ 
+                    borderColor: BRAND_COLORS.primary, 
+                    color: BRAND_COLORS.primary,
+                    "&:hover": {
+                      borderColor: BRAND_COLORS.primaryDark,
+                      backgroundColor: BRAND_COLORS.secondaryLight
+                    }
+                  }}
+                >
+                  Exportar
+                </Button>
+              </Grid>
+            </Grid>
+          </Paper>
+
+
+      {/* Vista de Cards Circulares */}
+      <Box sx={{ mb: 3 }}>
         
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
-            <CircularProgress size={60} sx={{ color: "#a36920" }} />
+            <CircularProgress size={60} sx={{ color: BRAND_COLORS.primary }} />
           </Box>
-        ) : estadisticas.length === 0 ? (
+        ) : personalFiltrado.length === 0 ? (
           <Alert severity="info" sx={{ my: 3 }}>
-            No hay datos disponibles para el período seleccionado. Selecciona diferentes filtros y haz clic en "Aplicar".
+            No se encontraron resultados.
           </Alert>
         ) : (
-          <TableContainer sx={{ maxHeight: 600 }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 180 }}>Nombre Completo</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 100 }}>Tipo</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#e3f2fd" }}>Pacientes Atendidos</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#e3f2fd" }}>Tratamientos Realizados</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#e8f5e9" }}>Monto Generado</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#fff8e1", minWidth: 90 }}>% Comisión</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#fff8e1" }}>Comisión Calculada</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#fff3e0", minWidth: 100 }}>Sueldo Fijo</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: "bold", bgcolor: "#ffebee", minWidth: 120 }}>Total a Pagar</TableCell>
-                  <TableCell align="center" sx={{ fontWeight: "bold", bgcolor: "#f5f5f5", minWidth: 160 }}>Acciones</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {estadisticas.map((stat, index) => {
-                  const editando = editandoComision[stat.especialista_id];
-                  return (
-                  <TableRow
-                    key={index}
+          <Grid container spacing={3}>
+            {personalFiltrado.map((stat) => {
+              const coloresAvatar = ['#F4C430', '#9B7EBD', '#7FB3D5', '#F8B4B4', '#B4E7CE'];
+              const colorIndex = stat.especialista_id % coloresAvatar.length;
+              const iniciales = stat.especialista_nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+              
+              return (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={stat.especialista_id}>
+                  <Card
+                    onClick={() => {
+                      setPersonalExpandido(stat.especialista_id);
+                      cargarDetallePersonalExpandido(stat.especialista_id);
+                    }}
                     sx={{
-                      "&:hover": { backgroundColor: "#f9f9f9" },
-                      borderLeft: stat.total_atenciones > 0 ? "4px solid #a36920" : "4px solid #e0e0e0",
-                      opacity: stat.total_atenciones > 0 ? 1 : 0.6
+                      cursor: 'pointer',
+                      backgroundColor: '#2D2D2D',
+                      borderRadius: 3,
+                      p: 3,
+                      textAlign: 'center',
+                      transition: 'all 0.3s',
+                      '&:hover': {
+                        transform: 'translateY(-4px)',
+                        boxShadow: '0 8px 24px rgba(133, 79, 11, 0.3)'
+                      }
                     }}
                   >
-                    <TableCell>
-                      <Box sx={{ display: "flex", alignItems: "center" }}>
-                        <Person sx={{ mr: 1, color: "#a36920", fontSize: 20 }} />
-                        <Typography variant="body2" sx={{ fontWeight: "bold" }}>
-                          {stat.especialista_nombre}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Chip
-                        label={stat.tipo || "Doctor"}
-                        size="small"
-                        color={stat.tipo === "Cosmiatra" ? "secondary" : "primary"}
-                        sx={{ fontWeight: "bold", fontSize: "0.7rem" }}
-                      />
-                    </TableCell>
-                    <TableCell align="center" sx={{ bgcolor: "#e3f2fd" }}>
-                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#1976d2" }}>
-                        {stat.pacientes_unicos || 0}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center" sx={{ bgcolor: "#e3f2fd" }}>
-                      <Chip
-                        label={stat.total_atenciones}
-                        size="small"
-                        color={stat.total_atenciones > 0 ? "info" : "default"}
-                        sx={{ fontWeight: "bold", minWidth: 40 }}
-                      />
-                    </TableCell>
-                    <TableCell align="right" sx={{ bgcolor: "#e8f5e9" }}>
-                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
-                        S/ {Number(stat.total_ingresos).toFixed(2)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center" sx={{ bgcolor: "#fff8e1" }}>
-                      {editando ? (
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={editando.comision_porcentaje}
-                          onChange={(e) => setEditandoComision(prev => ({
-                            ...prev,
-                            [stat.especialista_id]: { ...prev[stat.especialista_id], comision_porcentaje: e.target.value }
-                          }))}
-                          inputProps={{ min: 0, max: 100, step: 1 }}
-                          sx={{ width: 70, "& input": { textAlign: "center", py: 0.5, fontSize: "0.85rem" } }}
-                        />
-                      ) : (
-                        <Chip
-                          label={`${Number(stat.comision_porcentaje).toFixed(0)}%`}
-                          size="small"
-                          variant="outlined"
-                          sx={{ fontWeight: "bold", color: "#ff9800", borderColor: "#ff9800" }}
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell align="center" sx={{ bgcolor: "#fff8e1" }}>
-                      {editando ? (
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={editando.pago_fijo}
-                          onChange={(e) => setEditandoComision(prev => ({
-                            ...prev,
-                            [stat.especialista_id]: { ...prev[stat.especialista_id], pago_fijo: e.target.value }
-                          }))}
-                          inputProps={{ min: 0, step: 5 }}
-                          sx={{ width: 80, "& input": { textAlign: "center", py: 0.5, fontSize: "0.85rem" } }}
-                        />
-                      ) : (
-                        <Typography variant="body2" sx={{ color: stat.pago_fijo > 0 ? "#333" : "#999" }}>
-                          S/ {Number(stat.pago_fijo).toFixed(2)}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="right" sx={{ bgcolor: "#fff8e1" }}>
-                      <Typography variant="body2" sx={{ fontWeight: "bold", color: "#f57c00" }}>
-                        S/ {Number(stat.comision_calculada).toFixed(2)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right" sx={{ bgcolor: "#fff3e0" }}>
-                      {editando ? (
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={editando.pago_fijo}
-                          onChange={(e) => setEditandoComision(prev => ({
-                            ...prev,
-                            [stat.especialista_id]: { ...prev[stat.especialista_id], pago_fijo: e.target.value }
-                          }))}
-                          inputProps={{ min: 0, step: 5 }}
-                          sx={{ width: 90, "& input": { textAlign: "right", py: 0.5, fontSize: "0.85rem" } }}
-                        />
-                      ) : (
-                        <Typography variant="body2" sx={{ fontWeight: "bold", color: stat.pago_fijo > 0 ? "#e65100" : "#999" }}>
-                          S/ {Number(stat.pago_fijo).toFixed(2)}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="right" sx={{ bgcolor: "#ffebee" }}>
-                      <Tooltip title={`Comisión: S/ ${Number(stat.comision_calculada).toFixed(2)} + Sueldo Fijo: S/ ${Number(stat.pago_fijo).toFixed(2)}`}>
-                        <Typography variant="body2" sx={{ fontWeight: "bold", color: "#c62828", fontSize: "0.95rem" }}>
-                          S/ {Number(stat.pago_total_especialista).toFixed(2)}
-                        </Typography>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Stack direction="row" spacing={0.5} justifyContent="center">
-                        {editando ? (
-                          <>
-                            <Tooltip title="Guardar">
-                              <IconButton
-                                size="small"
-                                onClick={() => guardarComision(stat.especialista_id)}
-                                sx={{ color: "#4caf50" }}
-                              >
-                                <Save fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Cancelar">
-                              <IconButton
-                                size="small"
-                                onClick={() => cancelarEdicion(stat.especialista_id)}
-                                sx={{ color: "#d32f2f" }}
-                              >
-                                <Close fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        ) : (
-                          <Tooltip title="Editar comisión">
-                            <IconButton
-                              size="small"
-                              onClick={() => iniciarEdicion(stat.especialista_id, stat.comision_porcentaje, stat.pago_fijo)}
-                              sx={{ color: "#ff9800" }}
-                            >
-                              <Edit fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        <Button
-                          variant="contained"
-                          size="small"
-                          startIcon={<Visibility />}
-                          onClick={() => verDetalleEspecialista(stat)}
-                          sx={{ 
-                            backgroundColor: "#a36920", 
-                            "&:hover": { backgroundColor: "#8a5a1a" },
-                            fontSize: "0.7rem",
-                            py: 0.3
-                          }}
-                        >
-                          Detalle
-                        </Button>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </Paper>
+                    <Avatar
+                      sx={{
+                        width: 100,
+                        height: 100,
+                        margin: '0 auto 16px',
+                        backgroundColor: coloresAvatar[colorIndex],
+                        fontSize: '2rem',
+                        fontWeight: 'bold',
+                        color: '#2D2D2D'
+                      }}
+                    >
+                      {iniciales}
+                    </Avatar>
+                    
+                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 0.5 }}>
+                      {stat.especialista_nombre}
+                    </Typography>
+                    
+                    <Typography variant="body2" sx={{ color: '#999', mb: 2 }}>
+                      {stat.tipo === 'doctor' ? 'Medicina estética' : stat.tipo === 'asistente' ? 'Asistente clínica' : 'Recepción'}
+                    </Typography>
+                    
+                    <Typography variant="h5" sx={{ color: BRAND_COLORS.warning, fontWeight: 'bold', mb: 0.5 }}>
+                      S/ {Number(stat.pago_total_especialista || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </Typography>
+                    
+                    <Typography variant="caption" sx={{ color: '#aaa', display: 'block', mb: 0.5 }}>
+                      Pago mensual
+                    </Typography>
 
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, mt: 0.5 }}>
+                      <Chip
+                        label={`${stat.total_atenciones} tratamiento${stat.total_atenciones !== 1 ? 's' : ''}`}
+                        size="small"
+                        sx={{ 
+                          backgroundColor: 'rgba(76,175,80,0.2)', 
+                          color: '#81c784', 
+                          fontWeight: 600,
+                          fontSize: '0.65rem',
+                          height: 22
+                        }}
+                      />
+                    </Box>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        )}
+      </Box>
+      
+      {/* Modal de Detalle del Trabajador */}
+      <Dialog 
+        open={personalExpandido !== null} 
+        onClose={() => setPersonalExpandido(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backgroundColor: '#2D2D2D',
+            borderRadius: 3
+          }
+        }}
+      >
+        {personalExpandido && (() => {
+          const trabajador = estadisticas.find(e => e.especialista_id === personalExpandido);
+          if (!trabajador) return null;
+          
+          const coloresAvatar = ['#F4C430', '#9B7EBD', '#7FB3D5', '#F8B4B4', '#B4E7CE'];
+          const colorIndex = trabajador.especialista_id % coloresAvatar.length;
+          const iniciales = trabajador.especialista_nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+          const tipoPago = trabajador.pago_fijo > 0 && trabajador.comision_porcentaje > 0 ? 'Fijo + Comisión' : trabajador.pago_fijo > 0 ? 'Sueldo Fijo' : 'Comisión';
+          
+          return (
+            <>
+              <DialogTitle sx={{ pb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Button
+                    startIcon={<Close />}
+                    onClick={() => setPersonalExpandido(null)}
+                    sx={{ color: '#999' }}
+                  >
+                    Volver al equipo
+                  </Button>
+                  <IconButton onClick={() => setPersonalExpandido(null)} sx={{ color: '#999' }}>
+                    <Close />
+                  </IconButton>
+                </Box>
+              </DialogTitle>
+              
+              <DialogContent>
+                {/* Header con Avatar y Nombre */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                  <Avatar
+                    sx={{
+                      width: 80,
+                      height: 80,
+                      backgroundColor: coloresAvatar[colorIndex],
+                      fontSize: '1.8rem',
+                      fontWeight: 'bold',
+                      color: '#2D2D2D'
+                    }}
+                  >
+                    {iniciales}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h5" sx={{ color: 'white', fontWeight: 600 }}>
+                      {trabajador.especialista_nombre}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#999' }}>
+                      {trabajador.tipo === 'doctor' ? 'Medicina estética' : trabajador.tipo === 'asistente' ? 'Asistente clínica' : 'Recepción'}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                      <Chip label={trabajador.tipo || 'Doctor'} size="small" sx={{ backgroundColor: '#4A4A4A', color: 'white', textTransform: 'capitalize' }} />
+                      <Chip label={tipoPago} size="small" sx={{ backgroundColor: '#4A4A4A', color: 'white' }} />
+                    </Box>
+                  </Box>
+                </Box>
+                
+                {/* Resumen Financiero */}
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={3}>
+                    <Paper sx={{ p: 2, backgroundColor: '#3A3A3A', textAlign: 'center', borderRadius: 2 }}>
+                      <Typography variant="caption" sx={{ color: '#999' }}>Sueldo fijo</Typography>
+                      <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
+                        S/ {Number(trabajador.pago_fijo).toLocaleString('es-PE', { minimumFractionDigits: 0 })}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Paper sx={{ p: 2, backgroundColor: '#3A3A3A', textAlign: 'center', borderRadius: 2 }}>
+                      <Typography variant="caption" sx={{ color: '#999' }}>Comisión ({Number(trabajador.comision_porcentaje).toFixed(0)}%)</Typography>
+                      <Typography variant="h6" sx={{ color: BRAND_COLORS.warning, fontWeight: 600 }}>
+                        S/ {Number(trabajador.comision_calculada).toLocaleString('es-PE', { minimumFractionDigits: 0 })}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Paper sx={{ p: 2, backgroundColor: '#3A3A3A', textAlign: 'center', borderRadius: 2 }}>
+                      <Typography variant="caption" sx={{ color: '#999' }}>Total a pagar</Typography>
+                      <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 600 }}>
+                        S/ {Number(trabajador.pago_total_especialista).toLocaleString('es-PE', { minimumFractionDigits: 0 })}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={3}>
+                    <Paper sx={{ p: 2, backgroundColor: '#3A3A3A', textAlign: 'center', borderRadius: 2 }}>
+                      <Typography variant="caption" sx={{ color: '#999' }}>Tratamientos</Typography>
+                      <Typography variant="h6" sx={{ color: '#81c784', fontWeight: 600 }}>
+                        {trabajador.total_atenciones}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                {/* Botones de Acción rápida */}
+                <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+                  <Button 
+                    variant="contained" 
+                    fullWidth
+                    startIcon={<Payment />}
+                    onClick={() => abrirModalRegistrarPago(trabajador)}
+                    sx={{ backgroundColor: BRAND_COLORS.primary, '&:hover': { backgroundColor: BRAND_COLORS.primaryDark } }}
+                  >
+                    Registrar pago
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth
+                    startIcon={<Visibility />}
+                    onClick={() => verDetalleEspecialista(trabajador)}
+                    sx={{ borderColor: BRAND_COLORS.primary, color: BRAND_COLORS.primary }}
+                  >
+                    Ver tratamientos
+                  </Button>
+                  <Button 
+                    variant="outlined" 
+                    fullWidth
+                    startIcon={<FileDownload />}
+                    onClick={() => {
+                      const datos = [{
+                        'Nombre': trabajador.especialista_nombre,
+                        'Tratamientos': trabajador.total_atenciones,
+                        'Ingresos': Number(trabajador.total_ingresos).toFixed(2),
+                        'Comisión': Number(trabajador.comision_calculada).toFixed(2),
+                        'Sueldo Fijo': Number(trabajador.pago_fijo).toFixed(2),
+                        'Total a Pagar': Number(trabajador.pago_total_especialista).toFixed(2),
+                      }];
+                      const ws = XLSX.utils.json_to_sheet(datos);
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Detalle");
+                      XLSX.writeFile(wb, `detalle_${trabajador.especialista_nombre.replace(/\s/g,'_')}.xlsx`);
+                      showToast({ severity: "success", message: "Exportado exitosamente" });
+                    }}
+                    sx={{ borderColor: '#4A4A4A', color: 'white' }}
+                  >
+                    Exportar
+                  </Button>
+                </Stack>
+                
+                {/* Tabs de contenido */}
+                <Box sx={{ borderBottom: 1, borderColor: '#4A4A4A', mb: 2 }}>
+                  <Tabs 
+                    value={tabDetalleModal} 
+                    onChange={(_, v) => setTabDetalleModal(v)}
+                    sx={{ 
+                      '& .MuiTab-root': { color: '#999', fontSize: '0.8rem', minWidth: 'auto', px: 2 }, 
+                      '& .Mui-selected': { color: 'white' },
+                      '& .MuiTabs-indicator': { backgroundColor: BRAND_COLORS.primary }
+                    }}
+                  >
+                    <Tab label="Presupuestos asignados" />
+                    <Tab label="Tratamientos realizados" />
+                    <Tab label="Historial de pagos" />
+                  </Tabs>
+                </Box>
+
+                {loadingDetallePersonal ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress size={40} sx={{ color: BRAND_COLORS.primary }} />
+                  </Box>
+                ) : (
+                  <>
+                    {/* Tab 0: Presupuestos asignados */}
+                    {tabDetalleModal === 0 && (
+                      <Box>
+                        {presupuestosEspecialista.length === 0 ? (
+                          <Alert severity="info" sx={{ backgroundColor: '#3A3A3A', color: '#ccc', '& .MuiAlert-icon': { color: '#81c784' } }}>
+                            No hay presupuestos asignados a este especialista en el período seleccionado.
+                          </Alert>
+                        ) : (
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {presupuestosEspecialista.map((pres) => {
+                              const tratamientos = pres.tratamientos || [];
+                              const precioTotal = Number(pres.precio_total || 0);
+                              const descuento = Number(pres.descuento || 0);
+                              const pagado = Number(pres.monto_pagado || 0);
+                              const saldo = Math.max(0, precioTotal - descuento - pagado);
+                              const estadoColor = pres.estado === 'completado' ? '#4CAF50' : pres.estado === 'activo' ? BRAND_COLORS.warning : '#999';
+                              
+                              return (
+                                <Paper key={pres.id} sx={{ p: 2, backgroundColor: '#3A3A3A', borderRadius: 2, border: `1px solid ${estadoColor}40` }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                                    <Box>
+                                      <Typography variant="subtitle2" sx={{ color: 'white', fontWeight: 600 }}>
+                                        {pres.paciente_nombre} {pres.paciente_apellido || ''}
+                                      </Typography>
+                                      <Typography variant="caption" sx={{ color: '#999' }}>
+                                        {pres.paciente_dni ? `DNI: ${pres.paciente_dni} · ` : ''} Creado: {pres.creado_en?.split(' ')[0] || '-'}
+                                      </Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Chip 
+                                        label={`${pres.sesiones_completadas || 0}/${pres.sesiones_totales || 0} sesiones`}
+                                        size="small"
+                                        sx={{ backgroundColor: '#4A4A4A', color: 'white', fontSize: '0.7rem' }}
+                                      />
+                                      <Chip 
+                                        label={pres.estado === 'completado' ? 'Completado' : pres.estado === 'activo' ? 'Activo' : pres.estado}
+                                        size="small"
+                                        sx={{ backgroundColor: `${estadoColor}30`, color: estadoColor, fontWeight: 600, fontSize: '0.7rem' }}
+                                      />
+                                    </Box>
+                                  </Box>
+                                  
+                                  {/* Tratamientos del presupuesto */}
+                                  <Box sx={{ mb: 1.5 }}>
+                                    {tratamientos.map((trat, idx) => (
+                                      <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5, borderBottom: idx < tratamientos.length - 1 ? '1px solid #4A4A4A' : 'none' }}>
+                                        <Typography variant="body2" sx={{ color: '#ddd', fontSize: '0.8rem' }}>
+                                          {trat.nombre || trat.tratamiento || 'Tratamiento'}
+                                          {trat.sesiones > 1 ? ` (${trat.sesiones} ses.)` : ''}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: BRAND_COLORS.warning, fontWeight: 600, fontSize: '0.8rem' }}>
+                                          S/ {Number(trat.precio || 0).toFixed(2)}
+                                        </Typography>
+                                      </Box>
+                                    ))}
+                                  </Box>
+
+                                  {/* Resumen financiero del presupuesto */}
+                                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                    <Box sx={{ flex: 1, textAlign: 'center', backgroundColor: '#2D2D2D', p: 1, borderRadius: 1 }}>
+                                      <Typography variant="caption" sx={{ color: '#999' }}>Total</Typography>
+                                      <Typography variant="body2" sx={{ color: 'white', fontWeight: 600 }}>S/ {precioTotal.toFixed(2)}</Typography>
+                                    </Box>
+                                    {descuento > 0 && (
+                                      <Box sx={{ flex: 1, textAlign: 'center', backgroundColor: '#2D2D2D', p: 1, borderRadius: 1 }}>
+                                        <Typography variant="caption" sx={{ color: '#999' }}>Descuento</Typography>
+                                        <Typography variant="body2" sx={{ color: '#f44336', fontWeight: 600 }}>-S/ {descuento.toFixed(2)}</Typography>
+                                      </Box>
+                                    )}
+                                    <Box sx={{ flex: 1, textAlign: 'center', backgroundColor: '#2D2D2D', p: 1, borderRadius: 1 }}>
+                                      <Typography variant="caption" sx={{ color: '#999' }}>Pagado</Typography>
+                                      <Typography variant="body2" sx={{ color: '#4CAF50', fontWeight: 600 }}>S/ {pagado.toFixed(2)}</Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1, textAlign: 'center', backgroundColor: '#2D2D2D', p: 1, borderRadius: 1 }}>
+                                      <Typography variant="caption" sx={{ color: '#999' }}>Saldo</Typography>
+                                      <Typography variant="body2" sx={{ color: saldo > 0 ? '#ff9800' : '#4CAF50', fontWeight: 600 }}>S/ {saldo.toFixed(2)}</Typography>
+                                    </Box>
+                                  </Box>
+                                </Paper>
+                              );
+                            })}
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+
+                    {/* Tab 1: Tratamientos realizados */}
+                    {tabDetalleModal === 1 && (
+                      <Box>
+                        {!detallePersonalData || !detallePersonalData.tratamientos || detallePersonalData.tratamientos.length === 0 ? (
+                          <Alert severity="info" sx={{ backgroundColor: '#3A3A3A', color: '#ccc', '& .MuiAlert-icon': { color: '#81c784' } }}>
+                            No hay tratamientos realizados en el período seleccionado.
+                          </Alert>
+                        ) : (
+                          <TableContainer>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ color: '#999', borderColor: '#4A4A4A', fontWeight: 600 }}>Tratamiento</TableCell>
+                                  <TableCell align="center" sx={{ color: '#999', borderColor: '#4A4A4A', fontWeight: 600 }}>Sesiones</TableCell>
+                                  <TableCell align="right" sx={{ color: '#999', borderColor: '#4A4A4A', fontWeight: 600 }}>Ingresos</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {detallePersonalData.tratamientos.map((trat, idx) => (
+                                  <TableRow key={idx}>
+                                    <TableCell sx={{ color: 'white', borderColor: '#4A4A4A' }}>{trat.tratamiento_nombre}</TableCell>
+                                    <TableCell align="center" sx={{ color: '#81c784', borderColor: '#4A4A4A', fontWeight: 600 }}>{trat.total_sesiones}</TableCell>
+                                    <TableCell align="right" sx={{ color: BRAND_COLORS.warning, borderColor: '#4A4A4A', fontWeight: 600 }}>
+                                      S/ {Number(trat.total_ingresos || 0).toFixed(2)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                                <TableRow>
+                                  <TableCell sx={{ color: 'white', borderColor: '#4A4A4A', fontWeight: 700 }}>Total</TableCell>
+                                  <TableCell align="center" sx={{ color: '#81c784', borderColor: '#4A4A4A', fontWeight: 700 }}>
+                                    {detallePersonalData.tratamientos.reduce((s, t) => s + t.total_sesiones, 0)}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ color: BRAND_COLORS.warning, borderColor: '#4A4A4A', fontWeight: 700 }}>
+                                    S/ {Number(detallePersonalData.totales?.total_ingresos || 0).toFixed(2)}
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        )}
+                      </Box>
+                    )}
+
+                    {/* Tab 2: Historial de pagos */}
+                    {tabDetalleModal === 2 && (
+                      <Box>
+                        {historialPagos.length === 0 ? (
+                          <Alert severity="info" sx={{ backgroundColor: '#3A3A3A', color: '#ccc', '& .MuiAlert-icon': { color: '#81c784' } }}>
+                            No hay pagos registrados para este especialista.
+                          </Alert>
+                        ) : (
+                          <TableContainer>
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell sx={{ color: '#999', borderColor: '#4A4A4A', fontWeight: 600 }}>Fecha</TableCell>
+                                  <TableCell align="right" sx={{ color: '#999', borderColor: '#4A4A4A', fontWeight: 600 }}>Monto</TableCell>
+                                  <TableCell sx={{ color: '#999', borderColor: '#4A4A4A', fontWeight: 600 }}>Método</TableCell>
+                                  <TableCell sx={{ color: '#999', borderColor: '#4A4A4A', fontWeight: 600 }}>Referencia</TableCell>
+                                  <TableCell sx={{ color: '#999', borderColor: '#4A4A4A', fontWeight: 600 }}>Estado</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {historialPagos.map((pago) => (
+                                  <TableRow key={pago.id}>
+                                    <TableCell sx={{ color: 'white', borderColor: '#4A4A4A' }}>{pago.fecha_pago}</TableCell>
+                                    <TableCell align="right" sx={{ color: '#4CAF50', borderColor: '#4A4A4A', fontWeight: 600 }}>
+                                      S/ {Number(pago.monto || 0).toFixed(2)}
+                                    </TableCell>
+                                    <TableCell sx={{ color: '#ddd', borderColor: '#4A4A4A', textTransform: 'capitalize' }}>{pago.metodo_pago || '-'}</TableCell>
+                                    <TableCell sx={{ color: '#ddd', borderColor: '#4A4A4A' }}>{pago.referencia || '-'}</TableCell>
+                                    <TableCell sx={{ borderColor: '#4A4A4A' }}>
+                                      <Chip label={pago.estado || 'pagado'} size="small" sx={{ backgroundColor: '#4CAF5030', color: '#4CAF50', fontSize: '0.7rem', textTransform: 'capitalize' }} />
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        )}
+                      </Box>
+                    )}
+                  </>
+                )}
+              </DialogContent>
+            </>
+          );
+        })()}
+      </Dialog>
+        </>
+      )}
+
+      {/* Pestaña: Pagos del mes */}
+      {tabActual === 1 && (
+        <Paper elevation={0} sx={{ p: 3, backgroundColor: "white", borderRadius: 2, border: `1px solid ${BRAND_COLORS.secondary}` }}>
+          <Typography variant="h6" sx={{ mb: 3 }}>Nómina del mes</Typography>
+          <Alert severity="info">Funcionalidad en desarrollo</Alert>
+        </Paper>
+      )}
+
+      {/* Pestaña: Historial */}
+      {tabActual === 2 && (
+        <Paper elevation={0} sx={{ p: 3, backgroundColor: "white", borderRadius: 2, border: `1px solid ${BRAND_COLORS.secondary}` }}>
+          <Typography variant="h6" sx={{ mb: 3 }}>Historial de pagos</Typography>
+          <Alert severity="info">Funcionalidad en desarrollo</Alert>
+        </Paper>
+      )}
+
+      {/* Pestaña: Configuración */}
+      {tabActual === 3 && (
+        <Paper elevation={0} sx={{ p: 3, backgroundColor: "white", borderRadius: 2, border: `1px solid ${BRAND_COLORS.secondary}` }}>
+          <Typography variant="h6" sx={{ mb: 3 }}>Configuración</Typography>
+          <Alert severity="info">Funcionalidad en desarrollo</Alert>
+        </Paper>
+      )}
 
       {/* Gestión de Usuarios (solo master) */}
-      {isMaster && (
+      {isMaster && tabActual === 3 && (
+        <Paper elevation={0} sx={{ p: 3, mt: 4, borderRadius: 3, border: "1px solid rgba(163,105,32,0.2)", backgroundColor: "#fffdf7" }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920", display: "flex", alignItems: "center", gap: 1 }}>
+              <VpnKey /> Gestión de Usuarios
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<PersonAdd />}
+              onClick={() => setOpenCreateUser(true)}
+              sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" } }}
+            >
+              Crear Usuario
+            </Button>
+          </Box>
+          <Divider sx={{ mb: 2 }} />
+          {usuarios.length === 0 ? (
+            <Typography color="text.secondary">No se encontraron usuarios.</Typography>
+          ) : (
+            <Grid container spacing={2}>
+              {usuarios.map((u) => (
+                <Grid item xs={12} sm={6} md={4} key={u.id}>
+                  <Paper elevation={2} sx={{ p: 2, borderRadius: 2, border: "1px solid #e0d6c2", backgroundColor: "#f5f1e4" }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.5 }}>
+                      <Box>
+                        <Typography sx={{ fontWeight: "bold", color: "#333", fontSize: "1rem" }}>{u.username}</Typography>
+                        <Chip 
+                          label={u.role} 
+                          size="small" 
+                          sx={{ 
+                            mt: 0.5, 
+                            backgroundColor: u.role === "master" ? "#a36920" : u.role === "doctor" ? "#ba9a63" : "#e0d6c2", 
+                            color: u.role === "master" || u.role === "doctor" ? "white" : "#555", 
+                            fontWeight: 600, 
+                            fontSize: "0.7rem" 
+                          }} 
+                        />
+                      </Box>
+                      {u.role !== "master" && (
+                        <IconButton 
+                          size="small" 
+                          onClick={() => eliminarUsuario(u.id, u.username)} 
+                          sx={{ color: "#d32f2f" }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                    
+                    <Divider sx={{ my: 1.5 }} />
+                    
+                    <Stack spacing={1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Lock />}
+                        fullWidth
+                        onClick={() => { setPasswordEditing(u.id); setNewPassword(""); setShowPassword(false); }}
+                        sx={{ 
+                          borderColor: "#a36920", 
+                          color: "#a36920",
+                          fontSize: "0.75rem",
+                          "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(163,105,32,0.05)" }
+                        }}
+                      >
+                        Cambiar Contraseña
+                      </Button>
+                      
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<LockOpen />}
+                        fullWidth
+                        onClick={() => abrirEditarPermisos(u)}
+                        sx={{ 
+                          borderColor: "#ba9a63", 
+                          color: "#ba9a63",
+                          fontSize: "0.75rem",
+                          "&:hover": { borderColor: "#a36920", backgroundColor: "rgba(186,154,99,0.05)" }
+                        }}
+                      >
+                        Gestionar Permisos
+                      </Button>
+                    </Stack>
+                    
+                    {passwordEditing === u.id && (
+                      <Box sx={{ mt: 1.5, p: 1.5, backgroundColor: "white", borderRadius: 1, border: "1px solid #e0d6c2" }}>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          type={showPassword ? "text" : "password"}
+        </Paper>
+      )}
+
+      {/* Pestaña: Historial */}
+      {tabActual === 2 && (
+        <Paper elevation={0} sx={{ p: 3, backgroundColor: "white", borderRadius: 2, border: `1px solid ${BRAND_COLORS.secondary}` }}>
+          <Typography variant="h6" sx={{ mb: 3 }}>Historial de pagos</Typography>
+          <Alert severity="info">Funcionalidad en desarrollo</Alert>
+        </Paper>
+      )}
+
+      {/* Pestaña: Configuración */}
+      {tabActual === 3 && (
+        <Paper elevation={0} sx={{ p: 3, backgroundColor: "white", borderRadius: 2, border: `1px solid ${BRAND_COLORS.secondary}` }}>
+          <Typography variant="h6" sx={{ mb: 3 }}>Configuración</Typography>
+          <Alert severity="info">Funcionalidad en desarrollo</Alert>
+        </Paper>
+      )}
+
+      {/* Gestión de Usuarios (solo master) */}
+      {isMaster && tabActual === 3 && (
         <Paper elevation={0} sx={{ p: 3, mt: 4, borderRadius: 3, border: "1px solid rgba(163,105,32,0.2)", backgroundColor: "#fffdf7" }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: "bold", color: "#a36920", display: "flex", alignItems: "center", gap: 1 }}>
@@ -1605,6 +2202,253 @@ const GestionClinica = () => {
               backgroundColor: "#a36920",
               "&:hover": { backgroundColor: "#8a5a1a" }
             }}
+          >
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal: Registrar Pago */}
+      <Dialog open={modalRegistrarPago.abierto} onClose={() => setModalRegistrarPago({ abierto: false, trabajador: null })} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.primaryDark} 100%)`, color: "white" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Payment />
+            <Typography variant="h6">Registrar Pago</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 3 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
+                Trabajador: <strong>{modalRegistrarPago.trabajador?.especialista_nombre}</strong>
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Monto a pagar"
+                type="number"
+                value={datoPago.monto}
+                onChange={(e) => setDatoPago({ ...datoPago, monto: parseFloat(e.target.value) })}
+                InputProps={{
+                  startAdornment: <Typography sx={{ mr: 1 }}>S/</Typography>
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Fecha de pago"
+                type="date"
+                value={datoPago.fecha}
+                onChange={(e) => setDatoPago({ ...datoPago, fecha: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Método de pago</InputLabel>
+                <Select
+                  value={datoPago.metodo}
+                  onChange={(e) => setDatoPago({ ...datoPago, metodo: e.target.value })}
+                  label="Método de pago"
+                >
+                  <MenuItem value="efectivo">Efectivo</MenuItem>
+                  <MenuItem value="transferencia">Transferencia</MenuItem>
+                  <MenuItem value="yape">Yape</MenuItem>
+                  <MenuItem value="plin">Plin</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Referencia / Nº Operación"
+                value={datoPago.referencia}
+                onChange={(e) => setDatoPago({ ...datoPago, referencia: e.target.value })}
+                placeholder="Opcional"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalRegistrarPago({ abierto: false, trabajador: null })} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={registrarPago}
+            sx={{ backgroundColor: BRAND_COLORS.primary, "&:hover": { backgroundColor: BRAND_COLORS.primaryDark } }}
+          >
+            Confirmar Pago
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal: Editar Datos */}
+      <Dialog open={modalEditarDatos.abierto} onClose={() => setModalEditarDatos({ abierto: false, trabajador: null })} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.primaryDark} 100%)`, color: "white" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Edit />
+            <Typography variant="h6">Editar Datos del Trabajador</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 3 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Typography variant="body2" sx={{ mb: 2, color: "#666" }}>
+                Trabajador: <strong>{modalEditarDatos.trabajador?.especialista_nombre}</strong>
+              </Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="DNI"
+                value={datoEdicion.dni}
+                onChange={(e) => setDatoEdicion({ ...datoEdicion, dni: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Especialidad"
+                value={datoEdicion.especialidad}
+                onChange={(e) => setDatoEdicion({ ...datoEdicion, especialidad: e.target.value })}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Fecha de ingreso"
+                type="date"
+                value={datoEdicion.fecha_ingreso}
+                onChange={(e) => setDatoEdicion({ ...datoEdicion, fecha_ingreso: e.target.value })}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <InputLabel>Tipo de contrato</InputLabel>
+                <Select
+                  value={datoEdicion.tipo_contrato}
+                  onChange={(e) => setDatoEdicion({ ...datoEdicion, tipo_contrato: e.target.value })}
+                  label="Tipo de contrato"
+                >
+                  <MenuItem value="indefinido">Indefinido</MenuItem>
+                  <MenuItem value="temporal">Temporal</MenuItem>
+                  <MenuItem value="por_servicios">Por servicios</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Sueldo fijo mensual"
+                type="number"
+                value={datoEdicion.sueldo_fijo}
+                onChange={(e) => setDatoEdicion({ ...datoEdicion, sueldo_fijo: parseFloat(e.target.value) })}
+                InputProps={{
+                  startAdornment: <Typography sx={{ mr: 1 }}>S/</Typography>
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="% Comisión"
+                type="number"
+                value={datoEdicion.comision_porcentaje}
+                onChange={(e) => setDatoEdicion({ ...datoEdicion, comision_porcentaje: parseFloat(e.target.value) })}
+                InputProps={{
+                  endAdornment: <Typography sx={{ ml: 1 }}>%</Typography>
+                }}
+                inputProps={{ min: 0, max: 100 }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Cuenta bancaria"
+                value={datoEdicion.cuenta_bancaria}
+                onChange={(e) => setDatoEdicion({ ...datoEdicion, cuenta_bancaria: e.target.value })}
+                placeholder="Banco - Nº Cuenta"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setModalEditarDatos({ abierto: false, trabajador: null })} sx={{ color: "#666" }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={guardarEdicionDatos}
+            sx={{ backgroundColor: BRAND_COLORS.primary, "&:hover": { backgroundColor: BRAND_COLORS.primaryDark } }}
+          >
+            Guardar Cambios
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal: Historial de Pagos */}
+      <Dialog open={modalHistorial.abierto} onClose={() => setModalHistorial({ abierto: false, trabajador: null })} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, ${BRAND_COLORS.primaryDark} 100%)`, color: "white" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <History />
+            <Typography variant="h6">Historial de Pagos</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 3 }}>
+          <Typography variant="body2" sx={{ mb: 3, color: "#666" }}>
+            Trabajador: <strong>{modalHistorial.trabajador?.especialista_nombre}</strong>
+          </Typography>
+          {historialPagos.length === 0 ? (
+            <Alert severity="info">No hay pagos registrados para este trabajador.</Alert>
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>Fecha</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>Monto</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Método</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Mes/Año</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Referencia</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Estado</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {historialPagos.map((pago) => (
+                    <TableRow key={pago.id}>
+                      <TableCell>{pago.fecha_pago}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, color: BRAND_COLORS.success }}>
+                        S/ {Number(pago.monto || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell sx={{ textTransform: 'capitalize' }}>{pago.metodo_pago || '-'}</TableCell>
+                      <TableCell>{pago.mes && pago.anio ? `${pago.mes}/${pago.anio}` : '-'}</TableCell>
+                      <TableCell>{pago.referencia || '-'}</TableCell>
+                      <TableCell>
+                        <Chip label={pago.estado || 'pagado'} size="small" color="success" variant="outlined" sx={{ textTransform: 'capitalize' }} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, color: BRAND_COLORS.primary }}>
+                      S/ {historialPagos.reduce((s, p) => s + Number(p.monto || 0), 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell colSpan={4} />
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={() => setModalHistorial({ abierto: false, trabajador: null })} 
+            variant="contained"
+            sx={{ backgroundColor: BRAND_COLORS.primary, "&:hover": { backgroundColor: BRAND_COLORS.primaryDark } }}
           >
             Cerrar
           </Button>

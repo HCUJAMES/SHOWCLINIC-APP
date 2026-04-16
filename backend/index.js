@@ -718,6 +718,14 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
+    // Agregar columna especialista_id a presupuestos_asignados (para asignar presupuesto a un especialista)
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN especialista_id INTEGER`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna especialista_id a presupuestos_asignados:", err.message);
+      } else {
+        console.log("✅ Columna especialista_id agregada a presupuestos_asignados");
+      }
+    });
 
     // 🧱 Tabla de especialistas
     db.run(`
@@ -746,6 +754,42 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
         console.error("Error agregando columna pago_fijo a especialistas:", err.message);
       } else {
         console.log("✅ Columna pago_fijo agregada a especialistas");
+      }
+    });
+
+    // Agregar columna tipo a especialistas
+    db.run(`ALTER TABLE especialistas ADD COLUMN tipo TEXT DEFAULT 'doctor'`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna tipo a especialistas:", err.message);
+      } else {
+        console.log("✅ Columna tipo agregada a especialistas");
+      }
+    });
+
+    // Agregar columna especialidad a especialistas
+    db.run(`ALTER TABLE especialistas ADD COLUMN especialidad TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna especialidad a especialistas:", err.message);
+      } else {
+        console.log("✅ Columna especialidad agregada a especialistas");
+      }
+    });
+
+    // Agregar columna foto_perfil a especialistas
+    db.run(`ALTER TABLE especialistas ADD COLUMN foto_perfil TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna foto_perfil a especialistas:", err.message);
+      } else {
+        console.log("✅ Columna foto_perfil agregada a especialistas");
+      }
+    });
+
+    // Agregar columna cuenta_bancaria a especialistas
+    db.run(`ALTER TABLE especialistas ADD COLUMN cuenta_bancaria TEXT`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna cuenta_bancaria a especialistas:", err.message);
+      } else {
+        console.log("✅ Columna cuenta_bancaria agregada a especialistas");
       }
     });
 
@@ -1075,6 +1119,26 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE INDEX IF NOT EXISTS idx_mapa_facial_paciente ON mapa_facial_3d(paciente_id)");
     console.log("✅ Tabla mapa_facial_3d creada");
 
+    // 💰 Tabla de pagos a personal (historial de pagos realizados a especialistas)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS pagos_personal (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        especialista_id INTEGER NOT NULL,
+        monto REAL NOT NULL DEFAULT 0,
+        fecha_pago TEXT NOT NULL,
+        metodo_pago TEXT DEFAULT 'transferencia',
+        referencia TEXT,
+        mes INTEGER,
+        anio INTEGER,
+        estado TEXT DEFAULT 'pagado',
+        notas TEXT,
+        creado_en TEXT DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY(especialista_id) REFERENCES especialistas(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_pagos_personal_esp ON pagos_personal(especialista_id)");
+    console.log("✅ Tabla pagos_personal creada");
+
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
 
@@ -1101,6 +1165,7 @@ app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/n8n", n8nIntegrationRoutes);
 app.use("/api/gestion-clinica", gestionClinicaRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
+app.use("/uploads/especialistas", express.static("uploads/especialistas"));
 
 // ✅ Servir frontend (React build) para acceso remoto (ej. iPad/iPhone)
 const frontendBuildPath = path.join(__dirname, "..", "frontend", "build");

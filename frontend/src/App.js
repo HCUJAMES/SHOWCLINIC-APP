@@ -20,7 +20,7 @@ const Especialistas = React.lazy(() => import("./pages/Especialistas"));
 const Estadisticas = React.lazy(() => import("./pages/Estadisticas"));
 const Gestion = React.lazy(() => import("./pages/Gestion"));
 const Paquetes = React.lazy(() => import("./pages/Paquetes"));
-const GestionClinica = React.lazy(() => import("./pages/GestionClinica"));
+const GestionClinica = React.lazy(() => import("./pages/GestionPersonalCards"));
 
 // Spinner de carga mientras se descarga el chunk de la página
 const PageLoader = () => (

@@ -1,8 +1,41 @@
 import express from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import db from "../db/database.js";
 import { authMiddleware, requireDoctor } from "../middleware/auth.js";
 
 const router = express.Router();
+
+// Configuración de multer para subir fotos de perfil
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/especialistas';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'perfil-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowedExt = /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i;
+    const allowedMime = /^image\//i;
+    const extOk = allowedExt.test(path.extname(file.originalname));
+    const mimeOk = allowedMime.test(file.mimetype);
+    if (extOk || mimeOk) {
+      return cb(null, true);
+    }
+    cb(new Error('Solo se permiten archivos de imagen'));
+  }
+});
 
 // Función para formatear nombre de especialista a formato correcto
 // Ej: "ERICK SPETIA" -> "Erick Spetia", "dr. erick spetia" -> "Dr. Erick Spetia"
@@ -183,6 +216,145 @@ router.put("/comision/:id", authMiddleware, requireDoctor, (req, res) => {
       res.json({ message: "Comisión actualizada correctamente" });
     }
   );
+});
+
+// ✅ Obtener datos completos de un especialista
+router.get("/:id", authMiddleware, (req, res) => {
+  const { id } = req.params;
+  
+  db.get("SELECT * FROM especialistas WHERE id = ?", [id], (err, row) => {
+    if (err) {
+      console.error("❌ Error al obtener especialista:", err.message);
+      return res.status(500).json({ message: "Error al obtener especialista" });
+    }
+    
+    if (!row) {
+      return res.status(404).json({ message: "Especialista no encontrado" });
+    }
+    
+    res.json(row);
+  });
+});
+
+// ✅ Actualizar datos completos de un especialista
+router.put("/:id", authMiddleware, requireDoctor, (req, res) => {
+  const { id } = req.params;
+  const { 
+    nombre,
+    apellido,
+    dni, 
+    especialidad, 
+    fecha_ingreso, 
+    tipo_contrato, 
+    metodo_pago, 
+    sueldo_fijo,
+    pago_fijo,
+    comision_porcentaje, 
+    cuenta_bancaria 
+  } = req.body;
+
+  const updates = [];
+  const params = [];
+
+  if (nombre !== undefined) {
+    updates.push("nombre = ?");
+    const nombreCompleto = apellido ? `${nombre} ${apellido}` : nombre;
+    params.push(formatNombreEspecialista(nombreCompleto));
+  }
+  if (dni !== undefined) {
+    updates.push("dni = ?");
+    params.push(dni);
+  }
+  if (especialidad !== undefined) {
+    updates.push("especialidad = ?");
+    params.push(especialidad);
+  }
+  if (fecha_ingreso !== undefined) {
+    updates.push("fecha_ingreso = ?");
+    params.push(fecha_ingreso);
+  }
+  if (tipo_contrato !== undefined) {
+    updates.push("tipo_contrato = ?");
+    params.push(tipo_contrato);
+  }
+  if (metodo_pago !== undefined) {
+    updates.push("metodo_pago = ?");
+    params.push(metodo_pago);
+  }
+  if (sueldo_fijo !== undefined || pago_fijo !== undefined) {
+    updates.push("pago_fijo = ?");
+    params.push(Number(pago_fijo || sueldo_fijo));
+  }
+  if (comision_porcentaje !== undefined) {
+    updates.push("comision_porcentaje = ?");
+    params.push(Number(comision_porcentaje));
+  }
+  if (cuenta_bancaria !== undefined) {
+    updates.push("cuenta_bancaria = ?");
+    params.push(cuenta_bancaria);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ message: "No se enviaron datos para actualizar" });
+  }
+
+  params.push(id);
+
+  db.run(
+    `UPDATE especialistas SET ${updates.join(", ")} WHERE id = ?`,
+    params,
+    function (err) {
+      if (err) {
+        console.error("❌ Error al actualizar especialista:", err.message);
+        return res.status(500).json({ message: "Error al actualizar especialista" });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ message: "Especialista no encontrado" });
+      }
+
+      console.log(`✅ Datos actualizados para especialista ID ${id}`);
+      res.json({ message: "Datos actualizados correctamente" });
+    }
+  );
+});
+
+// ✅ Subir foto de perfil de un especialista
+router.post("/:id/foto", authMiddleware, requireDoctor, (req, res) => {
+  upload.single('foto')(req, res, (multerErr) => {
+    if (multerErr) {
+      console.error("❌ Error multer al subir foto:", multerErr.message);
+      return res.status(400).json({ message: multerErr.message || "Error al subir archivo" });
+    }
+
+    const { id } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No se recibió ninguna foto" });
+    }
+
+    const fotoUrl = `/uploads/especialistas/${req.file.filename}`;
+
+    db.run(
+      "UPDATE especialistas SET foto_perfil = ? WHERE id = ?",
+      [fotoUrl, id],
+      function (err) {
+        if (err) {
+          console.error("❌ Error al actualizar foto:", err.message);
+          try { fs.unlinkSync(req.file.path); } catch (_) {}
+          return res.status(500).json({ message: "Error al actualizar foto" });
+        }
+
+        if (this.changes === 0) {
+          try { fs.unlinkSync(req.file.path); } catch (_) {}
+          return res.status(404).json({ message: "Especialista no encontrado" });
+        }
+
+        console.log(`✅ Foto actualizada para especialista ID ${id}`);
+        res.json({ foto_url: fotoUrl, message: "Foto actualizada correctamente" });
+      }
+    );
+  });
 });
 
 export default router;

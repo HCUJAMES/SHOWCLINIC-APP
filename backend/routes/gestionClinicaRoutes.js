@@ -93,7 +93,8 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
     const todosEspecialistas = await dbAll(`
       SELECT id as especialista_id, nombre as especialista_nombre,
         COALESCE(comision_porcentaje, 20) as comision_porcentaje,
-        COALESCE(pago_fijo, 0) as pago_fijo
+        COALESCE(pago_fijo, 0) as pago_fijo,
+        tipo, especialidad, cuenta_bancaria, foto_perfil
       FROM especialistas
       ORDER BY nombre
     `);
@@ -221,6 +222,9 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
         especialista_id: espId,
         especialista_nombre: esp.especialista_nombre,
         tipo: esp.tipo,
+        especialidad: esp.especialidad || '',
+        cuenta_bancaria: esp.cuenta_bancaria || '',
+        foto_perfil: esp.foto_perfil || '',
         comision_porcentaje: esp.comision_porcentaje,
         pago_fijo: esp.pago_fijo,
         total_atenciones: atenData.atenciones,
@@ -504,6 +508,107 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("❌ Error al obtener detalle:", err.message, err.stack);
     res.status(500).json({ message: "Error al obtener detalle", error: err.message });
+  }
+});
+
+// ✅ Obtener presupuestos asignados a un especialista
+router.get("/especialista/:id/presupuestos", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fecha_inicio, fecha_fin } = req.query;
+
+    let conditions = ["pa.especialista_id = ?"];
+    let params = [parseInt(id)];
+
+    if (fecha_inicio) {
+      conditions.push("DATE(pa.creado_en) >= ?");
+      params.push(fecha_inicio);
+    }
+    if (fecha_fin) {
+      conditions.push("DATE(pa.creado_en) <= ?");
+      params.push(fecha_fin);
+    }
+
+    const whereClause = `WHERE ${conditions.join(" AND ")}`;
+
+    const presupuestos = await dbAll(`
+      SELECT pa.*, 
+        p.nombre as paciente_nombre, 
+        p.apellido as paciente_apellido,
+        p.dni as paciente_dni,
+        (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id AND ps.estado = 'completada') as sesiones_completadas,
+        (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id) as sesiones_totales
+      FROM presupuestos_asignados pa
+      LEFT JOIN patients p ON pa.paciente_id = p.id
+      ${whereClause}
+      ORDER BY pa.creado_en DESC
+    `, params);
+
+    // Parse tratamientos_json for each
+    for (const pres of presupuestos) {
+      try {
+        pres.tratamientos = pres.tratamientos_json ? JSON.parse(pres.tratamientos_json) : [];
+      } catch (e) {
+        pres.tratamientos = [];
+      }
+    }
+
+    res.json(presupuestos);
+  } catch (err) {
+    console.error("❌ Error al obtener presupuestos del especialista:", err.message);
+    res.status(500).json({ message: "Error al obtener presupuestos", error: err.message });
+  }
+});
+
+// ✅ Registrar pago a especialista
+router.post("/registrar-pago", authMiddleware, async (req, res) => {
+  console.log("💰 Registrando pago a especialista");
+  
+  try {
+    const { especialista_id, monto, fecha, metodo, referencia, mes, anio } = req.body;
+
+    if (!especialista_id || !monto || !fecha) {
+      return res.status(400).json({ message: "Faltan datos requeridos" });
+    }
+
+    // Insertar registro de pago
+    const result = await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO pagos_personal (especialista_id, monto, fecha_pago, metodo_pago, referencia, mes, anio, estado)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pagado')`,
+        [especialista_id, monto, fecha, metodo, referencia || null, mes, anio],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+
+    console.log(`✅ Pago registrado: ID ${result.id}`);
+    res.json({ message: "Pago registrado exitosamente", id: result.id });
+
+  } catch (err) {
+    console.error("❌ Error al registrar pago:", err.message);
+    res.status(500).json({ message: "Error al registrar pago", error: err.message });
+  }
+});
+
+// ✅ Obtener historial de pagos de un especialista
+router.get("/historial-pagos/:especialista_id", authMiddleware, async (req, res) => {
+  try {
+    const { especialista_id } = req.params;
+
+    const pagos = await dbAll(
+      `SELECT * FROM pagos_personal 
+       WHERE especialista_id = ? 
+       ORDER BY fecha_pago DESC`,
+      [especialista_id]
+    );
+
+    res.json(pagos);
+  } catch (err) {
+    console.error("❌ Error al obtener historial:", err.message);
+    res.status(500).json({ message: "Error al obtener historial", error: err.message });
   }
 });
 

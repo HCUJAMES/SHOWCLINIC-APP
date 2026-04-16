@@ -33,7 +33,7 @@ import {
   FormControlLabel,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -294,6 +294,7 @@ const HistorialClinico = () => {
   // Estados para especialistas
   const [especialistas, setEspecialistas] = useState([]);
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
+  const [especialistaPorPresupuesto, setEspecialistaPorPresupuesto] = useState({});
 
   const [openConfirmarEliminarPaciente, setOpenConfirmarEliminarPaciente] = useState(false);
   const [pacienteEliminar, setPacienteEliminar] = useState(null);
@@ -958,6 +959,12 @@ const HistorialClinico = () => {
   const asignarPresupuesto = async (oferta, marcas) => {
     if (!pacienteSeleccionado?.id) return;
     
+    const espId = especialistaPorPresupuesto[oferta.id];
+    if (!espId) {
+      showToast({ severity: "warning", message: "Por favor selecciona un especialista para este presupuesto" });
+      return;
+    }
+    
     setAsignandoPresupuesto(true);
     try {
       await axios.post(
@@ -966,6 +973,7 @@ const HistorialClinico = () => {
           paciente_id: pacienteSeleccionado.id,
           oferta_id: oferta.id,
           marcas: marcas || {},
+          especialista_id: espId,
         },
         { headers: authHeaders }
       );
@@ -1549,17 +1557,15 @@ const HistorialClinico = () => {
     window.open(pdfUrl, "_blank");
   };
 
-  // Generar recibo PDF del presupuesto
+  // Generar recibo EDITABLE del presupuesto (HTML en nueva ventana)
   const generarReciboPresupuesto = (presupuesto) => {
     if (!pacienteSeleccionado || !presupuesto) return;
 
     // Clasificar tratamientos según marcas de color (gold=pagado, purple=pendiente, gray/sin marca=no se hará)
-    // Agrupar sesiones del mismo tratamiento para no duplicar precios
     const sesiones = presupuesto.sesiones || [];
     let tratamientosJSON = [];
     try { tratamientosJSON = presupuesto.tratamientos_json ? JSON.parse(presupuesto.tratamientos_json) : []; } catch(e) {}
 
-    // Agrupar por nombre de tratamiento para evitar duplicar precios
     const tratamientosAgrupados = {};
     let totalGold = 0;
     let totalPurple = 0;
@@ -1575,7 +1581,6 @@ const HistorialClinico = () => {
           }
           tratamientosAgrupados[nombre].sesiones += 1;
           tratamientosAgrupados[nombre].precioTotal += parseFloat(sesion.precio_sesion) || 0;
-          // Si hay mix de gold/purple en sesiones del mismo tratamiento, priorizar gold
           if (estado === "gold") tratamientosAgrupados[nombre].estado = "gold";
         }
       });
@@ -1602,208 +1607,242 @@ const HistorialClinico = () => {
     const totalActivo = totalGold + totalPurple;
     const descuento = parseFloat(presupuesto.descuento) || 0;
     const totalConDescuento = totalActivo - descuento;
-    
-    // Usar valores reales del presupuesto para pagado y saldo pendiente
     const montoPagadoReal = parseFloat(presupuesto.monto_pagado) || 0;
     const saldoPendienteReal = parseFloat(presupuesto.saldo_pendiente) || (totalConDescuento - montoPagadoReal);
     const totalFinal = totalActivo - descuento;
-
-    const numItems = itemsBoleta.length || 1;
-    const pageHeight = Math.max(280, 210 + numItems * 18);
-    const doc = new jsPDF("p", "mm", [80, pageHeight]);
-    const pageWidth = 80;
-    let y = 6;
-
-    // Logo
-    try {
-      const logoImg = new Image();
-      logoImg.src = '/logo-showclinic.png';
-      doc.addImage(logoImg, 'PNG', pageWidth / 2 - 12, y, 24, 24);
-      y += 27;
-    } catch (e) {
-      y += 2;
-    }
-
-    // ── Encabezado ──
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("SHOWCLINIC", pageWidth / 2, y, { align: "center" });
-    y += 5;
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.text("Centro de Estetica Avanzada", pageWidth / 2, y, { align: "center" });
-    y += 4;
-    doc.text("Av. Ejercito 616, Yanahuara, Arequipa", pageWidth / 2, y, { align: "center" });
-    y += 4;
-    doc.setFont("helvetica", "bold");
-    doc.text("Tel: 974 212 114", pageWidth / 2, y, { align: "center" });
-    y += 6;
-
-    // ── Separador ──
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.4);
-    doc.line(4, y, pageWidth - 4, y);
-    y += 5;
-
-    // ── Datos del paciente ──
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
-    doc.text("Cliente:", 5, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(nombrePaciente, 22, y);
-    y += 5;
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Doc:", 5, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(`${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}`, 15, y);
-    y += 5;
-    
-    doc.setFont("helvetica", "bold");
-    doc.text("Fecha:", 5, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(new Date().toLocaleDateString("es-PE", { day: '2-digit', month: '2-digit', year: 'numeric' }), 19, y);
-    y += 6;
-
-    // ── Separador ──
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.4);
-    doc.line(4, y, pageWidth - 4, y);
-    y += 5;
-
-    // ── Tratamientos ──
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text("TRATAMIENTOS", pageWidth / 2, y, { align: "center" });
-    y += 6;
-
-    doc.setFontSize(8);
-    if (itemsBoleta.length > 0) {
-      itemsBoleta.forEach((item) => {
-        const sesInfo = item.sesiones > 1 ? ` (${item.sesiones} ses.)` : "";
-        doc.setFont("helvetica", "bold");
-        doc.text(`${item.nombre}${sesInfo}`, 5, y);
-        y += 4;
-        doc.setFont("helvetica", "normal");
-        doc.text(`Precio: S/ ${item.precioTotal.toFixed(2)}`, 7, y);
-        y += 5;
-      });
-    } else {
-      doc.setFont("helvetica", "normal");
-      doc.text("Sin tratamientos seleccionados", 5, y);
-      y += 5;
-    }
-
-    y += 2;
-    // ── Separador ──
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.4);
-    doc.line(4, y, pageWidth - 4, y);
-    y += 5;
-
-    // ── Resumen de precios ──
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(8);
-
-    // Total (subtotal sin descuento)
-    doc.setFont("helvetica", "normal");
-    doc.text("Total:", 5, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(`S/ ${totalActivo.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    y += 5;
-
-    // Descuento
-    if (descuento > 0) {
-      doc.setFont("helvetica", "normal");
-      doc.text("Descuento:", 5, y);
-      doc.setFont("helvetica", "bold");
-      doc.text(`-S/ ${descuento.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      y += 5;
-    }
-
-    // Total con Descuento (usar la variable ya declarada arriba)
-    doc.setFont("helvetica", "normal");
-    doc.text("Total con Descuento:", 5, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(`S/ ${totalConDescuento.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    y += 5;
-
-    // Consulta (si aplica)
     const montoConsulta = parseFloat(presupuesto.monto_consulta) || 0;
-    if (presupuesto.consulta_pagada === 1 && montoConsulta > 0) {
-      doc.setFont("helvetica", "normal");
-      doc.text("Consulta:", 5, y);
-      doc.setFont("helvetica", "bold");
-      doc.text(`S/ ${montoConsulta.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-      y += 5;
+    const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
+    const fechaHoy = new Date().toLocaleDateString("es-PE", { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // Generar filas de tratamientos
+    const tratamientosHTML = itemsBoleta.length > 0
+      ? itemsBoleta.map(item => {
+          const sesInfo = item.sesiones > 1 ? ` (${item.sesiones} ses.)` : "";
+          return `
+            <div style="margin-bottom:10px;padding-bottom:6px;border-bottom:1px dotted #ccc;">
+              <div style="display:flex;justify-content:space-between;">
+                <span contenteditable="true" style="font-weight:bold;font-size:11px;">${item.nombre}${sesInfo}</span>
+                <span contenteditable="true" style="font-size:11px;">S/ ${item.precioTotal.toFixed(2)}</span>
+              </div>
+            </div>`;
+        }).join('')
+      : '<div contenteditable="true" style="font-size:9px;color:#666;">Sin tratamientos seleccionados</div>';
+
+    // Consulta row
+    const consultaHTML = (presupuesto.consulta_pagada === 1 && montoConsulta > 0)
+      ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+           <span contenteditable="true" style="font-size:11px;">Consulta:</span>
+           <span contenteditable="true" style="font-weight:bold;font-size:11px;">S/ ${montoConsulta.toFixed(2)}</span>
+         </div>`
+      : '';
+
+    // Descuento row
+    const descuentoHTML = descuento > 0
+      ? `<div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+           <span contenteditable="true" style="font-size:11px;">Descuento:</span>
+           <span contenteditable="true" style="font-weight:bold;font-size:11px;color:#D4AF37;">-S/ ${descuento.toFixed(2)}</span>
+         </div>`
+      : '';
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Boleta - ${nombrePaciente}</title>
+  <style>
+    @media print {
+      body { margin: 0; padding: 0; }
+      .no-print { display: none !important; }
+      .receipt { box-shadow: none !important; border: none !important; }
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    .toolbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #2D2D2D;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .toolbar button {
+      background: #a36920;
+      color: white;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .toolbar button:hover { background: #8a5a1a; }
+    .toolbar .hint {
+      font-size: 12px;
+      color: #ccc;
+    }
+    .receipt {
+      width: 302px;
+      background: white;
+      padding: 20px 18px 30px;
+      margin-top: 60px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      border-radius: 4px;
+    }
+    .separator {
+      border: none;
+      border-top: 1px dashed #000;
+      margin: 12px 0;
+    }
+    .separator-double {
+      border: none;
+      border-top: 2px solid #000;
+      margin: 10px 0 3px 0;
+    }
+    .separator-thin {
+      border: none;
+      border-top: 1px solid #000;
+      margin: 3px 0 10px 0;
+    }
+    .center { text-align: center; }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .total-box {
+      background: #e0e0e0;
+      padding: 10px 12px;
+      margin: 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    [contenteditable="true"]:hover {
+      outline: 1px dashed #a36920;
+      outline-offset: 1px;
+    }
+    [contenteditable="true"]:focus {
+      outline: 2px solid #a36920;
+      outline-offset: 1px;
+      background: #fffde7;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar no-print">
+    <div>
+      <span style="font-weight:bold;font-size:14px;">Boleta Editable</span>
+      <span class="hint" style="margin-left:12px;">Haz clic en cualquier texto para editarlo</span>
+    </div>
+    <button onclick="window.print()">Imprimir</button>
+  </div>
 
-    y += 2;
+  <div class="receipt">
+    <!-- Logo -->
+    <div class="center" style="margin-bottom:8px;">
+      <img src="${window.location.origin}/logo-showclinic.png" style="width:70px;height:70px;" onerror="this.style.display='none'" />
+    </div>
 
-    // Monto Pagado
-    doc.setFont("helvetica", "normal");
-    doc.text("Pagado:", 5, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(`S/ ${montoPagadoReal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    y += 5;
+    <!-- Encabezado -->
+    <div class="center" style="margin-bottom:6px;">
+      <div contenteditable="true" style="font-size:20px;font-weight:bold;letter-spacing:2px;">SHOWCLINIC</div>
+      <div contenteditable="true" style="font-size:10px;margin-top:4px;">Centro de Estetica Avanzada</div>
+      <div contenteditable="true" style="font-size:10px;margin-top:2px;">Av. Ejercito 616, Yanahuara, Arequipa</div>
+      <div contenteditable="true" style="font-size:10px;font-weight:bold;margin-top:2px;">Tel: 974 212 114</div>
+    </div>
 
-    // Saldo Pendiente
-    doc.setFont("helvetica", "normal");
-    doc.text("Saldo Pendiente:", 5, y);
-    doc.setFont("helvetica", "bold");
-    doc.text(`S/ ${saldoPendienteReal.toFixed(2)}`, pageWidth - 5, y, { align: "right" });
-    y += 5;
+    <hr class="separator" />
 
-    y += 2;
-    // ── Separador doble ──
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.5);
-    doc.line(4, y, pageWidth - 4, y);
-    y += 1.5;
-    doc.setLineWidth(0.2);
-    doc.line(4, y, pageWidth - 4, y);
-    y += 5;
+    <!-- Datos del paciente -->
+    <div style="margin-bottom:8px;">
+      <div class="row">
+        <span style="font-size:11px;font-weight:bold;">Cliente:</span>
+        <span contenteditable="true" style="font-size:11px;">${nombrePaciente}</span>
+      </div>
+      <div class="row">
+        <span style="font-size:11px;font-weight:bold;">Doc:</span>
+        <span contenteditable="true" style="font-size:11px;">${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}</span>
+      </div>
+      <div class="row">
+        <span style="font-size:11px;font-weight:bold;">Fecha:</span>
+        <span contenteditable="true" style="font-size:11px;">${fechaHoy}</span>
+      </div>
+    </div>
 
-    // ── TOTAL destacado ──
-    doc.setFillColor(200, 200, 200);
-    doc.rect(4, y - 3.5, pageWidth - 8, 9, 'F');
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("TOTAL:", 7, y + 1.5);
-    doc.text(`S/ ${totalFinal.toFixed(2)}`, pageWidth - 7, y + 1.5, { align: "right" });
-    y += 10;
+    <hr class="separator" />
 
-    y += 4;
+    <!-- Tratamientos -->
+    <div class="center" style="margin-bottom:10px;">
+      <span contenteditable="true" style="font-size:12px;font-weight:bold;text-decoration:underline;">TRATAMIENTOS</span>
+    </div>
 
-    // ── Pie de pagina ──
-    doc.setDrawColor(0, 0, 0);
-    doc.setLineWidth(0.3);
-    doc.line(4, y, pageWidth - 4, y);
-    y += 5;
+    <div style="margin-bottom:8px;">
+      ${tratamientosHTML}
+    </div>
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text("Gracias por su preferencia!", pageWidth / 2, y, { align: "center" });
-    y += 4;
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text("ShowClinic - Tu belleza, nuestra pasion", pageWidth / 2, y, { align: "center" });
-    y += 5;
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "bold");
-    doc.text("Documento informativo. No es comprobante fiscal.", pageWidth / 2, y, { align: "center" });
+    <hr class="separator" />
 
-    // Abrir en nueva ventana para imprimir
-    const pdfBlob = doc.output("blob");
-    const pdfUrl = URL.createObjectURL(pdfBlob);
-    window.open(pdfUrl, "_blank");
+    <!-- Resumen -->
+    <div style="margin-bottom:8px;">
+      <div class="row">
+        <span contenteditable="true" style="font-size:11px;">Total:</span>
+        <span contenteditable="true" style="font-weight:bold;font-size:11px;">S/ ${totalActivo.toFixed(2)}</span>
+      </div>
+      ${descuentoHTML}
+      <div class="row">
+        <span contenteditable="true" style="font-size:11px;">Total con Descuento:</span>
+        <span contenteditable="true" style="font-weight:bold;font-size:11px;">S/ ${totalConDescuento.toFixed(2)}</span>
+      </div>
+      ${consultaHTML}
+      <div class="row">
+        <span contenteditable="true" style="font-size:11px;">Pagado:</span>
+        <span contenteditable="true" style="font-weight:bold;font-size:11px;">S/ ${montoPagadoReal.toFixed(2)}</span>
+      </div>
+      <div class="row">
+        <span contenteditable="true" style="font-size:11px;">Saldo Pendiente:</span>
+        <span contenteditable="true" style="font-weight:bold;font-size:11px;">S/ ${saldoPendienteReal.toFixed(2)}</span>
+      </div>
+    </div>
+
+    <hr class="separator-double" />
+    <hr class="separator-thin" />
+
+    <!-- Total destacado -->
+    <div class="total-box">
+      <span contenteditable="true" style="font-size:16px;font-weight:bold;">TOTAL:</span>
+      <span contenteditable="true" style="font-size:16px;font-weight:bold;">S/ ${totalFinal.toFixed(2)}</span>
+    </div>
+
+    <hr class="separator" />
+
+    <!-- Pie -->
+    <div class="center" style="margin-top:14px;">
+      <div contenteditable="true" style="font-size:10px;font-weight:bold;">Gracias por su preferencia!</div>
+      <div contenteditable="true" style="font-size:9px;margin-top:4px;">ShowClinic - Tu belleza, nuestra pasion</div>
+      <div style="margin-top:16px;border-top:1px dashed #000;padding-top:6px;">
+        <div contenteditable="true" style="font-size:10px;">Firma: _________________________</div>
+      </div>
+      <div contenteditable="true" style="font-size:8px;font-weight:bold;margin-top:12px;">Documento informativo. No es comprobante fiscal.</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const ventana = window.open('', '_blank');
+    ventana.document.write(htmlContent);
+    ventana.document.close();
   };
 
   const toggleOfertaItem = (t) => {
@@ -4524,6 +4563,58 @@ const HistorialClinico = () => {
                             </Box>
                           </Box>
                           
+                          {/* Selector de Especialista */}
+                          {!yaAsignado && (
+                            <Box sx={{ mt: 1, mb: 1 }}>
+                              <FormControl size="small" sx={{ minWidth: 220 }}>
+                                <InputLabel sx={{ fontSize: "0.8rem" }}>Especialista asignado</InputLabel>
+                                <Select
+                                  value={especialistaPorPresupuesto[o.id] || ''}
+                                  onChange={(e) => setEspecialistaPorPresupuesto(prev => ({
+                                    ...prev,
+                                    [o.id]: e.target.value
+                                  }))}
+                                  label="Especialista asignado"
+                                  sx={{ 
+                                    fontSize: "0.8rem",
+                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#ba9a63' },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#a36920' },
+                                  }}
+                                >
+                                  {especialistas.map((esp) => (
+                                    <MenuItem key={esp.id} value={esp.id} sx={{ fontSize: "0.85rem" }}>
+                                      {esp.nombre}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              {!especialistaPorPresupuesto[o.id] && (
+                                <Typography variant="caption" sx={{ color: "#ff9800", display: "block", mt: 0.5 }}>
+                                  Selecciona un especialista antes de asignar
+                                </Typography>
+                              )}
+                            </Box>
+                          )}
+                          {yaAsignado && (() => {
+                            const presAsig = presupuestosAsignados.find(p => p.oferta_id === o.id);
+                            return presAsig?.especialista_nombre ? (
+                              <Box sx={{ mt: 0.5, mb: 1 }}>
+                                <Chip
+                                  icon={<Person sx={{ fontSize: 16 }} />}
+                                  label={`Especialista: ${presAsig.especialista_nombre}`}
+                                  size="small"
+                                  sx={{ 
+                                    backgroundColor: "rgba(76,175,80,0.15)", 
+                                    color: "#2e7d32",
+                                    fontWeight: 600,
+                                    fontSize: "0.75rem",
+                                    '& .MuiChip-icon': { color: '#2e7d32' }
+                                  }}
+                                />
+                              </Box>
+                            ) : null;
+                          })()}
+
                           {/* Carrusel de tratamientos del presupuesto */}
                           {(() => {
                             // Cargar imágenes de tratamientos si faltan
