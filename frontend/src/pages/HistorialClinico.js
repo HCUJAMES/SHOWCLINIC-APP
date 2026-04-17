@@ -1619,10 +1619,10 @@ const HistorialClinico = () => {
       ? itemsBoleta.map(item => {
           const sesInfo = item.sesiones > 1 ? ` (${item.sesiones} ses.)` : "";
           return `
-            <div style="margin-bottom:4px;padding-bottom:3px;border-bottom:1px dotted #999;">
+            <div style="margin-bottom:2px;">
               <div style="display:flex;justify-content:space-between;">
-                <span contenteditable="true" style="font-weight:bold;font-size:9px;color:#000;">${item.nombre}${sesInfo}</span>
-                <span contenteditable="true" style="font-size:9px;color:#000;">S/ ${item.precioTotal.toFixed(2)}</span>
+                <span contenteditable="true" style="font-weight:900;font-size:8px;">${item.nombre}${sesInfo}</span>
+                <span contenteditable="true" style="font-weight:900;font-size:8px;">S/ ${item.precioTotal.toFixed(2)}</span>
               </div>
             </div>`;
         }).join('')
@@ -1630,18 +1630,12 @@ const HistorialClinico = () => {
 
     // Consulta row
     const consultaHTML = (presupuesto.consulta_pagada === 1 && montoConsulta > 0)
-      ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-           <span contenteditable="true" style="font-size:9px;color:#000;">Consulta:</span>
-           <span contenteditable="true" style="font-weight:bold;font-size:9px;color:#000;">S/ ${montoConsulta.toFixed(2)}</span>
-         </div>`
+      ? `<div class="r"><span style="font-size:8px;font-weight:700;">Consulta:</span><span style="font-size:8px;font-weight:900;">S/ ${montoConsulta.toFixed(2)}</span></div>`
       : '';
 
     // Descuento row
     const descuentoHTML = descuento > 0
-      ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-           <span contenteditable="true" style="font-size:9px;color:#000;">Descuento:</span>
-           <span contenteditable="true" style="font-weight:bold;font-size:9px;color:#000;">-S/ ${descuento.toFixed(2)}</span>
-         </div>`
+      ? `<div class="r"><span style="font-size:8px;font-weight:700;">Descuento:</span><span style="font-size:8px;font-weight:900;">-S/ ${descuento.toFixed(2)}</span></div>`
       : '';
 
     const htmlContent = `
@@ -1649,161 +1643,69 @@ const HistorialClinico = () => {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Boleta - ${nombrePaciente}</title>
+  <title>Boleta</title>
   <style>
     @media print {
-      body { margin: 0; padding: 0; }
-      .no-print { display: none !important; }
-      .receipt { box-shadow: none !important; border: none !important; margin: 0; border-radius: 0; width: 80mm; padding: 2mm 3mm 4mm; }
-      @page { size: 80mm auto; margin: 0; }
+      html,body{margin:0;padding:0;width:80mm;height:auto;}
+      .no-print{display:none!important;}
+      .receipt{box-shadow:none!important;border:none!important;margin:0;border-radius:0;width:80mm;padding:1mm 2mm 2mm;}
+      @page{size:80mm auto;margin:0;}
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; color: #000; }
-    body {
-      font-family: 'Courier New', monospace;
-      background: #f5f5f5;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-      color: #000;
-    }
-    .toolbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      background: #2D2D2D;
-      color: white;
-      padding: 10px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .toolbar button {
-      background: #a36920;
-      color: white;
-      border: none;
-      padding: 8px 20px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: bold;
-    }
-    .toolbar button:hover { background: #8a5a1a; }
-    .toolbar .hint { font-size: 12px; color: #ccc; }
-    .receipt {
-      width: 302px;
-      background: white;
-      padding: 12px 10px 16px;
-      margin-top: 60px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-      border-radius: 4px;
-    }
-    .sep { border: none; border-top: 1px dashed #000; margin: 6px 0; }
-    .sep2 { border: none; border-top: 2px solid #000; margin: 5px 0 2px; }
-    .sep3 { border: none; border-top: 1px solid #000; margin: 2px 0 5px; }
-    .center { text-align: center; }
-    .row { display: flex; justify-content: space-between; margin-bottom: 3px; }
-    .total-box {
-      background: #000;
-      color: #fff !important;
-      padding: 6px 8px;
-      margin: 4px 0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .total-box span { color: #fff !important; }
-    [contenteditable="true"]:hover { outline: 1px dashed #a36920; outline-offset: 1px; }
-    [contenteditable="true"]:focus { outline: 2px solid #a36920; outline-offset: 1px; background: #fffde7; }
+    *{box-sizing:border-box;margin:0;padding:0;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    body{font-family:'Courier New',monospace;background:#f5f5f5;display:flex;flex-direction:column;align-items:center;padding:15px;}
+    .toolbar{position:fixed;top:0;left:0;right:0;background:#2D2D2D;color:white!important;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;z-index:1000;}
+    .toolbar *{color:white!important;}
+    .toolbar button{background:#a36920;color:white!important;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;}
+    .receipt{width:302px;background:white;padding:8px 6px 10px;margin-top:50px;box-shadow:0 1px 6px rgba(0,0,0,0.12);border-radius:3px;}
+    .s{border:none;border-top:1px dashed #000;margin:4px 0;}
+    .c{text-align:center;}
+    .r{display:flex;justify-content:space-between;margin-bottom:2px;}
+    .tb{background:#000;padding:4px 6px;margin:3px 0;display:flex;justify-content:space-between;align-items:center;}
+    .tb span{color:#fff!important;}
+    [contenteditable="true"]:hover{outline:1px dashed #a36920;}
+    [contenteditable="true"]:focus{outline:2px solid #a36920;background:#fffde7;}
   </style>
 </head>
 <body>
   <div class="toolbar no-print">
-    <div>
-      <span style="font-weight:bold;font-size:14px;">Boleta Editable</span>
-      <span class="hint" style="margin-left:12px;">Haz clic en cualquier texto para editarlo</span>
-    </div>
+    <span style="font-weight:bold;font-size:13px;">Boleta</span>
     <button onclick="window.print()">Imprimir</button>
   </div>
-
   <div class="receipt">
-    <div class="center" style="margin-bottom:4px;">
-      <img src="${window.location.origin}/logo-showclinic.png" style="width:50px;height:50px;" onerror="this.style.display='none'" />
+    <div class="c" style="margin-bottom:2px;">
+      <img src="${window.location.origin}/logo-showclinic.png" style="width:40px;height:40px;" onerror="this.style.display='none'" />
     </div>
-    <div class="center" style="margin-bottom:3px;">
-      <div contenteditable="true" style="font-size:16px;font-weight:900;letter-spacing:2px;color:#000;">SHOWCLINIC</div>
-      <div contenteditable="true" style="font-size:9px;color:#000;">Centro de Estetica Avanzada</div>
-      <div contenteditable="true" style="font-size:8px;color:#000;">Av. Ejercito 616, Yanahuara, Arequipa</div>
-      <div contenteditable="true" style="font-size:8px;font-weight:bold;color:#000;">Tel: 974 212 114</div>
+    <div class="c" style="margin-bottom:2px;">
+      <div contenteditable="true" style="font-size:14px;font-weight:900;letter-spacing:1px;">SHOWCLINIC</div>
+      <div contenteditable="true" style="font-size:8px;">Centro de Estetica Avanzada</div>
+      <div contenteditable="true" style="font-size:7px;">Av. Ejercito 616, Yanahuara</div>
+      <div contenteditable="true" style="font-size:7px;font-weight:900;">Tel: 974 212 114</div>
     </div>
-
-    <hr class="sep" />
-
-    <div style="margin-bottom:4px;">
-      <div class="row">
-        <span style="font-size:10px;font-weight:bold;color:#000;">Cliente:</span>
-        <span contenteditable="true" style="font-size:10px;color:#000;">${nombrePaciente}</span>
-      </div>
-      <div class="row">
-        <span style="font-size:10px;font-weight:bold;color:#000;">Doc:</span>
-        <span contenteditable="true" style="font-size:10px;color:#000;">${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni || "-"}</span>
-      </div>
-      <div class="row">
-        <span style="font-size:10px;font-weight:bold;color:#000;">Fecha:</span>
-        <span contenteditable="true" style="font-size:10px;color:#000;">${fechaHoy}</span>
-      </div>
+    <hr class="s"/>
+    <div style="margin-bottom:2px;">
+      <div class="r"><span style="font-size:9px;font-weight:900;">Cliente:</span><span contenteditable="true" style="font-size:9px;font-weight:700;">${nombrePaciente}</span></div>
+      <div class="r"><span style="font-size:9px;font-weight:900;">DNI:</span><span contenteditable="true" style="font-size:9px;font-weight:700;">${pacienteSeleccionado.dni || "-"}</span></div>
     </div>
-
-    <hr class="sep" />
-
-    <div class="center" style="margin-bottom:4px;">
-      <span contenteditable="true" style="font-size:10px;font-weight:900;color:#000;">TRATAMIENTOS</span>
-    </div>
-    <div style="margin-bottom:4px;">
-      ${tratamientosHTML}
-    </div>
-
-    <hr class="sep" />
-
-    <div style="margin-bottom:4px;">
-      <div class="row">
-        <span contenteditable="true" style="font-size:9px;color:#000;">Subtotal:</span>
-        <span contenteditable="true" style="font-weight:bold;font-size:9px;color:#000;">S/ ${totalActivo.toFixed(2)}</span>
-      </div>
+    <hr class="s"/>
+    <div class="c" style="margin-bottom:2px;"><span style="font-size:9px;font-weight:900;">TRATAMIENTOS</span></div>
+    <div style="margin-bottom:2px;">${tratamientosHTML}</div>
+    <hr class="s"/>
+    <div style="margin-bottom:2px;">
+      <div class="r"><span style="font-size:8px;font-weight:700;">Subtotal:</span><span style="font-size:8px;font-weight:900;">S/ ${totalActivo.toFixed(2)}</span></div>
       ${descuentoHTML}
-      ${totalConDescuento !== totalActivo ? `<div class="row">
-        <span contenteditable="true" style="font-size:9px;color:#000;">Con Descuento:</span>
-        <span contenteditable="true" style="font-weight:bold;font-size:9px;color:#000;">S/ ${totalConDescuento.toFixed(2)}</span>
-      </div>` : ''}
+      ${totalConDescuento !== totalActivo ? `<div class="r"><span style="font-size:8px;font-weight:700;">Con Dcto:</span><span style="font-size:8px;font-weight:900;">S/ ${totalConDescuento.toFixed(2)}</span></div>` : ''}
       ${consultaHTML}
-      <div class="row">
-        <span contenteditable="true" style="font-size:9px;color:#000;">Pagado:</span>
-        <span contenteditable="true" style="font-weight:bold;font-size:9px;color:#000;">S/ ${montoPagadoReal.toFixed(2)}</span>
-      </div>
-      ${saldoPendienteReal > 0 ? `<div class="row">
-        <span contenteditable="true" style="font-size:9px;color:#000;">Saldo Pendiente:</span>
-        <span contenteditable="true" style="font-weight:900;font-size:9px;color:#000;">S/ ${saldoPendienteReal.toFixed(2)}</span>
-      </div>` : ''}
+      <div class="r"><span style="font-size:8px;font-weight:700;">Pagado:</span><span style="font-size:8px;font-weight:900;">S/ ${montoPagadoReal.toFixed(2)}</span></div>
+      ${saldoPendienteReal > 0 ? `<div class="r"><span style="font-size:8px;font-weight:700;">Saldo:</span><span style="font-size:8px;font-weight:900;">S/ ${saldoPendienteReal.toFixed(2)}</span></div>` : ''}
     </div>
-
-    <hr class="sep2" />
-    <hr class="sep3" />
-
-    <div class="total-box">
-      <span contenteditable="true" style="font-size:14px;font-weight:900;">TOTAL:</span>
-      <span contenteditable="true" style="font-size:14px;font-weight:900;">S/ ${totalFinal.toFixed(2)}</span>
+    <div class="tb">
+      <span style="font-size:12px;font-weight:900;">TOTAL:</span>
+      <span style="font-size:12px;font-weight:900;">S/ ${totalFinal.toFixed(2)}</span>
     </div>
-
-    <hr class="sep" />
-
-    <div class="center" style="margin-top:6px;">
-      <div contenteditable="true" style="font-size:9px;font-weight:bold;color:#000;">Gracias por su preferencia!</div>
-      <div contenteditable="true" style="font-size:8px;color:#000;margin-top:2px;">ShowClinic - Tu belleza, nuestra pasion</div>
-      <div style="margin-top:8px;border-top:1px dashed #000;padding-top:4px;">
-        <div contenteditable="true" style="font-size:8px;color:#000;">Firma: ______________________</div>
-      </div>
-      <div contenteditable="true" style="font-size:7px;font-weight:bold;color:#000;margin-top:6px;">Documento informativo. No es comprobante fiscal.</div>
+    <hr class="s"/>
+    <div class="c" style="margin-top:3px;">
+      <div style="font-size:8px;font-weight:900;">Gracias por su preferencia!</div>
+      <div style="font-size:7px;margin-top:1px;">${fechaHoy}</div>
     </div>
   </div>
 </body>
