@@ -1616,26 +1616,25 @@ const HistorialClinico = () => {
 
     // Generar filas de tratamientos
     const tratamientosHTML = itemsBoleta.length > 0
-      ? itemsBoleta.map(item => {
+      ? itemsBoleta.map((item, i) => {
           const sesInfo = item.sesiones > 1 ? ` (${item.sesiones} ses.)` : "";
+          const separator = i < itemsBoleta.length - 1 ? '<hr class="s"/>' : '';
           return `
-            <div style="margin-bottom:2px;">
-              <div style="display:flex;justify-content:space-between;">
-                <span contenteditable="true" style="font-weight:900;font-size:8px;">${item.nombre}${sesInfo}</span>
-                <span contenteditable="true" style="font-weight:900;font-size:8px;">S/ ${item.precioTotal.toFixed(2)}</span>
-              </div>
-            </div>`;
+            <div class="r" style="padding:4px 0;">
+              <span contenteditable="true" style="font-weight:bold;font-size:10px;">${item.nombre}${sesInfo}</span>
+              <span contenteditable="true" style="font-weight:bold;font-size:10px;">S/ ${item.precioTotal.toFixed(2)}</span>
+            </div>${separator}`;
         }).join('')
-      : '<div contenteditable="true" style="font-size:9px;color:#666;">Sin tratamientos seleccionados</div>';
+      : '<div contenteditable="true" style="font-size:10px;color:#000;padding:4px 0;">Sin tratamientos seleccionados</div>';
 
-    // Consulta row
+    const horaHoy = new Date().toLocaleTimeString("es-PE", { hour: '2-digit', minute: '2-digit' });
+    const numComprobante = `${String(presupuesto.id).padStart(6, '0')}`;
+
     const consultaHTML = (presupuesto.consulta_pagada === 1 && montoConsulta > 0)
-      ? `<div class="r"><span style="font-size:8px;font-weight:700;">Consulta:</span><span style="font-size:8px;font-weight:900;">S/ ${montoConsulta.toFixed(2)}</span></div>`
+      ? `<div class="r"><span style="font-size:9px;font-weight:bold;">Consulta:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${montoConsulta.toFixed(2)}</span></div>`
       : '';
-
-    // Descuento row
     const descuentoHTML = descuento > 0
-      ? `<div class="r"><span style="font-size:8px;font-weight:700;">Descuento:</span><span style="font-size:8px;font-weight:900;">-S/ ${descuento.toFixed(2)}</span></div>`
+      ? `<div class="r"><span style="font-size:9px;font-weight:bold;">Descuento:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">-S/ ${descuento.toFixed(2)}</span></div>`
       : '';
 
     const htmlContent = `
@@ -1643,7 +1642,7 @@ const HistorialClinico = () => {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Boleta</title>
+  <title>Boleta ShowClinic</title>
   <style>
     @media print {
       html,body{margin:0;padding:0;width:80mm;height:auto;}
@@ -1652,60 +1651,99 @@ const HistorialClinico = () => {
       @page{size:80mm auto;margin:0;}
     }
     *{box-sizing:border-box;margin:0;padding:0;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body{font-family:'Courier New',monospace;background:#f5f5f5;display:flex;flex-direction:column;align-items:center;padding:15px;}
-    .toolbar{position:fixed;top:0;left:0;right:0;background:#2D2D2D;color:white!important;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;z-index:1000;}
+    body{font-family:'Courier New',Courier,monospace;background:#e8e8e8;display:flex;flex-direction:column;align-items:center;padding:20px 10px;}
+    .toolbar{position:fixed;top:0;left:0;right:0;background:#1a1a1a;color:white!important;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
     .toolbar *{color:white!important;}
-    .toolbar button{background:#a36920;color:white!important;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;}
-    .receipt{width:302px;background:white;padding:8px 6px 10px;margin-top:50px;box-shadow:0 1px 6px rgba(0,0,0,0.12);border-radius:3px;}
-    .s{border:none;border-top:1px dashed #000;margin:4px 0;}
+    .toolbar button{background:#a36920;color:white!important;border:none;padding:7px 20px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:0.5px;}
+    .toolbar button:hover{background:#8a5a1a;}
+    .receipt{width:302px;background:#fff;padding:10px 8px 12px;margin-top:55px;box-shadow:0 2px 10px rgba(0,0,0,0.15);border-radius:2px;}
+    .s{border:none;border-top:1px dashed #000;margin:5px 0;}
+    .s2{border:none;border-top:2px solid #000;margin:5px 0;}
     .c{text-align:center;}
-    .r{display:flex;justify-content:space-between;margin-bottom:2px;}
-    .tb{background:#000;padding:4px 6px;margin:3px 0;display:flex;justify-content:space-between;align-items:center;}
+    .r{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
+    .banda{background:#000;color:#fff!important;padding:5px 8px;margin:6px 0;text-align:center;letter-spacing:2px;}
+    .banda *{color:#fff!important;}
+    .tb{background:#000;padding:6px 8px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;}
     .tb span{color:#fff!important;}
+    .sec-title{font-size:10px;font-weight:bold;text-decoration:underline;margin-bottom:4px;letter-spacing:0.5px;}
+    .disclaimer{border:1.5px solid #000;padding:6px 5px;margin-top:8px;text-align:center;}
+    .disclaimer span{font-size:9px;font-weight:bold;line-height:1.4;display:block;}
     [contenteditable="true"]:hover{outline:1px dashed #a36920;}
     [contenteditable="true"]:focus{outline:2px solid #a36920;background:#fffde7;}
   </style>
 </head>
 <body>
   <div class="toolbar no-print">
-    <span style="font-weight:bold;font-size:13px;">Boleta</span>
-    <button onclick="window.print()">Imprimir</button>
+    <span style="font-weight:bold;font-size:13px;letter-spacing:0.5px;">Comprobante ShowClinic</span>
+    <button onclick="window.print()">🖨 Imprimir</button>
   </div>
   <div class="receipt">
-    <div class="c" style="margin-bottom:2px;">
-      <img src="${window.location.origin}/logo-showclinic.png" style="width:40px;height:40px;" onerror="this.style.display='none'" />
+    <!-- LOGO -->
+    <div class="c" style="margin-bottom:4px;">
+      <div style="width:52px;height:52px;border-radius:50%;border:2.5px solid #000;display:inline-flex;align-items:center;justify-content:center;">
+        <span style="font-family:Georgia,serif;font-size:28px;font-weight:bold;color:#000!important;">S</span>
+      </div>
     </div>
-    <div class="c" style="margin-bottom:2px;">
-      <div contenteditable="true" style="font-size:14px;font-weight:900;letter-spacing:1px;">SHOWCLINIC</div>
-      <div contenteditable="true" style="font-size:8px;">Centro de Estetica Avanzada</div>
-      <div contenteditable="true" style="font-size:7px;">Av. Ejercito 616, Yanahuara</div>
-      <div contenteditable="true" style="font-size:7px;font-weight:900;">Tel: 974 212 114</div>
+    <!-- HEADER -->
+    <div class="c" style="margin-bottom:4px;">
+      <div style="font-size:22px;font-weight:bold;letter-spacing:4px;color:#000!important;">SHOWCLINIC</div>
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Centro de Estética Avanzada</div>
+      <div contenteditable="true" style="font-size:8px;margin-top:3px;line-height:1.4;">Av. Ejército 616, Yanahuara, Arequipa · Perú</div>
+      <div contenteditable="true" style="font-size:8px;font-weight:bold;">Tel: 974 212 114</div>
     </div>
+    <!-- BANDA COMPROBANTE -->
+    <div class="banda">
+      <span style="font-size:11px;font-weight:bold;letter-spacing:2px;color:#fff!important;">COMPROBANTE INTERNO</span>
+    </div>
+    <!-- INFO COMPROBANTE -->
     <hr class="s"/>
     <div style="margin-bottom:2px;">
-      <div class="r"><span style="font-size:9px;font-weight:900;">Cliente:</span><span contenteditable="true" style="font-size:9px;font-weight:700;">${nombrePaciente}</span></div>
-      <div class="r"><span style="font-size:9px;font-weight:900;">DNI:</span><span contenteditable="true" style="font-size:9px;font-weight:700;">${pacienteSeleccionado.dni || "-"}</span></div>
+      <div class="r"><span style="font-size:9px;font-weight:bold;">N° Comprobante:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">${numComprobante}</span></div>
+      <div class="r"><span style="font-size:9px;font-weight:bold;">Fecha:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">${fechaHoy}</span></div>
+      <div class="r"><span style="font-size:9px;font-weight:bold;">Hora:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">${horaHoy}</span></div>
     </div>
     <hr class="s"/>
-    <div class="c" style="margin-bottom:2px;"><span style="font-size:9px;font-weight:900;">TRATAMIENTOS</span></div>
-    <div style="margin-bottom:2px;">${tratamientosHTML}</div>
-    <hr class="s"/>
-    <div style="margin-bottom:2px;">
-      <div class="r"><span style="font-size:8px;font-weight:700;">Subtotal:</span><span style="font-size:8px;font-weight:900;">S/ ${totalActivo.toFixed(2)}</span></div>
+    <!-- CLIENTE -->
+    <div style="margin-bottom:4px;">
+      <div class="sec-title">CLIENTE</div>
+      <div class="r"><span style="font-size:9px;">Nombre:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">${nombrePaciente}</span></div>
+      <div class="r"><span style="font-size:9px;">DNI:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">${pacienteSeleccionado.dni || "-"}</span></div>
+    </div>
+    <!-- TRATAMIENTOS -->
+    <div style="margin-bottom:4px;">
+      <div class="sec-title">TRATAMIENTOS</div>
+      <hr class="s"/>
+      ${tratamientosHTML}
+      <hr class="s"/>
+    </div>
+    <!-- TOTALES -->
+    <hr class="s2"/>
+    <div style="margin-bottom:4px;">
+      <div class="r"><span style="font-size:9px;font-weight:bold;">Subtotal:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${totalActivo.toFixed(2)}</span></div>
       ${descuentoHTML}
-      ${totalConDescuento !== totalActivo ? `<div class="r"><span style="font-size:8px;font-weight:700;">Con Dcto:</span><span style="font-size:8px;font-weight:900;">S/ ${totalConDescuento.toFixed(2)}</span></div>` : ''}
+      ${totalConDescuento !== totalActivo ? `<div class="r"><span style="font-size:9px;font-weight:bold;">Con descuento:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${totalConDescuento.toFixed(2)}</span></div>` : ''}
       ${consultaHTML}
-      <div class="r"><span style="font-size:8px;font-weight:700;">Pagado:</span><span style="font-size:8px;font-weight:900;">S/ ${montoPagadoReal.toFixed(2)}</span></div>
-      ${saldoPendienteReal > 0 ? `<div class="r"><span style="font-size:8px;font-weight:700;">Saldo:</span><span style="font-size:8px;font-weight:900;">S/ ${saldoPendienteReal.toFixed(2)}</span></div>` : ''}
+      <div class="r"><span style="font-size:9px;font-weight:bold;">Pagado:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${montoPagadoReal.toFixed(2)}</span></div>
+      ${saldoPendienteReal > 0 ? `<div class="r"><span style="font-size:9px;font-weight:bold;">Saldo pendiente:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${saldoPendienteReal.toFixed(2)}</span></div>` : ''}
     </div>
+    <!-- BANDA TOTAL -->
     <div class="tb">
-      <span style="font-size:12px;font-weight:900;">TOTAL:</span>
-      <span style="font-size:12px;font-weight:900;">S/ ${totalFinal.toFixed(2)}</span>
+      <span style="font-size:14px;font-weight:bold;color:#fff!important;">TOTAL</span>
+      <span contenteditable="true" style="font-size:18px;font-weight:bold;color:#fff!important;">S/ ${totalFinal.toFixed(2)}</span>
+    </div>
+    <!-- PIE -->
+    <hr class="s"/>
+    <div class="c" style="padding:4px 0;">
+      <div style="font-size:10px;font-weight:bold;">¡GRACIAS POR SU PREFERENCIA!</div>
     </div>
     <hr class="s"/>
     <div class="c" style="margin-top:3px;">
-      <div style="font-size:8px;font-weight:900;">Gracias por su preferencia!</div>
-      <div style="font-size:7px;margin-top:1px;">${fechaHoy}</div>
+      <div style="font-size:8px;">@showclinic.pe</div>
+      <div style="font-size:8px;margin-top:2px;">WhatsApp: wa.me/51974212114</div>
+    </div>
+    <!-- DISCLAIMER -->
+    <div class="disclaimer">
+      <span>ESTE DOCUMENTO NO TIENE VALIDEZ TRIBUTARIA / NO ES COMPROBANTE DE PAGO ELECTRÓNICO / SOLO PARA USO INTERNO DEL CLIENTE</span>
     </div>
   </div>
 </body>
