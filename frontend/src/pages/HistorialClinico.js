@@ -208,7 +208,7 @@ const HistorialClinico = () => {
   const [corporalEditId, setCorporalEditId] = useState(null);
   const [corporalTipo, setCorporalTipo] = useState("evaluacion");
   const [corporalTablas, setCorporalTablas] = useState([
-    { titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: "1ra sesión", datos: "" }] }
+    { titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", abdomen_alto: "", abdomen_medio: "", abdomen_bajo: "", sesion: "1ra sesión", datos: "" }] }
   ]);
   const [corporalActividad, setCorporalActividad] = useState("");
   const [corporalObservaciones, setCorporalObservaciones] = useState("");
@@ -699,7 +699,7 @@ const HistorialClinico = () => {
   const resetCorporalForm = () => {
     setCorporalEditId(null);
     setCorporalTipo("evaluacion");
-    setCorporalTablas([{ titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: "1ra sesión", datos: "" }] }]);
+    setCorporalTablas([{ titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", abdomen_alto: "", abdomen_medio: "", abdomen_bajo: "", sesion: "1ra sesión", datos: "" }] }]);
     setCorporalActividad("");
     setCorporalObservaciones("");
   };
@@ -713,7 +713,7 @@ const HistorialClinico = () => {
   const editarCorporal = (registro) => {
     setCorporalEditId(registro.id);
     setCorporalTipo(registro.tipo || "evaluacion");
-    setCorporalTablas(registro.tablas_json || [{ titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: "1ra sesión", datos: "" }] }]);
+    setCorporalTablas(registro.tablas_json || [{ titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", abdomen_alto: "", abdomen_medio: "", abdomen_bajo: "", sesion: "1ra sesión", datos: "" }] }]);
     setCorporalActividad(registro.actividad_fisica || "");
     setCorporalObservaciones(registro.observaciones || "");
   };
@@ -1618,24 +1618,18 @@ const HistorialClinico = () => {
     const tratamientosHTML = itemsBoleta.length > 0
       ? itemsBoleta.map((item, i) => {
           const sesInfo = item.sesiones > 1 ? ` (${item.sesiones} ses.)` : "";
-          const separator = i < itemsBoleta.length - 1 ? '<hr class="s"/>' : '';
+          const separator = i < itemsBoleta.length - 1 ? '<hr class="s sep-trat"/>' : '';
           return `
-            <div class="r" style="padding:4px 0;">
-              <span contenteditable="true" style="font-weight:bold;font-size:10px;">${item.nombre}${sesInfo}</span>
-              <span contenteditable="true" style="font-weight:bold;font-size:10px;">S/ ${item.precioTotal.toFixed(2)}</span>
+            <div class="trat-row r" style="padding:4px 0;position:relative;">
+              <span contenteditable="true" style="font-weight:bold;font-size:10px;flex:1;">${item.nombre}${sesInfo}</span>
+              <span contenteditable="true" style="font-weight:bold;font-size:10px;white-space:nowrap;">S/ ${item.precioTotal.toFixed(2)}</span>
+              <button class="del-btn no-print" onclick="this.closest('.trat-row').remove();var ns=this.closest('.trat-row')?.nextElementSibling;if(ns&&ns.classList.contains('sep-trat'))ns.remove();" title="Eliminar">✕</button>
             </div>${separator}`;
         }).join('')
       : '<div contenteditable="true" style="font-size:10px;color:#000;padding:4px 0;">Sin tratamientos seleccionados</div>';
 
     const horaHoy = new Date().toLocaleTimeString("es-PE", { hour: '2-digit', minute: '2-digit' });
     const numComprobante = `${String(presupuesto.id).padStart(6, '0')}`;
-
-    const consultaHTML = (presupuesto.consulta_pagada === 1 && montoConsulta > 0)
-      ? `<div class="r"><span style="font-size:9px;font-weight:bold;">Consulta:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${montoConsulta.toFixed(2)}</span></div>`
-      : '';
-    const descuentoHTML = descuento > 0
-      ? `<div class="r"><span style="font-size:9px;font-weight:bold;">Descuento:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">-S/ ${descuento.toFixed(2)}</span></div>`
-      : '';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -1670,6 +1664,13 @@ const HistorialClinico = () => {
     .disclaimer span{font-size:9px;font-weight:bold;line-height:1.4;display:block;}
     [contenteditable="true"]:hover{outline:1px dashed #a36920;}
     [contenteditable="true"]:focus{outline:2px solid #a36920;background:#fffde7;}
+    .del-btn{position:absolute;right:-18px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:#c0392b;color:#fff!important;border:none;font-size:10px;line-height:16px;text-align:center;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s;}
+    .trat-row:hover .del-btn,.total-row:hover .del-btn{opacity:1;}
+    .del-btn:hover{background:#e74c3c;}
+    .total-row{position:relative;}
+    .total-row .del-btn{right:-18px;}
+    .hint-bar{background:#a36920;color:#fff!important;text-align:center;padding:5px 8px;font-size:10px;font-weight:bold;letter-spacing:0.3px;margin-top:2px;border-radius:0 0 4px 4px;}
+    .hint-bar *{color:#fff!important;}
   </style>
 </head>
 <body>
@@ -1677,7 +1678,10 @@ const HistorialClinico = () => {
     <span style="font-weight:bold;font-size:13px;letter-spacing:0.5px;">Comprobante ShowClinic</span>
     <button onclick="window.print()">🖨 Imprimir</button>
   </div>
-  <div class="receipt">
+  <div class="hint-bar no-print" style="width:302px;margin-top:55px;">
+    ✏️ Haz clic en cualquier texto para editarlo · Pasa el mouse sobre items para eliminar
+  </div>
+  <div class="receipt" style="margin-top:0;">
     <!-- LOGO -->
     <div class="c" style="margin-bottom:4px;">
       <div style="width:52px;height:52px;border-radius:50%;border:2.5px solid #000;display:inline-flex;align-items:center;justify-content:center;">
@@ -1719,12 +1723,12 @@ const HistorialClinico = () => {
     <!-- TOTALES -->
     <hr class="s2"/>
     <div style="margin-bottom:4px;">
-      <div class="r"><span style="font-size:9px;font-weight:bold;">Subtotal:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${totalActivo.toFixed(2)}</span></div>
-      ${descuentoHTML}
-      ${totalConDescuento !== totalActivo ? `<div class="r"><span style="font-size:9px;font-weight:bold;">Con descuento:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${totalConDescuento.toFixed(2)}</span></div>` : ''}
-      ${consultaHTML}
-      <div class="r"><span style="font-size:9px;font-weight:bold;">Pagado:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${montoPagadoReal.toFixed(2)}</span></div>
-      ${saldoPendienteReal > 0 ? `<div class="r"><span style="font-size:9px;font-weight:bold;">Saldo pendiente:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${saldoPendienteReal.toFixed(2)}</span></div>` : ''}
+      <div class="total-row r"><span style="font-size:9px;font-weight:bold;">Subtotal:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${totalActivo.toFixed(2)}</span><button class="del-btn no-print" onclick="this.parentElement.remove()" title="Eliminar fila">✕</button></div>
+      ${descuento > 0 ? `<div class="total-row r"><span style="font-size:9px;font-weight:bold;">Descuento:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">-S/ ${descuento.toFixed(2)}</span><button class="del-btn no-print" onclick="this.parentElement.remove()" title="Eliminar fila">✕</button></div>` : ''}
+      ${totalConDescuento !== totalActivo ? `<div class="total-row r"><span style="font-size:9px;font-weight:bold;">Con descuento:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${totalConDescuento.toFixed(2)}</span><button class="del-btn no-print" onclick="this.parentElement.remove()" title="Eliminar fila">✕</button></div>` : ''}
+      ${(presupuesto.consulta_pagada === 1 && montoConsulta > 0) ? `<div class="total-row r"><span style="font-size:9px;font-weight:bold;">Consulta:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${montoConsulta.toFixed(2)}</span><button class="del-btn no-print" onclick="this.parentElement.remove()" title="Eliminar fila">✕</button></div>` : ''}
+      <div class="total-row r"><span style="font-size:9px;font-weight:bold;">Pagado:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${montoPagadoReal.toFixed(2)}</span><button class="del-btn no-print" onclick="this.parentElement.remove()" title="Eliminar fila">✕</button></div>
+      ${saldoPendienteReal > 0 ? `<div class="total-row r"><span style="font-size:9px;font-weight:bold;">Saldo pendiente:</span><span contenteditable="true" style="font-size:9px;font-weight:bold;">S/ ${saldoPendienteReal.toFixed(2)}</span><button class="del-btn no-print" onclick="this.parentElement.remove()" title="Eliminar fila">✕</button></div>` : ''}
     </div>
     <!-- BANDA TOTAL -->
     <div class="tb">
@@ -7549,7 +7553,7 @@ const HistorialClinico = () => {
         PaperProps={{ sx: { borderRadius: 4, minHeight: "70vh" } }}
       >
         <DialogTitle sx={{
-          backgroundColor: "#e91e63",
+          backgroundColor: "#a36920",
           color: "white",
           display: "flex",
           alignItems: "center",
@@ -7563,22 +7567,22 @@ const HistorialClinico = () => {
             <Close />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ p: 3, backgroundColor: "#fafafa" }}>
+        <DialogContent sx={{ p: 3, backgroundColor: "#fffdf7" }}>
           {/* Tabs Evaluación / Tratamiento */}
           <Box sx={{ display: "flex", gap: 1, mb: 3, mt: 1 }}>
             <Button
               variant={corporalTipo === "evaluacion" ? "contained" : "outlined"}
               onClick={() => setCorporalTipo("evaluacion")}
               sx={{
-                backgroundColor: corporalTipo === "evaluacion" ? "#e91e63" : "transparent",
-                color: corporalTipo === "evaluacion" ? "white" : "#e91e63",
-                borderColor: "#e91e63",
+                backgroundColor: corporalTipo === "evaluacion" ? "#a36920" : "transparent",
+                color: corporalTipo === "evaluacion" ? "white" : "#a36920",
+                borderColor: "#a36920",
                 fontWeight: "bold",
                 borderRadius: 3,
                 px: 4,
                 "&:hover": {
-                  backgroundColor: corporalTipo === "evaluacion" ? "#c2185b" : "rgba(233,30,99,0.08)",
-                  borderColor: "#e91e63",
+                  backgroundColor: corporalTipo === "evaluacion" ? "#8a5a1a" : "rgba(163,105,32,0.08)",
+                  borderColor: "#a36920",
                 },
               }}
             >
@@ -7588,15 +7592,15 @@ const HistorialClinico = () => {
               variant={corporalTipo === "tratamiento" ? "contained" : "outlined"}
               onClick={() => setCorporalTipo("tratamiento")}
               sx={{
-                backgroundColor: corporalTipo === "tratamiento" ? "#7b1fa2" : "transparent",
-                color: corporalTipo === "tratamiento" ? "white" : "#7b1fa2",
-                borderColor: "#7b1fa2",
+                backgroundColor: corporalTipo === "tratamiento" ? "#ba9a63" : "transparent",
+                color: corporalTipo === "tratamiento" ? "white" : "#ba9a63",
+                borderColor: "#ba9a63",
                 fontWeight: "bold",
                 borderRadius: 3,
                 px: 4,
                 "&:hover": {
-                  backgroundColor: corporalTipo === "tratamiento" ? "#6a1b9a" : "rgba(123,31,162,0.08)",
-                  borderColor: "#7b1fa2",
+                  backgroundColor: corporalTipo === "tratamiento" ? "#a36920" : "rgba(186,154,99,0.08)",
+                  borderColor: "#ba9a63",
                 },
               }}
             >
@@ -7610,8 +7614,8 @@ const HistorialClinico = () => {
               <Box sx={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 px: 2, py: 1.5,
-                backgroundColor: corporalTipo === "evaluacion" ? "#fce4ec" : "#f3e5f5",
-                borderBottom: "1px solid #e0e0e0",
+                backgroundColor: corporalTipo === "evaluacion" ? "#f5f1e4" : "#f5f1e4",
+                borderBottom: "1px solid #ba9a63",
               }}>
                 <TextField
                   variant="standard"
@@ -7621,7 +7625,7 @@ const HistorialClinico = () => {
                     nuevo[tIdx].titulo = e.target.value;
                     setCorporalTablas(nuevo);
                   }}
-                  InputProps={{ disableUnderline: true, sx: { fontWeight: "bold", fontSize: "1rem", color: corporalTipo === "evaluacion" ? "#c2185b" : "#7b1fa2" } }}
+                  InputProps={{ disableUnderline: true, sx: { fontWeight: "bold", fontSize: "1rem", color: "#a36920" } }}
                   placeholder="Título de la tabla"
                 />
                 <Box sx={{ display: "flex", gap: 0.5 }}>
@@ -7640,20 +7644,23 @@ const HistorialClinico = () => {
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Cintura</TableCell>
-                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Cadera</TableCell>
-                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Muslos</TableCell>
-                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Glúteos</TableCell>
-                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 90 }}>Brazos</TableCell>
-                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 110 }}>Sesión</TableCell>
-                      <TableCell sx={{ fontWeight: "bold", color: "#555", fontSize: "0.8rem", minWidth: 140 }}>Datos</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Cintura</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Cadera</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Muslos</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Glúteos</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Brazos</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Abd. Alto</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Abd. Medio</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Abd. Bajo</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 100 }}>Sesión</TableCell>
+                      <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 120 }}>Datos</TableCell>
                       <TableCell sx={{ width: 40 }}></TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {tabla.filas.map((fila, fIdx) => (
-                      <TableRow key={fIdx} sx={{ "&:hover": { backgroundColor: "rgba(233,30,99,0.03)" } }}>
-                        {["cintura", "cadera", "muslos", "gluteos", "brazos"].map((campo) => (
+                      <TableRow key={fIdx} sx={{ "&:hover": { backgroundColor: "rgba(163,105,32,0.04)" } }}>
+                        {["cintura", "cadera", "muslos", "gluteos", "brazos", "abdomen_alto", "abdomen_medio", "abdomen_bajo"].map((campo) => (
                           <TableCell key={campo} sx={{ p: 0.5 }}>
                             <TextField
                               variant="outlined"
@@ -7745,10 +7752,10 @@ const HistorialClinico = () => {
                     const nuevo = [...corporalTablas];
                     const numFila = nuevo[tIdx].filas.length + 1;
                     const sesionLabel = numFila === 1 ? "1ra sesión" : numFila === 2 ? "2da sesión" : numFila === 3 ? "3ra sesión" : `${numFila}ta sesión`;
-                    nuevo[tIdx].filas.push({ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: sesionLabel, datos: "" });
+                    nuevo[tIdx].filas.push({ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", abdomen_alto: "", abdomen_medio: "", abdomen_bajo: "", sesion: sesionLabel, datos: "" });
                     setCorporalTablas(nuevo);
                   }}
-                  sx={{ color: "#e91e63", fontWeight: "bold", fontSize: "0.8rem" }}
+                  sx={{ color: "#a36920", fontWeight: "bold", fontSize: "0.8rem" }}
                 >
                   + Agregar fila
                 </Button>
@@ -7761,16 +7768,16 @@ const HistorialClinico = () => {
             onClick={() => {
               setCorporalTablas(prev => [...prev, {
                 titulo: `Tabla ${prev.length + 1}`,
-                filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", sesion: "1ra sesión", datos: "" }]
+                filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", abdomen_alto: "", abdomen_medio: "", abdomen_bajo: "", sesion: "1ra sesión", datos: "" }]
               }]);
             }}
             sx={{
-              borderColor: "#e91e63",
-              color: "#e91e63",
+              borderColor: "#ba9a63",
+              color: "#a36920",
               fontWeight: "bold",
               borderRadius: 3,
               mb: 3,
-              "&:hover": { backgroundColor: "rgba(233,30,99,0.08)", borderColor: "#e91e63" },
+              "&:hover": { backgroundColor: "rgba(163,105,32,0.08)", borderColor: "#a36920" },
             }}
           >
             + Agregar nueva tabla
@@ -7778,7 +7785,7 @@ const HistorialClinico = () => {
 
           {/* Actividad Física */}
           <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#e91e63", mb: 1.5 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#a36920", mb: 1.5 }}>
               🏃 Actividad Física
             </Typography>
             <TextField
@@ -7799,7 +7806,7 @@ const HistorialClinico = () => {
 
           {/* Observaciones */}
           <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#e91e63", mb: 1.5 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#a36920", mb: 1.5 }}>
               📝 Observaciones
             </Typography>
             <TextField
@@ -7834,13 +7841,13 @@ const HistorialClinico = () => {
               onClick={guardarCorporal}
               disabled={guardandoCorporal}
               sx={{
-                backgroundColor: "#e91e63",
+                backgroundColor: "#a36920",
                 fontWeight: "bold",
                 borderRadius: 3,
                 px: 5,
                 py: 1.2,
                 fontSize: "1rem",
-                "&:hover": { backgroundColor: "#c2185b" },
+                "&:hover": { backgroundColor: "#8a5a1a" },
               }}
             >
               {guardandoCorporal ? "Guardando..." : corporalEditId ? "Actualizar Registro" : "Guardar Registro"}
@@ -7864,8 +7871,8 @@ const HistorialClinico = () => {
                 elevation={0}
                 sx={{
                   mb: 2, p: 2, borderRadius: 3,
-                  border: `1px solid ${reg.tipo === "evaluacion" ? "#f48fb1" : "#ce93d8"}`,
-                  backgroundColor: reg.tipo === "evaluacion" ? "#fce4ec" : "#f3e5f5",
+                  border: `1px solid ${reg.tipo === "evaluacion" ? "#ba9a63" : "#d4c5a0"}`,
+                  backgroundColor: reg.tipo === "evaluacion" ? "#fffdf7" : "#f5f1e4",
                   cursor: "pointer",
                   transition: "all 0.2s",
                   "&:hover": { transform: "translateY(-1px)", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" },
@@ -7877,7 +7884,7 @@ const HistorialClinico = () => {
                       label={reg.tipo === "evaluacion" ? "Evaluación" : "Tratamiento"}
                       size="small"
                       sx={{
-                        backgroundColor: reg.tipo === "evaluacion" ? "#e91e63" : "#7b1fa2",
+                        backgroundColor: reg.tipo === "evaluacion" ? "#a36920" : "#ba9a63",
                         color: "white",
                         fontWeight: "bold",
                         fontSize: "0.75rem",
@@ -7905,13 +7912,16 @@ const HistorialClinico = () => {
                       <Table size="small">
                         <TableHead>
                           <TableRow>
-                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Cintura</TableCell>
-                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Cadera</TableCell>
-                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Muslos</TableCell>
-                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Glúteos</TableCell>
-                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Brazos</TableCell>
-                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Sesión</TableCell>
-                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#888" }}>Datos</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Cintura</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Cadera</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Muslos</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Glúteos</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Brazos</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Abd. Alto</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Abd. Medio</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Abd. Bajo</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Sesión</TableCell>
+                            <TableCell sx={{ fontWeight: "bold", fontSize: "0.7rem", p: 0.5, color: "#a36920" }}>Datos</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -7922,6 +7932,9 @@ const HistorialClinico = () => {
                               <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.muslos || "-"}</TableCell>
                               <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.gluteos || "-"}</TableCell>
                               <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.brazos || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.abdomen_alto || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.abdomen_medio || "-"}</TableCell>
+                              <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.abdomen_bajo || "-"}</TableCell>
                               <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.sesion || "-"}</TableCell>
                               <TableCell sx={{ fontSize: "0.75rem", p: 0.5 }}>{f.datos || "-"}</TableCell>
                             </TableRow>
