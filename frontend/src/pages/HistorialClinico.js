@@ -1499,7 +1499,7 @@ const HistorialClinico = () => {
 
     // Información de pagos
     const montoPagado = parseFloat(paquete.monto_pagado) || 0;
-    const saldoPendiente = parseFloat(paquete.saldo_pendiente) || (precioFinal - montoPagado);
+    const saldoPendiente = Math.max(0, precioFinal - montoPagado);
 
     if (montoPagado > 0) {
       doc.text("Pagado:", 5, y);
@@ -1608,7 +1608,7 @@ const HistorialClinico = () => {
     const descuento = parseFloat(presupuesto.descuento) || 0;
     const totalConDescuento = totalActivo - descuento;
     const montoPagadoReal = parseFloat(presupuesto.monto_pagado) || 0;
-    const saldoPendienteReal = parseFloat(presupuesto.saldo_pendiente) || (totalConDescuento - montoPagadoReal);
+    const saldoPendienteReal = Math.max(0, totalConDescuento - montoPagadoReal);
     const totalFinal = totalActivo - descuento;
     const montoConsulta = parseFloat(presupuesto.monto_consulta) || 0;
     const nombrePaciente = `${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim();
@@ -5535,7 +5535,7 @@ const HistorialClinico = () => {
                                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                     <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
                                     <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
-                                      S/ {(presupuesto.saldo_pendiente || ((presupuesto.precio_total || 0) - (presupuesto.descuento || 0) - (presupuesto.monto_pagado || 0))).toFixed(2)}
+                                      S/ {Math.max(0, (Number(presupuesto.precio_total) || 0) - (Number(presupuesto.descuento) || 0) - (Number(presupuesto.monto_pagado) || 0)).toFixed(2)}
                                     </Typography>
                                   </Box>
                                 )}
@@ -5583,7 +5583,7 @@ const HistorialClinico = () => {
                                     setPresupuestoParaPago(presupuesto);
                                     // Calcular precio con descuento
                                     const precioConDescuento = (presupuesto.precio_total || 0) - (presupuesto.descuento || 0);
-                                    const saldoPendiente = presupuesto.saldo_pendiente || (precioConDescuento - (presupuesto.monto_pagado || 0));
+                                    const saldoPendiente = Math.max(0, precioConDescuento - (Number(presupuesto.monto_pagado) || 0));
                                     setMontoPago(saldoPendiente > 0 ? saldoPendiente : precioConDescuento);
                                     setMetodoPago("efectivo");
                                     setTipoPago(presupuesto.estado_pago === 'adelanto' ? 'saldo' : 'total');
@@ -5979,7 +5979,7 @@ const HistorialClinico = () => {
                                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                     <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
                                     <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
-                                      S/ {(paquete.saldo_pendiente || (paquete.precio_total - (paquete.monto_pagado || 0))).toFixed(2)}
+                                      S/ {Math.max(0, (Number(paquete.precio_total) || 0) - (Number(paquete.monto_pagado) || 0)).toFixed(2)}
                                     </Typography>
                                   </Box>
                                 )}
@@ -6025,7 +6025,7 @@ const HistorialClinico = () => {
                                   variant="contained"
                                   onClick={() => {
                                     setPaqueteParaPago(paquete);
-                                    const saldoPendiente = paquete.saldo_pendiente || (paquete.precio_total - (paquete.monto_pagado || 0));
+                                    const saldoPendiente = Math.max(0, (Number(paquete.precio_total) || 0) - (Number(paquete.monto_pagado) || 0));
                                     setMontoPago(saldoPendiente > 0 ? saldoPendiente : paquete.precio_total);
                                     setMetodoPago("efectivo");
                                     setTipoPago(paquete.estado_pago === 'adelanto' ? 'saldo' : 'total');
@@ -6814,10 +6814,10 @@ const HistorialClinico = () => {
                     // Ajustar monto según tipo (considerando descuento)
                     const precioConDescuento = (presupuestoParaPago.precio_total || 0) - (presupuestoParaPago.descuento || 0);
                     if (e.target.value === 'total') {
-                      const saldo = precioConDescuento - (presupuestoParaPago.monto_pagado || 0);
+                      const saldo = Math.max(0, precioConDescuento - (Number(presupuestoParaPago.monto_pagado) || 0));
                       setMontoPago(saldo > 0 ? saldo : precioConDescuento);
                     } else if (e.target.value === 'saldo') {
-                      const saldoPendiente = presupuestoParaPago.saldo_pendiente || (precioConDescuento - (presupuestoParaPago.monto_pagado || 0));
+                      const saldoPendiente = Math.max(0, precioConDescuento - (Number(presupuestoParaPago.monto_pagado) || 0));
                       setMontoPago(saldoPendiente);
                     }
                   }}
@@ -6825,7 +6825,7 @@ const HistorialClinico = () => {
                 >
                   <MenuItem value="total">💵 Pago Total</MenuItem>
                   <MenuItem value="adelanto">📝 Adelanto</MenuItem>
-                  {(presupuestoParaPago.saldo_pendiente > 0 || presupuestoParaPago.estado_pago === 'adelanto') && (
+                  {(Math.max(0, (Number(presupuestoParaPago.precio_total) || 0) - (Number(presupuestoParaPago.descuento) || 0) - (Number(presupuestoParaPago.monto_pagado) || 0)) > 0 || presupuestoParaPago.estado_pago === 'adelanto') && (
                     <MenuItem value="saldo">✅ Pagar Saldo Restante</MenuItem>
                   )}
                 </Select>
@@ -6881,8 +6881,8 @@ const HistorialClinico = () => {
                   </Box>
                 )}
                 {(() => {
-                  const precioConDescuento = (presupuestoParaPago.precio_total || 0) - (presupuestoParaPago.descuento || 0);
-                  const saldoPendiente = presupuestoParaPago.saldo_pendiente || (precioConDescuento - (presupuestoParaPago.monto_pagado || 0));
+                  const precioConDescuento = (Number(presupuestoParaPago.precio_total) || 0) - (Number(presupuestoParaPago.descuento) || 0);
+                  const saldoPendiente = Math.max(0, precioConDescuento - (Number(presupuestoParaPago.monto_pagado) || 0));
                   return saldoPendiente > 0 && (
                     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                       <Typography variant="body2" color="text.secondary">Saldo pendiente:</Typography>
@@ -6942,14 +6942,14 @@ const HistorialClinico = () => {
                       const saldo = (paqueteParaPago.precio_total || 0) - (paqueteParaPago.monto_pagado || 0);
                       setMontoPago(saldo > 0 ? saldo : paqueteParaPago.precio_total);
                     } else if (e.target.value === 'saldo') {
-                      setMontoPago(paqueteParaPago.saldo_pendiente || 0);
+                      setMontoPago(Math.max(0, (Number(paqueteParaPago.precio_total) || 0) - (Number(paqueteParaPago.monto_pagado) || 0)));
                     }
                   }}
                   label="Tipo de Pago"
                 >
                   <MenuItem value="total">💵 Pago Total</MenuItem>
                   <MenuItem value="adelanto">📝 Adelanto</MenuItem>
-                  {(paqueteParaPago.saldo_pendiente > 0 || paqueteParaPago.estado_pago === 'adelanto') && (
+                  {(Math.max(0, (Number(paqueteParaPago.precio_total) || 0) - (Number(paqueteParaPago.monto_pagado) || 0)) > 0 || paqueteParaPago.estado_pago === 'adelanto') && (
                     <MenuItem value="saldo">✅ Pagar Saldo Restante</MenuItem>
                   )}
                 </Select>
@@ -6992,11 +6992,11 @@ const HistorialClinico = () => {
                     <Typography sx={{ color: "#4caf50", fontWeight: "bold" }}>S/ {(paqueteParaPago.monto_pagado || 0).toFixed(2)}</Typography>
                   </Box>
                 )}
-                {(paqueteParaPago.saldo_pendiente > 0 || (paqueteParaPago.precio_total - (paqueteParaPago.monto_pagado || 0)) > 0) && (
+                {(Math.max(0, (Number(paqueteParaPago.precio_total) || 0) - (Number(paqueteParaPago.monto_pagado) || 0)) > 0) && (
                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                     <Typography variant="body2" color="text.secondary">Saldo pendiente:</Typography>
                     <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>
-                      S/ {(paqueteParaPago.saldo_pendiente || (paqueteParaPago.precio_total - (paqueteParaPago.monto_pagado || 0))).toFixed(2)}
+                      S/ {Math.max(0, (Number(paqueteParaPago.precio_total) || 0) - (Number(paqueteParaPago.monto_pagado) || 0)).toFixed(2)}
                     </Typography>
                   </Box>
                 )}
@@ -7475,7 +7475,7 @@ const HistorialClinico = () => {
                 <strong>Monto pagado actual:</strong> S/ {Number(presupuestoEditarPago.monto_pagado || 0).toFixed(2)}
               </Typography>
               <Typography variant="body2" sx={{ color: "#f57c00", mb: 1 }}>
-                <strong>Saldo pendiente:</strong> S/ {(presupuestoEditarPago.saldo_pendiente || ((presupuestoEditarPago.precio_total || 0) - (presupuestoEditarPago.descuento || 0) - (presupuestoEditarPago.monto_pagado || 0))).toFixed(2)}
+                <strong>Saldo pendiente:</strong> S/ {Math.max(0, (Number(presupuestoEditarPago.precio_total) || 0) - (Number(presupuestoEditarPago.descuento) || 0) - (Number(presupuestoEditarPago.monto_pagado) || 0)).toFixed(2)}
               </Typography>
             </Box>
           )}
