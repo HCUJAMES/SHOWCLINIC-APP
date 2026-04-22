@@ -156,11 +156,13 @@ export default function Dashboard() {
         const filtered = (Array.isArray(data) ? data : []).filter(p => {
           const nombre = (p.nombre || "").toLowerCase();
           const apellido = (p.apellido || "").toLowerCase();
+          const nombreCompleto = `${nombre} ${apellido}`.trim();
           const dni = (p.dni || "").toString();
           const queryLower = query.toLowerCase();
           
           return nombre.includes(queryLower) || 
                  apellido.includes(queryLower) || 
+                 nombreCompleto.includes(queryLower) ||
                  dni.includes(query);
         }).slice(0, 5);
         

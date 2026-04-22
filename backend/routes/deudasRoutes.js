@@ -140,8 +140,8 @@ router.get("/listar", async (req, res) => {
     const trimmed = typeof term === "string" ? term.trim() : "";
     if (trimmed) {
       const like = `%${trimmed}%`;
-      where.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ?)");
-      params.push(like, like, like);
+      where.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ? OR (p.nombre || ' ' || COALESCE(p.apellido, '')) LIKE ?)");
+      params.push(like, like, like, like);
     }
 
     const tratamientoIdNumRaw =
@@ -199,8 +199,8 @@ router.get("/listar", async (req, res) => {
 
     if (trimmed) {
       const like = `%${trimmed}%`;
-      wherePresupuestos.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ?)");
-      paramsPresupuestos.push(like, like, like);
+      wherePresupuestos.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ? OR (p.nombre || ' ' || COALESCE(p.apellido, '')) LIKE ?)");
+      paramsPresupuestos.push(like, like, like, like);
     }
     if (fechaDesdeSql) {
       wherePresupuestos.push("pa.fecha_inicio >= ?");
@@ -267,8 +267,8 @@ router.get("/listar", async (req, res) => {
 
     if (trimmed) {
       const like = `%${trimmed}%`;
-      wherePaquetes.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ?)");
-      paramsPaquetes.push(like, like, like);
+      wherePaquetes.push("(p.nombre LIKE ? OR p.apellido LIKE ? OR p.dni LIKE ? OR (p.nombre || ' ' || COALESCE(p.apellido, '')) LIKE ?)");
+      paramsPaquetes.push(like, like, like, like);
     }
     if (fechaDesdeSql) {
       wherePaquetes.push("pp.fecha_inicio >= ?");

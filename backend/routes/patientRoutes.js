@@ -548,8 +548,9 @@ router.get("/buscar", (req, res) => {
   const trimmedTerm = typeof term === "string" ? term.trim() : "";
   if (trimmedTerm) {
     const value = `%${trimmedTerm}%`;
-    where.push("(nombre LIKE ? OR apellido LIKE ? OR dni LIKE ?)");
-    params.push(value, value, value);
+    // Buscar en nombre, apellido, DNI, y en la concatenación de nombre + apellido
+    where.push("(nombre LIKE ? OR apellido LIKE ? OR dni LIKE ? OR (nombre || ' ' || COALESCE(apellido, '')) LIKE ?)");
+    params.push(value, value, value, value);
   }
 
   const tratamientoIdNumRaw =

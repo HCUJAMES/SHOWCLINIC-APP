@@ -33,7 +33,7 @@ import {
   FormControlLabel,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -2944,10 +2944,16 @@ const HistorialClinico = () => {
               </Box>
 
               {/* Información completa del paciente */}
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
                 <Typography
                   variant="h6"
-                  sx={{ color: "#a36920", fontWeight: "bold" }}
+                  sx={{ 
+                    color: "#a36920", 
+                    fontWeight: "bold",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    fontSize: "0.95rem"
+                  }}
                 >
                   Información completa del paciente
                 </Typography>
@@ -2984,329 +2990,235 @@ const HistorialClinico = () => {
                 />
               </Box>
 
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 4,
-                  p: 3,
-                  borderRadius: 3,
-                  backgroundColor: "#fffdf7",
-                  border: "1px solid rgba(186,154,99,0.25)",
-                }}
-              >
-                <Grid container spacing={2.5}>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ display: "grid", gap: 1.2 }}>
-                      {[
-                        ["Documento", `${pacienteSeleccionado.tipoDocumento || 'DNI'}: ${pacienteSeleccionado.dni}`],
-                        ["Nombre", pacienteSeleccionado.nombre],
-                        ["Apellido", pacienteSeleccionado.apellido],
-                        ["Edad", `${calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || 'N/A'} años`],
-                        ["Sexo", pacienteSeleccionado.sexo],
-                        ["Embarazada", pacienteSeleccionado.embarazada || "No especifica"],
-                        ["Ocupación", pacienteSeleccionado.ocupacion],
-                        ["Fecha Nac.", pacienteSeleccionado.fechaNacimiento],
-                        ["Ciudad Nac.", pacienteSeleccionado.ciudadNacimiento],
-                        ["Ciudad Res.", pacienteSeleccionado.ciudadResidencia],
-                      ].map(([label, value]) => (
-                        <Box key={label} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.3, borderBottom: "1px solid rgba(186,154,99,0.1)" }}>
-                          <Typography variant="caption" sx={{ minWidth: 95, fontWeight: 700, color: "#a36920", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.68rem" }}>{label}</Typography>
-                          <Typography variant="body2" sx={{ color: "#333", fontWeight: 500 }}>{value || "—"}</Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ display: "grid", gap: 1.2 }}>
-                      {[
-                        ["Correo", pacienteSeleccionado.correo],
-                        ["Celular", pacienteSeleccionado.celular],
-                        ["Dirección", pacienteSeleccionado.direccion],
-                        ["Alergias", pacienteSeleccionado.alergias || "Ninguna"],
-                        ["Enfermedades", pacienteSeleccionado.enfermedad || "Ninguna"],
-                        ["Cirugía Est.", pacienteSeleccionado.cirugiaEstetica || "No"],
-                        ["Tabaco", pacienteSeleccionado.tabaco || "No"],
-                        ["Alcohol", pacienteSeleccionado.alcohol || "No"],
-                        ["Drogas", pacienteSeleccionado.drogas || "No"],
-                        ["Referencia", pacienteSeleccionado.referencia || "No especificada"],
-                        ["N° de hijos", pacienteSeleccionado.numeroHijos ?? "No registrado"],
-                      ].map(([label, value]) => (
-                        <Box key={label} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.3, borderBottom: "1px solid rgba(186,154,99,0.1)" }}>
-                          <Typography variant="caption" sx={{ minWidth: 95, fontWeight: 700, color: "#a36920", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.68rem" }}>{label}</Typography>
-                          <Typography variant="body2" sx={{ color: "#333", fontWeight: 500 }}>{value || "—"}</Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Paper>
-
-              {/* ========== GALERÍA DE FOTOS DEL PACIENTE ========== */}
-              <Typography
-                variant="h6"
-                sx={{ color: "#a36920", fontWeight: "bold", mb: 2 }}
-              >
-                Galería de fotos
-              </Typography>
-
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 4,
-                  p: 2.5,
-                  borderRadius: 3,
-                  backgroundColor: "rgba(255,255,255,0.68)",
-                  border: "1px solid rgba(212,175,55,0.18)",
-                }}
-              >
-                {/* Subir fotos */}
-                <Box sx={{ mb: 2.5 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "rgba(0,0,0,0.70)", mb: 1.5 }}>
-                    Subir fotos (máx. 15 por lote)
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Nombre del tratamiento"
-                    placeholder="Ej: Botox, Limpieza facial, Peeling..."
-                    value={nombreTratamientoFoto}
-                    onChange={(e) => setNombreTratamientoFoto(e.target.value)}
+              <Grid container spacing={2.5} sx={{ mb: 4 }}>
+                {/* DATOS PERSONALES */}
+                <Grid item xs={12} md={6}>
+                  <Paper
+                    elevation={0}
                     sx={{
-                      mb: 1.5,
-                      "& .MuiInputBase-root": {
-                        backgroundColor: "rgba(212, 175, 55, 0.10)",
-                        borderRadius: 2,
-                      },
-                      "& .MuiOutlinedInput-root": {
-                        "&:hover fieldset": { borderColor: "#a36920" },
-                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                      },
-                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                      p: 3,
+                      borderRadius: 2.5,
+                      backgroundColor: "#fff",
+                      border: "1px solid #e0e0e0",
+                      height: "100%"
                     }}
-                  />
-                  <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
-                    <Button
-                      variant="outlined"
-                      component="label"
-                      size="small"
-                      sx={{
-                        borderColor: "#a36920",
-                        color: "#a36920",
-                        fontWeight: "bold",
-                        borderRadius: 2,
-                        textTransform: "none",
-                        "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
-                      }}
-                    >
-                      Seleccionar fotos
-                      <input
-                        hidden
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={(e) => {
-                          const archivos = Array.from(e.target.files || []);
-                          if (archivos.length > 15) {
-                            showToast({ severity: "warning", message: "Solo puedes subir hasta 15 fotos por lote" });
-                          }
-                          setArchivosFotosPaciente(archivos.slice(0, 15));
-                          e.target.value = "";
-                        }}
-                      />
-                    </Button>
-                    {archivosFotosPaciente.length > 0 && (
-                      <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.60)" }}>
-                        {archivosFotosPaciente.length} foto(s) seleccionada(s)
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, pb: 2, borderBottom: "2px solid #f5f5f5" }}>
+                      <Person sx={{ color: "#666", fontSize: 22 }} />
+                      <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                        Datos Personales
                       </Typography>
-                    )}
-                    <Button
-                      variant="contained"
-                      size="small"
-                      disabled={!archivosFotosPaciente.length || !nombreTratamientoFoto.trim() || subiendoFotosPaciente}
-                      onClick={subirFotosPaciente}
-                      sx={{
-                        backgroundColor: "#a36920",
-                        "&:hover": { backgroundColor: "#8b581b" },
-                        borderRadius: 2,
-                        fontWeight: "bold",
-                        textTransform: "none",
-                      }}
-                    >
-                      {subiendoFotosPaciente ? "Subiendo..." : "Subir fotos"}
-                    </Button>
-                  </Box>
-
-                  {/* Preview de archivos seleccionados */}
-                  {archivosFotosPaciente.length > 0 && (
-                    <Box sx={{ display: "flex", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
-                      {archivosFotosPaciente.map((file, idx) => (
-                        <Box
-                          key={idx}
-                          sx={{
-                            width: 64,
-                            height: 64,
-                            borderRadius: 1.5,
-                            overflow: "hidden",
-                            border: "1px solid rgba(163,105,32,0.25)",
-                          }}
-                        >
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={`preview-${idx}`}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        </Box>
-                      ))}
                     </Box>
-                  )}
-                </Box>
-
-                <Divider sx={{ mb: 2.5 }} />
-
-                {/* Galería de fotos subidas */}
-                {fotosPaciente.length === 0 ? (
-                  <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.50)", fontStyle: "italic" }}>
-                    No hay fotos registradas para este paciente.
-                  </Typography>
-                ) : (
-                  <>
-                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "rgba(0,0,0,0.70)", mb: 1.5 }}>
-                      Últimas fotos ({fotosPaciente.length} en total)
-                    </Typography>
-                    <Grid container spacing={1.5}>
-                      {(mostrarTodasFotos ? fotosPaciente : fotosPaciente.slice(0, 5)).map((foto) => (
-                        <Grid item xs={6} sm={4} md={3} key={foto.id}>
-                          <Paper
-                            elevation={0}
-                            sx={{
-                              borderRadius: 2,
-                              overflow: "hidden",
-                              border: "1px solid rgba(163,105,32,0.18)",
-                              backgroundColor: "rgba(255,255,255,0.80)",
-                              transition: "box-shadow 0.2s, transform 0.2s",
-                              "&:hover": {
-                                boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
-                                transform: "translateY(-2px)",
-                              },
-                            }}
-                          >
-                            <Box
-                              sx={{ position: "relative", cursor: "pointer" }}
-                              onClick={() => setFotoPreview(foto)}
-                            >
-                              <img
-                                src={`${API_BASE_URL}${foto.archivo}`}
-                                alt={foto.nombre_tratamiento}
-                                style={{
-                                  width: "100%",
-                                  height: 200,
-                                  objectFit: "cover",
-                                  display: "block",
-                                }}
-                              />
-                            </Box>
-                            <Box sx={{ p: 1 }}>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  display: "block",
-                                  fontWeight: 700,
-                                  color: "#a36920",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {foto.nombre_tratamiento}
-                              </Typography>
-                              <Typography variant="caption" sx={{ display: "block", color: "rgba(0,0,0,0.50)", fontSize: "0.68rem" }}>
-                                {foto.creado_en ? foto.creado_en.split(" ")[0] : ""}
-                              </Typography>
-                              <IconButton
-                                size="small"
-                                onClick={() => eliminarFotoPaciente(foto.id)}
-                                sx={{
-                                  mt: 0.3,
-                                  color: "#d32f2f",
-                                  padding: "2px",
-                                  "&:hover": { backgroundColor: "rgba(211,47,47,0.08)" },
-                                }}
-                              >
-                                <Delete sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Box>
-                          </Paper>
-                        </Grid>
-                      ))}
-                    </Grid>
-
-                    {fotosPaciente.length > 5 && (
-                      <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => setMostrarTodasFotos((v) => !v)}
-                          sx={{
-                            borderColor: "#a36920",
-                            color: "#a36920",
-                            fontWeight: "bold",
-                            borderRadius: 3,
-                            textTransform: "none",
-                            "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
-                          }}
-                        >
-                          {mostrarTodasFotos ? "Mostrar menos" : `Mostrar más (${fotosPaciente.length - 5} fotos más)`}
-                        </Button>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Documento</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>DNI: {pacienteSeleccionado.dni || "—"}</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Edad</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"}</Typography>
+                        </Box>
                       </Box>
-                    )}
-                  </>
-                )}
-              </Paper>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Nombre</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.nombre || "—"}</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Apellido</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.apellido || "—"}</Typography>
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Sexo</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.sexo || "—"}</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Fecha Nac.</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.fechaNacimiento || "—"}</Typography>
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Ocupación</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.ocupacion || "—"}</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Embarazada</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.embarazada || "No especifica"}</Typography>
+                        </Box>
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
 
-              {/* Modal de previsualización de foto */}
-              <Dialog
-                open={Boolean(fotoPreview)}
-                onClose={() => setFotoPreview(null)}
-                maxWidth="md"
-                fullWidth
-                PaperProps={{
-                  sx: {
-                    borderRadius: 3,
-                    overflow: "hidden",
-                    background: "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.95) 100%)",
-                  },
-                }}
-              >
-                {fotoPreview && (
-                  <>
-                    <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1 }}>
+                {/* CONTACTO */}
+                <Grid item xs={12} md={6}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 2.5,
+                      backgroundColor: "#fff",
+                      border: "1px solid #e0e0e0",
+                      height: "100%"
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, pb: 2, borderBottom: "2px solid #f5f5f5" }}>
+                      <Phone sx={{ color: "#666", fontSize: 22 }} />
+                      <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                        Contacto
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Celular</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.celular || "—"}</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Correo</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem", wordBreak: "break-word" }}>{pacienteSeleccionado.correo || "—"}</Typography>
+                        </Box>
+                      </Box>
                       <Box>
-                        <Typography variant="h6" sx={{ color: "#a36920", fontWeight: "bold" }}>
-                          {fotoPreview.nombre_tratamiento}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.50)" }}>
-                          {fotoPreview.creado_en}
-                        </Typography>
+                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Dirección</Typography>
+                        <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.direccion || "—"}</Typography>
                       </Box>
-                      <IconButton onClick={() => setFotoPreview(null)}>
-                        <Close />
-                      </IconButton>
-                    </DialogTitle>
-                    <DialogContent sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-                      <img
-                        src={`${API_BASE_URL}${fotoPreview.archivo}`}
-                        alt={fotoPreview.nombre_tratamiento}
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "70vh",
-                          objectFit: "contain",
-                          borderRadius: 8,
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Ciudad Res.</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.ciudadResidencia || "—"}</Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>N° Hijos</Typography>
+                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.numeroHijos ?? "—"}</Typography>
+                        </Box>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Referencia</Typography>
+                        <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.referencia || "No especificada"}</Typography>
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                {/* HISTORIAL MÉDICO */}
+                <Grid item xs={12} md={6}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 2.5,
+                      backgroundColor: "#fff",
+                      border: "1px solid #e0e0e0",
+                      height: "100%"
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, pb: 2, borderBottom: "2px solid #f5f5f5" }}>
+                      <LocalHospital sx={{ color: "#666", fontSize: 22 }} />
+                      <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                        Historial Médico
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                      <Chip 
+                        icon={pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? <Close sx={{ fontSize: 16 }} /> : <Check sx={{ fontSize: 16 }} />}
+                        label={pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? `Alergias: ${pacienteSeleccionado.alergias}` : "Sin alergias"}
+                        sx={{ 
+                          backgroundColor: pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? "#fff3e0" : "#e8f5e9",
+                          color: pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? "#e65100" : "#2e7d32",
+                          fontWeight: 600,
+                          fontSize: "0.8rem",
+                          height: "36px",
+                          justifyContent: "flex-start",
+                          px: 2
                         }}
                       />
-                    </DialogContent>
-                  </>
-                )}
-              </Dialog>
+                      <Chip 
+                        icon={pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? <Close sx={{ fontSize: 16 }} /> : <Check sx={{ fontSize: 16 }} />}
+                        label={pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? `Enfermedades: ${pacienteSeleccionado.enfermedad}` : "Sin enfermedades"}
+                        sx={{ 
+                          backgroundColor: pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? "#fff3e0" : "#e8f5e9",
+                          color: pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? "#e65100" : "#2e7d32",
+                          fontWeight: 600,
+                          fontSize: "0.8rem",
+                          height: "36px",
+                          justifyContent: "flex-start",
+                          px: 2
+                        }}
+                      />
+                      <Chip 
+                        label={pacienteSeleccionado.cirugiaEstetica === "Sí" ? "Con cirugía estética" : "Sin cirugía estética"}
+                        sx={{ 
+                          backgroundColor: "#f3e5f5",
+                          color: "#6a1b9a",
+                          fontWeight: 600,
+                          fontSize: "0.8rem",
+                          height: "36px",
+                          justifyContent: "flex-start",
+                          px: 2
+                        }}
+                      />
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                {/* HÁBITOS */}
+                <Grid item xs={12} md={6}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 3,
+                      borderRadius: 2.5,
+                      backgroundColor: "#fff",
+                      border: "1px solid #e0e0e0",
+                      height: "100%"
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, pb: 2, borderBottom: "2px solid #f5f5f5" }}>
+                      <Favorite sx={{ color: "#666", fontSize: 22 }} />
+                      <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                        Hábitos
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", justifyContent: "space-around", gap: 3 }}>
+                      <Box sx={{ textAlign: "center", flex: 1 }}>
+                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Tabaco</Typography>
+                        <Typography sx={{ 
+                          fontWeight: 700, 
+                          color: pacienteSeleccionado.tabaco === "Sí" ? "#d32f2f" : "#2e7d32",
+                          fontSize: "1.1rem"
+                        }}>
+                          {pacienteSeleccionado.tabaco === "Sí" ? "Sí" : "No"}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: "center", flex: 1 }}>
+                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Alcohol</Typography>
+                        <Typography sx={{ 
+                          fontWeight: 700, 
+                          color: pacienteSeleccionado.alcohol === "Sí" ? "#d32f2f" : "#2e7d32",
+                          fontSize: "1.1rem"
+                        }}>
+                          {pacienteSeleccionado.alcohol === "Sí" ? "Sí" : "No"}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ textAlign: "center", flex: 1 }}>
+                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Drogas</Typography>
+                        <Typography sx={{ 
+                          fontWeight: 700, 
+                          color: pacienteSeleccionado.drogas === "Sí" ? "#d32f2f" : "#2e7d32",
+                          fontSize: "1.1rem"
+                        }}>
+                          {pacienteSeleccionado.drogas === "Sí" ? "Sí" : "No"}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Paper>
+                </Grid>
+              </Grid>
 
               {/* Observaciones - colapsable */}
               <Box
@@ -6402,6 +6314,274 @@ const HistorialClinico = () => {
 
                 </>
               )}
+
+              {/* ========== GALERÍA DE FOTOS DEL PACIENTE ========== */}
+              <Typography
+                variant="h6"
+                sx={{ color: "#a36920", fontWeight: "bold", mb: 2, mt: 4 }}
+              >
+                Galería de fotos
+              </Typography>
+
+              <Paper
+                elevation={0}
+                sx={{
+                  mb: 4,
+                  p: 2.5,
+                  borderRadius: 3,
+                  backgroundColor: "rgba(255,255,255,0.68)",
+                  border: "1px solid rgba(212,175,55,0.18)",
+                }}
+              >
+                {/* Subir fotos */}
+                <Box sx={{ mb: 2.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "rgba(0,0,0,0.70)", mb: 1.5 }}>
+                    Subir fotos (máx. 15 por lote)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Nombre del tratamiento"
+                    placeholder="Ej: Botox, Limpieza facial, Peeling..."
+                    value={nombreTratamientoFoto}
+                    onChange={(e) => setNombreTratamientoFoto(e.target.value)}
+                    sx={{
+                      mb: 1.5,
+                      "& .MuiInputBase-root": {
+                        backgroundColor: "rgba(212, 175, 55, 0.10)",
+                        borderRadius: 2,
+                      },
+                      "& .MuiOutlinedInput-root": {
+                        "&:hover fieldset": { borderColor: "#a36920" },
+                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                      },
+                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                    }}
+                  />
+                  <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      size="small"
+                      sx={{
+                        borderColor: "#a36920",
+                        color: "#a36920",
+                        fontWeight: "bold",
+                        borderRadius: 2,
+                        textTransform: "none",
+                        "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
+                      }}
+                    >
+                      Seleccionar fotos
+                      <input
+                        hidden
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => {
+                          const archivos = Array.from(e.target.files || []);
+                          if (archivos.length > 15) {
+                            showToast({ severity: "warning", message: "Solo puedes subir hasta 15 fotos por lote" });
+                          }
+                          setArchivosFotosPaciente(archivos.slice(0, 15));
+                          e.target.value = "";
+                        }}
+                      />
+                    </Button>
+                    {archivosFotosPaciente.length > 0 && (
+                      <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.60)" }}>
+                        {archivosFotosPaciente.length} foto(s) seleccionada(s)
+                      </Typography>
+                    )}
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={!archivosFotosPaciente.length || !nombreTratamientoFoto.trim() || subiendoFotosPaciente}
+                      onClick={subirFotosPaciente}
+                      sx={{
+                        backgroundColor: "#a36920",
+                        "&:hover": { backgroundColor: "#8b581b" },
+                        borderRadius: 2,
+                        fontWeight: "bold",
+                        textTransform: "none",
+                      }}
+                    >
+                      {subiendoFotosPaciente ? "Subiendo..." : "Subir fotos"}
+                    </Button>
+                  </Box>
+
+                  {/* Preview de archivos seleccionados */}
+                  {archivosFotosPaciente.length > 0 && (
+                    <Box sx={{ display: "flex", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
+                      {archivosFotosPaciente.map((file, idx) => (
+                        <Box
+                          key={idx}
+                          sx={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: 1.5,
+                            overflow: "hidden",
+                            border: "1px solid rgba(163,105,32,0.25)",
+                          }}
+                        >
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`preview-${idx}`}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+
+                <Divider sx={{ mb: 2.5 }} />
+
+                {/* Galería de fotos subidas */}
+                {fotosPaciente.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.50)", fontStyle: "italic" }}>
+                    No hay fotos registradas para este paciente.
+                  </Typography>
+                ) : (
+                  <>
+                    <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "rgba(0,0,0,0.70)", mb: 1.5 }}>
+                      Últimas fotos ({fotosPaciente.length} en total)
+                    </Typography>
+                    <Grid container spacing={1.5}>
+                      {(mostrarTodasFotos ? fotosPaciente : fotosPaciente.slice(0, 5)).map((foto) => (
+                        <Grid item xs={6} sm={4} md={3} key={foto.id}>
+                          <Paper
+                            elevation={0}
+                            sx={{
+                              borderRadius: 2,
+                              overflow: "hidden",
+                              border: "1px solid rgba(163,105,32,0.18)",
+                              backgroundColor: "rgba(255,255,255,0.80)",
+                              transition: "box-shadow 0.2s, transform 0.2s",
+                              "&:hover": {
+                                boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+                                transform: "translateY(-2px)",
+                              },
+                            }}
+                          >
+                            <Box
+                              sx={{ position: "relative", cursor: "pointer" }}
+                              onClick={() => setFotoPreview(foto)}
+                            >
+                              <img
+                                src={`${API_BASE_URL}${foto.archivo}`}
+                                alt={foto.nombre_tratamiento}
+                                style={{
+                                  width: "100%",
+                                  height: 200,
+                                  objectFit: "cover",
+                                  display: "block",
+                                }}
+                              />
+                            </Box>
+                            <Box sx={{ p: 1 }}>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  display: "block",
+                                  fontWeight: 700,
+                                  color: "#a36920",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {foto.nombre_tratamiento}
+                              </Typography>
+                              <Typography variant="caption" sx={{ display: "block", color: "rgba(0,0,0,0.50)", fontSize: "0.68rem" }}>
+                                {foto.creado_en ? foto.creado_en.split(" ")[0] : ""}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => eliminarFotoPaciente(foto.id)}
+                                sx={{
+                                  mt: 0.3,
+                                  color: "#d32f2f",
+                                  padding: "2px",
+                                  "&:hover": { backgroundColor: "rgba(211,47,47,0.08)" },
+                                }}
+                              >
+                                <Delete sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Box>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+
+                    {fotosPaciente.length > 5 && (
+                      <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => setMostrarTodasFotos((v) => !v)}
+                          sx={{
+                            borderColor: "#a36920",
+                            color: "#a36920",
+                            fontWeight: "bold",
+                            borderRadius: 3,
+                            textTransform: "none",
+                            "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
+                          }}
+                        >
+                          {mostrarTodasFotos ? "Mostrar menos" : `Mostrar más (${fotosPaciente.length - 5} fotos más)`}
+                        </Button>
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Paper>
+
+              {/* Modal de previsualización de foto */}
+              <Dialog
+                open={Boolean(fotoPreview)}
+                onClose={() => setFotoPreview(null)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                  sx: {
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    background: "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.95) 100%)",
+                  },
+                }}
+              >
+                {fotoPreview && (
+                  <>
+                    <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1 }}>
+                      <Box>
+                        <Typography variant="h6" sx={{ color: "#a36920", fontWeight: "bold" }}>
+                          {fotoPreview.nombre_tratamiento}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.50)" }}>
+                          {fotoPreview.creado_en}
+                        </Typography>
+                      </Box>
+                      <IconButton onClick={() => setFotoPreview(null)}>
+                        <Close />
+                      </IconButton>
+                    </DialogTitle>
+                    <DialogContent sx={{ display: "flex", justifyContent: "center", p: 2 }}>
+                      <img
+                        src={`${API_BASE_URL}${fotoPreview.archivo}`}
+                        alt={fotoPreview.nombre_tratamiento}
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: "70vh",
+                          objectFit: "contain",
+                          borderRadius: 8,
+                        }}
+                      />
+                    </DialogContent>
+                  </>
+                )}
+              </Dialog>
+
             </>
           )}
         </Paper>

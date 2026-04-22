@@ -62,9 +62,11 @@ const ProductosAplicados = () => {
   const tratamientosFiltrados = tratamientos.filter((t) => {
     if (!filtroNombre) return true;
     const busqueda = filtroNombre.toLowerCase();
+    const nombreCompleto = `${t.paciente_nombre || ""} ${t.paciente_apellido || ""}`.trim().toLowerCase();
     return (
       t.paciente_nombre?.toLowerCase().includes(busqueda) ||
       t.paciente_apellido?.toLowerCase().includes(busqueda) ||
+      nombreCompleto.includes(busqueda) ||
       t.tratamiento_nombre?.toLowerCase().includes(busqueda) ||
       t.productos_texto?.toLowerCase().includes(busqueda)
     );
