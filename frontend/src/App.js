@@ -21,6 +21,7 @@ const Estadisticas = React.lazy(() => import("./pages/Estadisticas"));
 const Gestion = React.lazy(() => import("./pages/Gestion"));
 const Paquetes = React.lazy(() => import("./pages/Paquetes"));
 const GestionClinica = React.lazy(() => import("./pages/GestionPersonalCards"));
+const ProductosAplicados = React.lazy(() => import("./pages/ProductosAplicados"));
 
 // Spinner de carga mientras se descarga el chunk de la página
 const PageLoader = () => (
@@ -187,6 +188,14 @@ function App() {
           element={
             <ProtectedRoute>
               <GestionClinica />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/productos-aplicados"
+          element={
+            <ProtectedRoute allowedRoles={["master"]}>
+              <ProductosAplicados />
             </ProtectedRoute>
           }
         />

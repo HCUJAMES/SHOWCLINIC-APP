@@ -36,6 +36,7 @@ import {
   LocalHospital,
   Search,
   Close,
+  CalendarToday,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
@@ -50,6 +51,7 @@ const moduleIcons = {
   Estadísticas: Insights,
   Gestionar: Settings,
   "Gestión Clínica": LocalHospital,
+  "Productos Aplicados": CalendarToday,
 };
 
 const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
@@ -106,6 +108,7 @@ export default function Dashboard() {
       { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
       { title: "Especialistas", image: "/images/especialista.png", path: "/especialistas", description: "Equipo médico" },
       { title: "Gestión Clínica", image: "/images/finanzas.jpeg", path: "/gestion-clinica", description: "Gestión de atenciones" },
+      { title: "Productos Aplicados", image: "/images/inventario.jpeg", path: "/productos-aplicados", description: "Reporte de productos usados" },
       { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },
       { title: "Gestionar", image: "/images/inventario.jpeg", path: "/gestion", description: "Administración del sistema" },
     ],

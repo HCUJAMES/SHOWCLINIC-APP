@@ -45,6 +45,7 @@ import { useToast } from "../components/ToastProvider";
 import ReciboTicket from "../components/ReciboTicket";
 import ReciboConsolidado from "../components/ReciboConsolidado";
 import FacialMap3D from "../components/FacialMap3D";
+import PatientJourneyChart from "../components/PatientJourneyChart";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -4952,6 +4953,16 @@ const HistorialClinico = () => {
               )}
 
               <Divider sx={{ mb: 3 }} />
+
+              {/* Seguimiento del Tratamiento - Journey Chart */}
+              {presupuestosAsignados.map(presupuesto => (
+                <PatientJourneyChart
+                  key={`journey-${presupuesto.id}`}
+                  presupuesto={presupuesto}
+                  especialistas={especialistas}
+                  navigate={navigate}
+                />
+              ))}
 
               {/* Paquetes Promocionales Activos */}
               {paquetesActivos.length > 0 && (

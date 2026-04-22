@@ -1401,4 +1401,78 @@ router.delete("/huerfanos", requireRole("master"), async (req, res) => {
   }
 });
 
+/* ==============================
+   📊 PRODUCTOS APLICADOS A PACIENTES
+   Endpoint para el módulo de reportes de productos aplicados
+============================== */
+router.get("/productos-aplicados", authMiddleware, requireRole(["master"]), async (req, res) => {
+  try {
+    const { fechaInicio, fechaFin } = req.query;
+
+    let whereClause = "WHERE tr.paciente_id IS NOT NULL";
+    const params = [];
+
+    if (fechaInicio && fechaFin) {
+      whereClause += " AND DATE(tr.fecha) BETWEEN ? AND ?";
+      params.push(fechaInicio, fechaFin);
+    }
+
+    const tratamientos = await dbAll(
+      `
+      SELECT 
+        tr.id,
+        tr.fecha,
+        tr.paciente_id,
+        tr.tratamiento_id,
+        tr.productos,
+        tr.cantidad_total,
+        tr.especialista,
+        tr.sesion,
+        tr.tipoAtencion,
+        t.nombre AS tratamiento_nombre,
+        p.nombre AS paciente_nombre,
+        p.apellido AS paciente_apellido
+      FROM tratamientos_realizados tr
+      LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
+      LEFT JOIN patients p ON p.id = tr.paciente_id
+      ${whereClause}
+      ORDER BY tr.fecha DESC, tr.id DESC
+      `,
+      params
+    );
+
+    // Parse productos JSON y crear texto legible
+    const tratamientosConProductos = tratamientos.map((t) => {
+      let productosTexto = "-";
+      try {
+        if (t.productos) {
+          const productosArray = typeof t.productos === "string" ? JSON.parse(t.productos) : t.productos;
+          if (Array.isArray(productosArray) && productosArray.length > 0) {
+            productosTexto = productosArray
+              .map((prod) => {
+                const nombre = prod.nombre || prod.producto || "";
+                const variante = prod.variante_nombre || "";
+                const cantidad = prod.cantidad || "";
+                return `${nombre} ${variante} ${cantidad ? `(${cantidad})` : ""}`.trim();
+              })
+              .join(", ");
+          }
+        }
+      } catch (e) {
+        console.error("Error parseando productos:", e);
+      }
+
+      return {
+        ...t,
+        productos_texto: productosTexto,
+      };
+    });
+
+    res.json(tratamientosConProductos);
+  } catch (error) {
+    console.error("❌ Error al obtener productos aplicados:", error);
+    res.status(500).json({ message: "Error al obtener productos aplicados" });
+  }
+});
+
 export default router;
