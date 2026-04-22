@@ -601,13 +601,21 @@ const GestionPersonalCards = () => {
                 </Grid>
                 <Grid item xs={6} sm={3}>
                   <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Tratamientos</Typography>
-                    <Typography variant="h6" sx={{ color: '#854F0B', fontWeight: 600, fontSize: '1.1rem' }}>
-                      {trabajadorActual.total_atenciones || 0}
+                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Ingresos</Typography>
+                    <Typography variant="h6" sx={{ color: '#2196F3', fontWeight: 600, fontSize: '1.1rem' }}>
+                      S/ {Number(trabajadorActual.total_ingresos || 0).toFixed(2)}
                     </Typography>
                   </Paper>
                 </Grid>
               </Grid>
+              
+              {/* Info adicional: Tratamientos */}
+              <Box sx={{ mb: 2, textAlign: 'center' }}>
+                <Chip 
+                  label={`${trabajadorActual.total_atenciones || 0} tratamientos realizados`}
+                  sx={{ backgroundColor: '#FAEEDA', color: '#854F0B', fontWeight: 600 }}
+                />
+              </Box>
 
               {/* Botones de Acción */}
               <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
