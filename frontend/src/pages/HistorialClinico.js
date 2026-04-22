@@ -33,7 +33,7 @@ import {
   FormControlLabel,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -2446,13 +2446,13 @@ const HistorialClinico = () => {
           "linear-gradient(rgba(255,255,255,0.85), rgba(232,211,57,0.85)), url('/images/background-showclinic.jpg')",
         backgroundSize: "cover",
         minHeight: "100vh",
-        padding: "40px 20px",
+        padding: "40px 30px",
       }}
     >
-      <Container maxWidth="lg">
+      <Container maxWidth={false} sx={{ maxWidth: "1800px", mx: "auto" }}>
         <Paper
           sx={{
-            p: 5,
+            p: 6,
             borderRadius: "15px",
             background:
               "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
@@ -2990,7 +2990,7 @@ const HistorialClinico = () => {
                 />
               </Box>
 
-              <Grid container spacing={2.5} sx={{ mb: 4 }}>
+              <Grid container spacing={3} sx={{ mb: 5 }}>
                 {/* DATOS PERSONALES */}
                 <Grid item xs={12} md={6}>
                   <Paper
@@ -3009,7 +3009,7 @@ const HistorialClinico = () => {
                         Datos Personales
                       </Typography>
                     </Box>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                         <Box sx={{ flex: 1 }}>
                           <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Documento</Typography>
@@ -3072,7 +3072,7 @@ const HistorialClinico = () => {
                         Contacto
                       </Typography>
                     </Box>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                         <Box sx={{ flex: 1 }}>
                           <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Celular</Typography>
@@ -3218,84 +3218,115 @@ const HistorialClinico = () => {
                     </Box>
                   </Paper>
                 </Grid>
-              </Grid>
 
-              {/* Observaciones - colapsable */}
-              <Box
-                onClick={() => setShowObservaciones(prev => !prev)}
-                sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1, cursor: "pointer", userSelect: "none" }}
-              >
-                <Typography
-                  variant="h6"
-                  sx={{ color: "#a36920", fontWeight: "bold" }}
-                >
-                  Otras observaciones
-                </Typography>
-                <Typography sx={{ color: "#a36920", fontSize: "0.9rem", transition: "transform 0.2s", transform: showObservaciones ? "rotate(180deg)" : "rotate(0deg)" }}>
-                  ▼
-                </Typography>
-                {Array.isArray(observaciones) && observaciones.length > 0 && (
-                  <Typography variant="caption" sx={{ backgroundColor: "#a36920", color: "white", borderRadius: 10, px: 1, py: 0.2, fontWeight: "bold", fontSize: "0.65rem" }}>
-                    {observaciones.length}
-                  </Typography>
-                )}
-              </Box>
-
-              {showObservaciones && (
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 4,
-                  p: 2,
-                  borderRadius: 3,
-                  backgroundColor: "rgba(255,255,255,0.68)",
-                  border: "1px solid rgba(212,175,55,0.18)",
-                }}
-              >
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  placeholder="Escribe aquí cualquier observación adicional..."
-                  value={nuevaObservacion}
-                  onChange={(e) => setNuevaObservacion(e.target.value)}
-                  sx={{
-                    "& .MuiInputBase-root": {
-                      backgroundColor: "rgba(212, 175, 55, 0.10)",
-                      borderRadius: 2,
-                    },
-                    "& .MuiOutlinedInput-root": {
-                      "&:hover fieldset": { borderColor: "#a36920" },
-                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                    },
-                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                  }}
-                />
-                <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1 }}>
-                  <Button
-                    variant="contained"
-                    size="small"
+                {/* OTRAS OBSERVACIONES */}
+                <Grid item xs={12}>
+                  <Paper
+                    elevation={0}
                     sx={{
-                      backgroundColor: "#a36920",
-                      "&:hover": { backgroundColor: "#8b581b" },
-                      borderRadius: 3,
-                      fontWeight: "bold",
+                      p: 3,
+                      borderRadius: 2.5,
+                      backgroundColor: "#fff",
+                      border: "1px solid #e0e0e0",
                     }}
-                    disabled={guardandoObservaciones}
-                    onClick={guardarObservacion}
                   >
-                    Guardar observación
-                  </Button>
-                </Box>
-
-                {Array.isArray(observaciones) && observaciones.length > 0 && (
-                  <Box sx={{ mt: 1.5 }}>
-                    <Typography
-                      variant="subtitle2"
-                      sx={{ color: "rgba(0,0,0,0.70)", mb: 1, fontWeight: "bold" }}
+                    <Box 
+                      onClick={() => setShowObservaciones(prev => !prev)}
+                      sx={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "space-between",
+                        cursor: "pointer",
+                        mb: showObservaciones ? 3 : 0,
+                        pb: showObservaciones ? 2 : 0,
+                        borderBottom: showObservaciones ? "2px solid #f5f5f5" : "none",
+                        transition: "all 0.3s ease"
+                      }}
                     >
-                      Historial de observaciones
-                    </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <DescriptionOutlined sx={{ color: "#666", fontSize: 22 }} />
+                        <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                          Otras observaciones
+                        </Typography>
+                        {Array.isArray(observaciones) && observaciones.length > 0 && (
+                          <Chip 
+                            label={observaciones.length} 
+                            size="small" 
+                            sx={{ 
+                              backgroundColor: "#f5f5f5", 
+                              color: "#666", 
+                              fontWeight: 600,
+                              height: "24px",
+                              fontSize: "0.75rem"
+                            }} 
+                          />
+                        )}
+                      </Box>
+                      <IconButton size="small" sx={{ color: "#666" }}>
+                        {showObservaciones ? <ExpandLess /> : <ExpandMore />}
+                      </IconButton>
+                    </Box>
+
+                    <Collapse in={showObservaciones} timeout="auto" unmountOnExit>
+                      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        {/* Nueva observación */}
+                        <Box sx={{ 
+                          p: 2.5, 
+                          backgroundColor: "#fafafa", 
+                          borderRadius: 2,
+                          border: "1px solid #e8e8e8"
+                        }}>
+                          <Typography variant="subtitle2" sx={{ color: "#555", mb: 1.5, fontWeight: 600, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            Nueva observación
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            multiline
+                            minRows={3}
+                            placeholder="Escribe aquí cualquier observación adicional..."
+                            value={nuevaObservacion}
+                            onChange={(e) => setNuevaObservacion(e.target.value)}
+                            sx={{
+                              "& .MuiInputBase-root": {
+                                backgroundColor: "#fff",
+                                borderRadius: 2,
+                              },
+                              "& .MuiOutlinedInput-root": {
+                                "&:hover fieldset": { borderColor: "#a36920" },
+                                "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                              },
+                            }}
+                          />
+                          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5 }}>
+                            <Button
+                              variant="contained"
+                              size="medium"
+                              sx={{
+                                backgroundColor: "#a36920",
+                                "&:hover": { backgroundColor: "#8b581b" },
+                                borderRadius: 2,
+                                fontWeight: 600,
+                                textTransform: "none",
+                                px: 3,
+                                boxShadow: "0 2px 8px rgba(163,105,32,0.2)"
+                              }}
+                              disabled={guardandoObservaciones || !nuevaObservacion.trim()}
+                              onClick={guardarObservacion}
+                            >
+                              {guardandoObservaciones ? "Guardando..." : "Guardar observación"}
+                            </Button>
+                          </Box>
+                        </Box>
+
+                        {/* Historial de observaciones */}
+                        {Array.isArray(observaciones) && observaciones.length > 0 && (
+                          <Box>
+                            <Typography
+                              variant="subtitle2"
+                              sx={{ color: "#555", mb: 2, fontWeight: 600, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}
+                            >
+                              Historial ({observaciones.length})
+                            </Typography>
                     <Box
                       sx={{
                         display: "grid",
@@ -3310,10 +3341,15 @@ const HistorialClinico = () => {
                           key={o.id}
                           elevation={0}
                           sx={{
-                            p: 1.6,
+                            p: 2,
                             borderRadius: 2,
-                            backgroundColor: "rgba(255,255,255,0.78)",
-                            border: "1px solid rgba(163,105,32,0.16)",
+                            backgroundColor: "#fff",
+                            border: "1px solid #e8e8e8",
+                            transition: "all 0.2s ease",
+                            "&:hover": {
+                              borderColor: "#d0d0d0",
+                              boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
+                            }
                           }}
                         >
                           <Box
@@ -3329,8 +3365,10 @@ const HistorialClinico = () => {
                                 variant="caption"
                                 sx={{
                                   display: "block",
-                                  color: "rgba(0,0,0,0.58)",
-                                  mb: 0.5,
+                                  color: "#999",
+                                  mb: 1,
+                                  fontSize: "0.7rem",
+                                  fontWeight: 500
                                 }}
                               >
                                 {o.creado_en}
@@ -3423,8 +3461,11 @@ const HistorialClinico = () => {
                     </Box>
                   </Box>
                 )}
-              </Paper>
-              )}
+                      </Box>
+                    </Collapse>
+                  </Paper>
+                </Grid>
+              </Grid>
 
               <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, mt: 6, flexWrap: "wrap" }}>
                 <Typography
@@ -3505,8 +3546,9 @@ const HistorialClinico = () => {
                     }
                   }}
                   disabled={!pacienteSeleccionado}
+                  startIcon={<Inventory2 />}
                 >
-                  📦 Paquete
+                  Paquete
                 </Button>
                 <Button
                   variant="outlined"
@@ -3534,8 +3576,9 @@ const HistorialClinico = () => {
                   }}
                   onClick={abrirModalFacial}
                   disabled={!pacienteSeleccionado}
+                  startIcon={<Face />}
                 >
-                  📊 Mapa Facial 3D
+                  Mapa Facial 3D
                 </Button>
                 <Button
                   variant="outlined"
@@ -3563,8 +3606,9 @@ const HistorialClinico = () => {
                   }}
                   onClick={abrirModalCorporal}
                   disabled={!pacienteSeleccionado}
+                  startIcon={<FitnessCenter />}
                 >
-                  📏 Corporal
+                  Corporal
                 </Button>
               </Box>
 
@@ -4900,13 +4944,16 @@ const HistorialClinico = () => {
                       "&:hover": { opacity: 0.85 },
                     }}
                   >
-                    <Typography
-                      variant="h6"
-                      sx={{ color: "#2e7d32", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
-                    >
-                      🎁 Paquetes Promocionales Disponibles
-                      <Chip label={`${paquetesActivos.length}`} size="small" sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold", ml: 1 }} />
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <CardGiftcard sx={{ color: "#2e7d32", fontSize: 24 }} />
+                      <Typography
+                        variant="h6"
+                        sx={{ color: "#2e7d32", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        Paquetes Promocionales Disponibles
+                        <Chip label={`${paquetesActivos.length}`} size="small" sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold", ml: 1 }} />
+                      </Typography>
+                    </Box>
                     <IconButton size="small" sx={{ color: "#2e7d32" }}>
                       {paquetesPromoExpanded ? <ExpandLess /> : <ExpandMore />}
                     </IconButton>
@@ -5057,12 +5104,15 @@ const HistorialClinico = () => {
                     border: "1px solid rgba(163, 105, 32, 0.3)",
                   }}
                 >
-                  <Typography
-                    variant="h6"
-                    sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
-                  >
-                    📋 Presupuestos Asignados
-                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+                    <Assignment sx={{ color: "#a36920", fontSize: 24 }} />
+                    <Typography
+                      variant="h6"
+                      sx={{ color: "#a36920", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
+                    >
+                      Presupuestos Asignados
+                    </Typography>
+                  </Box>
                   <Box sx={{ display: "grid", gap: 2 }}>
                     {presupuestosAsignados.map((presupuesto) => {
                       const progreso = presupuesto.sesiones_totales > 0 
@@ -5601,12 +5651,15 @@ const HistorialClinico = () => {
                     border: "1px solid rgba(33, 150, 243, 0.3)",
                   }}
                 >
-                  <Typography
-                    variant="h6"
-                    sx={{ color: "#1565c0", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
-                  >
-                    📦 Paquetes del Paciente
-                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+                    <Inventory sx={{ color: "#1565c0", fontSize: 24 }} />
+                    <Typography
+                      variant="h6"
+                      sx={{ color: "#1565c0", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
+                    >
+                      Paquetes del Paciente
+                    </Typography>
+                  </Box>
                   <Box sx={{ display: "grid", gap: 2 }}>
                     {paquetesPaciente.map((paquete) => {
                       const progreso = paquete.sesiones_totales > 0 
