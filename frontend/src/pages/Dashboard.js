@@ -485,8 +485,8 @@ export default function Dashboard() {
               sx={{
                 display: "grid",
                 gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
-                gap: 2.5,
-                maxWidth: 950,
+                gap: 2,
+                maxWidth: 850,
                 mx: "auto",
                 px: 2,
               }}
@@ -518,29 +518,29 @@ export default function Dashboard() {
                           boxShadow: "0 8px 24px rgba(163,105,32,0.12)",
                           border: "1px solid rgba(163,105,32,0.3)",
                         },
-                        p: 2.5,
+                        p: 2,
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "space-between",
-                        minHeight: 170,
+                        minHeight: 145,
                       }}
                     >
                       {/* Icono */}
                       <Box
                         sx={{
-                          width: 42,
-                          height: 42,
+                          width: 38,
+                          height: 38,
                           borderRadius: 2,
                           background: "linear-gradient(135deg, rgba(163,105,32,0.08) 0%, rgba(212,175,55,0.12) 100%)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          mb: 1.8,
+                          mb: 1.5,
                           position: "relative",
                         }}
                       >
                         {IconComponent && (
-                          <IconComponent sx={{ fontSize: 22, color: "#a36920" }} />
+                          <IconComponent sx={{ fontSize: 20, color: "#a36920" }} />
                         )}
                         {isLocked && (
                           <Box
@@ -564,12 +564,12 @@ export default function Dashboard() {
                       </Box>
 
                       {/* Titulo */}
-                      <Typography sx={{ fontWeight: 700, color: "#2e2e2e", fontSize: "0.95rem", lineHeight: 1.3, mb: 0.5 }}>
+                      <Typography sx={{ fontWeight: 700, color: "#2e2e2e", fontSize: "0.88rem", lineHeight: 1.3, mb: 0.5 }}>
                         {item.title}
                       </Typography>
 
                       {/* Descripcion */}
-                      <Typography sx={{ color: "#999", fontSize: "0.78rem", lineHeight: 1.5, flex: 1 }}>
+                      <Typography sx={{ color: "#999", fontSize: "0.72rem", lineHeight: 1.5, flex: 1 }}>
                         {item.description}
                       </Typography>
 
@@ -578,15 +578,15 @@ export default function Dashboard() {
                         sx={{
                           display: "inline-flex",
                           alignSelf: "flex-start",
-                          mt: 1.5,
-                          px: 1.2,
-                          py: 0.4,
+                          mt: 1.2,
+                          px: 1,
+                          py: 0.35,
                           borderRadius: 1.5,
                           border: "1px solid rgba(186,154,99,0.25)",
                           backgroundColor: "rgba(163,105,32,0.04)",
                         }}
                       >
-                        <Typography sx={{ color: "#ba9a63", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                        <Typography sx={{ color: "#ba9a63", fontSize: "0.6rem", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>
                           {isLocked ? "BLOQUEADO" : item.tag}
                         </Typography>
                       </Box>
