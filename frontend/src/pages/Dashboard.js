@@ -69,57 +69,57 @@ export default function Dashboard() {
   // Menú según rol
   const menuItemsByRole = {
     doctor: [
-      { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
-      { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
-      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
-      { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
-      { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
-      { title: "Especialistas", image: "/images/especialista.png", path: "/especialistas", description: "Equipo médico" },
-      { title: "Gestión Clínica", image: "/images/finanzas.jpeg", path: "/gestion-clinica", description: "Gestión de atenciones" },
-      { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },
+      { title: "Pacientes", path: "/pacientes", description: "Gestión de fichas clínicas, historial y seguimiento personalizado", tag: "REGISTROS" },
+      { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO" },
+      { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS" },
+      { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK" },
+      { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "S/ 18.4K" },
+      { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO" },
+      { title: "Gestión Clínica", path: "/gestion-clinica", description: "Gestión de atenciones diarias y control de citas", tag: "ACCEDER" },
+      { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN" },
     ],
     admin: [
-      { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
-      { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
-      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
-      { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
-      { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
-      { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },
+      { title: "Pacientes", path: "/pacientes", description: "Gestión de fichas clínicas, historial y seguimiento personalizado", tag: "REGISTROS" },
+      { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO" },
+      { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS" },
+      { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK" },
+      { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "S/ 18.4K" },
+      { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN" },
     ],
     logistica: [
-      { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
-      { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
-      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
-      { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
-      { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
+      { title: "Pacientes", path: "/pacientes", description: "Gestión de fichas clínicas, historial y seguimiento personalizado", tag: "REGISTROS" },
+      { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO" },
+      { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS" },
+      { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK" },
+      { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "S/ 18.4K" },
     ],
     asistente: [
-      { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
-      { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
-      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
-      { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
-      { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
+      { title: "Pacientes", path: "/pacientes", description: "Gestión de fichas clínicas, historial y seguimiento personalizado", tag: "REGISTROS" },
+      { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO" },
+      { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS" },
+      { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK" },
+      { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "S/ 18.4K" },
     ],
     master: [
-      { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes" },
-      { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos" },
-      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales" },
-      { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos" },
-      { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos" },
-      { title: "Especialistas", image: "/images/especialista.png", path: "/especialistas", description: "Equipo médico" },
-      { title: "Gestión Clínica", image: "/images/finanzas.jpeg", path: "/gestion-clinica", description: "Gestión de atenciones" },
-      { title: "Productos Aplicados", image: "/images/inventario.jpeg", path: "/productos-aplicados", description: "Reporte de productos usados" },
-      { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes" },
-      { title: "Gestionar", image: "/images/inventario.jpeg", path: "/gestion", description: "Administración del sistema" },
+      { title: "Pacientes", path: "/pacientes", description: "Gestión de fichas clínicas, historial y seguimiento personalizado", tag: "REGISTROS" },
+      { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO" },
+      { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS" },
+      { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK" },
+      { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "S/ 18.4K" },
+      { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO" },
+      { title: "Gestión Clínica", path: "/gestion-clinica", description: "Gestión de atenciones diarias y control de citas", tag: "ACCEDER" },
+      { title: "Productos Aplicados", path: "/productos-aplicados", description: "Reporte de productos usados en tratamientos", tag: "REPORTE" },
+      { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN" },
+      { title: "Gestionar", path: "/gestion", description: "Administración del sistema, usuarios y configuración general", tag: "ADMIN" },
     ],
     doctora: [
-      { title: "Pacientes", image: "/images/pacientes.jpeg", path: "/pacientes", description: "Gestión de pacientes", hasAccess: true },
-      { title: "Tratamientos", image: "/images/tratamientos.jpeg", path: "/tratamientos", description: "Procedimientos estéticos", hasAccess: true },
-      { title: "Paquetes", image: "/images/paquetes.jpeg", path: "/paquetes", description: "Paquetes promocionales", hasAccess: false },
-      { title: "Inventario", image: "/images/inventario.jpeg", path: "/inventario", description: "Control de productos", hasAccess: false },
-      { title: "Finanzas", image: "/images/finanzas.jpeg", path: "/finanzas", description: "Ingresos y gastos", hasAccess: false },
-      { title: "Especialistas", image: "/images/especialista.png", path: "/especialistas", description: "Equipo médico", hasAccess: false },
-      { title: "Estadísticas", image: "/images/finanzas.jpeg", path: "/estadisticas", description: "Resumen del mes", hasAccess: false },
+      { title: "Pacientes", path: "/pacientes", description: "Gestión de fichas clínicas, historial y seguimiento personalizado", tag: "REGISTROS", hasAccess: true },
+      { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO", hasAccess: true },
+      { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS", hasAccess: false },
+      { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK", hasAccess: false },
+      { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "S/ 18.4K", hasAccess: false },
+      { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO", hasAccess: false },
+      { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN", hasAccess: false },
     ],
   };
 
@@ -481,142 +481,120 @@ export default function Dashboard() {
             </Box>
 
             {/* Grid de módulos */}
-            <Grid container spacing={3} justifyContent="center">
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
+                gap: 2.5,
+                maxWidth: 950,
+                mx: "auto",
+                px: 2,
+              }}
+            >
               {menuItems.map((item, index) => {
                 const IconComponent = moduleIcons[item.title];
                 const isLocked = item.hasAccess === false;
                 return (
                   <Grow in timeout={300 + index * 100} key={index}>
-                    <Grid item xs={6} sm={4} md={4}>
-                      <Card
+                    <Card
+                      onClick={() => {
+                        if (isLocked) {
+                          setDeniedModule(item.title);
+                          setOpenAccessDenied(true);
+                        } else {
+                          navigate(item.path);
+                        }
+                      }}
+                      sx={{
+                        cursor: "pointer",
+                        borderRadius: 3,
+                        backgroundColor: isLocked ? "rgba(250,248,245,0.5)" : "#fffdf7",
+                        border: isLocked ? "1px solid #e8e8e8" : "1px solid rgba(186,154,99,0.15)",
+                        boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+                        opacity: isLocked ? 0.6 : 1,
+                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                        "&:hover": isLocked ? {} : {
+                          transform: "translateY(-4px)",
+                          boxShadow: "0 8px 24px rgba(163,105,32,0.12)",
+                          border: "1px solid rgba(163,105,32,0.3)",
+                        },
+                        p: 2.5,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        minHeight: 170,
+                      }}
+                    >
+                      {/* Icono */}
+                      <Box
                         sx={{
-                          height: "100%",
-                          borderRadius: 4,
+                          width: 42,
+                          height: 42,
+                          borderRadius: 2,
+                          background: "linear-gradient(135deg, rgba(163,105,32,0.08) 0%, rgba(212,175,55,0.12) 100%)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          mb: 1.8,
                           position: "relative",
-                          overflow: "hidden",
-                          backgroundColor: isLocked ? "rgba(240,238,234,0.6)" : "#fffdf7",
-                          border: isLocked ? "1px solid #e0dcd5" : "1px solid rgba(186,154,99,0.18)",
-                          boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
-                          opacity: isLocked ? 0.55 : 1,
-                          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                          "&:hover": isLocked ? {} : {
-                            transform: "translateY(-8px)",
-                            boxShadow: "0 16px 48px rgba(163,105,32,0.2)",
-                            border: "1px solid rgba(163,105,32,0.4)",
-                            "& .mod-icon-wrap": {
-                              background: "linear-gradient(135deg, #a36920 0%, #d4af37 100%)",
-                              boxShadow: "0 6px 16px rgba(163,105,32,0.3)",
-                            },
-                            "& .mod-icon-wrap svg": {
-                              color: "white",
-                            },
-                            "& .mod-title": {
-                              color: "#a36920",
-                            },
-                          },
                         }}
                       >
-                        <CardActionArea
-                          onClick={() => {
-                            if (isLocked) {
-                              setDeniedModule(item.title);
-                              setOpenAccessDenied(true);
-                            } else {
-                              navigate(item.path);
-                            }
-                          }}
-                          sx={{
-                            height: "100%",
-                            textAlign: "center",
-                            py: { xs: 3.5, sm: 4.5 },
-                            px: 2.5,
-                            minHeight: { xs: 180, sm: 220 },
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 1.5,
-                          }}
-                        >
+                        {IconComponent && (
+                          <IconComponent sx={{ fontSize: 22, color: "#a36920" }} />
+                        )}
+                        {isLocked && (
                           <Box
-                            className="mod-icon-wrap"
                             sx={{
-                              width: 80,
-                              height: 80,
+                              position: "absolute",
+                              top: -6,
+                              right: -6,
+                              backgroundColor: "#d32f2f",
                               borderRadius: "50%",
-                              background: "linear-gradient(135deg, rgba(163,105,32,0.07) 0%, rgba(212,175,55,0.14) 100%)",
+                              width: 18,
+                              height: 18,
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              transition: "all 0.3s ease",
-                              position: "relative",
+                              border: "2px solid white",
                             }}
                           >
-                            {IconComponent && (
-                              <IconComponent
-                                sx={{
-                                  fontSize: 38,
-                                  color: "#a36920",
-                                  transition: "color 0.3s ease",
-                                }}
-                              />
-                            )}
-                            {isLocked && (
-                              <Box
-                                sx={{
-                                  position: "absolute",
-                                  top: -6,
-                                  right: -6,
-                                  backgroundColor: "#b71c1c",
-                                  borderRadius: "50%",
-                                  width: 26,
-                                  height: 26,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  border: "2px solid white",
-                                }}
-                              >
-                                <Lock sx={{ fontSize: 14, color: "white" }} />
-                              </Box>
-                            )}
+                            <Lock sx={{ fontSize: 10, color: "white" }} />
                           </Box>
+                        )}
+                      </Box>
 
-                          <CardContent sx={{ p: "0 !important" }}>
-                            <Typography
-                              className="mod-title"
-                              sx={{
-                                fontFamily: "'Playfair Display', serif",
-                                fontWeight: 700,
-                                color: "#2e2e2e",
-                                fontSize: { xs: "0.95rem", sm: "1.1rem" },
-                                lineHeight: 1.3,
-                                letterSpacing: 4,
-                                transition: "color 0.3s ease",
-                                mb: 0.5,
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              {item.title}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: "#9a9a9a",
-                                fontSize: "0.8rem",
-                                display: "block",
-                              }}
-                            >
-                              {item.description}
-                            </Typography>
-                          </CardContent>
-                        </CardActionArea>
-                      </Card>
-                    </Grid>
+                      {/* Titulo */}
+                      <Typography sx={{ fontWeight: 700, color: "#2e2e2e", fontSize: "0.95rem", lineHeight: 1.3, mb: 0.5 }}>
+                        {item.title}
+                      </Typography>
+
+                      {/* Descripcion */}
+                      <Typography sx={{ color: "#999", fontSize: "0.78rem", lineHeight: 1.5, flex: 1 }}>
+                        {item.description}
+                      </Typography>
+
+                      {/* Tag */}
+                      <Box
+                        sx={{
+                          display: "inline-flex",
+                          alignSelf: "flex-start",
+                          mt: 1.5,
+                          px: 1.2,
+                          py: 0.4,
+                          borderRadius: 1.5,
+                          border: "1px solid rgba(186,154,99,0.25)",
+                          backgroundColor: "rgba(163,105,32,0.04)",
+                        }}
+                      >
+                        <Typography sx={{ color: "#ba9a63", fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+                          {isLocked ? "BLOQUEADO" : item.tag}
+                        </Typography>
+                      </Box>
+                    </Card>
                   </Grow>
                 );
               })}
-            </Grid>
+            </Box>
 
             {/* Session info */}
             <Fade in timeout={800}>

@@ -42,28 +42,33 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     navigate("/", { replace: true });
   };
 
+  // Mostrar el botón de cerrar sesión solo en el Dashboard
+  const showLogoutButton = location.pathname === "/dashboard";
+
   return (
     <>
-      <Box
-        sx={{
-          position: "fixed",
-          top: 12,
-          right: 12,
-          zIndex: 1400,
-        }}
-      >
-        <Button
-          variant="outlined"
-          size="small"
-          onClick={logout}
+      {showLogoutButton && (
+        <Box
           sx={{
-            textTransform: "none",
-            fontWeight: 700,
+            position: "fixed",
+            top: 12,
+            right: 12,
+            zIndex: 1400,
           }}
         >
-          Cerrar sesión
-        </Button>
-      </Box>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={logout}
+            sx={{
+              textTransform: "none",
+              fontWeight: 700,
+            }}
+          >
+            Cerrar sesión
+          </Button>
+        </Box>
+      )}
       {children}
     </>
   );
