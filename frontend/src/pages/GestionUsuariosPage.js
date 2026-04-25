@@ -76,7 +76,8 @@ const availableModules = [
   { name: "Finanzas", key: "finanzas" },
   { name: "Especialistas", key: "especialistas" },
   { name: "Gestión Clínica", key: "gestion-clinica" },
-  { name: "Estadísticas", key: "estadisticas" }
+  { name: "Estadísticas", key: "estadisticas" },
+  { name: "Historial Clínico", key: "historial-clinico" }
 ];
 
 const defaultRoleConfig = {
