@@ -573,41 +573,35 @@ const GestionPersonalCards = () => {
                 </Box>
               </Box>
               
-              {/* Resumen Financiero - 4 cards con cálculos correctos */}
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={6} sm={3}>
-                  <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Sueldo fijo</Typography>
-                    <Typography variant="h6" sx={{ color: '#333', fontWeight: 600, fontSize: '1.1rem' }}>
-                      S/ {Number(trabajadorActual.pago_fijo || 0).toFixed(2)}
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={3}>
-                  <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Comisión ({Number(trabajadorActual.comision_porcentaje || 0).toFixed(0)}%)</Typography>
-                    <Typography variant="h6" sx={{ color: '#854F0B', fontWeight: 600, fontSize: '1.1rem' }}>
-                      S/ {Number(trabajadorActual.comision_calculada || 0).toFixed(2)}
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={3}>
-                  <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Total a pagar</Typography>
-                    <Typography variant="h6" sx={{ color: '#4CAF50', fontWeight: 600, fontSize: '1.1rem' }}>
-                      S/ {(Number(trabajadorActual.pago_fijo || 0) + Number(trabajadorActual.comision_calculada || 0)).toFixed(2)}
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={3}>
-                  <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Ingresos</Typography>
-                    <Typography variant="h6" sx={{ color: '#2196F3', fontWeight: 600, fontSize: '1.1rem' }}>
-                      S/ {Number(trabajadorActual.total_ingresos || 0).toFixed(2)}
-                    </Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
+              {/* Resumen Financiero - 2 cards: Sueldo fijo + Comisión calculada sobre pagado */}
+              {(() => {
+                const totalPagado = presupuestosEsp.reduce((sum, p) => sum + Number(p.monto_pagado || 0), 0);
+                const comisionPct = Number(trabajadorActual.comision_porcentaje || 0);
+                const comisionCalculada = totalPagado * (comisionPct / 100);
+                return (
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={6}>
+                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Sueldo fijo</Typography>
+                        <Typography variant="h6" sx={{ color: '#333', fontWeight: 600, fontSize: '1.1rem' }}>
+                          S/ {Number(trabajadorActual.pago_fijo || 0).toFixed(2)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Comisión ({comisionPct.toFixed(0)}% sobre pagado)</Typography>
+                        <Typography variant="h6" sx={{ color: '#854F0B', fontWeight: 600, fontSize: '1.1rem' }}>
+                          S/ {comisionCalculada.toFixed(2)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#999', fontSize: '0.6rem' }}>
+                          Total pagado: S/ {totalPagado.toFixed(2)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                );
+              })()}
               
               {/* Info adicional: Tratamientos */}
               <Box sx={{ mb: 2, textAlign: 'center' }}>
