@@ -38,6 +38,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import api from "../api/axios";
+import useUserPermissions from "../hooks/useUserPermissions";
 
 const money = (n) => {
   const value = Number(n) || 0;
@@ -54,9 +55,10 @@ const rankColors = ["#D4AF37", "#A0A0A0", "#CD7F32"];
 export default function Estadisticas() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { hasAccess, loaded: permsLoaded } = useUserPermissions();
   const role = localStorage.getItem("role");
 
-  const canViewStats = role === "doctor" || role === "admin" || role === "master";
+  const canViewStats = role === "doctor" || role === "admin" || role === "master" || hasAccess("estadisticas");
 
   const today = useMemo(() => new Date(), []);
   const currentYear = today.getFullYear();
@@ -67,11 +69,11 @@ export default function Estadisticas() {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    if (!canViewStats) {
+    if (permsLoaded && !canViewStats) {
       showToast({ severity: "error", message: "No tienes permisos para acceder a Estadísticas" });
       navigate("/dashboard");
     }
-  }, [canViewStats, navigate, showToast]);
+  }, [canViewStats, permsLoaded, navigate, showToast]);
 
   const cargar = async () => {
     setLoading(true);
@@ -97,7 +99,7 @@ export default function Estadisticas() {
     if (canViewStats) cargar();
   });
 
-  if (!canViewStats) return null;
+  if (!permsLoaded || !canViewStats) return null;
 
   const kpi = data?.kpi;
   const ingresosBruto = kpi?.ingresos_bruto ?? 0;

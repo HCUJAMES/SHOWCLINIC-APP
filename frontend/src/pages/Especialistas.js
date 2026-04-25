@@ -22,6 +22,7 @@ import { Add, Delete, ArrowBack, Home } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import axios from "axios";
+import useUserPermissions from "../hooks/useUserPermissions";
 
 const API_BASE =
   process.env.REACT_APP_API_URL ||
@@ -50,6 +51,7 @@ export default function Especialistas() {
   const { showToast } = useToast();
   const token = localStorage.getItem("token");
   const role = localStorage.getItem("role");
+  const { hasAccess, loaded: permsLoaded } = useUserPermissions();
 
   const [especialistas, setEspecialistas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,13 +65,14 @@ export default function Especialistas() {
 
   const authHeaders = { Authorization: `Bearer ${token}` };
 
-  // Verificar que solo doctor o master puede acceder
+  // Verificar permisos de acceso
+  const canView = role === "doctor" || role === "master" || hasAccess("especialistas");
   useEffect(() => {
-    if (role !== "doctor" && role !== "master") {
+    if (permsLoaded && !canView) {
       showToast({ severity: "error", message: "No tienes permisos para acceder a esta sección" });
       navigate("/dashboard");
     }
-  }, [role, navigate, showToast]);
+  }, [canView, permsLoaded, navigate, showToast]);
 
   // Cargar especialistas
   const cargarEspecialistas = async () => {
