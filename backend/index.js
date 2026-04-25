@@ -145,6 +145,18 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run(`CREATE INDEX IF NOT EXISTS idx_user_permissions_user_id ON user_permissions(user_id)`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_user_permissions_module ON user_permissions(module_name)`);
 
+    // 🎭 Tabla de roles personalizados
+    db.run(`
+      CREATE TABLE IF NOT EXISTS custom_roles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        label TEXT NOT NULL,
+        default_modules TEXT DEFAULT '[]',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // 🧱 Tabla de pacientes
     db.run(`
       CREATE TABLE IF NOT EXISTS patients (

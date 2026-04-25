@@ -190,6 +190,143 @@ router.delete("/users/:id", requireRole("master"), async (req, res) => {
   }
 });
 
+// Cambiar rol de un usuario (solo master)
+router.put("/users/:id/role", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  const { role } = req.body;
+  if (!role) {
+    return res.status(400).json({ message: "El rol es requerido" });
+  }
+  try {
+    const user = await new Promise((resolve, reject) => {
+      db.get("SELECT id, username, role FROM users WHERE id = ?", [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+    if (user.role === "master") return res.status(403).json({ message: "No se puede cambiar el rol del usuario master" });
+    await dbRun("UPDATE users SET role = ? WHERE id = ?", [role, id]);
+    res.json({ message: `Rol de "${user.username}" actualizado a "${role}"` });
+  } catch (err) {
+    console.error("Error al cambiar rol:", err);
+    res.status(500).json({ message: "Error al cambiar rol" });
+  }
+});
+
+// Editar username de un usuario (solo master)
+router.put("/users/:id/username", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  const { username } = req.body;
+  if (!username || username.trim().length < 2) {
+    return res.status(400).json({ message: "El nombre de usuario debe tener al menos 2 caracteres" });
+  }
+  try {
+    const user = await new Promise((resolve, reject) => {
+      db.get("SELECT id, username, role FROM users WHERE id = ?", [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+    const existing = await new Promise((resolve, reject) => {
+      db.get("SELECT id FROM users WHERE username = ? AND id != ?", [username.trim(), id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    if (existing) return res.status(400).json({ message: "Ese nombre de usuario ya existe" });
+    await dbRun("UPDATE users SET username = ? WHERE id = ?", [username.trim(), id]);
+    res.json({ message: `Nombre actualizado a "${username.trim()}"` });
+  } catch (err) {
+    console.error("Error al cambiar username:", err);
+    res.status(500).json({ message: "Error al cambiar nombre de usuario" });
+  }
+});
+
+// ====== ROLES PERSONALIZADOS ======
+
+// Listar roles personalizados
+router.get("/roles", requireRole("master"), async (req, res) => {
+  try {
+    const roles = await dbAll("SELECT * FROM custom_roles ORDER BY name");
+    for (const role of roles) {
+      try {
+        role.default_modules = JSON.parse(role.default_modules || "[]");
+      } catch { role.default_modules = []; }
+    }
+    res.json(roles || []);
+  } catch (err) {
+    console.error("Error al listar roles:", err);
+    res.status(500).json({ message: "Error al listar roles" });
+  }
+});
+
+// Crear rol personalizado
+router.post("/roles", requireRole("master"), async (req, res) => {
+  const { name, label, default_modules } = req.body;
+  if (!name || !label) {
+    return res.status(400).json({ message: "Nombre y etiqueta son requeridos" });
+  }
+  const roleName = name.toLowerCase().replace(/\s+/g, "_");
+  try {
+    const existing = await new Promise((resolve, reject) => {
+      db.get("SELECT id FROM custom_roles WHERE name = ?", [roleName], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    if (existing) return res.status(400).json({ message: "Ya existe un rol con ese nombre" });
+    const result = await dbRun(
+      "INSERT INTO custom_roles (name, label, default_modules) VALUES (?, ?, ?)",
+      [roleName, label, JSON.stringify(default_modules || [])]
+    );
+    res.status(201).json({ message: "Rol creado exitosamente", id: result.lastID, name: roleName });
+  } catch (err) {
+    console.error("Error al crear rol:", err);
+    res.status(500).json({ message: "Error al crear rol" });
+  }
+});
+
+// Editar rol personalizado
+router.put("/roles/:id", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  const { label, default_modules } = req.body;
+  try {
+    await dbRun(
+      "UPDATE custom_roles SET label = ?, default_modules = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [label, JSON.stringify(default_modules || []), id]
+    );
+    res.json({ message: "Rol actualizado exitosamente" });
+  } catch (err) {
+    console.error("Error al editar rol:", err);
+    res.status(500).json({ message: "Error al editar rol" });
+  }
+});
+
+// Eliminar rol personalizado
+router.delete("/roles/:id", requireRole("master"), async (req, res) => {
+  const { id } = req.params;
+  try {
+    const role = await new Promise((resolve, reject) => {
+      db.get("SELECT name FROM custom_roles WHERE id = ?", [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    if (!role) return res.status(404).json({ message: "Rol no encontrado" });
+    const usersWithRole = await dbAll("SELECT id FROM users WHERE role = ?", [role.name]);
+    if (usersWithRole && usersWithRole.length > 0) {
+      return res.status(400).json({ message: `No se puede eliminar: ${usersWithRole.length} usuario(s) tienen este rol asignado` });
+    }
+    await dbRun("DELETE FROM custom_roles WHERE id = ?", [id]);
+    res.json({ message: "Rol eliminado exitosamente" });
+  } catch (err) {
+    console.error("Error al eliminar rol:", err);
+    res.status(500).json({ message: "Error al eliminar rol" });
+  }
+});
+
 // Listar usuarios con sus permisos (solo master)
 router.get("/users-with-permissions", requireRole("master"), async (req, res) => {
   try {
