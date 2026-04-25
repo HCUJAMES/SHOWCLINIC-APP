@@ -98,12 +98,30 @@ router.post("/users", requireRole("master"), async (req, res) => {
     
     const userId = result.lastID;
     
-    if (permissions && Array.isArray(permissions)) {
+    if (permissions && Array.isArray(permissions) && permissions.length > 0) {
       for (const perm of permissions) {
         await dbRun(
           "INSERT INTO user_permissions (user_id, module_name, can_access, can_edit) VALUES (?, ?, ?, ?)",
           [userId, perm.module_name, perm.can_access ? 1 : 0, perm.can_edit ? 1 : 0]
         );
+      }
+    } else {
+      // Si no se enviaron permisos, buscar default_modules del rol personalizado
+      const customRole = await new Promise((resolve, reject) => {
+        db.get("SELECT default_modules FROM custom_roles WHERE name = ?", [role], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
+      if (customRole && customRole.default_modules) {
+        let defaultMods = [];
+        try { defaultMods = JSON.parse(customRole.default_modules); } catch { defaultMods = []; }
+        for (const mod of defaultMods) {
+          await dbRun(
+            "INSERT INTO user_permissions (user_id, module_name, can_access, can_edit) VALUES (?, ?, ?, ?)",
+            [userId, mod, 1, 1]
+          );
+        }
       }
     }
     

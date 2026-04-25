@@ -126,7 +126,38 @@ export default function Dashboard() {
     ],
   };
 
-  const menuItems = menuItemsByRole[role] || [];
+  const [permissionMenuItems, setPermissionMenuItems] = useState([]);
+
+  // Map de module_name en user_permissions → config del módulo en el dashboard
+  const moduleMap = {
+    pacientes: { title: "Pacientes", path: "/pacientes", description: "Gestión de fichas clínicas, historial y seguimiento personalizado", tag: "REGISTROS" },
+    tratamientos: { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO" },
+    paquetes: { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS" },
+    inventario: { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK" },
+    finanzas: { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "REPORTES" },
+    especialistas: { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO" },
+    "gestion-clinica": { title: "Gestión Clínica", path: "/gestion-clinica", description: "Gestión de atenciones diarias y control de citas", tag: "ACCEDER" },
+    estadisticas: { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN" },
+  };
+
+  // Si el rol no está en menuItemsByRole, cargar permisos del usuario
+  useEffect(() => {
+    if (!menuItemsByRole[role] && role !== "master") {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      fetch(`${API_BASE}/api/admin/my-permissions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => res.json())
+        .then(perms => {
+          const items = (perms || []).filter(p => p.can_access).map(p => moduleMap[p.module_name]).filter(Boolean);
+          setPermissionMenuItems(items);
+        })
+        .catch(err => console.error("Error cargando permisos:", err));
+    }
+  }, [role]);
+
+  const menuItems = menuItemsByRole[role] || permissionMenuItems;
 
   const username = localStorage.getItem("username") || role;
   const hora = new Date().getHours();
