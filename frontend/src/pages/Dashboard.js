@@ -37,6 +37,7 @@ import {
   Search,
   Close,
   CalendarToday,
+  SupervisorAccount,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
@@ -52,6 +53,7 @@ const moduleIcons = {
   Gestionar: Settings,
   "Gestión Clínica": LocalHospital,
   "Productos Aplicados": CalendarToday,
+  "Usuarios": SupervisorAccount,
 };
 
 const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
@@ -111,13 +113,14 @@ export default function Dashboard() {
       { title: "Productos Aplicados", path: "/productos-aplicados", description: "Reporte de productos usados en tratamientos", tag: "REPORTE" },
       { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN" },
       { title: "Gestionar", path: "/gestion", description: "Administración del sistema, usuarios y configuración general", tag: "ADMIN" },
+      { title: "Usuarios", path: "/gestion-usuarios", description: "Crear usuarios, asignar roles y gestionar permisos de acceso", tag: "USUARIOS" },
     ],
     doctora: [
       { title: "Pacientes", path: "/pacientes", description: "Gestión de fichas clínicas, historial y seguimiento personalizado", tag: "REGISTROS", hasAccess: true },
       { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO", hasAccess: true },
       { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS", hasAccess: false },
       { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK", hasAccess: false },
-      { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "S/ 18.4K", hasAccess: false },
+      { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "REPORTES", hasAccess: false },
       { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO", hasAccess: false },
       { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN", hasAccess: false },
     ],
