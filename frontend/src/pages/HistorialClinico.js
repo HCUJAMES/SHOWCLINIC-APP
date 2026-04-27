@@ -2041,9 +2041,26 @@ const HistorialClinico = () => {
 
   const pacientesFiltrados = pacientes
     .filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(filtro.toLowerCase()) ||
-        p.apellido.toLowerCase().includes(filtro.toLowerCase())
+      (p) => {
+        if (!filtro.trim()) return true;
+        // Normalizar: quitar tildes, minúsculas, trim espacios múltiples
+        const normalize = (str) => (str || "")
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+        
+        const filtroNorm = normalize(filtro);
+        const nombreNorm = normalize(p.nombre);
+        const apellidoNorm = normalize(p.apellido);
+        const nombreCompletoNorm = `${nombreNorm} ${apellidoNorm}`.trim();
+        const dniNorm = (p.dni || "").toString().trim();
+        
+        return nombreNorm.includes(filtroNorm) ||
+               apellidoNorm.includes(filtroNorm) ||
+               nombreCompletoNorm.includes(filtroNorm) ||
+               dniNorm.includes(filtroNorm);
+      }
     )
     .sort((a, b) => {
       switch (ordenPacientes) {

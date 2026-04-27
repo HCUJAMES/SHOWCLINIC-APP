@@ -547,10 +547,10 @@ router.get("/buscar", (req, res) => {
 
   const trimmedTerm = typeof term === "string" ? term.trim() : "";
   if (trimmedTerm) {
-    const value = `%${trimmedTerm}%`;
-    // Buscar en nombre, apellido, DNI, y en la concatenación de nombre + apellido
-    where.push("(nombre LIKE ? OR apellido LIKE ? OR dni LIKE ? OR (nombre || ' ' || COALESCE(apellido, '')) LIKE ?)");
-    params.push(value, value, value, value);
+    const valueLower = `%${trimmedTerm.toLowerCase()}%`;
+    // Buscar en nombre, apellido, DNI (case-insensitive), y en la concatenación de nombre + apellido
+    where.push("(LOWER(nombre) LIKE ? OR LOWER(apellido) LIKE ? OR dni LIKE ? OR LOWER(nombre || ' ' || COALESCE(apellido, '')) LIKE ?)");
+    params.push(valueLower, valueLower, trimmedTerm, valueLower);
   }
 
   const tratamientoIdNumRaw =

@@ -187,17 +187,25 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json();
         
+        // Normalizar texto: quitar tildes, minúsculas, trim espacios múltiples
+        const normalize = (str) => (str || "")
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+        
+        const queryNorm = normalize(query);
+        
         const filtered = (Array.isArray(data) ? data : []).filter(p => {
-          const nombre = (p.nombre || "").toLowerCase();
-          const apellido = (p.apellido || "").toLowerCase();
-          const nombreCompleto = `${nombre} ${apellido}`.trim();
-          const dni = (p.dni || "").toString();
-          const queryLower = query.toLowerCase();
+          const nombreNorm = normalize(p.nombre);
+          const apellidoNorm = normalize(p.apellido);
+          const nombreCompletoNorm = `${nombreNorm} ${apellidoNorm}`.trim();
+          const dniNorm = (p.dni || "").toString().trim();
           
-          return nombre.includes(queryLower) || 
-                 apellido.includes(queryLower) || 
-                 nombreCompleto.includes(queryLower) ||
-                 dni.includes(query);
+          return nombreNorm.includes(queryNorm) || 
+                 apellidoNorm.includes(queryNorm) || 
+                 nombreCompletoNorm.includes(queryNorm) ||
+                 dniNorm.includes(queryNorm);
         }).slice(0, 5);
         
         setSearchResults(filtered);
