@@ -714,7 +714,9 @@ const HistorialClinico = () => {
   const editarCorporal = (registro) => {
     setCorporalEditId(registro.id);
     setCorporalTipo(registro.tipo || "evaluacion");
-    setCorporalTablas(registro.tablas_json || [{ titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", abdomen_alto: "", abdomen_medio: "", abdomen_bajo: "", sesion: "1ra sesión", datos: "" }] }]);
+    // Deep clone para evitar mutaciones por referencia
+    const tablasClone = JSON.parse(JSON.stringify(registro.tablas_json || [{ titulo: "Mediciones", filas: [{ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", abdomen_alto: "", abdomen_medio: "", abdomen_bajo: "", sesion: "1ra sesión", datos: "" }] }]));
+    setCorporalTablas(tablasClone);
     setCorporalActividad(registro.actividad_fisica || "");
     setCorporalObservaciones(registro.observaciones || "");
   };
@@ -725,22 +727,27 @@ const HistorialClinico = () => {
     try {
       const payload = {
         tipo: corporalTipo,
-        tablas_json: corporalTablas,
+        tablas_json: JSON.parse(JSON.stringify(corporalTablas)),
         actividad_fisica: corporalActividad,
         observaciones: corporalObservaciones,
       };
       if (corporalEditId) {
-        await axios.put(`${API_BASE_URL}/api/pacientes/corporal/${corporalEditId}`, payload, { headers: authHeaders });
-        showToast({ severity: "success", message: "Registro corporal actualizado" });
+        const resp = await axios.put(`${API_BASE_URL}/api/pacientes/corporal/${corporalEditId}`, payload, { headers: authHeaders });
+        if (resp.data?.warning) {
+          showToast({ severity: "warning", message: resp.data.warning });
+        } else {
+          showToast({ severity: "success", message: "Registro corporal actualizado" });
+        }
       } else {
         await axios.post(`${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/corporal`, payload, { headers: authHeaders });
         showToast({ severity: "success", message: "Registro corporal creado" });
       }
-      resetCorporalForm();
+      // Recargar datos ANTES de resetear formulario
       await cargarCorporal();
+      resetCorporalForm();
     } catch (err) {
       console.error("Error al guardar corporal:", err);
-      showToast({ severity: "error", message: "Error al guardar registro corporal" });
+      showToast({ severity: "error", message: err.response?.data?.message || "Error al guardar registro corporal" });
     } finally {
       setGuardandoCorporal(false);
     }
@@ -7865,7 +7872,7 @@ const HistorialClinico = () => {
                   variant="standard"
                   value={tabla.titulo}
                   onChange={(e) => {
-                    const nuevo = [...corporalTablas];
+                    const nuevo = JSON.parse(JSON.stringify(corporalTablas));
                     nuevo[tIdx].titulo = e.target.value;
                     setCorporalTablas(nuevo);
                   }}
@@ -7911,7 +7918,7 @@ const HistorialClinico = () => {
                               size="small"
                               value={fila[campo] || ""}
                               onChange={(e) => {
-                                const nuevo = [...corporalTablas];
+                                const nuevo = JSON.parse(JSON.stringify(corporalTablas));
                                 nuevo[tIdx].filas[fIdx][campo] = e.target.value;
                                 setCorporalTablas(nuevo);
                               }}
@@ -7933,7 +7940,7 @@ const HistorialClinico = () => {
                             size="small"
                             value={fila.sesion || ""}
                             onChange={(e) => {
-                              const nuevo = [...corporalTablas];
+                              const nuevo = JSON.parse(JSON.stringify(corporalTablas));
                               nuevo[tIdx].filas[fIdx].sesion = e.target.value;
                               setCorporalTablas(nuevo);
                             }}
@@ -7954,7 +7961,7 @@ const HistorialClinico = () => {
                             size="small"
                             value={fila.datos || ""}
                             onChange={(e) => {
-                              const nuevo = [...corporalTablas];
+                              const nuevo = JSON.parse(JSON.stringify(corporalTablas));
                               nuevo[tIdx].filas[fIdx].datos = e.target.value;
                               setCorporalTablas(nuevo);
                             }}
@@ -7974,7 +7981,7 @@ const HistorialClinico = () => {
                             <IconButton
                               size="small"
                               onClick={() => {
-                                const nuevo = [...corporalTablas];
+                                const nuevo = JSON.parse(JSON.stringify(corporalTablas));
                                 nuevo[tIdx].filas = nuevo[tIdx].filas.filter((_, i) => i !== fIdx);
                                 setCorporalTablas(nuevo);
                               }}
@@ -7993,7 +8000,7 @@ const HistorialClinico = () => {
                 <Button
                   size="small"
                   onClick={() => {
-                    const nuevo = [...corporalTablas];
+                    const nuevo = JSON.parse(JSON.stringify(corporalTablas));
                     const numFila = nuevo[tIdx].filas.length + 1;
                     const sesionLabel = numFila === 1 ? "1ra sesión" : numFila === 2 ? "2da sesión" : numFila === 3 ? "3ra sesión" : `${numFila}ta sesión`;
                     nuevo[tIdx].filas.push({ cintura: "", cadera: "", muslos: "", gluteos: "", brazos: "", abdomen_alto: "", abdomen_medio: "", abdomen_bajo: "", sesion: sesionLabel, datos: "" });

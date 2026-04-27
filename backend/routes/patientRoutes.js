@@ -971,14 +971,22 @@ router.put("/corporal/:corporalId", requirePatientWrite, (req, res) => {
   const { tipo, tablas_json, actividad_fisica, observaciones } = req.body;
   const ahora = new Date(new Date().getTime() - 5 * 60 * 60 * 1000).toISOString().replace("T", " ").slice(0, 19);
 
+  const tablasStr = JSON.stringify(tablas_json || []);
+  console.log(`📝 Actualizando corporal ID=${corporalId}, tipo=${tipo}, tablas_json length=${tablasStr.length}, actividad=${(actividad_fisica || "").length} chars, obs=${(observaciones || "").length} chars`);
+
   db.run(
     `UPDATE presupuesto_corporal SET tipo = ?, tablas_json = ?, actividad_fisica = ?, observaciones = ?, actualizado_en = ? WHERE id = ?`,
-    [tipo || "evaluacion", JSON.stringify(tablas_json || []), actividad_fisica || "", observaciones || "", ahora, corporalId],
+    [tipo || "evaluacion", tablasStr, actividad_fisica || "", observaciones || "", ahora, corporalId],
     function (err) {
       if (err) {
         console.error("❌ Error al actualizar corporal:", err.message);
         return res.status(500).json({ message: "Error al actualizar registro corporal" });
       }
+      if (this.changes === 0) {
+        console.warn(`⚠️ Corporal ID=${corporalId} no encontrado para actualizar`);
+        return res.json({ message: "Registro corporal actualizado", warning: "El registro no fue encontrado, es posible que haya sido eliminado" });
+      }
+      console.log(`✅ Corporal ID=${corporalId} actualizado correctamente`);
       res.json({ message: "Registro corporal actualizado" });
     }
   );
