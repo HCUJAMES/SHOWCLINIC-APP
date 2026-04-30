@@ -38,13 +38,15 @@ import {
   Payment,
   History,
   FileDownload,
-  Edit
+  Edit,
+  PictureAsPdf
 } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { formatearFechaCorta } from "../utils/dateUtils";
 import * as XLSX from "xlsx";
+import { generarReporteComisionPDF } from "../utils/generarReporteComisionPDF";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -235,6 +237,25 @@ const GestionPersonalCards = () => {
     XLSX.utils.book_append_sheet(wb, ws, "Detalle");
     XLSX.writeFile(wb, `detalle_${trabajador.especialista_nombre.replace(/\s/g, '_')}.xlsx`);
     showToast({ severity: "success", message: "Exportado exitosamente" });
+  };
+
+  const exportarPDF = async (trabajador) => {
+    if (!trabajador) return;
+    try {
+      await generarReporteComisionPDF({
+        trabajador,
+        presupuestos: presupuestosEsp,
+        tratamientosRealizados: detalleData?.tratamientos || [],
+        totalesTratamientos: detalleData?.totales || {},
+        historialPagos,
+        mes: mesSeleccionado,
+        anio: anioSeleccionado
+      });
+      showToast({ severity: "success", message: "PDF generado exitosamente" });
+    } catch (error) {
+      console.error("Error generando PDF:", error);
+      showToast({ severity: "error", message: "Error al generar PDF" });
+    }
   };
 
   const abrirModalEditarCard = async (e, trabajador) => {
@@ -621,6 +642,15 @@ const GestionPersonalCards = () => {
                   sx={{ backgroundColor: '#854F0B', '&:hover': { backgroundColor: '#6B3F08' } }}
                 >
                   Registrar pago
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  fullWidth
+                  startIcon={<PictureAsPdf />}
+                  onClick={() => exportarPDF(trabajadorActual)}
+                  sx={{ borderColor: '#D32F2F', color: '#D32F2F', '&:hover': { borderColor: '#B71C1C', backgroundColor: '#FFEBEE' } }}
+                >
+                  Exportar PDF
                 </Button>
                 <Button 
                   variant="outlined" 
