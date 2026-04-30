@@ -1,5 +1,4 @@
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 const LOGO_URL = "/logo-showclinic.png";
 
@@ -28,20 +27,17 @@ const fmtSoles = (n) => `S/ ${Number(n || 0).toFixed(2)}`;
 
 const fmtFecha = (str) => {
   if (!str) return "-";
-  const s = String(str).split(" ")[0];
-  return s;
+  return String(str).split(" ")[0];
 };
 
 /**
- * Genera un reporte PDF con el informe de pago de comisión del especialista,
- * incluyendo presupuestos asignados, tratamientos realizados e historial de pagos.
+ * Genera reporte PDF con el informe de comisión del especialista.
+ * Solo muestra: datos del especialista, comisión, y presupuestos asignados
+ * replicando el diseño del sistema (cards con tratamientos y resumen financiero).
  */
 export const generarReporteComisionPDF = async ({
   trabajador,
   presupuestos = [],
-  tratamientosRealizados = [],
-  totalesTratamientos = {},
-  historialPagos = [],
   mes,
   anio
 }) => {
@@ -52,12 +48,22 @@ export const generarReporteComisionPDF = async ({
   const pageHeight = doc.internal.pageSize.getHeight();
 
   // Paleta de marca
-  const dorado = [163, 105, 32];
-  const doradoMedio = [186, 154, 99];
-  const cremaClaro = [245, 241, 228];
+  const dorado = [163, 105, 32];        // #a36920
+  const doradoMedio = [186, 154, 99];    // #ba9a63
+  const cremaClaro = [245, 241, 228];    // #f5f1e4
+  const cremaSuave = [253, 248, 240];    // #FDF8F0
+  const beigeBorde = [250, 238, 218];    // #FAEEDA
   const blanco = [255, 255, 255];
   const negro = [40, 40, 40];
   const gris = [110, 110, 110];
+  const grisTexto = [85, 85, 85];
+  const verde = [76, 175, 80];
+  const rojo = [244, 67, 54];
+  const naranja = [255, 152, 0];
+  const activoNaranja = [255, 152, 0];
+
+  const marginX = 14;
+  const contentW = pageWidth - marginX * 2;
 
   // ============ HEADER ============
   doc.setFillColor(...dorado);
@@ -89,17 +95,17 @@ export const generarReporteComisionPDF = async ({
   // ============ DATOS DEL ESPECIALISTA ============
   let y = 42;
   doc.setFillColor(...cremaClaro);
-  doc.roundedRect(12, y, pageWidth - 24, 28, 3, 3, "F");
+  doc.roundedRect(marginX, y, contentW, 28, 3, 3, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...dorado);
-  doc.text("ESPECIALISTA", 18, y + 7);
+  doc.text("ESPECIALISTA", marginX + 6, y + 7);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...negro);
-  doc.text(String(trabajador.especialista_nombre || "-").toUpperCase(), 18, y + 15);
+  doc.text(String(trabajador.especialista_nombre || "-").toUpperCase(), marginX + 6, y + 15);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
@@ -107,263 +113,182 @@ export const generarReporteComisionPDF = async ({
   const rol = trabajador.tipo === "doctor" ? "Doctor / Medicina estética"
     : trabajador.tipo === "asistente" ? "Asistente clínica"
     : trabajador.tipo === "recepcion" ? "Recepción" : (trabajador.tipo || "-");
-  doc.text(`Rol: ${rol}`, 18, y + 22);
-
-  // Modalidad de pago
-  const pagoFijo = Number(trabajador.pago_fijo || 0);
   const comPct = Number(trabajador.comision_porcentaje || 0);
-  const modalidad = pagoFijo > 0 && comPct > 0 ? "Sueldo fijo + comisión"
-    : pagoFijo > 0 ? "Sueldo fijo"
-    : "Comisión";
-  doc.text(`Modalidad: ${modalidad}  |  Comisión: ${comPct.toFixed(0)}%`, 18, y + 27);
+  doc.text(`Rol: ${rol}`, marginX + 6, y + 22);
+  doc.text(`Comisión: ${comPct.toFixed(0)}%`, marginX + 6, y + 27);
 
-  // ============ RESUMEN FINANCIERO (4 cards) ============
   y += 36;
+
+  // ============ COMISIÓN (tarjeta única) ============
   const totalPagadoPresup = presupuestos.reduce((s, p) => s + Number(p.monto_pagado || 0), 0);
   const comisionCalculada = totalPagadoPresup * (comPct / 100);
-  const totalAPagar = pagoFijo + comisionCalculada;
-  const totalTratamientos = trabajador.total_atenciones
-    || tratamientosRealizados.reduce((s, t) => s + Number(t.total_sesiones || 0), 0);
 
-  const cards = [
-    { label: "Sueldo fijo", value: fmtSoles(pagoFijo), color: negro },
-    { label: `Comisión (${comPct.toFixed(0)}%)`, value: fmtSoles(comisionCalculada), color: dorado },
-    { label: "Total a pagar", value: fmtSoles(totalAPagar), color: [76, 175, 80] },
-    { label: "Tratamientos", value: String(totalTratamientos), color: doradoMedio }
-  ];
+  doc.setFillColor(...cremaSuave);
+  doc.setDrawColor(...beigeBorde);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(marginX, y, contentW, 22, 2, 2, "FD");
 
-  const cardW = (pageWidth - 24 - 12) / 4;
-  cards.forEach((c, i) => {
-    const x = 12 + i * (cardW + 4);
-    doc.setFillColor(...blanco);
-    doc.setDrawColor(...doradoMedio);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(x, y, cardW, 22, 2, 2, "FD");
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...gris);
-    doc.text(c.label, x + cardW / 2, y + 7, { align: "center" });
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(...c.color);
-    doc.text(c.value, x + cardW / 2, y + 16, { align: "center" });
-  });
-
-  y += 28;
-
-  // Total pagado por pacientes (base de la comisión)
-  doc.setFont("helvetica", "italic");
+  doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...gris);
-  doc.text(
-    `Base de comisión (total pagado por pacientes en presupuestos asignados): ${fmtSoles(totalPagadoPresup)}`,
-    12,
-    y
-  );
-  y += 6;
+  doc.text(`Comisión (${comPct.toFixed(0)}% sobre pagado)`, marginX + contentW / 2, y + 8, { align: "center" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...dorado);
+  doc.text(fmtSoles(comisionCalculada), marginX + contentW / 2, y + 17, { align: "center" });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...gris);
+  doc.text(`Total pagado por pacientes: ${fmtSoles(totalPagadoPresup)}`, marginX + contentW / 2, y + 21, { align: "center" });
+
+  y += 30;
 
   // ============ PRESUPUESTOS ASIGNADOS ============
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...dorado);
-  doc.text("PRESUPUESTOS ASIGNADOS", 12, y);
-  y += 2;
+  doc.text("PRESUPUESTOS ASIGNADOS", marginX, y);
   doc.setDrawColor(...dorado);
   doc.setLineWidth(0.4);
-  doc.line(12, y + 1, pageWidth - 12, y + 1);
-  y += 5;
+  doc.line(marginX, y + 2, pageWidth - marginX, y + 2);
+  y += 7;
 
   if (presupuestos.length === 0) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     doc.setTextColor(...gris);
-    doc.text("No hay presupuestos asignados en el período seleccionado.", 12, y);
-    y += 6;
+    doc.text("No hay presupuestos asignados en el período seleccionado.", marginX, y);
   } else {
-    const presupBody = presupuestos.map((p) => {
-      const total = Number(p.precio_total || 0);
-      const desc = Number(p.descuento || 0);
-      const pagado = Number(p.monto_pagado || 0);
-      const saldo = Math.max(0, total - desc - pagado);
-      const tratNombres = (p.tratamientos || [])
-        .map(t => `${t.nombre || t.tratamiento || "Tratamiento"}${t.sesiones > 1 ? ` (${t.sesiones})` : ""}`)
-        .join(", ");
-      return [
-        `${p.paciente_nombre || ""} ${p.paciente_apellido || ""}`.trim(),
-        p.paciente_dni || "-",
-        fmtFecha(p.creado_en),
-        tratNombres || "-",
-        `${p.sesiones_completadas || 0}/${p.sesiones_totales || 0}`,
-        (p.estado || "-").toString(),
-        fmtSoles(total),
-        fmtSoles(pagado),
-        fmtSoles(saldo)
+    // Renderizar cada presupuesto como card (mismo diseño del sistema)
+    for (const pres of presupuestos) {
+      const tratamientos = pres.tratamientos || [];
+      const precioTotal = Number(pres.precio_total || 0);
+      const descuento = Number(pres.descuento || 0);
+      const pagado = Number(pres.monto_pagado || 0);
+      const saldo = Math.max(0, precioTotal - descuento - pagado);
+      const estado = pres.estado || "-";
+      const estadoLabel = estado === "completado" ? "Completado"
+        : estado === "activo" ? "Activo"
+        : estado;
+      const estadoColor = estado === "completado" ? verde
+        : estado === "activo" ? activoNaranja
+        : [153, 153, 153];
+
+      // Calcular alto dinámico de la card
+      const headerH = 14;
+      const tratH = tratamientos.length * 5.5 + 3;
+      const resumenH = 14;
+      const paddingV = 4;
+      const cardH = headerH + tratH + resumenH + paddingV;
+
+      // Salto de página si no entra
+      if (y + cardH > pageHeight - 22) {
+        doc.addPage();
+        y = 20;
+      }
+
+      // Fondo crema con borde según estado
+      doc.setFillColor(...cremaSuave);
+      doc.setDrawColor(estadoColor[0], estadoColor[1], estadoColor[2]);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(marginX, y, contentW, cardH, 2.5, 2.5, "FD");
+
+      // ----- Header de la card -----
+      // Paciente (nombre)
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(...negro);
+      const nombrePaciente = `${pres.paciente_nombre || ""} ${pres.paciente_apellido || ""}`.trim().toUpperCase();
+      doc.text(nombrePaciente || "-", marginX + 4, y + 6);
+
+      // DNI + fecha
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...gris);
+      const sub = `${pres.paciente_dni ? `DNI: ${pres.paciente_dni} · ` : ""}Creado: ${fmtFecha(pres.creado_en)}`;
+      doc.text(sub, marginX + 4, y + 11);
+
+      // Chips a la derecha: sesiones y estado
+      const sesionesTxt = `${pres.sesiones_completadas || 0}/${pres.sesiones_totales || 0} sesiones`;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      const sesionesW = doc.getTextWidth(sesionesTxt) + 6;
+      const estadoW = doc.getTextWidth(estadoLabel) + 6;
+      const chipY = y + 4;
+      const chipH = 5;
+      const estadoX = marginX + contentW - 4 - estadoW;
+      const sesionesX = estadoX - 2 - sesionesW;
+
+      // Chip sesiones (beige)
+      doc.setFillColor(...beigeBorde);
+      doc.roundedRect(sesionesX, chipY, sesionesW, chipH, 1.2, 1.2, "F");
+      doc.setTextColor(...dorado);
+      doc.text(sesionesTxt, sesionesX + sesionesW / 2, chipY + 3.5, { align: "center" });
+
+      // Chip estado (tintado por color de estado)
+      doc.setFillColor(estadoColor[0], estadoColor[1], estadoColor[2]);
+      doc.setGState(new doc.GState({ opacity: 0.18 }));
+      doc.roundedRect(estadoX, chipY, estadoW, chipH, 1.2, 1.2, "F");
+      doc.setGState(new doc.GState({ opacity: 1 }));
+      doc.setTextColor(estadoColor[0], estadoColor[1], estadoColor[2]);
+      doc.text(estadoLabel, estadoX + estadoW / 2, chipY + 3.5, { align: "center" });
+
+      // ----- Tratamientos -----
+      let tY = y + headerH;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      tratamientos.forEach((t, idx) => {
+        const nombreT = `${t.nombre || t.tratamiento || "Tratamiento"}${t.sesiones > 1 ? ` (${t.sesiones} ses.)` : ""}`;
+        doc.setTextColor(...grisTexto);
+        doc.text(nombreT, marginX + 4, tY + 4);
+        doc.setTextColor(...dorado);
+        doc.setFont("helvetica", "bold");
+        doc.text(fmtSoles(t.precio), marginX + contentW - 4, tY + 4, { align: "right" });
+        doc.setFont("helvetica", "normal");
+
+        // Línea separadora entre tratamientos
+        if (idx < tratamientos.length - 1) {
+          doc.setDrawColor(...beigeBorde);
+          doc.setLineWidth(0.2);
+          doc.line(marginX + 4, tY + 5.5, marginX + contentW - 4, tY + 5.5);
+        }
+        tY += 5.5;
+      });
+
+      // ----- Resumen financiero (Total, Descuento, Pagado, Saldo) -----
+      const resumenY = y + headerH + tratH;
+      const cajas = [
+        { label: "Total", value: fmtSoles(precioTotal), color: negro },
+        ...(descuento > 0 ? [{ label: "Descuento", value: `-${fmtSoles(descuento)}`, color: rojo }] : []),
+        { label: "Pagado", value: fmtSoles(pagado), color: verde },
+        { label: "Saldo", value: fmtSoles(saldo), color: saldo > 0 ? naranja : verde }
       ];
-    });
+      const cajaGap = 2;
+      const cajaW = (contentW - 8 - cajaGap * (cajas.length - 1)) / cajas.length;
 
-    autoTable(doc, {
-      startY: y,
-      head: [["Paciente", "DNI", "Creado", "Tratamientos", "Sesiones", "Estado", "Total", "Pagado", "Saldo"]],
-      body: presupBody,
-      theme: "striped",
-      headStyles: {
-        fillColor: dorado,
-        textColor: blanco,
-        fontStyle: "bold",
-        fontSize: 8,
-        halign: "center",
-        cellPadding: 2
-      },
-      bodyStyles: { fontSize: 7.5, textColor: negro, cellPadding: 1.8 },
-      alternateRowStyles: { fillColor: cremaClaro },
-      columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 18, halign: "center" },
-        2: { cellWidth: 18, halign: "center" },
-        3: { cellWidth: 45 },
-        4: { cellWidth: 14, halign: "center" },
-        5: { cellWidth: 18, halign: "center" },
-        6: { cellWidth: 18, halign: "right" },
-        7: { cellWidth: 18, halign: "right" },
-        8: { cellWidth: 18, halign: "right" }
-      },
-      margin: { left: 12, right: 12 }
-    });
-    y = doc.lastAutoTable.finalY + 6;
+      cajas.forEach((c, i) => {
+        const cx = marginX + 4 + i * (cajaW + cajaGap);
+        doc.setFillColor(...blanco);
+        doc.setDrawColor(...beigeBorde);
+        doc.setLineWidth(0.25);
+        doc.roundedRect(cx, resumenY, cajaW, 12, 1.5, 1.5, "FD");
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(...gris);
+        doc.text(c.label, cx + cajaW / 2, resumenY + 4, { align: "center" });
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(c.color[0], c.color[1], c.color[2]);
+        doc.text(c.value, cx + cajaW / 2, resumenY + 9.5, { align: "center" });
+      });
+
+      y += cardH + 4;
+    }
   }
-
-  // ============ TRATAMIENTOS REALIZADOS ============
-  if (y > pageHeight - 60) { doc.addPage(); y = 20; }
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...dorado);
-  doc.text("TRATAMIENTOS REALIZADOS", 12, y);
-  y += 2;
-  doc.setDrawColor(...dorado);
-  doc.line(12, y + 1, pageWidth - 12, y + 1);
-  y += 5;
-
-  if (!tratamientosRealizados || tratamientosRealizados.length === 0) {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(...gris);
-    doc.text("No hay tratamientos realizados en el período seleccionado.", 12, y);
-    y += 6;
-  } else {
-    const tratBody = tratamientosRealizados.map((t) => [
-      t.tratamiento_nombre || "-",
-      String(t.total_sesiones || 0),
-      fmtSoles(t.total_ingresos)
-    ]);
-    const totalSes = tratamientosRealizados.reduce((s, t) => s + Number(t.total_sesiones || 0), 0);
-    const totalIng = Number(totalesTratamientos.total_ingresos || tratamientosRealizados.reduce((s, t) => s + Number(t.total_ingresos || 0), 0));
-
-    autoTable(doc, {
-      startY: y,
-      head: [["Tratamiento", "Sesiones", "Ingresos"]],
-      body: tratBody,
-      foot: [["TOTAL", String(totalSes), fmtSoles(totalIng)]],
-      theme: "striped",
-      headStyles: { fillColor: dorado, textColor: blanco, fontStyle: "bold", fontSize: 9, halign: "center", cellPadding: 2.5 },
-      footStyles: { fillColor: cremaClaro, textColor: dorado, fontStyle: "bold", fontSize: 9 },
-      bodyStyles: { fontSize: 9, textColor: negro, cellPadding: 2 },
-      alternateRowStyles: { fillColor: cremaClaro },
-      columnStyles: {
-        0: { cellWidth: "auto" },
-        1: { cellWidth: 30, halign: "center" },
-        2: { cellWidth: 40, halign: "right" }
-      },
-      margin: { left: 12, right: 12 }
-    });
-    y = doc.lastAutoTable.finalY + 6;
-  }
-
-  // ============ HISTORIAL DE PAGOS ============
-  if (y > pageHeight - 60) { doc.addPage(); y = 20; }
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...dorado);
-  doc.text("HISTORIAL DE PAGOS", 12, y);
-  y += 2;
-  doc.setDrawColor(...dorado);
-  doc.line(12, y + 1, pageWidth - 12, y + 1);
-  y += 5;
-
-  if (!historialPagos || historialPagos.length === 0) {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.setTextColor(...gris);
-    doc.text("No hay pagos registrados para este especialista.", 12, y);
-    y += 6;
-  } else {
-    const pagosBody = historialPagos.map((p) => [
-      fmtFecha(p.fecha_pago),
-      fmtSoles(p.monto),
-      (p.metodo_pago || "-").toString(),
-      p.referencia || "-",
-      (p.estado || "pagado").toString()
-    ]);
-    const totalPagos = historialPagos.reduce((s, p) => s + Number(p.monto || 0), 0);
-
-    autoTable(doc, {
-      startY: y,
-      head: [["Fecha", "Monto", "Método", "Referencia", "Estado"]],
-      body: pagosBody,
-      foot: [["TOTAL PAGADO", fmtSoles(totalPagos), "", "", ""]],
-      theme: "striped",
-      headStyles: { fillColor: dorado, textColor: blanco, fontStyle: "bold", fontSize: 9, halign: "center", cellPadding: 2.5 },
-      footStyles: { fillColor: cremaClaro, textColor: dorado, fontStyle: "bold", fontSize: 9 },
-      bodyStyles: { fontSize: 9, textColor: negro, cellPadding: 2 },
-      alternateRowStyles: { fillColor: cremaClaro },
-      columnStyles: {
-        0: { cellWidth: 30, halign: "center" },
-        1: { cellWidth: 32, halign: "right" },
-        2: { cellWidth: 30, halign: "center" },
-        3: { cellWidth: "auto" },
-        4: { cellWidth: 28, halign: "center" }
-      },
-      margin: { left: 12, right: 12 }
-    });
-    y = doc.lastAutoTable.finalY + 8;
-  }
-
-  // ============ RESUMEN FINAL ============
-  if (y > pageHeight - 50) { doc.addPage(); y = 20; }
-
-  const boxX = pageWidth - 90 - 12;
-  const boxW = 90;
-  const boxH = 38;
-  doc.setFillColor(...cremaClaro);
-  doc.setDrawColor(...dorado);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(boxX, y, boxW, boxH, 3, 3, "FD");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(...dorado);
-  doc.text("RESUMEN A PAGAR", boxX + boxW / 2, y + 7, { align: "center" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(...negro);
-  doc.text("Sueldo fijo:", boxX + 5, y + 15);
-  doc.text(fmtSoles(pagoFijo), boxX + boxW - 5, y + 15, { align: "right" });
-
-  doc.text(`Comisión (${comPct.toFixed(0)}%):`, boxX + 5, y + 22);
-  doc.text(fmtSoles(comisionCalculada), boxX + boxW - 5, y + 22, { align: "right" });
-
-  doc.setDrawColor(...dorado);
-  doc.line(boxX + 5, y + 26, boxX + boxW - 5, y + 26);
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...dorado);
-  doc.text("TOTAL:", boxX + 5, y + 33);
-  doc.text(fmtSoles(totalAPagar), boxX + boxW - 5, y + 33, { align: "right" });
 
   // ============ FOOTER en cada página ============
   const totalPages = doc.internal.getNumberOfPages();

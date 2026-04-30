@@ -245,9 +245,6 @@ const GestionPersonalCards = () => {
       await generarReporteComisionPDF({
         trabajador,
         presupuestos: presupuestosEsp,
-        tratamientosRealizados: detalleData?.tratamientos || [],
-        totalesTratamientos: detalleData?.totales || {},
-        historialPagos,
         mes: mesSeleccionado,
         anio: anioSeleccionado
       });
