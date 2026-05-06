@@ -3679,6 +3679,12 @@ const HistorialClinico = () => {
                     Selecciona tratamientos para agregar al presupuesto
                   </Typography>
 
+                  {/* Layout dividido: catálogo izquierda + resumen derecha */}
+                  <Box sx={{ display: "flex", gap: 2.5, flexDirection: { xs: "column", md: ofertaItems.length > 0 ? "row" : "column" } }}>
+
+                  {/* Catálogo de tratamientos */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+
                   {/* Buscador de tratamientos */}
                   <TextField
                     fullWidth
@@ -3879,280 +3885,225 @@ const HistorialClinico = () => {
                     );
                   })()}
 
-                  {/* Tratamientos seleccionados para el presupuesto */}
-                  {ofertaItems.length > 0 && (() => {
-                    // Load missing images
-                    const missingIds = ofertaItems
-                      .map(it => it.tratamientoId)
-                      .filter(id => id && !(id in tratamientoImagenCache));
-                    if (missingIds.length > 0) {
-                      setTimeout(() => cargarImagenesPresupuesto(missingIds.map(id => ({ tratamiento_id: id }))), 0);
-                    }
-                    return (
-                    <Box sx={{ mb: 2.5 }}>
-                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#666" }}>
-                          {ofertaItems.length} tratamiento{ofertaItems.length !== 1 ? "s" : ""} seleccionado{ofertaItems.length !== 1 ? "s" : ""}
-                        </Typography>
-                      </Box>
+                  </Box>
+                  {/* FIN LADO IZQUIERDO */}
 
+                  {/* Resumen de seleccionados (panel lateral) */}
+                  {ofertaItems.length > 0 && (
+                    <Box sx={{ 
+                      width: { md: 340 },
+                      minWidth: { md: 340 },
+                      backgroundColor: "#faf8f4",
+                      borderRadius: 3,
+                      border: "1px solid rgba(163,105,32,0.15)",
+                      p: 2,
+                      display: "flex",
+                      flexDirection: "column",
+                      maxHeight: { md: 560 },
+                      position: { md: "sticky" },
+                      top: { md: 16 },
+                      alignSelf: "flex-start",
+                    }}>
+                      <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#1a1a1a", mb: 1.5 }}>
+                        Resumen ({ofertaItems.length})
+                      </Typography>
+
+                      {/* Lista de items editables */}
                       <Box sx={{ 
-                        display: "grid", 
-                        gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr", md: "1fr 1fr 1fr 1fr", lg: "1fr 1fr 1fr 1fr 1fr" }, 
-                        gap: 1.5,
-                        maxHeight: 420,
-                        overflowY: "auto",
+                        flex: 1, 
+                        overflowY: "auto", 
                         pr: 0.5,
-                        "&::-webkit-scrollbar": { width: 5 },
+                        "&::-webkit-scrollbar": { width: 4 },
                         "&::-webkit-scrollbar-thumb": { backgroundColor: "#ba9a63", borderRadius: 3 },
                       }}>
-                        {ofertaItems.map((item) => {
+                        {ofertaItems.map((item, idx) => {
                           const t = tratamientosBase.find(x => x.id === item.tratamientoId);
                           if (!t) return null;
-                          const imgArray = item.tratamientoId ? tratamientoImagenCache[item.tratamientoId] : null;
-                          const imgUrl = Array.isArray(imgArray) && imgArray.length > 0 ? imgArray[0] : null;
                           return (
                             <Box
-                              key={t.id}
+                              key={`${item.tratamientoId}-${idx}`}
                               sx={{
-                                borderRadius: 2.5,
-                                border: "1.5px solid rgba(163,105,32,0.2)",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.8,
+                                p: 1.2,
+                                mb: 1,
                                 backgroundColor: "white",
-                                overflow: "hidden",
-                                transition: "all 0.2s ease",
-                                boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
-                                "&:hover": { 
-                                  borderColor: "#ba9a63",
-                                  boxShadow: "0 3px 12px rgba(163,105,32,0.1)",
-                                },
+                                borderRadius: 2,
+                                border: "1px solid rgba(163,105,32,0.1)",
                               }}
                             >
-                              {/* Imagen compacta */}
-                              <Box sx={{
-                                width: "100%",
-                                height: 90,
-                                backgroundColor: "#f5f1e4",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                position: "relative",
-                                overflow: "hidden",
-                              }}>
-                                {imgUrl ? (
-                                  <img src={imgUrl} alt={t.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                ) : (
-                                  <Typography sx={{ fontSize: "1.8rem", opacity: 0.3 }}>💉</Typography>
-                                )}
-                                {/* Botón eliminar */}
+                              {/* Header: nombre + botón eliminar */}
+                              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: "#1a1a1a", flex: 1, lineHeight: 1.3 }}>
+                                  {t.nombre}
+                                </Typography>
                                 <IconButton
                                   size="small"
-                                  onClick={() => toggleOfertaItem(t)}
-                                  sx={{
-                                    position: "absolute",
-                                    top: 4,
-                                    left: 4,
-                                    backgroundColor: "rgba(211,47,47,0.85)",
-                                    color: "white",
-                                    width: 22, height: 22,
-                                    "&:hover": { backgroundColor: "#d32f2f" },
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                                  }}
+                                  onClick={() => removeOneOfertaItem(t)}
+                                  sx={{ width: 22, height: 22, color: "#e57373", "&:hover": { color: "#d32f2f" } }}
                                 >
-                                  <Close sx={{ fontSize: 13 }} />
+                                  <Close sx={{ fontSize: 14 }} />
                                 </IconButton>
                               </Box>
 
-                              {/* Info compacta */}
-                              <Box sx={{ p: 1.2 }}>
-                                <Typography sx={{ 
-                                  fontWeight: 700, 
-                                  fontSize: "0.72rem", 
-                                  color: "#1a1a1a",
-                                  lineHeight: 1.2,
-                                  mb: 0.8,
-                                  display: "-webkit-box",
-                                  WebkitLineClamp: 2,
-                                  WebkitBoxOrient: "vertical",
-                                  overflow: "hidden",
-                                  minHeight: "1.8em",
-                                }}>
-                                  {t.nombre}
-                                </Typography>
+                              {/* Precio + Sesiones */}
+                              <Box sx={{ display: "flex", gap: 0.5 }}>
+                                <TextField
+                                  size="small"
+                                  label="S/ Precio"
+                                  type="number"
+                                  value={item?.precio ?? ""}
+                                  onChange={(e) => setOfertaPrecio(t.id, e.target.value)}
+                                  sx={{
+                                    flex: 1,
+                                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.78rem", fontWeight: 700, height: 34 },
+                                    "& .MuiOutlinedInput-root": {
+                                      "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
+                                      "&:hover fieldset": { borderColor: "#ba9a63" },
+                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                                    },
+                                    "& .MuiInputLabel-root": { fontSize: "0.7rem" },
+                                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                                  }}
+                                />
+                                <TextField
+                                  size="small"
+                                  label="Sesiones"
+                                  type="number"
+                                  value={item?.sesiones ?? "1"}
+                                  onChange={(e) => setOfertaSesiones(t.id, e.target.value)}
+                                  inputProps={{ min: 1, step: 1 }}
+                                  sx={{
+                                    width: 70,
+                                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.78rem", height: 34 },
+                                    "& .MuiOutlinedInput-root": {
+                                      "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
+                                      "&:hover fieldset": { borderColor: "#ba9a63" },
+                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                                    },
+                                    "& .MuiInputLabel-root": { fontSize: "0.7rem" },
+                                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                                  }}
+                                />
+                              </Box>
 
-                                {/* Precio y Sesiones en fila compacta */}
-                                <Box sx={{ display: "flex", gap: 0.5, mb: 0.8 }}>
-                                  <TextField
-                                    size="small"
-                                    label="S/"
-                                    type="number"
-                                    value={item?.precio ?? ""}
-                                    onChange={(e) => setOfertaPrecio(t.id, e.target.value)}
-                                    sx={{
-                                      flex: 1,
-                                      "& .MuiInputBase-root": {
-                                        backgroundColor: "#fffdf7",
-                                        borderRadius: 1.5,
-                                        fontSize: "0.75rem",
-                                        fontWeight: 700,
-                                        height: 32,
-                                      },
-                                      "& .MuiOutlinedInput-root": {
-                                        "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
-                                        "&:hover fieldset": { borderColor: "#ba9a63" },
-                                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                      },
-                                      "& .MuiInputLabel-root": { fontSize: "0.65rem" },
-                                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                                    }}
-                                  />
-                                  <TextField
-                                    size="small"
-                                    label="Ses."
-                                    type="number"
-                                    value={item?.sesiones ?? "1"}
-                                    onChange={(e) => setOfertaSesiones(t.id, e.target.value)}
-                                    inputProps={{ min: 1, step: 1 }}
-                                    sx={{
-                                      width: 48,
-                                      "& .MuiInputBase-root": {
-                                        backgroundColor: "#fffdf7",
-                                        borderRadius: 1.5,
-                                        fontSize: "0.75rem",
-                                        height: 32,
-                                      },
-                                      "& .MuiOutlinedInput-root": {
-                                        "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
-                                        "&:hover fieldset": { borderColor: "#ba9a63" },
-                                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                      },
-                                      "& .MuiInputLabel-root": { fontSize: "0.65rem" },
-                                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                                    }}
-                                  />
-                                </Box>
-
-                                {/* Producto y ML compactos */}
-                                <Box sx={{ display: "flex", gap: 0.5 }}>
-                                  <Autocomplete
-                                    freeSolo
-                                    size="small"
-                                    options={productosInventario}
-                                    getOptionLabel={(option) => typeof option === "string" ? option : option?.label || ""}
-                                    value={item?.producto || ""}
-                                    onChange={(e, newValue) => {
-                                      const val = typeof newValue === "string" ? newValue : newValue?.value || "";
-                                      setOfertaProducto(t.id, val);
-                                    }}
-                                    onInputChange={(e, newInputValue, reason) => {
-                                      if (reason === "input") setOfertaProducto(t.id, newInputValue);
-                                    }}
-                                    filterOptions={(options, { inputValue }) => {
-                                      const term = (inputValue || "").toLowerCase();
-                                      if (!term) return options.slice(0, 20);
-                                      return options.filter(o => o.label.toLowerCase().includes(term)).slice(0, 20);
-                                    }}
-                                    sx={{ flex: 1 }}
-                                    renderInput={(params) => (
-                                      <TextField
-                                        {...params}
-                                        label="Producto"
-                                        sx={{
-                                          "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.7rem", height: 32 },
-                                          "& .MuiOutlinedInput-root": {
-                                            "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
-                                            "&:hover fieldset": { borderColor: "#ba9a63" },
-                                            "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                          },
-                                          "& .MuiInputLabel-root": { fontSize: "0.65rem" },
-                                          "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                                        }}
-                                      />
-                                    )}
-                                  />
-                                  <TextField
-                                    size="small"
-                                    label="ML"
-                                    type="number"
-                                    value={item?.ml ?? ""}
-                                    onChange={(e) => setOfertaMl(t.id, e.target.value)}
-                                    inputProps={{ min: 0, step: 0.1 }}
-                                    sx={{
-                                      width: 45,
-                                      "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.7rem", height: 32 },
-                                      "& .MuiOutlinedInput-root": {
-                                        "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
-                                        "&:hover fieldset": { borderColor: "#ba9a63" },
-                                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                      },
-                                      "& .MuiInputLabel-root": { fontSize: "0.65rem" },
-                                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                                    }}
-                                  />
-                                </Box>
+                              {/* Producto + ML */}
+                              <Box sx={{ display: "flex", gap: 0.5 }}>
+                                <Autocomplete
+                                  freeSolo
+                                  size="small"
+                                  options={productosInventario}
+                                  getOptionLabel={(option) => typeof option === "string" ? option : option?.label || ""}
+                                  value={item?.producto || ""}
+                                  onChange={(e, newValue) => {
+                                    const val = typeof newValue === "string" ? newValue : newValue?.value || "";
+                                    setOfertaProducto(t.id, val);
+                                  }}
+                                  onInputChange={(e, newInputValue, reason) => {
+                                    if (reason === "input") setOfertaProducto(t.id, newInputValue);
+                                  }}
+                                  filterOptions={(options, { inputValue }) => {
+                                    const term = (inputValue || "").toLowerCase();
+                                    if (!term) return options.slice(0, 20);
+                                    return options.filter(o => o.label.toLowerCase().includes(term)).slice(0, 20);
+                                  }}
+                                  sx={{ flex: 1 }}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      label="Producto"
+                                      sx={{
+                                        "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.75rem", height: 34 },
+                                        "& .MuiOutlinedInput-root": {
+                                          "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
+                                          "&:hover fieldset": { borderColor: "#ba9a63" },
+                                          "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                                        },
+                                        "& .MuiInputLabel-root": { fontSize: "0.7rem" },
+                                        "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                                      }}
+                                    />
+                                  )}
+                                />
+                                <TextField
+                                  size="small"
+                                  label="ML"
+                                  type="number"
+                                  value={item?.ml ?? ""}
+                                  onChange={(e) => setOfertaMl(t.id, e.target.value)}
+                                  inputProps={{ min: 0, step: 0.1 }}
+                                  sx={{
+                                    width: 55,
+                                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.75rem", height: 34 },
+                                    "& .MuiOutlinedInput-root": {
+                                      "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
+                                      "&:hover fieldset": { borderColor: "#ba9a63" },
+                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                                    },
+                                    "& .MuiInputLabel-root": { fontSize: "0.7rem" },
+                                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                                  }}
+                                />
                               </Box>
                             </Box>
                           );
                         })}
                       </Box>
-                    </Box>
-                    );
-                  })()}
 
-                  {/* Total y botones */}
-                  <Box sx={{ 
-                    display: "flex", 
-                    justifyContent: "space-between", 
-                    alignItems: "center", 
-                    gap: 2, 
-                    flexWrap: "wrap",
-                    pt: 2,
-                    borderTop: ofertaItems.length > 0 ? "1px solid rgba(0,0,0,0.06)" : "none",
-                  }}>
-                    {ofertaItems.length > 0 && (
-                      <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: "#1a1a1a" }}>
-                        Total: S/ {totalOferta.toFixed(2)}
-                      </Typography>
-                    )}
-                    <Box sx={{ display: "flex", gap: 1, ml: "auto" }}>
-                      {ofertaEditId && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          sx={{
-                            borderColor: "#e0e0e0",
-                            color: "#888",
-                            borderRadius: 3,
-                            textTransform: "none",
-                            "&:hover": { backgroundColor: "#f5f5f5", borderColor: "#ccc" },
-                          }}
-                          onClick={() => {
-                            setOfertaEditId(null);
-                            setOfertaItems([]);
-                            setShowOferta(false);
-                          }}
-                        >
-                          Cancelar
-                        </Button>
-                      )}
-                      <Button
-                        variant="contained"
-                        sx={{
-                          backgroundColor: "#a36920",
-                          "&:hover": { backgroundColor: "#8a5a1a" },
-                          borderRadius: 3,
-                          fontWeight: 700,
-                          textTransform: "none",
-                          px: 3,
-                          boxShadow: "none",
-                          "&:hover": { backgroundColor: "#8a5a1a", boxShadow: "none" },
-                        }}
-                        disabled={guardandoOferta || ofertaItems.length === 0}
-                        onClick={guardarOferta}
-                      >
-                        {ofertaEditId ? "Guardar cambios" : "Guardar presupuesto"}
-                      </Button>
+                      {/* Total + botones */}
+                      <Box sx={{ pt: 1.5, mt: 1, borderTop: "1px solid rgba(163,105,32,0.15)" }}>
+                        <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#a36920", mb: 1.5 }}>
+                          Total: S/ {totalOferta.toFixed(2)}
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                          {ofertaEditId && (
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              sx={{
+                                borderColor: "#e0e0e0",
+                                color: "#888",
+                                borderRadius: 3,
+                                textTransform: "none",
+                                fontSize: "0.8rem",
+                                "&:hover": { backgroundColor: "#f5f5f5", borderColor: "#ccc" },
+                              }}
+                              onClick={() => {
+                                setOfertaEditId(null);
+                                setOfertaItems([]);
+                                setShowOferta(false);
+                              }}
+                            >
+                              Cancelar
+                            </Button>
+                          )}
+                          <Button
+                            variant="contained"
+                            size="small"
+                            sx={{
+                              backgroundColor: "#a36920",
+                              borderRadius: 3,
+                              fontWeight: 700,
+                              textTransform: "none",
+                              fontSize: "0.8rem",
+                              px: 2.5,
+                              boxShadow: "none",
+                              "&:hover": { backgroundColor: "#8a5a1a", boxShadow: "none" },
+                            }}
+                            disabled={guardandoOferta || ofertaItems.length === 0}
+                            onClick={guardarOferta}
+                          >
+                            {ofertaEditId ? "Guardar cambios" : "Guardar presupuesto"}
+                          </Button>
+                        </Box>
+                      </Box>
                     </Box>
+                  )}
+
                   </Box>
+                  {/* FIN Layout dividido */}
+
                 </Paper>
               )}
 
