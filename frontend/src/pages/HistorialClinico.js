@@ -3899,9 +3899,6 @@ const HistorialClinico = () => {
                       p: 2,
                       display: "flex",
                       flexDirection: "column",
-                      maxHeight: { md: 560 },
-                      position: { md: "sticky" },
-                      top: { md: 16 },
                       alignSelf: "flex-start",
                     }}>
                       <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#1a1a1a", mb: 1.5 }}>
@@ -3909,13 +3906,7 @@ const HistorialClinico = () => {
                       </Typography>
 
                       {/* Lista de items editables */}
-                      <Box sx={{ 
-                        flex: 1, 
-                        overflowY: "auto", 
-                        pr: 0.5,
-                        "&::-webkit-scrollbar": { width: 4 },
-                        "&::-webkit-scrollbar-thumb": { backgroundColor: "#ba9a63", borderRadius: 3 },
-                      }}>
+                      <Box>
                         {ofertaItems.map((item, idx) => {
                           const t = tratamientosBase.find(x => x.id === item.tratamientoId);
                           if (!t) return null;
