@@ -794,14 +794,13 @@ const ComenzarTratamiento = () => {
                         </FormControl>
                       </Grid>
 
-                      {/* Solo mostrar productos y cantidad si NO es Retoque */}
-                      {tipoAtencion !== "Retoque" && (
-                        <>
+                      {/* Producto y cantidad (opcional en Retoque) */}
                           <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 260 }}>
                             {(() => {
                               // Filtrar productos según la receta del tratamiento
                               const receta = b.tratamiento_id ? recetasPorTratamiento[b.tratamiento_id] || [] : [];
                               const tieneReceta = Array.isArray(receta) && receta.length > 0;
+                              const esRetoque = tipoAtencion === "Retoque";
                               
                               // Si hay receta, solo mostrar los productos de la receta
                               // Si no hay receta, mostrar todos los productos
@@ -840,10 +839,10 @@ const ComenzarTratamiento = () => {
                                   renderInput={(params) => (
                                     <TextField
                                       {...params}
-                                      label={tieneReceta ? "Producto (filtrado)" : "Producto"}
-                                      placeholder={tieneReceta ? "Productos configurados para este tratamiento" : "Seleccionar producto"}
+                                      label={esRetoque ? "Producto (opcional)" : tieneReceta ? "Producto (filtrado)" : "Producto"}
+                                      placeholder={esRetoque ? "Sin producto (opcional)" : tieneReceta ? "Productos configurados para este tratamiento" : "Seleccionar producto"}
                                       fullWidth
-                                      helperText={tieneReceta ? `${opcionesProductos.length} producto(s) disponible(s)` : ""}
+                                      helperText={esRetoque ? "En retoque el producto es opcional" : tieneReceta ? `${opcionesProductos.length} producto(s) disponible(s)` : ""}
                                       sx={{
                                         "& .MuiInputBase-root": {
                                           backgroundColor: "rgba(255,255,255,0.95)",
@@ -861,6 +860,8 @@ const ComenzarTratamiento = () => {
                             })()}
                           </Grid>
 
+                          {/* Solo mostrar cantidad si se seleccionó un producto */}
+                          {b.variante_id && (
                           <Grid item xs={12} sm="auto" md="auto">
                             {(() => {
                               const varSel = b.variante_id ? variantesInv.find(v => String(v.id) === String(b.variante_id)) : null;
@@ -900,8 +901,7 @@ const ComenzarTratamiento = () => {
                           );
                         })()}
                       </Grid>
-                        </>
-                      )}
+                          )}
 
                     </Grid>
                   </Paper>
