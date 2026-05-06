@@ -131,6 +131,8 @@ const HistorialClinico = () => {
   const [guardandoObservacionEdit, setGuardandoObservacionEdit] = useState(false);
   const [showObservaciones, setShowObservaciones] = useState(false);
   const [tratamientosBase, setTratamientosBase] = useState([]);
+  const [tratamientosUso, setTratamientosUso] = useState({}); // { tratamiento_id: count }
+  const [catalogoOrden, setCatalogoOrden] = useState("popular"); // "popular" | "nombre"
   const [productosInventario, setProductosInventario] = useState([]);
   const [paquetesActivos, setPaquetesActivos] = useState([]);
   const [paquetesPaciente, setPaquetesPaciente] = useState([]);
@@ -350,6 +352,16 @@ const HistorialClinico = () => {
         console.error("Error al obtener tratamientos base:", err);
         setTratamientosBase([]);
       });
+
+    // Cargar conteo de uso de tratamientos
+    axios
+      .get(`${API_BASE_URL}/api/tratamientos/uso-conteo`, { headers: authHeaders })
+      .then((res) => {
+        const usoMap = {};
+        (res.data || []).forEach(r => { usoMap[r.tratamiento_id] = r.uso; });
+        setTratamientosUso(usoMap);
+      })
+      .catch(() => setTratamientosUso({}));
 
     // Cargar especialistas
     axios
@@ -3682,13 +3694,18 @@ const HistorialClinico = () => {
                     const filteredTrats = (tratamientosBase || []).filter(t =>
                       !catalogoFiltro || t.nombre.toLowerCase().includes(catalogoFiltro.toLowerCase())
                     );
-                    const CAT_PER_VIEW = 3;
-                    const catMaxIdx = Math.max(0, filteredTrats.length - CAT_PER_VIEW);
-                    const catStart = Math.min(catalogoCarouselIdx, catMaxIdx);
-                    const catVisible = filteredTrats.slice(catStart, catStart + CAT_PER_VIEW);
-                    // Load missing images
-                    const catMissing = filteredTrats.slice(catStart, catStart + CAT_PER_VIEW + 3)
-                      .map(t => t.id).filter(id => id && !(id in tratamientoImagenCache));
+                    // Ordenar según el modo seleccionado
+                    const catVisible = [...filteredTrats].sort((a, b) => {
+                      if (catalogoOrden === "popular") {
+                        const usoA = tratamientosUso[a.id] || 0;
+                        const usoB = tratamientosUso[b.id] || 0;
+                        if (usoB !== usoA) return usoB - usoA;
+                        return (a.nombre || '').localeCompare(b.nombre || '');
+                      }
+                      return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
+                    });
+                    // Cargar imágenes faltantes del catálogo
+                    const catMissing = catVisible.map(t => t.id).filter(id => id && !(id in tratamientoImagenCache));
                     if (catMissing.length > 0) {
                       setTimeout(() => cargarImagenesPresupuesto(catMissing.map(id => ({ tratamiento_id: id }))), 0);
                     }
@@ -3698,296 +3715,126 @@ const HistorialClinico = () => {
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#888" }}>
                           {filteredTrats.length} tratamiento{filteredTrats.length !== 1 ? "s" : ""} disponible{filteredTrats.length !== 1 ? "s" : ""}
                         </Typography>
-                        <Box sx={{ display: "flex", gap: 0.5, alignItems: "center" }}>
-                          <Typography variant="caption" sx={{ color: "#bbb", mr: 0.5 }}>
-                            {catStart + 1}-{Math.min(catStart + CAT_PER_VIEW, filteredTrats.length)} / {filteredTrats.length}
-                          </Typography>
-                          <IconButton
+                        <Box sx={{ display: "flex", gap: 0.5 }}>
+                          <Chip
+                            label="Populares"
                             size="small"
-                            disabled={catStart === 0}
-                            onClick={() => setCatalogoCarouselIdx(Math.max(0, catStart - CAT_PER_VIEW))}
+                            onClick={() => setCatalogoOrden("popular")}
                             sx={{
-                              backgroundColor: catStart === 0 ? "#f5f5f5" : "#f5f1e4",
-                              width: 32, height: 32,
-                              "&:hover": { backgroundColor: "#ece5d0" },
-                              "&.Mui-disabled": { backgroundColor: "#f5f5f5" },
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              backgroundColor: catalogoOrden === "popular" ? "#a36920" : "#f5f1e4",
+                              color: catalogoOrden === "popular" ? "white" : "#666",
+                              cursor: "pointer",
+                              "&:hover": { backgroundColor: catalogoOrden === "popular" ? "#8a5a1a" : "#ece5d0" },
                             }}
-                          >
-                            <Typography sx={{ fontSize: 18, fontWeight: "bold", color: catStart === 0 ? "#ccc" : "#a36920" }}>‹</Typography>
-                          </IconButton>
-                          <IconButton
+                          />
+                          <Chip
+                            label="A-Z"
                             size="small"
-                            disabled={catStart >= catMaxIdx}
-                            onClick={() => setCatalogoCarouselIdx(Math.min(catMaxIdx, catStart + CAT_PER_VIEW))}
+                            onClick={() => setCatalogoOrden("nombre")}
                             sx={{
-                              backgroundColor: catStart >= catMaxIdx ? "#f5f5f5" : "#f5f1e4",
-                              width: 32, height: 32,
-                              "&:hover": { backgroundColor: "#ece5d0" },
-                              "&.Mui-disabled": { backgroundColor: "#f5f5f5" },
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              backgroundColor: catalogoOrden === "nombre" ? "#a36920" : "#f5f1e4",
+                              color: catalogoOrden === "nombre" ? "white" : "#666",
+                              cursor: "pointer",
+                              "&:hover": { backgroundColor: catalogoOrden === "nombre" ? "#8a5a1a" : "#ece5d0" },
                             }}
-                          >
-                            <Typography sx={{ fontSize: 18, fontWeight: "bold", color: catStart >= catMaxIdx ? "#ccc" : "#a36920" }}>›</Typography>
-                          </IconButton>
+                          />
                         </Box>
                       </Box>
 
                       <Box 
-                        key={catStart}
                         sx={{ 
                           display: "grid", 
-                          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" }, 
-                          gap: 2,
-                          animation: "fadeSlide 0.5s ease-out",
-                          "@keyframes fadeSlide": {
-                            "0%": { 
-                              opacity: 0, 
-                              transform: "translateX(30px)",
-                              filter: "blur(4px)",
-                            },
-                            "100%": { 
-                              opacity: 1, 
-                              transform: "translateX(0)",
-                              filter: "blur(0px)",
-                            },
-                          },
+                          gridTemplateColumns: { xs: "1fr 1fr 1fr", sm: "1fr 1fr 1fr 1fr", md: "1fr 1fr 1fr 1fr 1fr", lg: "1fr 1fr 1fr 1fr 1fr 1fr" }, 
+                          gap: 1.2,
                         }}
                       >
                         {catVisible.map((t) => {
-                          const imgArray = t.id ? tratamientoImagenCache[t.id] : null;
-                          const currentImgIdx = catalogoImagenIdx[t.id] || 0;
-                          const imgUrl = Array.isArray(imgArray) && imgArray.length > 0 ? imgArray[currentImgIdx] : null;
-                          const hasMultipleImages = Array.isArray(imgArray) && imgArray.length > 1;
                           const isSelected = ofertaItems.some(x => x.tratamientoId === t.id);
+                          const count = ofertaItems.filter(x => x.tratamientoId === t.id).length;
+                          const imgArray = tratamientoImagenCache[t.id];
+                          const imgUrl = Array.isArray(imgArray) && imgArray.length > 0 ? imgArray[0] : null;
                           return (
                             <Box
                               key={t.id}
                               onClick={() => {
                                 toggleOfertaItem(t);
-                                if (t.id && !(t.id in tratamientoImagenCache)) {
-                                  cargarImagenesPresupuesto([{ tratamiento_id: t.id }]);
-                                }
                               }}
                               sx={{
-                                borderRadius: 3.5,
-                                border: `2px solid ${isSelected ? '#a36920' : 'rgba(163,105,32,0.12)'}`,
+                                borderRadius: 2,
+                                border: `1.5px solid ${isSelected ? '#a36920' : 'rgba(163,105,32,0.15)'}`,
                                 backgroundColor: isSelected ? "rgba(163,105,32,0.04)" : "white",
-                                overflow: "hidden",
                                 cursor: "pointer",
                                 transition: "all 0.2s ease",
-                                boxShadow: isSelected ? "0 0 0 1px #a36920" : "0 1px 6px rgba(0,0,0,0.05)",
+                                display: "flex",
+                                flexDirection: "column",
+                                overflow: "hidden",
+                                position: "relative",
                                 "&:hover": { 
                                   borderColor: "#ba9a63",
-                                  boxShadow: "0 4px 16px rgba(163,105,32,0.12)",
-                                  transform: "translateY(-2px)",
+                                  boxShadow: "0 2px 8px rgba(163,105,32,0.12)",
+                                  transform: "translateY(-1px)",
                                 },
                               }}
                             >
-                              {/* Imagen con flechas de navegación */}
+                              {/* Imagen del tratamiento */}
                               <Box sx={{
                                 width: "100%",
-                                height: 400,
+                                aspectRatio: "1 / 1",
                                 backgroundColor: "#f5f1e4",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                position: "relative",
                                 overflow: "hidden",
                               }}>
                                 {imgUrl ? (
                                   <img src={imgUrl} alt={t.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                 ) : (
-                                  <Typography sx={{ fontSize: "2.5rem", opacity: 0.25 }}>💉</Typography>
+                                  <Typography sx={{ fontSize: "1.5rem", opacity: 0.3 }}>💉</Typography>
                                 )}
-                                
-                                {/* Botón - (esquina superior izquierda) */}
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Remover una instancia del tratamiento
-                                    setOfertaItems(prev => {
-                                      const idx = prev.findIndex(x => x.tratamientoId === t.id);
-                                      if (idx !== -1) {
-                                        const newItems = [...prev];
-                                        newItems.splice(idx, 1);
-                                        return newItems;
-                                      }
-                                      return prev;
-                                    });
-                                  }}
-                                  sx={{
-                                    position: "absolute",
-                                    left: 6,
-                                    top: 6,
-                                    backgroundColor: "rgba(244,67,54,0.75)",
-                                    color: "white",
-                                    width: 24,
-                                    height: 24,
-                                    boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-                                    "&:hover": { 
-                                      backgroundColor: "rgba(244,67,54,0.9)",
-                                      boxShadow: "0 2px 6px rgba(244,67,54,0.3)",
-                                    },
-                                  }}
-                                >
-                                  <Typography sx={{ fontSize: 18, fontWeight: "bold" }}>−</Typography>
-                                </IconButton>
-                                
-                                {/* Botón + (esquina superior derecha) */}
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    // Agregar una instancia del tratamiento (siempre agrega, permite duplicados)
-                                    setOfertaItems(prev => [
-                                      ...prev, 
-                                      { 
-                                        tratamientoId: t.id, 
-                                        nombre: t.nombre, 
-                                        precio: t.precio ? String(t.precio) : "", 
-                                        sesiones: "1", 
-                                        producto: "", 
-                                        ml: "" 
-                                      }
-                                    ]);
-                                  }}
-                                  sx={{
-                                    position: "absolute",
-                                    right: 6,
-                                    top: 6,
-                                    backgroundColor: "rgba(76,175,80,0.75)",
-                                    color: "white",
-                                    width: 24,
-                                    height: 24,
-                                    boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-                                    "&:hover": { 
-                                      backgroundColor: "rgba(76,175,80,0.9)",
-                                      boxShadow: "0 2px 6px rgba(76,175,80,0.3)",
-                                    },
-                                  }}
-                                >
-                                  <Typography sx={{ fontSize: 18, fontWeight: "bold" }}>+</Typography>
-                                </IconButton>
-                                
-                                {/* Flechas de navegación de imágenes */}
-                                {hasMultipleImages && (
-                                  <>
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setCatalogoImagenIdx(prev => ({
-                                          ...prev,
-                                          [t.id]: currentImgIdx > 0 ? currentImgIdx - 1 : imgArray.length - 1
-                                        }));
-                                      }}
-                                      sx={{
-                                        position: "absolute",
-                                        left: 8,
-                                        top: "50%",
-                                        transform: "translateY(-50%)",
-                                        backgroundColor: "rgba(255,255,255,0.9)",
-                                        width: 32,
-                                        height: 32,
-                                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                        "&:hover": { 
-                                          backgroundColor: "white",
-                                          boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-                                        },
-                                      }}
-                                    >
-                                      <Typography sx={{ fontSize: 18, fontWeight: "bold", color: "#a36920" }}>‹</Typography>
-                                    </IconButton>
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setCatalogoImagenIdx(prev => ({
-                                          ...prev,
-                                          [t.id]: currentImgIdx < imgArray.length - 1 ? currentImgIdx + 1 : 0
-                                        }));
-                                      }}
-                                      sx={{
-                                        position: "absolute",
-                                        right: 8,
-                                        top: "50%",
-                                        transform: "translateY(-50%)",
-                                        backgroundColor: "rgba(255,255,255,0.9)",
-                                        width: 32,
-                                        height: 32,
-                                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                        "&:hover": { 
-                                          backgroundColor: "white",
-                                          boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-                                        },
-                                      }}
-                                    >
-                                      <Typography sx={{ fontSize: 18, fontWeight: "bold", color: "#a36920" }}>›</Typography>
-                                    </IconButton>
-                                    {/* Indicador de imagen actual */}
-                                    <Box sx={{
-                                      position: "absolute",
-                                      bottom: 8,
-                                      left: "50%",
-                                      transform: "translateX(-50%)",
-                                      backgroundColor: "rgba(0,0,0,0.6)",
-                                      color: "white",
-                                      px: 1.5,
-                                      py: 0.5,
-                                      borderRadius: 2,
-                                      fontSize: "0.75rem",
-                                      fontWeight: 600,
-                                    }}>
-                                      {currentImgIdx + 1} / {imgArray.length}
-                                    </Box>
-                                  </>
-                                )}
-
-                                {/* Contador de cantidad si hay más de uno */}
-                                {(() => {
-                                  const count = ofertaItems.filter(x => x.tratamientoId === t.id).length;
-                                  return count > 0 ? (
-                                    <Box sx={{
-                                      position: "absolute",
-                                      bottom: 8,
-                                      right: 8,
-                                      minWidth: 28,
-                                      height: 28,
-                                      borderRadius: "50%",
-                                      backgroundColor: "#a36920",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      color: "white",
-                                      fontSize: "0.85rem",
-                                      fontWeight: "bold",
-                                      boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
-                                      px: count > 9 ? 1 : 0,
-                                    }}>
-                                      {count}
-                                    </Box>
-                                  ) : null;
-                                })()}
                               </Box>
                               {/* Info */}
-                              <Box sx={{ p: 1.5 }}>
+                              <Box sx={{ p: 0.8 }}>
                                 <Typography sx={{ 
                                   fontWeight: 700, 
-                                  fontSize: "0.85rem", 
+                                  fontSize: "0.68rem", 
                                   color: isSelected ? "#a36920" : "#333",
-                                  lineHeight: 1.3,
+                                  lineHeight: 1.2,
                                   display: "-webkit-box",
                                   WebkitLineClamp: 2,
                                   WebkitBoxOrient: "vertical",
                                   overflow: "hidden",
-                                  minHeight: "2.2em",
-                                  mb: 0.5,
+                                  minHeight: "1.7em",
                                 }}>
                                   {t.nombre}
                                 </Typography>
-                                <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: isSelected ? "#a36920" : "#666" }}>
+                                <Typography sx={{ fontWeight: 800, fontSize: "0.72rem", color: isSelected ? "#a36920" : "#666", mt: 0.3 }}>
                                   {t.precio ? `S/ ${Number(t.precio).toFixed(2)}` : "Sin precio"}
                                 </Typography>
+                              </Box>
+                              {/* Indicador de selección / cantidad */}
+                              <Box sx={{
+                                position: "absolute",
+                                top: 5,
+                                right: 5,
+                                width: 20,
+                                height: 20,
+                                borderRadius: "50%",
+                                border: `2px solid ${isSelected ? '#a36920' : 'rgba(255,255,255,0.8)'}`,
+                                backgroundColor: isSelected ? "#a36920" : "rgba(255,255,255,0.6)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                              }}>
+                                {count > 0 && (
+                                  <Typography sx={{ fontSize: "0.6rem", color: "white", fontWeight: 700 }}>
+                                    {count}
+                                  </Typography>
+                                )}
                               </Box>
                             </Box>
                           );
@@ -4005,10 +3852,6 @@ const HistorialClinico = () => {
 
                   {/* Tratamientos seleccionados para el presupuesto */}
                   {ofertaItems.length > 0 && (() => {
-                    const CARDS_PER_VIEW = 3;
-                    const maxIdx = Math.max(0, ofertaItems.length - CARDS_PER_VIEW);
-                    const startIdx = Math.min(presupuestoCarouselIdx, maxIdx);
-                    const visibleItems = ofertaItems.slice(startIdx, startIdx + CARDS_PER_VIEW);
                     // Load missing images
                     const missingIds = ofertaItems
                       .map(it => it.tratamientoId)
@@ -4022,38 +3865,19 @@ const HistorialClinico = () => {
                         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#666" }}>
                           {ofertaItems.length} tratamiento{ofertaItems.length !== 1 ? "s" : ""} seleccionado{ofertaItems.length !== 1 ? "s" : ""}
                         </Typography>
-                        <Box sx={{ display: "flex", gap: 0.5 }}>
-                          <IconButton
-                            size="small"
-                            disabled={startIdx === 0}
-                            onClick={() => setPresupuestoCarouselIdx(Math.max(0, startIdx - 1))}
-                            sx={{
-                              backgroundColor: startIdx === 0 ? "#f5f5f5" : "#f5f1e4",
-                              width: 32, height: 32,
-                              "&:hover": { backgroundColor: "#ece5d0" },
-                              "&.Mui-disabled": { backgroundColor: "#f5f5f5" },
-                            }}
-                          >
-                            <Typography sx={{ fontSize: 16, fontWeight: "bold", color: startIdx === 0 ? "#ccc" : "#a36920" }}>‹</Typography>
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            disabled={startIdx >= maxIdx}
-                            onClick={() => setPresupuestoCarouselIdx(Math.min(maxIdx, startIdx + 1))}
-                            sx={{
-                              backgroundColor: startIdx >= maxIdx ? "#f5f5f5" : "#f5f1e4",
-                              width: 32, height: 32,
-                              "&:hover": { backgroundColor: "#ece5d0" },
-                              "&.Mui-disabled": { backgroundColor: "#f5f5f5" },
-                            }}
-                          >
-                            <Typography sx={{ fontSize: 16, fontWeight: "bold", color: startIdx >= maxIdx ? "#ccc" : "#a36920" }}>›</Typography>
-                          </IconButton>
-                        </Box>
                       </Box>
 
-                      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" }, gap: 2 }}>
-                        {visibleItems.map((item) => {
+                      <Box sx={{ 
+                        display: "grid", 
+                        gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr", md: "1fr 1fr 1fr 1fr", lg: "1fr 1fr 1fr 1fr 1fr" }, 
+                        gap: 1.5,
+                        maxHeight: 420,
+                        overflowY: "auto",
+                        pr: 0.5,
+                        "&::-webkit-scrollbar": { width: 5 },
+                        "&::-webkit-scrollbar-thumb": { backgroundColor: "#ba9a63", borderRadius: 3 },
+                      }}>
+                        {ofertaItems.map((item) => {
                           const t = tratamientosBase.find(x => x.id === item.tratamientoId);
                           if (!t) return null;
                           const imgArray = item.tratamientoId ? tratamientoImagenCache[item.tratamientoId] : null;
@@ -4062,22 +3886,22 @@ const HistorialClinico = () => {
                             <Box
                               key={t.id}
                               sx={{
-                                borderRadius: 4,
-                                border: "1.5px solid rgba(163,105,32,0.15)",
+                                borderRadius: 2.5,
+                                border: "1.5px solid rgba(163,105,32,0.2)",
                                 backgroundColor: "white",
                                 overflow: "hidden",
                                 transition: "all 0.2s ease",
-                                boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+                                boxShadow: "0 1px 6px rgba(0,0,0,0.05)",
                                 "&:hover": { 
                                   borderColor: "#ba9a63",
-                                  boxShadow: "0 4px 20px rgba(163,105,32,0.12)",
+                                  boxShadow: "0 3px 12px rgba(163,105,32,0.1)",
                                 },
                               }}
                             >
-                              {/* Imagen grande */}
+                              {/* Imagen compacta */}
                               <Box sx={{
                                 width: "100%",
-                                height: 160,
+                                height: 90,
                                 backgroundColor: "#f5f1e4",
                                 display: "flex",
                                 alignItems: "center",
@@ -4088,7 +3912,7 @@ const HistorialClinico = () => {
                                 {imgUrl ? (
                                   <img src={imgUrl} alt={t.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                 ) : (
-                                  <Typography sx={{ fontSize: "3rem", opacity: 0.3 }}>💉</Typography>
+                                  <Typography sx={{ fontSize: "1.8rem", opacity: 0.3 }}>💉</Typography>
                                 )}
                                 {/* Botón eliminar */}
                                 <IconButton
@@ -4096,41 +3920,41 @@ const HistorialClinico = () => {
                                   onClick={() => toggleOfertaItem(t)}
                                   sx={{
                                     position: "absolute",
-                                    top: 8,
-                                    right: 8,
-                                    backgroundColor: "rgba(255,255,255,0.9)",
-                                    color: "#e57373",
-                                    width: 28, height: 28,
-                                    "&:hover": { backgroundColor: "white", color: "#d32f2f" },
-                                    boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+                                    top: 4,
+                                    left: 4,
+                                    backgroundColor: "rgba(211,47,47,0.85)",
+                                    color: "white",
+                                    width: 22, height: 22,
+                                    "&:hover": { backgroundColor: "#d32f2f" },
+                                    boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
                                   }}
                                 >
-                                  <Close sx={{ fontSize: 16 }} />
+                                  <Close sx={{ fontSize: 13 }} />
                                 </IconButton>
                               </Box>
 
-                              {/* Info del tratamiento */}
-                              <Box sx={{ p: 2 }}>
+                              {/* Info compacta */}
+                              <Box sx={{ p: 1.2 }}>
                                 <Typography sx={{ 
                                   fontWeight: 700, 
-                                  fontSize: "0.95rem", 
+                                  fontSize: "0.72rem", 
                                   color: "#1a1a1a",
-                                  lineHeight: 1.3,
-                                  mb: 1.5,
+                                  lineHeight: 1.2,
+                                  mb: 0.8,
                                   display: "-webkit-box",
                                   WebkitLineClamp: 2,
                                   WebkitBoxOrient: "vertical",
                                   overflow: "hidden",
-                                  minHeight: "2.4em",
+                                  minHeight: "1.8em",
                                 }}>
                                   {t.nombre}
                                 </Typography>
 
-                                {/* Precio y Sesiones */}
-                                <Box sx={{ display: "flex", gap: 1, mb: 1.5 }}>
+                                {/* Precio y Sesiones en fila compacta */}
+                                <Box sx={{ display: "flex", gap: 0.5, mb: 0.8 }}>
                                   <TextField
                                     size="small"
-                                    label="S/ Precio"
+                                    label="S/"
                                     type="number"
                                     value={item?.precio ?? ""}
                                     onChange={(e) => setOfertaPrecio(t.id, e.target.value)}
@@ -4138,46 +3962,48 @@ const HistorialClinico = () => {
                                       flex: 1,
                                       "& .MuiInputBase-root": {
                                         backgroundColor: "#fffdf7",
-                                        borderRadius: 2,
-                                        fontSize: "0.9rem",
+                                        borderRadius: 1.5,
+                                        fontSize: "0.75rem",
                                         fontWeight: 700,
+                                        height: 32,
                                       },
                                       "& .MuiOutlinedInput-root": {
                                         "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
                                         "&:hover fieldset": { borderColor: "#ba9a63" },
                                         "&.Mui-focused fieldset": { borderColor: "#a36920" },
                                       },
-                                      "& .MuiInputLabel-root": { fontSize: "0.8rem" },
+                                      "& .MuiInputLabel-root": { fontSize: "0.65rem" },
                                       "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
                                     }}
                                   />
                                   <TextField
                                     size="small"
-                                    label="Sesiones"
+                                    label="Ses."
                                     type="number"
                                     value={item?.sesiones ?? "1"}
                                     onChange={(e) => setOfertaSesiones(t.id, e.target.value)}
                                     inputProps={{ min: 1, step: 1 }}
                                     sx={{
-                                      width: 80,
+                                      width: 48,
                                       "& .MuiInputBase-root": {
                                         backgroundColor: "#fffdf7",
-                                        borderRadius: 2,
-                                        fontSize: "0.9rem",
+                                        borderRadius: 1.5,
+                                        fontSize: "0.75rem",
+                                        height: 32,
                                       },
                                       "& .MuiOutlinedInput-root": {
                                         "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
                                         "&:hover fieldset": { borderColor: "#ba9a63" },
                                         "&.Mui-focused fieldset": { borderColor: "#a36920" },
                                       },
-                                      "& .MuiInputLabel-root": { fontSize: "0.8rem" },
+                                      "& .MuiInputLabel-root": { fontSize: "0.65rem" },
                                       "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
                                     }}
                                   />
                                 </Box>
 
-                                {/* Producto y ML */}
-                                <Box sx={{ display: "flex", gap: 1 }}>
+                                {/* Producto y ML compactos */}
+                                <Box sx={{ display: "flex", gap: 0.5 }}>
                                   <Autocomplete
                                     freeSolo
                                     size="small"
@@ -4202,13 +4028,13 @@ const HistorialClinico = () => {
                                         {...params}
                                         label="Producto"
                                         sx={{
-                                          "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 2, fontSize: "0.85rem" },
+                                          "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.7rem", height: 32 },
                                           "& .MuiOutlinedInput-root": {
                                             "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
                                             "&:hover fieldset": { borderColor: "#ba9a63" },
                                             "&.Mui-focused fieldset": { borderColor: "#a36920" },
                                           },
-                                          "& .MuiInputLabel-root": { fontSize: "0.8rem" },
+                                          "& .MuiInputLabel-root": { fontSize: "0.65rem" },
                                           "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
                                         }}
                                       />
@@ -4222,14 +4048,14 @@ const HistorialClinico = () => {
                                     onChange={(e) => setOfertaMl(t.id, e.target.value)}
                                     inputProps={{ min: 0, step: 0.1 }}
                                     sx={{
-                                      width: 65,
-                                      "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 2, fontSize: "0.85rem" },
+                                      width: 45,
+                                      "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.7rem", height: 32 },
                                       "& .MuiOutlinedInput-root": {
                                         "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
                                         "&:hover fieldset": { borderColor: "#ba9a63" },
                                         "&.Mui-focused fieldset": { borderColor: "#a36920" },
                                       },
-                                      "& .MuiInputLabel-root": { fontSize: "0.8rem" },
+                                      "& .MuiInputLabel-root": { fontSize: "0.65rem" },
                                       "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
                                     }}
                                   />
@@ -4239,26 +4065,6 @@ const HistorialClinico = () => {
                           );
                         })}
                       </Box>
-
-                      {/* Indicadores de posición */}
-                      {ofertaItems.length > CARDS_PER_VIEW && (
-                        <Box sx={{ display: "flex", justifyContent: "center", gap: 0.5, mt: 1.5 }}>
-                          {Array.from({ length: maxIdx + 1 }).map((_, i) => (
-                            <Box
-                              key={i}
-                              onClick={() => setPresupuestoCarouselIdx(i)}
-                              sx={{
-                                width: i === startIdx ? 20 : 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: i === startIdx ? "#a36920" : "#e0dcd4",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                              }}
-                            />
-                          ))}
-                        </Box>
-                      )}
                     </Box>
                     );
                   })()}
@@ -4518,12 +4324,12 @@ const HistorialClinico = () => {
                               setTimeout(() => cargarImagenesPresupuesto(items.map(it => ({ tratamiento_id: it.tratamientoId || it.tratamiento_id }))), 0);
                             }
                             return (
-                          <Box sx={{ mt: 1 }}>
+                          <Box sx={{ mt: 1, width: "100%", overflow: "hidden" }}>
                             <Typography variant="caption" sx={{ fontWeight: "bold", color: "#666", mb: 1, display: "block" }}>
                               Tratamientos:
                             </Typography>
                             {/* Carrusel horizontal con flechas */}
-                            <Box sx={{ position: "relative" }}>
+                            <Box sx={{ position: "relative", width: "100%", overflow: "hidden" }}>
                               {/* Flecha izquierda */}
                               <IconButton
                                 onClick={() => {
@@ -4532,7 +4338,7 @@ const HistorialClinico = () => {
                                 }}
                                 sx={{
                                   position: "absolute",
-                                  left: -16,
+                                  left: 4,
                                   top: "50%",
                                   transform: "translateY(-50%)",
                                   zIndex: 3,
@@ -4554,7 +4360,7 @@ const HistorialClinico = () => {
                                 }}
                                 sx={{
                                   position: "absolute",
-                                  right: -16,
+                                  right: 4,
                                   top: "50%",
                                   transform: "translateY(-50%)",
                                   zIndex: 3,
@@ -4572,13 +4378,17 @@ const HistorialClinico = () => {
                               id={`carousel-${o.id}`}
                               sx={{ 
                               display: "flex", 
+                              flexWrap: "wrap",
                               gap: 1.5, 
-                              overflowX: "hidden", 
-                              pb: 0.5,
+                              overflowX: "auto", 
+                              pb: 1,
                               px: 0.5,
                               scrollSnapType: "x mandatory",
                               scrollBehavior: "smooth",
-                              maxWidth: 836,
+                              width: "100%",
+                              "&::-webkit-scrollbar": { display: "none" },
+                              msOverflowStyle: "none",
+                              scrollbarWidth: "none",
                             }}>
                               {items.map((it, idx) => {
                                 const tId = it.tratamientoId || it.tratamiento_id;
@@ -4590,8 +4400,9 @@ const HistorialClinico = () => {
                                 <Box
                                   key={`${o.id}-${idx}`}
                                   sx={{
-                                    minWidth: 200,
+                                    minWidth: 155,
                                     maxWidth: 200,
+                                    flex: "1 1 155px",
                                     scrollSnapAlign: "start",
                                     borderRadius: 2.5,
                                     border: `2px solid ${marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(163, 105, 32, 0.2)'}`,

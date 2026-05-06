@@ -85,6 +85,26 @@ router.get("/listar", (req, res) => {
   });
 });
 
+// ✅ Conteo de uso por tratamiento (para ordenar por más usados)
+router.get("/uso-conteo", async (req, res) => {
+  try {
+    const rows = await dbAll(`
+      SELECT tratamiento_id, COUNT(*) AS uso
+      FROM (
+        SELECT tratamiento_id FROM tratamientos_realizados WHERE tratamiento_id IS NOT NULL
+        UNION ALL
+        SELECT tratamiento_id FROM presupuestos_sesiones WHERE tratamiento_id IS NOT NULL
+      )
+      GROUP BY tratamiento_id
+      ORDER BY uso DESC
+    `);
+    res.json(rows || []);
+  } catch (err) {
+    console.error("Error al obtener conteo de uso:", err.message);
+    res.json([]);
+  }
+});
+
 router.delete("/eliminar/:id", requireDoctor, async (req, res) => {
   const { id } = req.params;
   try {
