@@ -1786,6 +1786,18 @@ const HistorialClinico = () => {
     });
   };
 
+  const addOfertaItem = (t) => {
+    setOfertaItems((prev) => [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: "1", producto: "", ml: "" }]);
+  };
+
+  const removeOneOfertaItem = (t) => {
+    setOfertaItems((prev) => {
+      const idx = prev.findLastIndex((x) => x.tratamientoId === t.id);
+      if (idx === -1) return prev;
+      return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
+    });
+  };
+
   const setOfertaPrecio = (tratamientoId, value) => {
     setOfertaItems((prev) =>
       prev.map((x) =>
@@ -3760,14 +3772,10 @@ const HistorialClinico = () => {
                           return (
                             <Box
                               key={t.id}
-                              onClick={() => {
-                                toggleOfertaItem(t);
-                              }}
                               sx={{
                                 borderRadius: 2,
                                 border: `1.5px solid ${isSelected ? '#a36920' : 'rgba(163,105,32,0.15)'}`,
                                 backgroundColor: isSelected ? "rgba(163,105,32,0.04)" : "white",
-                                cursor: "pointer",
                                 transition: "all 0.2s ease",
                                 display: "flex",
                                 flexDirection: "column",
@@ -3776,7 +3784,6 @@ const HistorialClinico = () => {
                                 "&:hover": { 
                                   borderColor: "#ba9a63",
                                   boxShadow: "0 2px 8px rgba(163,105,32,0.12)",
-                                  transform: "translateY(-1px)",
                                 },
                               }}
                             >
@@ -3815,26 +3822,48 @@ const HistorialClinico = () => {
                                   {t.precio ? `S/ ${Number(t.precio).toFixed(2)}` : "Sin precio"}
                                 </Typography>
                               </Box>
-                              {/* Indicador de selección / cantidad */}
+                              {/* Botones + / - */}
                               <Box sx={{
                                 position: "absolute",
-                                top: 5,
-                                right: 5,
-                                width: 20,
-                                height: 20,
-                                borderRadius: "50%",
-                                border: `2px solid ${isSelected ? '#a36920' : 'rgba(255,255,255,0.8)'}`,
-                                backgroundColor: isSelected ? "#a36920" : "rgba(255,255,255,0.6)",
+                                bottom: 4,
+                                right: 4,
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+                                gap: 0.3,
+                                backgroundColor: "rgba(255,255,255,0.92)",
+                                borderRadius: 2,
+                                padding: "2px 4px",
+                                boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
                               }}>
-                                {count > 0 && (
-                                  <Typography sx={{ fontSize: "0.6rem", color: "white", fontWeight: 700 }}>
-                                    {count}
-                                  </Typography>
-                                )}
+                                <Box
+                                  onClick={(e) => { e.stopPropagation(); removeOneOfertaItem(t); }}
+                                  sx={{
+                                    width: 20, height: 20,
+                                    borderRadius: "50%",
+                                    backgroundColor: count > 0 ? "#e57373" : "#eee",
+                                    color: count > 0 ? "white" : "#bbb",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    cursor: count > 0 ? "pointer" : "default",
+                                    fontSize: "0.85rem", fontWeight: 700, lineHeight: 1,
+                                    "&:hover": count > 0 ? { backgroundColor: "#d32f2f" } : {},
+                                  }}
+                                >−</Box>
+                                <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: count > 0 ? "#a36920" : "#999", minWidth: 14, textAlign: "center" }}>
+                                  {count}
+                                </Typography>
+                                <Box
+                                  onClick={(e) => { e.stopPropagation(); addOfertaItem(t); }}
+                                  sx={{
+                                    width: 20, height: 20,
+                                    borderRadius: "50%",
+                                    backgroundColor: "#a36920",
+                                    color: "white",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    cursor: "pointer",
+                                    fontSize: "0.85rem", fontWeight: 700, lineHeight: 1,
+                                    "&:hover": { backgroundColor: "#8a5a1a" },
+                                  }}
+                                >+</Box>
                               </Box>
                             </Box>
                           );
