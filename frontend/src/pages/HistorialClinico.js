@@ -145,6 +145,7 @@ const HistorialClinico = () => {
   const [guardandoOferta, setGuardandoOferta] = useState(false);
   const [ofertas, setOfertas] = useState([]);
   const [ofertaEditId, setOfertaEditId] = useState(null);
+  const [descuentoOferta, setDescuentoOferta] = useState("");
   const [presupuestoCarouselIdx, setPresupuestoCarouselIdx] = useState(0);
   const [catalogoFiltro, setCatalogoFiltro] = useState("");
   const [catalogoCarouselIdx, setCatalogoCarouselIdx] = useState(0);
@@ -455,6 +456,7 @@ const HistorialClinico = () => {
       setShowOferta(false);
       setOfertaItems([]);
       setOfertaEditId(null);
+      setDescuentoOferta("");
       setObservacionEditId(null);
       setObservacionEditTexto("");
       // Restaurar marcas desde la base de datos
@@ -1852,6 +1854,7 @@ const HistorialClinico = () => {
           producto: it.producto || "",
           ml: it.ml || "",
         })),
+        descuento: Number(descuentoOferta) || 0,
       };
 
       if (ofertaEditId) {
@@ -1876,6 +1879,7 @@ const HistorialClinico = () => {
       setOfertaItems([]);
       setShowOferta(false);
       setOfertaEditId(null);
+      setDescuentoOferta("");
       showToast({ severity: "success", message: ofertaEditId ? "Oferta actualizada" : "Oferta guardada" });
     } catch (e) {
       console.error("Error al guardar oferta:", e);
@@ -4042,11 +4046,39 @@ const HistorialClinico = () => {
                         })}
                       </Box>
 
-                      {/* Total + botones */}
+                      {/* Total + descuento + botones */}
                       <Box sx={{ pt: 1.5, mt: 1, borderTop: "1px solid rgba(163,105,32,0.15)" }}>
-                        <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#a36920", mb: 1.5 }}>
-                          Total: S/ {totalOferta.toFixed(2)}
+                        <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#a36920", mb: 0.5 }}>
+                          Subtotal: S/ {totalOferta.toFixed(2)}
                         </Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                          <Typography sx={{ fontSize: "0.85rem", color: "#666", whiteSpace: "nowrap" }}>
+                            Descuento S/:
+                          </Typography>
+                          <TextField
+                            size="small"
+                            type="number"
+                            placeholder="0.00"
+                            value={descuentoOferta}
+                            onChange={(e) => setDescuentoOferta(e.target.value)}
+                            inputProps={{ min: 0, step: 0.01 }}
+                            sx={{
+                              width: 100,
+                              "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.8rem", height: 32 },
+                              "& .MuiOutlinedInput-root": {
+                                "& fieldset": { borderColor: "rgba(163,105,32,0.25)" },
+                                "&:hover fieldset": { borderColor: "#ba9a63" },
+                                "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                              },
+                            }}
+                          />
+                        </Box>
+                        {Number(descuentoOferta) > 0 && (
+                          <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: "#a36920", mb: 1.5 }}>
+                            Total: S/ {(totalOferta - Number(descuentoOferta)).toFixed(2)}
+                          </Typography>
+                        )}
+                        {!(Number(descuentoOferta) > 0) && <Box sx={{ mb: 1 }} />}
                         <Box sx={{ display: "flex", gap: 1 }}>
                           {ofertaEditId && (
                             <Button
@@ -4063,6 +4095,7 @@ const HistorialClinico = () => {
                               onClick={() => {
                                 setOfertaEditId(null);
                                 setOfertaItems([]);
+                                setDescuentoOferta("");
                                 setShowOferta(false);
                               }}
                             >
@@ -4619,11 +4652,22 @@ const HistorialClinico = () => {
                               ) : (
                                 <>
                                   <Typography variant="body2" color="text.secondary">
-                                    Subtotal:
+                                    Subtotal: S/ {Number(o.total || 0).toFixed(2)}
                                   </Typography>
-                                  <Typography sx={{ fontWeight: "bold", color: "#888", fontSize: "0.95rem" }}>
-                                    S/ {Number(o.total || 0).toFixed(2)}
-                                  </Typography>
+                                  {Number(o.descuento || 0) > 0 && (
+                                    <Typography variant="body2" color="error" sx={{ fontSize: "0.85rem" }}>
+                                      Descuento: -S/ {Number(o.descuento).toFixed(2)}
+                                    </Typography>
+                                  )}
+                                  {Number(o.descuento || 0) > 0 ? (
+                                    <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.05rem" }}>
+                                      Total: S/ {(Number(o.total || 0) - Number(o.descuento || 0)).toFixed(2)}
+                                    </Typography>
+                                  ) : (
+                                    <Typography sx={{ fontWeight: "bold", color: "#888", fontSize: "0.95rem" }}>
+                                      S/ {Number(o.total || 0).toFixed(2)}
+                                    </Typography>
+                                  )}
                                   <Typography variant="caption" sx={{ color: "#999", fontStyle: "italic" }}>
                                     Selecciona tratamientos para calcular total
                                   </Typography>
@@ -4674,6 +4718,7 @@ const HistorialClinico = () => {
                                 variant="outlined"
                                 onClick={() => {
                                   setOfertaEditId(o.id);
+                                  setDescuentoOferta(Number(o.descuento) > 0 ? String(o.descuento) : "");
                                   setOfertaItems(
                                     (o.items || []).map((it) => ({
                                       tratamientoId: it.tratamientoId ?? it.tratamiento_id ?? null,

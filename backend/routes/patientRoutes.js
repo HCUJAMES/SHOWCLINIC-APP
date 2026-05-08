@@ -309,7 +309,8 @@ router.get("/:id/ofertas", (req, res) => {
 // ✅ Crear oferta ofrecida (con fecha/hora Perú)
 router.post("/:id/ofertas", requirePatientWrite, (req, res) => {
   const { id } = req.params;
-  const { items } = req.body;
+  const { items, descuento: descuentoBody } = req.body;
+  const descuentoNum = Number(descuentoBody) || 0;
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: "Debes seleccionar al menos un tratamiento" });
@@ -344,11 +345,11 @@ router.post("/:id/ofertas", requirePatientWrite, (req, res) => {
     .slice(0, 19);
 
   const query = `
-    INSERT INTO patient_ofertas (paciente_id, items_json, total, creado_en)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO patient_ofertas (paciente_id, items_json, total, descuento, creado_en)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
-  db.run(query, [id, JSON.stringify(normalized), total, creadoEn], function (err) {
+  db.run(query, [id, JSON.stringify(normalized), total, descuentoNum, creadoEn], function (err) {
     if (err) {
       console.error("❌ Error al crear oferta:", err.message);
       return res.status(500).json({ message: "Error al crear oferta" });
@@ -359,6 +360,7 @@ router.post("/:id/ofertas", requirePatientWrite, (req, res) => {
       paciente_id: Number(id),
       items: normalized,
       total,
+      descuento: descuentoNum,
       creado_en: creadoEn,
     });
   });
@@ -367,7 +369,8 @@ router.post("/:id/ofertas", requirePatientWrite, (req, res) => {
 // ✅ Editar oferta ofrecida (items y total) + sincronizar presupuesto asignado
 router.put("/:id/ofertas/:ofertaId", requirePatientWrite, async (req, res) => {
   const { id, ofertaId } = req.params;
-  const { items } = req.body;
+  const { items, descuento: descuentoBody } = req.body;
+  const descuentoNum = Number(descuentoBody) || 0;
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ message: "Debes seleccionar al menos un tratamiento" });
@@ -399,8 +402,8 @@ router.put("/:id/ofertas/:ofertaId", requirePatientWrite, async (req, res) => {
   try {
     // 1. Actualizar la oferta
     const result = await dbRun(
-      `UPDATE patient_ofertas SET items_json = ?, total = ? WHERE id = ? AND paciente_id = ?`,
-      [JSON.stringify(normalized), total, ofertaId, id]
+      `UPDATE patient_ofertas SET items_json = ?, total = ?, descuento = ? WHERE id = ? AND paciente_id = ?`,
+      [JSON.stringify(normalized), total, descuentoNum, ofertaId, id]
     );
 
     if (result.changes === 0) {
