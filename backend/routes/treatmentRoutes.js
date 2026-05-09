@@ -1499,4 +1499,58 @@ router.get("/productos-aplicados", authMiddleware, requireRole(["master"]), asyn
   }
 });
 
+/* ==============================
+   📊 CALENDAR LAYOUT (posiciones de nodos y conexiones)
+============================== */
+
+// GET: obtener layout guardado para un presupuesto
+router.get("/calendar-layout/:presupuestoId", async (req, res) => {
+  const { presupuestoId } = req.params;
+  try {
+    const row = await dbGet(
+      `SELECT * FROM calendar_layout WHERE presupuesto_id = ?`,
+      [presupuestoId]
+    );
+    if (!row) {
+      return res.json(null);
+    }
+    res.json({
+      presupuesto_id: row.presupuesto_id,
+      nodePositions: JSON.parse(row.node_positions_json || "{}"),
+      connectionOrder: JSON.parse(row.connection_order_json || "[]"),
+      numWeeks: row.num_weeks || 4,
+    });
+  } catch (err) {
+    console.error("❌ Error al obtener calendar layout:", err.message);
+    res.status(500).json({ message: "Error al obtener layout del calendario" });
+  }
+});
+
+// POST: guardar/actualizar layout de un presupuesto
+router.post("/calendar-layout/:presupuestoId", async (req, res) => {
+  const { presupuestoId } = req.params;
+  const { nodePositions, connectionOrder, numWeeks } = req.body;
+  try {
+    const existing = await dbGet(
+      `SELECT id FROM calendar_layout WHERE presupuesto_id = ?`,
+      [presupuestoId]
+    );
+    if (existing) {
+      await dbRun(
+        `UPDATE calendar_layout SET node_positions_json = ?, connection_order_json = ?, num_weeks = ?, actualizado_en = CURRENT_TIMESTAMP WHERE presupuesto_id = ?`,
+        [JSON.stringify(nodePositions || {}), JSON.stringify(connectionOrder || []), numWeeks || 4, presupuestoId]
+      );
+    } else {
+      await dbRun(
+        `INSERT INTO calendar_layout (presupuesto_id, node_positions_json, connection_order_json, num_weeks) VALUES (?, ?, ?, ?)`,
+        [presupuestoId, JSON.stringify(nodePositions || {}), JSON.stringify(connectionOrder || []), numWeeks || 4]
+      );
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ Error al guardar calendar layout:", err.message);
+    res.status(500).json({ message: "Error al guardar layout del calendario" });
+  }
+});
+
 export default router;

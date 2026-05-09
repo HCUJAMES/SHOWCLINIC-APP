@@ -46,6 +46,7 @@ import ReciboTicket from "../components/ReciboTicket";
 import ReciboConsolidado from "../components/ReciboConsolidado";
 import FacialMap3D from "../components/FacialMap3D";
 import PatientJourneyChart from "../components/PatientJourneyChart";
+import TreatmentCalendar from "../components/TreatmentCalendar";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -3203,7 +3204,7 @@ const HistorialClinico = () => {
                         }}
                       />
                       <Chip 
-                        label={pacienteSeleccionado.cirugiaEstetica === "Sí" ? "Con cirugía estética" : "Sin cirugía estética"}
+                        label={pacienteSeleccionado.cirugiaEstetica && pacienteSeleccionado.cirugiaEstetica.trim() !== "" ? `Cirugía: ${pacienteSeleccionado.cirugiaEstetica}` : "Sin cirugía estética"}
                         sx={{ 
                           backgroundColor: "#f3e5f5",
                           color: "#6a1b9a",
@@ -4761,13 +4762,16 @@ const HistorialClinico = () => {
 
               <Divider sx={{ mb: 3 }} />
 
-              {/* Seguimiento del Tratamiento - Journey Chart */}
+              {/* Calendario de Tratamientos */}
               {presupuestosAsignados.map(presupuesto => (
-                <PatientJourneyChart
-                  key={`journey-${presupuesto.id}`}
+                <TreatmentCalendar
+                  key={`calendar-${presupuesto.id}`}
                   presupuesto={presupuesto}
                   especialistas={especialistas}
-                  navigate={navigate}
+                  onCompletarSesion={completarSesionPresupuesto}
+                  onDesmarcarSesion={desmarcarSesionPresupuesto}
+                  especialistasPorSesion={especialistasPorSesion}
+                  setEspecialistasPorSesion={setEspecialistasPorSesion}
                 />
               ))}
 

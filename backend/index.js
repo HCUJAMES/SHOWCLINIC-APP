@@ -1168,6 +1168,20 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE INDEX IF NOT EXISTS idx_pagos_personal_esp ON pagos_personal(especialista_id)");
     console.log("✅ Tabla pagos_personal creada");
 
+    // 📊 Tabla de layout del calendario de tratamientos (posiciones de nodos, orden de conexión, semanas)
+    db.run(`
+      CREATE TABLE IF NOT EXISTS calendar_layout (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        presupuesto_id INTEGER NOT NULL UNIQUE,
+        node_positions_json TEXT NOT NULL DEFAULT '{}',
+        connection_order_json TEXT NOT NULL DEFAULT '[]',
+        num_weeks INTEGER DEFAULT 4,
+        actualizado_en TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_layout_presupuesto ON calendar_layout(presupuesto_id)");
+    console.log("✅ Tabla calendar_layout creada");
+
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
 
