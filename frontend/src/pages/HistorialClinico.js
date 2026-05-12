@@ -3901,17 +3901,60 @@ const HistorialClinico = () => {
                       backgroundColor: "#faf8f4",
                       borderRadius: 3,
                       border: "1px solid rgba(163,105,32,0.15)",
+                      boxShadow: { md: "0 4px 12px rgba(163,105,32,0.12)" },
                       p: 2,
                       display: "flex",
                       flexDirection: "column",
                       alignSelf: "flex-start",
+                      position: { md: "sticky" },
+                      top: { md: 20 },
+                      maxHeight: { md: "calc(100vh - 40px)" },
+                      overflowY: { md: "auto" },
+                      transition: "box-shadow 0.3s ease",
+                      "&:hover": {
+                        boxShadow: { md: "0 6px 16px rgba(163,105,32,0.18)" },
+                      },
+                      "&::-webkit-scrollbar": {
+                        width: "8px",
+                      },
+                      "&::-webkit-scrollbar-track": {
+                        backgroundColor: "rgba(163,105,32,0.08)",
+                        borderRadius: "10px",
+                        margin: "8px",
+                      },
+                      "&::-webkit-scrollbar-thumb": {
+                        backgroundColor: "rgba(163,105,32,0.35)",
+                        borderRadius: "10px",
+                        "&:hover": {
+                          backgroundColor: "rgba(163,105,32,0.55)",
+                        },
+                      },
                     }}>
                       <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#1a1a1a", mb: 1.5 }}>
                         Resumen ({ofertaItems.length})
                       </Typography>
 
                       {/* Lista de items editables */}
-                      <Box>
+                      <Box sx={{ 
+                        flex: 1,
+                        overflowY: "auto",
+                        mb: 1,
+                        pr: 0.5,
+                        "&::-webkit-scrollbar": {
+                          width: "6px",
+                        },
+                        "&::-webkit-scrollbar-track": {
+                          backgroundColor: "rgba(163,105,32,0.05)",
+                          borderRadius: "10px",
+                        },
+                        "&::-webkit-scrollbar-thumb": {
+                          backgroundColor: "rgba(163,105,32,0.3)",
+                          borderRadius: "10px",
+                          "&:hover": {
+                            backgroundColor: "rgba(163,105,32,0.5)",
+                          },
+                        },
+                      }}>
                         {ofertaItems.map((item, idx) => {
                           const t = tratamientosBase.find(x => x.id === item.tratamientoId);
                           if (!t) return null;
