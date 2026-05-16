@@ -38,6 +38,7 @@ import {
   Close,
   CalendarToday,
   SupervisorAccount,
+  QrCode2,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 
@@ -54,6 +55,7 @@ const moduleIcons = {
   "Gestión Clínica": LocalHospital,
   "Productos Aplicados": CalendarToday,
   "Usuarios": SupervisorAccount,
+  "Códigos de Barras": QrCode2,
 };
 
 const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
@@ -75,6 +77,7 @@ export default function Dashboard() {
       { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO" },
       { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS" },
       { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK" },
+      { title: "Códigos de Barras", path: "/codigos-barras", description: "Generación e impresión de códigos de barras para lotes de inventario", tag: "STICKERS" },
       { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "REPORTES" },
       { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO" },
       { title: "Gestión Clínica", path: "/gestion-clinica", description: "Gestión de atenciones diarias y control de citas", tag: "ACCEDER" },
@@ -107,6 +110,7 @@ export default function Dashboard() {
       { title: "Tratamientos", path: "/tratamientos", description: "Procedimientos estéticos, protocolos clínicos y catálogo de servicios", tag: "CATÁLOGO" },
       { title: "Paquetes", path: "/paquetes", description: "Paquetes promocionales, combos y ofertas especiales", tag: "PROMOS" },
       { title: "Inventario", path: "/inventario", description: "Control de productos, stock disponible y alertas de reposición", tag: "STOCK" },
+      { title: "Códigos de Barras", path: "/codigos-barras", description: "Generación e impresión de códigos de barras para lotes de inventario", tag: "STICKERS" },
       { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "REPORTES" },
       { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO" },
       { title: "Gestión Clínica", path: "/gestion-clinica", description: "Gestión de atenciones diarias y control de citas", tag: "ACCEDER" },

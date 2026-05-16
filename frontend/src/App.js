@@ -23,6 +23,7 @@ const Paquetes = React.lazy(() => import("./pages/Paquetes"));
 const GestionClinica = React.lazy(() => import("./pages/GestionPersonalCards"));
 const ProductosAplicados = React.lazy(() => import("./pages/ProductosAplicados"));
 const GestionUsuariosPage = React.lazy(() => import("./pages/GestionUsuariosPage"));
+const CodigosBarras = React.lazy(() => import("./pages/CodigosBarras"));
 
 // Spinner de carga mientras se descarga el chunk de la página
 const PageLoader = () => (
@@ -205,6 +206,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["master"]}>
               <GestionUsuariosPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/codigos-barras"
+          element={
+            <ProtectedRoute allowedRoles={["master", "doctor"]}>
+              <CodigosBarras />
             </ProtectedRoute>
           }
         />

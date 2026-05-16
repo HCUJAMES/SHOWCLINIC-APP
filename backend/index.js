@@ -22,6 +22,7 @@ import paquetesRoutes from "./routes/paquetesRoutes.js";
 import whatsappRoutes from "./routes/whatsappRoutes.js";
 import n8nIntegrationRoutes from "./routes/n8nIntegrationRoutes.js";
 import gestionClinicaRoutes from "./routes/gestionClinicaRoutes.js";
+import barcodeRoutes from "./routes/barcodeRoutes.js";
 import bcrypt from "bcryptjs";
 import { autoEmitMiddleware } from "./utils/socketEmitter.js";
 
@@ -1182,6 +1183,25 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_calendar_layout_presupuesto ON calendar_layout(presupuesto_id)");
     console.log("✅ Tabla calendar_layout creada");
 
+    // 📦 Tabla de códigos de barras para lotes de inventario
+    db.run(`
+      CREATE TABLE IF NOT EXISTS barcode_units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lote_id INTEGER NOT NULL,
+        barcode TEXT UNIQUE NOT NULL,
+        unit_type TEXT NOT NULL,
+        unit_index INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT DEFAULT (datetime('now', '-5 hours')),
+        scanned_at TEXT,
+        treatment_id INTEGER,
+        FOREIGN KEY(lote_id) REFERENCES stock_lotes(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_barcode_units_lote ON barcode_units(lote_id)");
+    db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_barcode_units_barcode ON barcode_units(barcode)");
+    console.log("✅ Tabla barcode_units creada");
+
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
 
@@ -1207,6 +1227,7 @@ app.use("/api/backup", backupRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/n8n", n8nIntegrationRoutes);
 app.use("/api/gestion-clinica", gestionClinicaRoutes);
+app.use("/api/barcodes", barcodeRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
 app.use("/uploads/especialistas", express.static("uploads/especialistas"));
 
