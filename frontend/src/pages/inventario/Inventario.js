@@ -116,17 +116,32 @@ const imprimirSticker = (stickerData) => {
   if (!printWindow) return;
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Sticker</title>
 <style>
+  /* Xprinter alimenta por el lado corto (29mm), así que @page es portrait */
   @page {
-    size: ${STICKER_W} ${STICKER_H};
+    size: ${STICKER_H} ${STICKER_W};
     margin: 0 !important;
     padding: 0 !important;
   }
   @media print {
-    html, body { margin: 0 !important; padding: 0 !important; width: ${STICKER_W}; height: ${STICKER_H}; }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: ${STICKER_H};
+      height: ${STICKER_W};
+    }
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  html, body { width: ${STICKER_W}; height: ${STICKER_H}; overflow: hidden; }
+  html, body { width: ${STICKER_H}; height: ${STICKER_W}; overflow: hidden; }
   body { font-family: 'Arial Narrow', Arial, Helvetica, sans-serif; background: #fff; }
+  /* Contenedor que rota el contenido 90° para que se lea horizontal en el sticker */
+  .page-container {
+    width: ${STICKER_H};
+    height: ${STICKER_W};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
   .sticker {
     width: ${STICKER_W};
     height: ${STICKER_H};
@@ -135,6 +150,8 @@ const imprimirSticker = (stickerData) => {
     flex-direction: column;
     justify-content: space-between;
     overflow: hidden;
+    transform: rotate(-90deg);
+    transform-origin: center center;
   }
   .row-top {
     display: flex;
@@ -200,20 +217,22 @@ const imprimirSticker = (stickerData) => {
     line-height: 1;
   }
 </style></head><body>
-<div class="sticker">
-  <div class="row-top">
-    <span>SHOWCLINIC</span>
-    <span>${stickerData.semana}</span>
-  </div>
-  <div class="product-name">${stickerData.nombre}</div>
-  <div class="subtitle">${stickerData.marca} &middot; Lote: ${stickerData.lote}</div>
-  <div class="barcode-wrap">
-    <img src="${stickerData.barcodeImg}" />
-  </div>
-  <div class="barcode-code">${stickerData.codigo}</div>
-  <div class="row-bottom">
-    <span>Vence: ${stickerData.vence}</span>
-    <span>${stickerData.unidad}</span>
+<div class="page-container">
+  <div class="sticker">
+    <div class="row-top">
+      <span>SHOWCLINIC</span>
+      <span>${stickerData.semana}</span>
+    </div>
+    <div class="product-name">${stickerData.nombre}</div>
+    <div class="subtitle">${stickerData.marca} &middot; Lote: ${stickerData.lote}</div>
+    <div class="barcode-wrap">
+      <img src="${stickerData.barcodeImg}" />
+    </div>
+    <div class="barcode-code">${stickerData.codigo}</div>
+    <div class="row-bottom">
+      <span>Vence: ${stickerData.vence}</span>
+      <span>${stickerData.unidad}</span>
+    </div>
   </div>
 </div>
 </body></html>`;
