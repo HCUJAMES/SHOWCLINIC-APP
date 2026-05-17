@@ -418,15 +418,22 @@ const HistorialClinico = () => {
     cargarProductosInventario();
   }, []);
 
-  // Seleccionar automáticamente el paciente si viene desde el Dashboard
+  // Seleccionar automáticamente el paciente si viene desde el Dashboard o desde Seguimiento
   useEffect(() => {
-    if (location.state?.pacienteId && pacientes.length > 0 && !pacienteSeleccionado) {
-      const pacienteId = location.state.pacienteId;
-      const paciente = pacientes.find(p => p.id === pacienteId);
-      if (paciente) {
-        cargarHistorial(pacienteId);
-        // Limpiar el state para que no se vuelva a seleccionar al navegar
-        window.history.replaceState({}, document.title);
+    if (pacientes.length > 0 && !pacienteSeleccionado) {
+      let pacienteId = location.state?.pacienteId;
+      // Also support query param ?paciente=ID
+      if (!pacienteId) {
+        const params = new URLSearchParams(window.location.search);
+        const qp = params.get("paciente");
+        if (qp) pacienteId = parseInt(qp, 10);
+      }
+      if (pacienteId) {
+        const paciente = pacientes.find(p => p.id === pacienteId);
+        if (paciente) {
+          cargarHistorial(pacienteId);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       }
     }
   }, [location.state, pacientes, pacienteSeleccionado]);

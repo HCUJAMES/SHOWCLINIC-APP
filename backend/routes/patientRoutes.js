@@ -236,6 +236,36 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
   );
 });
 
+// 📊 Seguimiento de pacientes - último tratamiento y tiempo sin venir
+router.get("/seguimiento", async (req, res) => {
+  try {
+    const rows = await dbAll(`
+      SELECT 
+        p.id,
+        p.nombre,
+        p.apellido,
+        p.dni,
+        tr.fecha AS ultima_fecha,
+        t.nombre AS ultimo_tratamiento,
+        tr.especialista AS ultimo_especialista
+      FROM patients p
+      INNER JOIN tratamientos_realizados tr ON tr.paciente_id = p.id
+      INNER JOIN (
+        SELECT paciente_id, MAX(fecha) AS max_fecha
+        FROM tratamientos_realizados
+        GROUP BY paciente_id
+      ) ult ON ult.paciente_id = p.id AND tr.fecha = ult.max_fecha
+      LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
+      GROUP BY p.id
+      ORDER BY tr.fecha ASC
+    `);
+    res.json(rows || []);
+  } catch (err) {
+    console.error("❌ Error en seguimiento:", err.message);
+    res.status(500).json({ message: "Error al obtener seguimiento" });
+  }
+});
+
 // ✅ Listar pacientes
 router.get("/listar", (req, res) => {
   const query = "SELECT * FROM patients ORDER BY id DESC";

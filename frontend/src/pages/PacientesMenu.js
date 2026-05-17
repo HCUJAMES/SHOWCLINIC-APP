@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Typography, Paper, IconButton, Grid, Avatar } from "@mui/material";
-import { ArrowBack, Home, Search, PersonAdd, Description, CreditCard, Groups } from "@mui/icons-material";
+import { ArrowBack, Home, Search, PersonAdd, Description, CreditCard, Groups, EventNote } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { canWritePatients } from "../utils/permissions";
@@ -37,6 +37,15 @@ export default function PacientesMenu() {
       iconColor: "#5a3e1b",
       path: "/historial-clinico",
       show: canWrite,
+    },
+    {
+      title: "Seguimiento de pacientes",
+      description: "Control de último tratamiento",
+      icon: <EventNote />,
+      iconBg: "#f5f1e4",
+      iconColor: "#a36920",
+      path: "/pacientes/seguimiento",
+      show: true,
     },
     {
       title: "Pacientes con deudas",
