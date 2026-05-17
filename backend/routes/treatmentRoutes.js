@@ -1514,11 +1514,16 @@ router.get("/calendar-layout/:presupuestoId", async (req, res) => {
     if (!row) {
       return res.json(null);
     }
+    const nodeData = JSON.parse(row.node_positions_json || "{}");
+    // Support both legacy flat format and new nested format
+    const isNewFormat = nodeData._matrixPositions || nodeData._specialistNames;
     res.json({
       presupuesto_id: row.presupuesto_id,
-      nodePositions: JSON.parse(row.node_positions_json || "{}"),
+      nodePositions: isNewFormat ? (nodeData.nodePositions || {}) : nodeData,
       connectionOrder: JSON.parse(row.connection_order_json || "[]"),
       numWeeks: row.num_weeks || 4,
+      matrixPositions: nodeData._matrixPositions || null,
+      specialistNames: nodeData._specialistNames || null,
     });
   } catch (err) {
     console.error("❌ Error al obtener calendar layout:", err.message);
@@ -1529,21 +1534,37 @@ router.get("/calendar-layout/:presupuestoId", async (req, res) => {
 // POST: guardar/actualizar layout de un presupuesto
 router.post("/calendar-layout/:presupuestoId", async (req, res) => {
   const { presupuestoId } = req.params;
-  const { nodePositions, connectionOrder, numWeeks } = req.body;
+  const { nodePositions, connectionOrder, numWeeks, matrixPositions, specialistNames } = req.body;
   try {
-    const existing = await dbGet(
+    // Merge matrix data into node_positions_json for backward compat
+    let nodeData;
+    if (matrixPositions || specialistNames) {
+      // New format: store everything in a nested object
+      const existing = await dbGet(`SELECT node_positions_json FROM calendar_layout WHERE presupuesto_id = ?`, [presupuestoId]);
+      const prev = existing ? JSON.parse(existing.node_positions_json || "{}") : {};
+      nodeData = {
+        ...prev,
+        nodePositions: nodePositions || prev.nodePositions || {},
+      };
+      if (matrixPositions) nodeData._matrixPositions = matrixPositions;
+      if (specialistNames) nodeData._specialistNames = specialistNames;
+    } else {
+      nodeData = nodePositions || {};
+    }
+
+    const existingRow = await dbGet(
       `SELECT id FROM calendar_layout WHERE presupuesto_id = ?`,
       [presupuestoId]
     );
-    if (existing) {
+    if (existingRow) {
       await dbRun(
         `UPDATE calendar_layout SET node_positions_json = ?, connection_order_json = ?, num_weeks = ?, actualizado_en = CURRENT_TIMESTAMP WHERE presupuesto_id = ?`,
-        [JSON.stringify(nodePositions || {}), JSON.stringify(connectionOrder || []), numWeeks || 4, presupuestoId]
+        [JSON.stringify(nodeData), JSON.stringify(connectionOrder || []), numWeeks || 4, presupuestoId]
       );
     } else {
       await dbRun(
         `INSERT INTO calendar_layout (presupuesto_id, node_positions_json, connection_order_json, num_weeks) VALUES (?, ?, ?, ?)`,
-        [presupuestoId, JSON.stringify(nodePositions || {}), JSON.stringify(connectionOrder || []), numWeeks || 4]
+        [presupuestoId, JSON.stringify(nodeData), JSON.stringify(connectionOrder || []), numWeeks || 4]
       );
     }
     res.json({ success: true });

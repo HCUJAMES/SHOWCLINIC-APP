@@ -47,6 +47,7 @@ import ReciboConsolidado from "../components/ReciboConsolidado";
 import FacialMap3D from "../components/FacialMap3D";
 import PatientJourneyChart from "../components/PatientJourneyChart";
 import TreatmentCalendar from "../components/TreatmentCalendar";
+import TreatmentTimelineMatrix from "../components/TreatmentTimelineMatrix";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -300,6 +301,7 @@ const HistorialClinico = () => {
   const [especialistas, setEspecialistas] = useState([]);
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
   const [especialistaPorPresupuesto, setEspecialistaPorPresupuesto] = useState({});
+  const [extraWeeks, setExtraWeeks] = useState({});
 
   const [openConfirmarEliminarPaciente, setOpenConfirmarEliminarPaciente] = useState(false);
   const [pacienteEliminar, setPacienteEliminar] = useState(null);
@@ -1994,6 +1996,46 @@ const HistorialClinico = () => {
     }
   };
 
+  // Reordenar un tratamiento dentro de un presupuesto (mover a una posición específica)
+  const reorderItemOferta = async (ofertaId, fromIdx, toIdx) => {
+    if (!pacienteSeleccionado?.id) return;
+    const oferta = ofertas.find(o => o.id === ofertaId);
+    if (!oferta) return;
+    const items = [...(oferta.items || [])];
+    if (fromIdx < 0 || fromIdx >= items.length || toIdx < 0 || toIdx >= items.length || fromIdx === toIdx) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(toIdx, 0, moved);
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas/${ofertaId}`,
+        { items: items.map(it => ({
+            tratamientoId: it.tratamientoId || it.tratamiento_id || 0,
+            nombre: it.nombre,
+            precio: it.precio,
+            sesiones: Number(it.sesiones) || 1,
+            producto: it.producto || "",
+            ml: it.ml || "",
+          }))
+        },
+        { headers: authHeaders }
+      );
+      const ofertasRes = await axios.get(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/ofertas`,
+        { headers: authHeaders }
+      );
+      setOfertas(Array.isArray(ofertasRes.data) ? ofertasRes.data : []);
+      // Recargar presupuestos asignados
+      try {
+        const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, { headers: authHeaders });
+        setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      } catch (_) {}
+      showToast({ severity: "success", message: `Orden actualizado: ${moved.nombre} ahora es #${toIdx + 1}` });
+    } catch (e) {
+      console.error("Error al reordenar:", e);
+      showToast({ severity: "error", message: "Error al reordenar tratamientos" });
+    }
+  };
+
   const guardarObservacion = async () => {
     if (!pacienteSeleccionado?.id) return;
     try {
@@ -3601,7 +3643,7 @@ const HistorialClinico = () => {
                   disabled={!pacienteSeleccionado}
                   startIcon={<Inventory2 />}
                 >
-                  Paquete
+                  Paquete 
                 </Button>
                 <Button
                   variant="outlined"
@@ -4447,6 +4489,34 @@ const HistorialClinico = () => {
                                 return (
                                 <Box
                                   key={`${o.id}-${idx}`}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData("text/plain", JSON.stringify({ ofertaId: o.id, fromIdx: idx }));
+                                    e.dataTransfer.effectAllowed = "move";
+                                    e.currentTarget.style.opacity = "0.5";
+                                  }}
+                                  onDragEnd={(e) => { e.currentTarget.style.opacity = "1"; }}
+                                  onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.dataTransfer.dropEffect = "move";
+                                    e.currentTarget.style.borderColor = "#a36920";
+                                    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(163,105,32,0.3)";
+                                  }}
+                                  onDragLeave={(e) => {
+                                    e.currentTarget.style.borderColor = marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(163, 105, 32, 0.2)';
+                                    e.currentTarget.style.boxShadow = "";
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.currentTarget.style.borderColor = marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(163, 105, 32, 0.2)';
+                                    e.currentTarget.style.boxShadow = "";
+                                    try {
+                                      const data = JSON.parse(e.dataTransfer.getData("text/plain"));
+                                      if (data.ofertaId === o.id && data.fromIdx !== idx) {
+                                        reorderItemOferta(o.id, data.fromIdx, idx);
+                                      }
+                                    } catch (_) {}
+                                  }}
                                   sx={{
                                     minWidth: 155,
                                     maxWidth: 200,
@@ -4459,12 +4529,14 @@ const HistorialClinico = () => {
                                     display: "flex",
                                     flexDirection: "column",
                                     flexShrink: 0,
-                                    transition: "border-color 0.2s, box-shadow 0.2s",
+                                    cursor: "grab",
+                                    transition: "border-color 0.2s, box-shadow 0.2s, opacity 0.2s",
                                     boxShadow: marca === "gold" 
                                       ? "0 0 0 2px rgba(212,175,55,0.25)" 
                                       : marca === "purple" 
                                         ? "0 0 0 2px rgba(123,31,162,0.25)" 
                                         : "0 1px 4px rgba(0,0,0,0.08)",
+                                    "&:active": { cursor: "grabbing" },
                                   }}
                                 >
                                   {/* Imagen del tratamiento */}
@@ -4519,8 +4591,8 @@ const HistorialClinico = () => {
                                         </Typography>
                                       </Box>
                                     )}
-                                    {/* Badge de marca (gold/purple/gray) */}
-                                    <Box 
+                                    {/* Badge de orden */}
+                                    <Box
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const current = tratamientosMarcados[marcaKey];
@@ -4534,24 +4606,19 @@ const HistorialClinico = () => {
                                       }}
                                       sx={{
                                         position: "absolute",
-                                        top: 8,
-                                        right: 8,
-                                        width: 26,
-                                        height: 26,
-                                        borderRadius: "50%",
+                                        top: 6,
+                                        right: 6,
+                                        zIndex: 2,
+                                        width: 26, height: 26, borderRadius: "50%",
                                         backgroundColor: marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(255,255,255,0.9)',
                                         border: `2px solid ${marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : '#bdbdbd'}`,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
                                         fontSize: "0.75rem",
                                         color: marca === "purple" ? 'white' : marca === "gold" ? '#3e2c0a' : '#bdbdbd',
-                                        fontWeight: "bold",
-                                        cursor: "pointer",
+                                        fontWeight: "bold", cursor: "pointer",
                                         transition: "all 0.2s ease",
-                                        zIndex: 2,
                                         boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
-                                        "&:hover": { transform: "scale(1.2)" },
+                                        "&:hover": { transform: "scale(1.1)" },
                                       }}
                                     >
                                       {idx + 1}
@@ -4805,18 +4872,101 @@ const HistorialClinico = () => {
 
               <Divider sx={{ mb: 3 }} />
 
-              {/* Calendario de Tratamientos */}
-              {presupuestosAsignados.map(presupuesto => (
-                <TreatmentCalendar
-                  key={`calendar-${presupuesto.id}`}
-                  presupuesto={presupuesto}
-                  especialistas={especialistas}
-                  onCompletarSesion={completarSesionPresupuesto}
-                  onDesmarcarSesion={desmarcarSesionPresupuesto}
-                  especialistasPorSesion={especialistasPorSesion}
-                  setEspecialistasPorSesion={setEspecialistasPorSesion}
-                />
-              ))}
+              {/* Calendario de Tratamientos - Timeline Matrix */}
+              {presupuestosAsignados.map(presupuesto => {
+                const sesiones = presupuesto.sesiones || [];
+                const completadas = sesiones.filter(s => s.estado === 'completada').length;
+                const totalSes = sesiones.length;
+                const progressPct = totalSes > 0 ? Math.round((completadas / totalSes) * 100) : 0;
+
+                // Fixed 3 categories
+                const matrixCategories = [
+                  { key: "armonizacion", label: "Armonización", initial: "A", subtitle: "Inyectables y rellenos" },
+                  { key: "facial", label: "Cosmiatría Facial", initial: "F", subtitle: "Aparatología y limpieza" },
+                  { key: "corporal", label: "Cosmiatría Corporal", initial: "C", subtitle: "Modelado y reductivos" },
+                ];
+
+                // Map treatments to categories based on keywords
+                const categorizeTreatment = (nombre) => {
+                  const n = (nombre || '').toLowerCase();
+                  // Corporal keywords
+                  if (n.includes('corporal') || n.includes('reducti') || n.includes('lipopapada') || n.includes('lipo') || 
+                      n.includes('masaje') || n.includes('modelado') || n.includes('criolipo') || n.includes('cavita') ||
+                      n.includes('drenaje') || n.includes('reafirm') || n.includes('gluteo') || n.includes('abdomen')) {
+                    return 'corporal';
+                  }
+                  // Facial keywords
+                  if (n.includes('facial') || n.includes('hifu') || n.includes('radiofrecuencia') || n.includes('limpieza') || 
+                      n.includes('peeling') || n.includes('microneeld') || n.includes('dermapen') || n.includes('led') ||
+                      n.includes('cosm') || n.includes('rejuvenec') || n.includes('mancha') || n.includes('acne') ||
+                      n.includes('carboxi')) {
+                    return 'facial';
+                  }
+                  // Default: Armonización (botox, relleno, exosomas, bioestimuladores, etc.)
+                  return 'armonizacion';
+                };
+
+                // Build weeks (distribute sessions across weeks + extra weeks added by user)
+                const baseWeeks = Math.max(4, Math.ceil(totalSes / matrixCategories.length) + 1);
+                const numWeeks = baseWeeks + (extraWeeks[presupuesto.id] || 0);
+                const matrixWeeks = Array.from({ length: numWeeks }, (_, i) => ({
+                  number: i + 1,
+                  dateRange: `Semana ${i + 1}`,
+                }));
+
+                // Build milestones from sessions
+                const matrixMilestones = sesiones.map((s, idx) => {
+                  const catKey = categorizeTreatment(s.tratamiento_nombre);
+                  // Distribute across weeks based on order
+                  const weekNum = Math.min(idx + 1, numWeeks);
+                  const espNombre = s.especialista_nombre || presupuesto.especialista_nombre || null;
+                  return {
+                    id: `s-${s.id}`,
+                    order: idx + 1,
+                    categoryKey: catKey,
+                    week: weekNum,
+                    name: s.tratamiento_nombre || `Sesión ${idx + 1}`,
+                    status: s.estado === 'completada' ? 'completed' : s.estado === 'pendiente' ? (espNombre ? 'assigned' : 'pending') : 'pending',
+                    specialist: espNombre ? {
+                      initials: espNombre.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
+                      fullName: espNombre,
+                    } : null,
+                  };
+                });
+
+                return (
+                  <div key={`timeline-${presupuesto.id}`} style={{ marginBottom: 24 }}>
+                    <TreatmentTimelineMatrix
+                      presupuestoId={presupuesto.id}
+                      especialistas={especialistas}
+                      budget={{
+                        id: `PRE-${presupuesto.id}`,
+                        patientName: pacienteSeleccionado?.nombre ? `${pacienteSeleccionado.nombre} ${pacienteSeleccionado.apellido || ''}`.trim() : '',
+                        progress: progressPct,
+                        completedSessions: completadas,
+                        totalSessions: totalSes,
+                      }}
+                      categories={matrixCategories}
+                      weeks={matrixWeeks}
+                      milestones={matrixMilestones}
+                      onAddWeek={() => setExtraWeeks(prev => ({ ...prev, [presupuesto.id]: (prev[presupuesto.id] || 0) + 1 }))}
+                      onRemoveWeek={() => setExtraWeeks(prev => ({ ...prev, [presupuesto.id]: Math.max(0, (prev[presupuesto.id] || 0) - 1) }))}
+                      onMilestoneMove={(milestoneId, newWeek, newCategoryKey) => {
+                        console.log('Move:', milestoneId, newWeek, newCategoryKey);
+                      }}
+                      onMilestoneClick={(milestoneId) => {
+                        console.log('Click:', milestoneId);
+                      }}
+                      onEdit={() => {
+                        console.log('Edit presupuesto:', presupuesto.id);
+                      }}
+                      onAssignSpecialist={(milestoneId) => {
+                        console.log('Assign specialist for:', milestoneId);
+                      }}
+                    />
+                  </div>
+                );
+              })}
 
               {/* Paquetes Promocionales Activos */}
               {paquetesActivos.length > 0 && (

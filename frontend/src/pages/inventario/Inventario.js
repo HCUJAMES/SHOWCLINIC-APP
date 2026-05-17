@@ -114,124 +114,63 @@ const STICKER_H = "25mm";
 const imprimirSticker = (stickerData) => {
   const printWindow = window.open("", "_blank");
   if (!printWindow) return;
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Sticker</title>
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Sticker</title>
 <style>
   @page {
-    size: ${STICKER_H} ${STICKER_W};
+    size: 50mm 25mm landscape;
     margin: 0;
-  }
-  @media print {
-    html, body {
-      margin: 0 !important;
-      padding: 0 !important;
-      width: ${STICKER_H};
-      height: ${STICKER_W};
-      overflow: hidden;
-    }
-    @page { margin: 0; }
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    width: ${STICKER_H};
-    height: ${STICKER_W};
+    width: 50mm; height: 25mm;
+    margin: 0 !important; padding: 0 !important;
     overflow: hidden;
-    font-family: 'Arial Narrow', Arial, sans-serif;
-  }
-  .page-wrap {
-    width: ${STICKER_H};
-    height: ${STICKER_W};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+    font-family: Arial, sans-serif;
+    -webkit-print-color-adjust: exact;
   }
   .sticker {
-    width: ${STICKER_W};
-    height: ${STICKER_H};
-    padding: 1mm 1.5mm;
-    display: flex;
-    flex-direction: column;
+    width: 50mm; height: 25mm;
+    padding: 1mm 2mm;
+    display: flex; flex-direction: column;
     justify-content: space-between;
-    transform: rotate(90deg);
-    transform-origin: center center;
   }
   .row-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 5.5pt;
-    font-weight: 700;
-    border-bottom: 0.2mm solid #000;
-    padding-bottom: 0.5mm;
-    line-height: 1;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 5.5pt; font-weight: 700;
+    border-bottom: 0.3pt solid #000;
+    padding-bottom: 0.5mm; line-height: 1;
   }
-  .product-name {
-    font-size: 7pt;
-    font-weight: 900;
-    text-transform: uppercase;
-    line-height: 1;
+  .name {
+    font-size: 7pt; font-weight: 900;
+    text-transform: uppercase; line-height: 1;
     margin-top: 0.5mm;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
-  .subtitle {
-    font-size: 5pt;
-    color: #222;
-    line-height: 1;
-    margin-top: 0.2mm;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .sub {
+    font-size: 5pt; line-height: 1; margin-top: 0.2mm;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
   }
-  .barcode-wrap {
-    text-align: center;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 0;
+  .bc { text-align: center; flex: 1; display: flex; align-items: center; justify-content: center; }
+  .bc img { width: 44mm; height: 6mm; object-fit: contain; }
+  .code {
+    font-size: 6.5pt; font-weight: 800; text-align: center;
+    letter-spacing: 1.2px; font-family: 'Courier New', monospace; line-height: 1;
   }
-  .barcode-wrap img {
-    width: 44mm;
-    height: 6mm;
-    object-fit: contain;
+  .row-bot {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 5pt; border-top: 0.3pt solid #000;
+    padding-top: 0.3mm; line-height: 1;
   }
-  .barcode-code {
-    font-size: 6.5pt;
-    font-weight: 800;
-    text-align: center;
-    letter-spacing: 1.2px;
-    font-family: 'Courier New', monospace;
-    line-height: 1;
-  }
-  .row-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 5pt;
-    border-top: 0.2mm solid #000;
-    padding-top: 0.3mm;
-    line-height: 1;
-  }
-</style></head><body>
-<div class="page-wrap">
-  <div class="sticker">
-    <div class="row-top">
-      <span>SHOWCLINIC</span>
-      <span>${stickerData.semana}</span>
-    </div>
-    <div class="product-name">${stickerData.nombre}</div>
-    <div class="subtitle">${stickerData.marca} &middot; Lote: ${stickerData.lote}</div>
-    <div class="barcode-wrap">
-      <img src="${stickerData.barcodeImg}" />
-    </div>
-    <div class="barcode-code">${stickerData.codigo}</div>
-    <div class="row-bottom">
-      <span>Vence: ${stickerData.vence}</span>
-      <span>${stickerData.unidad}</span>
-    </div>
-  </div>
+</style></head>
+<body>
+<div class="sticker">
+  <div class="row-top"><span>SHOWCLINIC</span><span>${stickerData.semana}</span></div>
+  <div class="name">${stickerData.nombre}</div>
+  <div class="sub">${stickerData.marca} &middot; Lote: ${stickerData.lote}</div>
+  <div class="bc"><img src="${stickerData.barcodeImg}" /></div>
+  <div class="code">${stickerData.codigo}</div>
+  <div class="row-bot"><span>Vence: ${stickerData.vence}</span><span>${stickerData.unidad}</span></div>
 </div>
 </body></html>`;
   printWindow.document.write(html);
