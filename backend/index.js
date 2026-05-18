@@ -320,6 +320,17 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
             }
           });
         }
+
+        const tieneProcedimiento = rows.some((col) => col.name === "procedimiento");
+        if (!tieneProcedimiento) {
+          db.run("ALTER TABLE tratamientos ADD COLUMN procedimiento TEXT", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna procedimiento en tratamientos:", alterErr.message);
+            } else {
+              console.log("✅ Columna procedimiento agregada a tratamientos");
+            }
+          });
+        }
       }
     });
 

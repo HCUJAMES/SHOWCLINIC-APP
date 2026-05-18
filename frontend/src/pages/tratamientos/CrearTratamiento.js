@@ -18,6 +18,10 @@ import {
   Autocomplete,
   Chip,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -32,7 +36,7 @@ export default function CrearTratamiento() {
   const { showToast } = useToast();
   const { role, token } = useAuth();
   const [tratamientos, setTratamientos] = useState([]);
-  const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "", precio: "" });
+  const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
   const [editId, setEditId] = useState(null);
   const isDoctor = checkIsDoctor(role);
   const canCreate = canCreateTreatments(role);
@@ -237,7 +241,7 @@ export default function CrearTratamiento() {
 
     if (res.ok) {
       showToast({ severity: "success", message: "Tratamiento actualizado correctamente" });
-      setNuevo({ nombre: "", descripcion: "", precio: "" });
+      setNuevo({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
       setEditId(null);
       cargarTratamientos();
     } else {
@@ -251,12 +255,13 @@ export default function CrearTratamiento() {
       nombre: t.nombre || "",
       descripcion: t.descripcion || "",
       precio: t.precio == null ? "" : String(t.precio),
+      procedimiento: t.procedimiento || "",
     });
   };
 
   const cancelarEdicion = () => {
     setEditId(null);
-    setNuevo({ nombre: "", descripcion: "", precio: "" });
+    setNuevo({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
   };
 
   const crearTratamiento = async () => {
@@ -281,7 +286,7 @@ export default function CrearTratamiento() {
 
     if (res.ok) {
       showToast({ severity: "success", message: "Tratamiento creado correctamente" });
-      setNuevo({ nombre: "", descripcion: "", precio: "" });
+      setNuevo({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
       cargarTratamientos();
     } else {
       showToast({ severity: "error", message: "Error al crear tratamiento" });
@@ -372,6 +377,19 @@ export default function CrearTratamiento() {
                 setNuevo({ ...nuevo, descripcion: e.target.value })
               }
             />
+            <FormControl fullWidth>
+              <InputLabel>Procedimiento</InputLabel>
+              <Select
+                value={nuevo.procedimiento}
+                label="Procedimiento"
+                onChange={(e) => setNuevo({ ...nuevo, procedimiento: e.target.value })}
+              >
+                <MenuItem value=""><em>Sin asignar</em></MenuItem>
+                <MenuItem value="Armonización">Armonización</MenuItem>
+                <MenuItem value="Cosmiatría Facial">Cosmiatría Facial</MenuItem>
+                <MenuItem value="Cosmiatría Corporal">Cosmiatría Corporal</MenuItem>
+              </Select>
+            </FormControl>
             <TextField
               label="Precio del tratamiento (S/)"
               type="number"
@@ -418,6 +436,7 @@ export default function CrearTratamiento() {
           <TableHead>
             <TableRow sx={{ backgroundColor: colorPrincipal }}>
               <TableCell sx={{ color: "white" }}>Nombre</TableCell>
+              <TableCell sx={{ color: "white" }}>Procedimiento</TableCell>
               <TableCell sx={{ color: "white" }}>Descripción</TableCell>
               <TableCell sx={{ color: "white" }} align="right">Precio</TableCell>
               <TableCell sx={{ color: "white" }}>Acciones</TableCell>
@@ -427,6 +446,26 @@ export default function CrearTratamiento() {
             {tratamientos.map((t) => (
               <TableRow key={t.id}>
                 <TableCell>{t.nombre}</TableCell>
+                <TableCell>
+                  {t.procedimiento ? (
+                    <Chip
+                      label={t.procedimiento}
+                      size="small"
+                      sx={{
+                        backgroundColor: t.procedimiento === "Armonización" ? "rgba(163,105,32,0.15)" :
+                          t.procedimiento === "Cosmiatría Facial" ? "rgba(76,175,80,0.15)" :
+                          "rgba(33,150,243,0.15)",
+                        color: t.procedimiento === "Armonización" ? "#a36920" :
+                          t.procedimiento === "Cosmiatría Facial" ? "#2e7d32" :
+                          "#1565c0",
+                        fontWeight: "bold",
+                        fontSize: "0.7rem",
+                      }}
+                    />
+                  ) : (
+                    <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.35)", fontStyle: "italic" }}>—</Typography>
+                  )}
+                </TableCell>
                 <TableCell>{t.descripcion}</TableCell>
                 <TableCell align="right">
                   {t.precio != null && t.precio !== "" ? (
