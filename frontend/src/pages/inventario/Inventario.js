@@ -31,6 +31,7 @@ import {
   Add,
   Visibility,
   Edit,
+  Delete,
   Warning,
   Inventory2,
   Category,
@@ -484,6 +485,24 @@ export default function Inventario() {
     setFormLote({ variante_id: "", lote: "", fecha_vencimiento: "", cantidad_unidades: "", cajas: "", jeringas: "", fecha_ingreso: new Date().toISOString().slice(0, 10) });
     setFormNuevoProducto({ marca: "", nombre: "", laboratorio: "", unidad_base: "UI", contenido_por_presentacion: "" });
     setCodigoPreview({ prefijo: "", correlativo: "", codigo: "" });
+  };
+
+  const eliminarProducto = async (varianteId, nombreProducto) => {
+    if (!window.confirm(`¿Estás seguro de eliminar "${nombreProducto}"? Se eliminarán también todos sus lotes. Esta acción no se puede deshacer.`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/inventario/variantes/${varianteId}`, {
+        method: "DELETE", headers,
+      });
+      if (res.ok) {
+        cargarDatos();
+      } else {
+        const err = await res.json();
+        alert(err.message || "Error al eliminar producto");
+      }
+    } catch (err) {
+      console.error("Error eliminando producto:", err);
+      alert("Error al eliminar producto");
+    }
   };
 
   const handleEditarLote = async () => {
@@ -976,6 +995,9 @@ export default function Inventario() {
                       </IconButton>
                       <IconButton size="small" onClick={() => { setProductoDetalle(p); setVista("detalle"); }} sx={{ color: "#888" }}>
                         <Edit fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => eliminarProducto(p.variante_id, p.variante)} sx={{ color: "#d32f2f" }}>
+                        <Delete fontSize="small" />
                       </IconButton>
                     </Box>
                   </Box>
