@@ -240,6 +240,37 @@ router.get("/next-correlativo", requireBarcodeAccess, async (req, res) => {
   }
 });
 
+// Registrar múltiples códigos con prefijo secuencial (usado al registrar lote desde Inventario)
+router.post("/register-batch", requireBarcodeAccess, async (req, res) => {
+  const { prefix, quantity, lote_id } = req.body;
+  if (!prefix || prefix.length < 2 || !quantity || quantity <= 0) {
+    return res.status(400).json({ message: "Prefijo y cantidad son obligatorios" });
+  }
+  try {
+    const row = await dbGet(
+      `SELECT COALESCE(MAX(CAST(SUBSTR(barcode, LENGTH(?) + 1) AS INTEGER)), 0) AS max_corr
+       FROM barcode_units
+       WHERE barcode LIKE ? || '%'`,
+      [prefix, prefix]
+    );
+    let correlativo = (row?.max_corr || 0) + 1;
+    const codes = [];
+    for (let i = 0; i < quantity; i++) {
+      const codigo = `${prefix}${correlativo.toString().padStart(4, "0")}`;
+      await dbRun(
+        `INSERT INTO barcode_units (lote_id, barcode, unit_type, unit_index, status) VALUES (?, ?, 'caja', ?, 'active')`,
+        [lote_id || null, codigo, correlativo]
+      );
+      codes.push(codigo);
+      correlativo++;
+    }
+    res.json({ codes, prefix, start: correlativo - quantity, end: correlativo - 1 });
+  } catch (err) {
+    console.error("Error registrando batch de códigos:", err.message);
+    res.status(500).json({ message: "Error al registrar códigos" });
+  }
+});
+
 router.post("/scan", requireBarcodeAccess, async (req, res) => {
   const { barcode } = req.body;
 

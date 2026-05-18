@@ -523,7 +523,7 @@ router.get("/stock-lotes/variante/:id", async (req, res) => {
 });
 
 router.post("/stock-lotes", requireInventoryWrite, async (req, res) => {
-  const { variante_id, lote, fecha_vencimiento, ubicacion, cantidad_unidades } = req.body;
+  const { variante_id, lote, fecha_vencimiento, ubicacion, cantidad_unidades, cajas, jeringas } = req.body;
 
   if (!variante_id || cantidad_unidades == null) {
     return res.status(400).json({ message: "variante_id y cantidad_unidades son obligatorios" });
@@ -533,8 +533,8 @@ router.post("/stock-lotes", requireInventoryWrite, async (req, res) => {
     const result = await dbRun(
       `
         INSERT INTO stock_lotes
-        (variante_id, lote, fecha_vencimiento, ubicacion, cantidad_unidades, creado_en)
-        VALUES (?, ?, ?, ?, ?, datetime('now', '-5 hours'))
+        (variante_id, lote, fecha_vencimiento, ubicacion, cantidad_unidades, cajas, jeringas, creado_en)
+        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '-5 hours'))
       `,
       [
         variante_id,
@@ -542,6 +542,8 @@ router.post("/stock-lotes", requireInventoryWrite, async (req, res) => {
         fecha_vencimiento || null,
         ubicacion || null,
         parseFloat(cantidad_unidades),
+        parseFloat(cajas) || 0,
+        parseFloat(jeringas) || 0,
       ]
     );
 

@@ -111,11 +111,23 @@ const construirPrefijoCodigo = (nombreProducto, lote) => {
 const STICKER_W = "50mm";
 const STICKER_H = "25mm";
 
-const imprimirSticker = (stickerData) => {
+const imprimirSticker = (stickerDataOrArray) => {
+  const stickers = Array.isArray(stickerDataOrArray) ? stickerDataOrArray : [stickerDataOrArray];
   const printWindow = window.open("", "_blank");
   if (!printWindow) return;
+
+  const stickerHtmlBlocks = stickers.map((s) => `
+<div class="sticker">
+  <div class="row-top"><span>SHOWCLINIC</span><span>${s.semana}</span></div>
+  <div class="name">${s.nombre}</div>
+  <div class="sub">${s.marca} &middot; Lote: ${s.lote}</div>
+  <div class="bc"><img src="${s.barcodeImg}" /></div>
+  <div class="code">${s.codigo}</div>
+  <div class="row-bot"><span>Vence: ${s.vence}</span><span>${s.unidad}</span></div>
+</div>`).join("\n");
+
   const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Sticker</title>
+<html><head><meta charset="UTF-8"><title>Stickers (${stickers.length})</title>
 <style>
   @page {
     size: 50mm 25mm landscape;
@@ -123,9 +135,7 @@ const imprimirSticker = (stickerData) => {
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    width: 50mm; height: 25mm;
     margin: 0 !important; padding: 0 !important;
-    overflow: hidden;
     font-family: Arial, sans-serif;
     -webkit-print-color-adjust: exact;
   }
@@ -134,7 +144,9 @@ const imprimirSticker = (stickerData) => {
     padding: 1mm 2mm;
     display: flex; flex-direction: column;
     justify-content: space-between;
+    page-break-after: always;
   }
+  .sticker:last-child { page-break-after: auto; }
   .row-top {
     display: flex; justify-content: space-between; align-items: center;
     font-size: 5.5pt; font-weight: 700;
@@ -164,14 +176,7 @@ const imprimirSticker = (stickerData) => {
   }
 </style></head>
 <body>
-<div class="sticker">
-  <div class="row-top"><span>SHOWCLINIC</span><span>${stickerData.semana}</span></div>
-  <div class="name">${stickerData.nombre}</div>
-  <div class="sub">${stickerData.marca} &middot; Lote: ${stickerData.lote}</div>
-  <div class="bc"><img src="${stickerData.barcodeImg}" /></div>
-  <div class="code">${stickerData.codigo}</div>
-  <div class="row-bot"><span>Vence: ${stickerData.vence}</span><span>${stickerData.unidad}</span></div>
-</div>
+${stickerHtmlBlocks}
 </body></html>`;
   printWindow.document.write(html);
   printWindow.document.close();
@@ -377,14 +382,32 @@ export default function Inventario() {
       });
 
       if (resLote.ok) {
-        if (imprimirAlGuardar && codigoPreview.codigo) {
-          const barcodeImg = await generarCodigoBarras(codigoPreview.codigo);
-          const now = new Date();
-          const semana = `${String(now.getFullYear()).slice(-2)}-W${String(Math.ceil(((now - new Date(now.getFullYear(), 0, 1)) / 86400000 + 1) / 7)).padStart(2, "0")}`;
-          imprimirSticker({
-            nombre, marca, lote: formLote.lote || "S/N", codigo: codigoPreview.codigo, barcodeImg, semana,
-            vence: formLote.fecha_vencimiento ? formLote.fecha_vencimiento.replace("-", "/") : "N/A",
-            unidad: `${formLote.cantidad_unidades} ${unidad_base}`,
+        const loteData = await resLote.json();
+        const numCajas = Math.max(1, parseInt(formLote.cajas) || 1);
+        if (imprimirAlGuardar && codigoPreview.prefijo) {
+          const batchRes = await fetch(`${API_BASE}/api/barcodes/register-batch`, {
+            method: "POST", headers,
+            body: JSON.stringify({ prefix: codigoPreview.prefijo, quantity: numCajas, lote_id: loteData.id || null }),
+          });
+          if (batchRes.ok) {
+            const { codes } = await batchRes.json();
+            const now = new Date();
+            const semana = `${String(now.getFullYear()).slice(-2)}-W${String(Math.ceil(((now - new Date(now.getFullYear(), 0, 1)) / 86400000 + 1) / 7)).padStart(2, "0")}`;
+            const stickers = [];
+            for (const codigo of codes) {
+              const barcodeImg = await generarCodigoBarras(codigo);
+              stickers.push({
+                nombre, marca, lote: formLote.lote || "S/N", codigo, barcodeImg, semana,
+                vence: formLote.fecha_vencimiento ? formLote.fecha_vencimiento.replace("-", "/") : "N/A",
+                unidad: `${formLote.cantidad_unidades} ${unidad_base}`,
+              });
+            }
+            imprimirSticker(stickers);
+          }
+        } else if (codigoPreview.prefijo) {
+          await fetch(`${API_BASE}/api/barcodes/register-batch`, {
+            method: "POST", headers,
+            body: JSON.stringify({ prefix: codigoPreview.prefijo, quantity: numCajas, lote_id: loteData.id || null }),
           });
         }
         resetFormularios();
@@ -412,16 +435,37 @@ export default function Inventario() {
         }),
       });
       if (res.ok) {
-        if (imprimirAlGuardar && codigoPreview.codigo) {
+        const loteData = await res.json();
+        const numCajas = Math.max(1, parseInt(formLote.cajas) || 1);
+        if (imprimirAlGuardar && codigoPreview.prefijo) {
           const v = variantes.find(x => String(x.id) === String(formLote.variante_id));
-          const barcodeImg = await generarCodigoBarras(codigoPreview.codigo);
-          const now = new Date();
-          const semana = `${String(now.getFullYear()).slice(-2)}-W${String(Math.ceil(((now - new Date(now.getFullYear(), 0, 1)) / 86400000 + 1) / 7)).padStart(2, "0")}`;
-          imprimirSticker({
-            nombre: v?.nombre || "", marca: v?.producto_base_nombre || "", lote: formLote.lote || "S/N",
-            codigo: codigoPreview.codigo, barcodeImg, semana,
-            vence: formLote.fecha_vencimiento ? formLote.fecha_vencimiento.replace("-", "/") : "N/A",
-            unidad: `${formLote.cantidad_unidades} ${v?.unidad_base || "u"}`,
+          // Register N codes in the DB and get them back
+          const batchRes = await fetch(`${API_BASE}/api/barcodes/register-batch`, {
+            method: "POST", headers,
+            body: JSON.stringify({ prefix: codigoPreview.prefijo, quantity: numCajas, lote_id: loteData.id || null }),
+          });
+          if (batchRes.ok) {
+            const { codes } = await batchRes.json();
+            const now = new Date();
+            const semana = `${String(now.getFullYear()).slice(-2)}-W${String(Math.ceil(((now - new Date(now.getFullYear(), 0, 1)) / 86400000 + 1) / 7)).padStart(2, "0")}`;
+            const stickers = [];
+            for (const codigo of codes) {
+              const barcodeImg = await generarCodigoBarras(codigo);
+              stickers.push({
+                nombre: v?.nombre || "", marca: v?.producto_base_nombre || "", lote: formLote.lote || "S/N",
+                codigo, barcodeImg, semana,
+                vence: formLote.fecha_vencimiento ? formLote.fecha_vencimiento.replace("-", "/") : "N/A",
+                unidad: `${formLote.cantidad_unidades} ${v?.unidad_base || "u"}`,
+              });
+            }
+            imprimirSticker(stickers);
+          }
+        } else if (codigoPreview.prefijo) {
+          // Even without printing, register the codes in the DB
+          const numToRegister = numCajas;
+          await fetch(`${API_BASE}/api/barcodes/register-batch`, {
+            method: "POST", headers,
+            body: JSON.stringify({ prefix: codigoPreview.prefijo, quantity: numToRegister, lote_id: loteData.id || null }),
           });
         }
         resetFormularios();
@@ -641,29 +685,44 @@ export default function Inventario() {
           </Box>
 
           {/* Código de Barras Preview */}
-          {codigoPreview.codigo && (
+          {codigoPreview.codigo && (() => {
+            const numCajas = Math.max(1, parseInt(formLote.cajas) || 1);
+            const startCorr = parseInt(codigoPreview.correlativo) || 1;
+            const endCorr = startCorr + numCajas - 1;
+            const lastCode = `${codigoPreview.prefijo}${String(endCorr).padStart(4, "0")}`;
+            return (
             <Box sx={{ background: "#f0f7ff", border: "1px solid #bbdefb", borderRadius: 2, p: 2, mb: 2 }}>
               <Typography variant="caption" sx={{ color: "#1565c0", fontWeight: 700, textTransform: "uppercase", mb: 1, display: "block" }}>
-                Código de barras generado
+                {numCajas > 1 ? `Códigos de barras (${numCajas} stickers)` : "Código de barras generado"}
               </Typography>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <Box sx={{ flex: 1 }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
                     <Typography variant="body2" sx={{ color: "#666" }}>Prefijo:</Typography>
                     <Chip label={codigoPreview.prefijo} size="small" sx={{ fontWeight: 700, fontFamily: "monospace", background: "#e3f2fd", color: "#1565c0" }} />
                     <Typography variant="body2" sx={{ color: "#666" }}>Nº:</Typography>
-                    <Chip label={codigoPreview.correlativo} size="small" sx={{ fontWeight: 700, fontFamily: "monospace", background: "#e8f5e9", color: "#2e7d32" }} />
+                    <Chip label={numCajas > 1 ? `${codigoPreview.correlativo} → ${String(endCorr).padStart(4, "0")}` : codigoPreview.correlativo} size="small" sx={{ fontWeight: 700, fontFamily: "monospace", background: "#e8f5e9", color: "#2e7d32" }} />
+                    {numCajas > 1 && <Chip label={`${numCajas} cajas`} size="small" sx={{ fontWeight: 600, background: "#fff3e0", color: "#e65100" }} />}
                   </Box>
-                  <Typography variant="h6" sx={{ fontWeight: 800, fontFamily: "monospace", letterSpacing: 2, color: "#2d2d2d" }}>
-                    {codigoPreview.codigo}
-                  </Typography>
+                  {numCajas > 1 ? (
+                    <Box>
+                      <Typography variant="h6" sx={{ fontWeight: 800, fontFamily: "monospace", letterSpacing: 2, color: "#2d2d2d" }}>
+                        {codigoPreview.codigo} ... {lastCode}
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <Typography variant="h6" sx={{ fontWeight: 800, fontFamily: "monospace", letterSpacing: 2, color: "#2d2d2d" }}>
+                      {codigoPreview.codigo}
+                    </Typography>
+                  )}
                   <Typography variant="caption" sx={{ color: "#888" }}>
                     = 2 letras producto ({codigoPreview.prefijo.substring(0, 2)}) + 2 últimos dígitos lote ({codigoPreview.prefijo.substring(2)}) + correlativo ({codigoPreview.correlativo})
                   </Typography>
                 </Box>
               </Box>
             </Box>
-          )}
+            );
+          })()}
 
           {/* Imprimir sticker checkbox */}
           <Card sx={{ border: "1px solid #e8e0d0", boxShadow: "none", borderRadius: 2 }}>
