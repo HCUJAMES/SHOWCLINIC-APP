@@ -229,6 +229,12 @@ export default function Inventario() {
   const [codigosProducto, setCodigosProducto] = useState([]);
   const [loadingCodigos, setLoadingCodigos] = useState(false);
 
+  // Estados para ajuste de stock
+  const [openAjusteStockModal, setOpenAjusteStockModal] = useState(false);
+  const [loteAjustando, setLoteAjustando] = useState(null);
+  const [formAjusteStock, setFormAjusteStock] = useState({ cantidad_a_reducir: "", motivo: "" });
+  const [ajustandoStock, setAjustandoStock] = useState(false);
+
   const obtenerSiguienteCorrelativo = async (nombreProducto, lote) => {
     const prefijo = construirPrefijoCodigo(nombreProducto, lote);
     if (prefijo.length < 2) return;
@@ -510,6 +516,48 @@ export default function Inventario() {
       setCodigosProducto([]);
     } finally {
       setLoadingCodigos(false);
+    }
+  };
+
+  const handleAjustarStock = async () => {
+    if (!loteAjustando || !formAjusteStock.cantidad_a_reducir) {
+      alert("Por favor ingresa la cantidad a reducir");
+      return;
+    }
+
+    const cantidad = parseFloat(formAjusteStock.cantidad_a_reducir);
+    if (isNaN(cantidad) || cantidad <= 0) {
+      alert("La cantidad debe ser un número mayor a 0");
+      return;
+    }
+
+    setAjustandoStock(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/inventario/stock-lotes/${loteAjustando.id}/ajustar`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          cantidad_a_reducir: cantidad,
+          motivo: formAjusteStock.motivo || "Ajuste manual de stock"
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        alert(`✅ ${data.message}`);
+        setOpenAjusteStockModal(false);
+        setFormAjusteStock({ cantidad_a_reducir: "", motivo: "" });
+        setLoteAjustando(null);
+        cargarDatos(); // Recargar datos del inventario
+      } else {
+        const error = await res.json();
+        alert(`❌ ${error.message}`);
+      }
+    } catch (err) {
+      console.error("Error ajustando stock:", err);
+      alert("❌ Error al ajustar stock");
+    } finally {
+      setAjustandoStock(false);
     }
   };
 
@@ -883,10 +931,79 @@ export default function Inventario() {
             cargarCodigosProducto(varianteId);
             setOpenCodigosModal(true);
           }}
+          onAjustarStock={(lote) => {
+            setLoteAjustando(lote);
+            setFormAjusteStock({ cantidad_a_reducir: "", motivo: "" });
+            setOpenAjusteStockModal(true);
+          }}
           formatVencimiento={formatVencimiento}
           formatStock={formatStock}
         />
         {renderModals()}
+        
+        {/* Modal de ajuste de stock */}
+        <Dialog
+          open={openAjusteStockModal}
+          onClose={() => setOpenAjusteStockModal(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 4,
+              background: "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.95) 100%)",
+            },
+          }}
+        >
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: 800, display: "flex", alignItems: "center", gap: 1 }}>
+            <Inventory2 />
+            Reducir Stock - {loteAjustando?.lote || "S/N"}
+          </DialogTitle>
+          <DialogContent dividers>
+            <Typography variant="body2" sx={{ color: "#666", mb: 2 }}>
+              Producto: {productoDetalle?.marca} - {productoDetalle?.variante}
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#666", mb: 3 }}>
+              Stock actual: <strong>{loteAjustando?.disponible || 0} {productoDetalle?.unidad_base || "u"}</strong>
+            </Typography>
+
+            <TextField
+              label="Cantidad a reducir"
+              type="number"
+              fullWidth
+              value={formAjusteStock.cantidad_a_reducir}
+              onChange={(e) => setFormAjusteStock({ ...formAjusteStock, cantidad_a_reducir: e.target.value })}
+              inputProps={{ min: 0.01, step: 0.01 }}
+              helperText="Ingresa la cantidad que deseas reducir del stock"
+              sx={{ mb: 2 }}
+            />
+
+            <TextField
+              label="Motivo del ajuste (opcional)"
+              fullWidth
+              multiline
+              rows={2}
+              value={formAjusteStock.motivo}
+              onChange={(e) => setFormAjusteStock({ ...formAjusteStock, motivo: e.target.value })}
+              placeholder="Ej: Producto dañado, caducado, error de registro, etc."
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+            <Button
+              onClick={() => setOpenAjusteStockModal(false)}
+              sx={{ color: "#666" }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleAjustarStock}
+              disabled={ajustandoStock || !formAjusteStock.cantidad_a_reducir}
+              variant="contained"
+              sx={{ background: colorPrincipal, "&:hover": { background: "#8a5a1a" } }}
+            >
+              {ajustandoStock ? "Reduciendo..." : "Reducir Stock"}
+            </Button>
+          </DialogActions>
+        </Dialog>
         
         {/* Modal de códigos de barras */}
         <Dialog
@@ -1152,7 +1269,7 @@ export default function Inventario() {
 }
 
 /* ===== DETALLE PRODUCTO ===== */
-function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoLote, onEditarLote, onImprimirSticker, onVerCodigos, formatVencimiento, formatStock }) {
+function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoLote, onEditarLote, onImprimirSticker, onVerCodigos, onAjustarStock, formatVencimiento, formatStock }) {
   const [tabLotes, setTabLotes] = useState("activos");
 
   const lotesActivos = lotesDelProducto.filter(l => l.disponible > 0);
@@ -1269,7 +1386,7 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
                       },
                     }} />
 
-                    <Box sx={{ display: "flex", gap: 1 }}>
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       <Button size="small" variant="outlined" onClick={() => onImprimirSticker(lote)}
                         sx={{ borderColor: "#ddd", color: "#555", borderRadius: 2, textTransform: "none", fontSize: 12, "&:hover": { borderColor: colorPrincipal, color: colorPrincipal } }}>
                         🏷️ Imprimir stickers
@@ -1277,6 +1394,10 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
                       <Button size="small" variant="outlined" onClick={() => onEditarLote(lote)}
                         sx={{ borderColor: "#ddd", color: "#555", borderRadius: 2, textTransform: "none", fontSize: 12, "&:hover": { borderColor: colorPrincipal, color: colorPrincipal } }}>
                         ✏️ Ajustar
+                      </Button>
+                      <Button size="small" variant="outlined" onClick={() => onAjustarStock(lote)}
+                        sx={{ borderColor: "#ddd", color: "#555", borderRadius: 2, textTransform: "none", fontSize: 12, "&:hover": { borderColor: colorPrincipal, color: colorPrincipal } }}>
+                        📉 Reducir stock
                       </Button>
                     </Box>
                   </CardContent>

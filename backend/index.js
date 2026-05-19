@@ -1213,6 +1213,24 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_barcode_units_barcode ON barcode_units(barcode)");
     console.log("✅ Tabla barcode_units creada");
 
+    // 📉 Tabla para registrar ajustes de stock
+    db.run(`
+      CREATE TABLE IF NOT EXISTS stock_ajustes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        lote_id INTEGER NOT NULL,
+        cantidad_anterior REAL NOT NULL,
+        cantidad_nueva REAL NOT NULL,
+        cantidad_reducida REAL NOT NULL,
+        motivo TEXT,
+        usuario_id INTEGER,
+        fecha TEXT DEFAULT (datetime('now', '-5 hours')),
+        FOREIGN KEY(lote_id) REFERENCES stock_lotes(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_stock_ajustes_lote ON stock_ajustes(lote_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_stock_ajustes_fecha ON stock_ajustes(fecha)");
+    console.log("✅ Tabla stock_ajustes creada");
+
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
 

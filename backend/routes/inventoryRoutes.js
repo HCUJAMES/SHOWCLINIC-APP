@@ -878,5 +878,70 @@ router.post("/consumir", requireInventoryWrite, async (req, res) => {
   }
 });
 
+/* ==============================================
+   📉 AJUSTAR STOCK (REDUCIR CANTIDAD)
+   - Permite reducir stock de un lote sin eliminarlo
+============================================== */
+router.put("/stock-lotes/:id/ajustar", requireInventoryWrite, async (req, res) => {
+  const { id } = req.params;
+  const { cantidad_a_reducir, motivo } = req.body;
+
+  const cantidadReducir = parseFloat(cantidad_a_reducir);
+  if (isNaN(cantidadReducir) || cantidadReducir <= 0) {
+    return res.status(400).json({ message: "La cantidad a reducir debe ser un número mayor a 0" });
+  }
+
+  try {
+    // Obtener el lote actual
+    const loteActual = await db.get(
+      `SELECT cantidad_unidades, cantidad_reservada_unidades FROM stock_lotes WHERE id = ?`,
+      [id]
+    );
+
+    if (!loteActual) {
+      return res.status(404).json({ message: "Lote no encontrado" });
+    }
+
+    const cantidadActual = parseFloat(loteActual.cantidad_unidades) || 0;
+    const cantidadReservada = parseFloat(loteActual.cantidad_reservada_unidades) || 0;
+    const disponible = cantidadActual - cantidadReservada;
+
+    if (cantidadReducir > disponible) {
+      return res.status(400).json({ 
+        message: `No se puede reducir ${cantidadReducir} unidades. Stock disponible: ${disponible} unidades` 
+      });
+    }
+
+    const nuevaCantidad = cantidadActual - cantidadReducir;
+
+    // Actualizar el lote
+    await dbRun(
+      `UPDATE stock_lotes 
+       SET cantidad_unidades = ?, 
+           actualizado_en = datetime('now', '-5 hours')
+       WHERE id = ?`,
+      [nuevaCantidad, id]
+    );
+
+    // Registrar el ajuste en un log (opcional, pero recomendado)
+    await dbRun(
+      `INSERT INTO stock_ajustes (lote_id, cantidad_anterior, cantidad_nueva, cantidad_reducida, motivo, usuario_id, fecha)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now', '-5 hours'))`,
+      [id, cantidadActual, nuevaCantidad, cantidadReducir, motivo || "Ajuste manual", req.user?.id || null]
+    );
+
+    res.json({
+      message: "✅ Stock ajustado correctamente",
+      cantidad_anterior: cantidadActual,
+      cantidad_nueva: nuevaCantidad,
+      cantidad_reducida: cantidadReducir
+    });
+
+  } catch (err) {
+    console.error("❌ Error ajustando stock:", err.message);
+    res.status(500).json({ message: "Error al ajustar stock" });
+  }
+});
+
 export default router;
 
