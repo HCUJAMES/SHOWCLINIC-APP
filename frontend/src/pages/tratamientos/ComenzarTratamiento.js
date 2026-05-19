@@ -65,6 +65,8 @@ const ComenzarTratamiento = () => {
       marca: "",
       cantidad: 1,
       dosis_unidades: "",
+      codigo_ingresado: "",
+      codigo_validado: false,
     },
   ]);
 
@@ -175,6 +177,8 @@ const ComenzarTratamiento = () => {
                   marca: "",
                   cantidad: 1,
                   dosis_unidades: "",
+                  codigo_ingresado: "",
+                  codigo_validado: false,
                 };
               });
               
@@ -218,7 +222,8 @@ const ComenzarTratamiento = () => {
                     cantidad: 1,
                     dosis_unidades: "",
                     sesion_paquete_id: sesion.id,
-                    barcode_escaneado: "",
+                    codigo_ingresado: "",
+                    codigo_validado: false,
                   };
                 });
                 
@@ -273,7 +278,8 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
-        barcode_escaneado: "",
+        codigo_ingresado: "",
+        codigo_validado: false,
       },
     ]);
   };
@@ -367,6 +373,8 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
+        codigo_ingresado: "",
+        codigo_validado: false,
       };
     });
 
@@ -415,6 +423,8 @@ const ComenzarTratamiento = () => {
         cantidad: 1,
         dosis_unidades: "",
         sesion_paquete_id: sesion.id, // Guardar referencia a la sesión del paquete
+        codigo_ingresado: "",
+        codigo_validado: false,
       };
     });
 
@@ -439,6 +449,8 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
+        codigo_ingresado: "",
+        codigo_validado: false,
       },
     ]);
     setPresupuestoAplicado(false);
@@ -446,71 +458,51 @@ const ComenzarTratamiento = () => {
     showToast({ severity: "info", message: "Presupuesto cancelado" });
   };
 
-  // Escanear código de barras y autoseleccionar producto
-  const escanearCodigo = async (index, codigo) => {
-    if (!codigo || codigo.trim().length < 4) return;
-    try {
-      const res = await axios.post(
-        `${API_BASE_URL}/api/barcodes/scan`,
-        { barcode: codigo.trim() },
-        { headers: authHeaders }
-      );
-      const { barcode_info, message } = res.data;
-      if (barcode_info && barcode_info.variante_id) {
-        // Verificar que el código esté activo
-        if (barcode_info.status !== "active") {
-          showToast({ 
-            severity: "warning", 
-            message: `⚠️ Este código ya fue utilizado (${barcode_info.status}). Usa un código activo.` 
-          });
-          // Limpiar el código no válido
-          const nuevosBloques = [...bloques];
-          nuevosBloques[index] = {
-            ...nuevosBloques[index],
-            barcode_escaneado: "",
-            barcode_validado: false,
-          };
-          setBloques(nuevosBloques);
-          return;
-        }
-        
-        // Auto-seleccionar el producto en el bloque
-        const nuevosBloques = [...bloques];
-        nuevosBloques[index] = {
-          ...nuevosBloques[index],
-          variante_id: barcode_info.variante_id,
-          producto: `${barcode_info.marca || ""} - ${barcode_info.variante_nombre || ""}`.trim(),
-          marca: barcode_info.marca || "",
-          barcode_escaneado: codigo.trim(),
-          barcode_validado: true, // Marcar como validado
-        };
-        setBloques(nuevosBloques);
-        showToast({
-          severity: "success",
-          message: `✅ Producto identificado: ${barcode_info.marca} - ${barcode_info.variante_nombre}`,
-        });
-      } else {
-        showToast({ severity: "error", message: "Código no asociado a ningún producto" });
-        // Limpiar
-        const nuevosBloques = [...bloques];
-        nuevosBloques[index] = {
-          ...nuevosBloques[index],
-          barcode_escaneado: "",
-          barcode_validado: false,
-        };
-        setBloques(nuevosBloques);
-      }
-    } catch (err) {
-      const msg = err?.response?.data?.message || "Código no encontrado en inventario";
-      showToast({ severity: "error", message: msg });
-      // Limpiar el código inválido
+  // Validar código de producto contra el SKU del inventario
+  const validarCodigoProducto = (index, codigo) => {
+    const bloque = bloques[index];
+    if (!bloque.variante_id) {
+      showToast({ severity: "warning", message: "Primero selecciona un producto" });
+      return;
+    }
+    if (!codigo || codigo.trim() === "") {
       const nuevosBloques = [...bloques];
-      nuevosBloques[index] = {
-        ...nuevosBloques[index],
-        barcode_escaneado: "",
-        barcode_validado: false,
-      };
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
       setBloques(nuevosBloques);
+      return;
+    }
+
+    // Buscar la variante seleccionada y comparar el SKU
+    const variante = variantesInv.find((v) => String(v.id) === String(bloque.variante_id));
+    if (!variante) {
+      showToast({ severity: "error", message: "Producto no encontrado en inventario" });
+      const nuevosBloques = [...bloques];
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+      setBloques(nuevosBloques);
+      return;
+    }
+
+    const skuInventario = String(variante.sku || "").trim();
+    const codigoIngresado = String(codigo).trim();
+
+    if (!skuInventario) {
+      showToast({ severity: "error", message: "Este producto no tiene un código (SKU) registrado en inventario. Registra el código primero." });
+      const nuevosBloques = [...bloques];
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+      setBloques(nuevosBloques);
+      return;
+    }
+
+    if (codigoIngresado === skuInventario) {
+      const nuevosBloques = [...bloques];
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: true };
+      setBloques(nuevosBloques);
+      showToast({ severity: "success", message: `Código validado correctamente` });
+    } else {
+      const nuevosBloques = [...bloques];
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+      setBloques(nuevosBloques);
+      showToast({ severity: "error", message: `Código incorrecto. No coincide con el SKU del producto en inventario.` });
     }
   };
 
@@ -528,15 +520,25 @@ const ComenzarTratamiento = () => {
       return;
     }
 
-    // Validar que si se ingresó un código de barras, este haya sido validado
+    // Validar que el código de producto sea correcto para cada bloque con producto seleccionado
     for (let i = 0; i < bloquesValidos.length; i++) {
       const bloque = bloquesValidos[i];
-      if (bloque.barcode_escaneado && bloque.barcode_escaneado.trim() !== "" && !bloque.barcode_validado) {
-        showToast({ 
-          severity: "error", 
-          message: `⚠️ El código "${bloque.barcode_escaneado}" del tratamiento #${i + 1} no ha sido validado. Presiona "Buscar" para verificarlo.` 
-        });
-        return;
+      if (bloque.variante_id) {
+        // Si tiene producto seleccionado, DEBE tener código validado
+        if (!bloque.codigo_ingresado || bloque.codigo_ingresado.trim() === "") {
+          showToast({ 
+            severity: "error", 
+            message: `Debes ingresar el código del producto en el tratamiento #${i + 1}` 
+          });
+          return;
+        }
+        if (!bloque.codigo_validado) {
+          showToast({ 
+            severity: "error", 
+            message: `El código del producto en el tratamiento #${i + 1} no es válido. Debe coincidir con el SKU del inventario.` 
+          });
+          return;
+        }
       }
     }
 
@@ -583,6 +585,8 @@ const ComenzarTratamiento = () => {
           marca: "",
           cantidad: 1,
           dosis_unidades: "",
+          codigo_ingresado: "",
+          codigo_validado: false,
         },
       ]);
       setPresupuestoAplicado(false);
@@ -911,14 +915,17 @@ const ComenzarTratamiento = () => {
                                   }}
                                   isOptionEqualToValue={(opt, val) => String(opt.id) === String(val.id)}
                                   onChange={(_, val) => {
-                                    actualizarBloque(index, "variante_id", val ? val.id : "");
-                                    actualizarBloque(
-                                      index,
-                                      "producto",
-                                      val
+                                    const nuevosBloques = [...bloques];
+                                    nuevosBloques[index] = {
+                                      ...nuevosBloques[index],
+                                      variante_id: val ? val.id : "",
+                                      producto: val
                                         ? `${val.producto_base_nombre || ""} - ${val.nombre || ""}`.trim()
-                                        : ""
-                                    );
+                                        : "",
+                                      codigo_ingresado: "",
+                                      codigo_validado: false,
+                                    };
+                                    setBloques(nuevosBloques);
                                   }}
                                   renderInput={(params) => (
                                     <TextField
@@ -944,63 +951,65 @@ const ComenzarTratamiento = () => {
                             })()}
                           </Grid>
 
-                          {/* Campo para escanear código de barras */}
+                          {/* Campo para ingresar código del producto (SKU) */}
+                          {b.variante_id && (
                           <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 200 }}>
                             <TextField
-                              label="Escanear código de barras"
-                              placeholder="Escanea o escribe el código"
+                              label="Código del producto"
+                              placeholder="Ingresa el código del producto"
                               fullWidth
-                              value={b.barcode_escaneado || ""}
+                              value={b.codigo_ingresado || ""}
                               onChange={(e) => {
                                 const nuevosBloques = [...bloques];
                                 nuevosBloques[index] = { 
                                   ...nuevosBloques[index], 
-                                  barcode_escaneado: e.target.value,
-                                  barcode_validado: false, // Invalidar al cambiar texto
+                                  codigo_ingresado: e.target.value,
+                                  codigo_validado: false,
                                 };
                                 setBloques(nuevosBloques);
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.preventDefault();
-                                  escanearCodigo(index, e.target.value);
+                                  validarCodigoProducto(index, e.target.value);
                                 }
                               }}
                               InputProps={{
                                 startAdornment: (
                                   <InputAdornment position="start">
-                                    <QrCodeScanner sx={{ color: b.barcode_validado ? "#2e7d32" : "#a36920" }} />
+                                    <QrCodeScanner sx={{ color: b.codigo_validado ? "#2e7d32" : "#a36920" }} />
                                   </InputAdornment>
                                 ),
-                                endAdornment: b.barcode_escaneado ? (
+                                endAdornment: b.codigo_ingresado ? (
                                   <InputAdornment position="end">
                                     <Button
                                       size="small"
-                                      onClick={() => escanearCodigo(index, b.barcode_escaneado)}
-                                      sx={{ color: "#a36920", fontWeight: 700, minWidth: "auto" }}
+                                      onClick={() => validarCodigoProducto(index, b.codigo_ingresado)}
+                                      sx={{ color: b.codigo_validado ? "#2e7d32" : "#a36920", fontWeight: 700, minWidth: "auto" }}
                                     >
-                                      Buscar
+                                      {b.codigo_validado ? "Validado" : "Validar"}
                                     </Button>
                                   </InputAdornment>
                                 ) : null,
                               }}
                               helperText={
-                                b.barcode_validado 
-                                  ? "✅ Código validado - listo para guardar" 
-                                  : b.barcode_escaneado 
-                                    ? "⚠️ Presiona Buscar para validar el código" 
-                                    : "Escanea o escribe el código y presiona Buscar"
+                                b.codigo_validado 
+                                  ? "Código correcto - coincide con inventario" 
+                                  : b.codigo_ingresado 
+                                    ? "Presiona Validar o Enter para verificar el código" 
+                                    : "Obligatorio: ingresa el código SKU del producto"
                               }
                               sx={{
                                 "& .MuiInputBase-root": {
                                   backgroundColor: "rgba(255,255,255,0.95)",
                                   borderRadius: 3,
                                   minHeight: "56px",
-                                  border: b.barcode_validado ? "2px solid #2e7d32" : b.barcode_escaneado && !b.barcode_validado ? "2px solid #f57c00" : "none",
+                                  border: b.codigo_validado ? "2px solid #2e7d32" : b.codigo_ingresado && !b.codigo_validado ? "2px solid #f57c00" : "none",
                                 },
                               }}
                             />
                           </Grid>
+                          )}
 
                           {/* Solo mostrar cantidad si se seleccionó un producto */}
                           {b.variante_id && (

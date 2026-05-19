@@ -708,53 +708,68 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         }
       }
 
-      // Validación de código de barras (temporalmente desactivada para evitar errores)
-      // TODO: Implementar validación cuando la tabla barcode_units esté completamente funcional
-      if (b.barcode_escaneado && b.barcode_escaneado.trim() !== "") {
-        console.log("📦 Código escaneado detectado:", b.barcode_escaneado);
-        // Por ahora, solo registramos que se escaneó un código pero no validamos
-        // para evitar el error 500
-      }
-
-      // Consumir por producto seleccionado (variante_id) SOLO si no se usó receta.
-      // Esto evita descuento doble cuando hay receta Y variante seleccionada.
+      // Validación de código de producto (SKU) contra inventario
       const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
       const cantidadElegida =
         parseNum(b.dosis_unidades) > 0
           ? parseNum(b.dosis_unidades)
           : parseNum(b.cantidad) || 0;
 
-      if (!usoReceta && varianteIdElegida && cantidadElegida > 0) {
-        const movimiento = await dbRun(
-          `
-            INSERT INTO movimientos_inventario
-            (tipo, motivo, referencia_tipo, referencia_id, usuario)
-            VALUES ('salida', 'tratamiento', 'tratamientos_realizados', ?, ?)
-          `,
-          [tratamientoRealizadoId, especialista || "No especificado"]
-        );
-
-        const result = await consumirStockFEFO({
-          dbAll,
-          dbRun,
-          movimientoId: movimiento.lastID,
-          varianteId: varianteIdElegida,
-          cantidad: cantidadElegida,
-          stockLoteId: null,
-        });
-
-        if (!result.ok) {
-          return res.status(result.status).json({ message: result.message });
+      if (varianteIdElegida) {
+        // Si se seleccionó un producto, DEBE tener código válido
+        const codigoIngresado = (b.codigo_ingresado || "").trim();
+        if (!codigoIngresado) {
+          return res.status(400).json({ 
+            message: `Debes ingresar el código del producto para validar el inventario.` 
+          });
         }
 
-        // Marcar código de barras como usado si se escaneó uno
-        if (b.barcode_escaneado) {
-          await dbRun(
-            `UPDATE barcode_units 
-             SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?
-             WHERE barcode = ?`,
-            [tratamientoRealizadoId, b.barcode_escaneado]
+        // Verificar que el código coincida con el SKU de la variante en inventario
+        const varianteRow = await dbGet(
+          `SELECT sku FROM variantes WHERE id = ?`,
+          [varianteIdElegida]
+        );
+
+        if (!varianteRow) {
+          return res.status(400).json({ message: `Producto no encontrado en inventario.` });
+        }
+
+        const skuInventario = (varianteRow.sku || "").trim();
+        if (!skuInventario) {
+          return res.status(400).json({ 
+            message: `Este producto no tiene un código (SKU) registrado en inventario.` 
+          });
+        }
+
+        if (codigoIngresado !== skuInventario) {
+          return res.status(400).json({ 
+            message: `Código incorrecto. No coincide con el SKU del producto en inventario.` 
+          });
+        }
+
+        // Código validado - proceder con descuento de stock
+        if (!usoReceta && cantidadElegida > 0) {
+          const movimiento = await dbRun(
+            `
+              INSERT INTO movimientos_inventario
+              (tipo, motivo, referencia_tipo, referencia_id, usuario)
+              VALUES ('salida', 'tratamiento', 'tratamientos_realizados', ?, ?)
+            `,
+            [tratamientoRealizadoId, especialista || "No especificado"]
           );
+
+          const result = await consumirStockFEFO({
+            dbAll,
+            dbRun,
+            movimientoId: movimiento.lastID,
+            varianteId: varianteIdElegida,
+            cantidad: cantidadElegida,
+            stockLoteId: null,
+          });
+
+          if (!result.ok) {
+            return res.status(result.status).json({ message: result.message });
+          }
         }
       } else if (!usoReceta && !varianteIdElegida) {
         // Compatibilidad con inventario clásico solo si no hay receta y no se eligió variante.
