@@ -723,9 +723,10 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           return res.status(400).json({ message: `El código de barras ${b.barcode_escaneado} ya fue utilizado anteriormente` });
         }
         
-        // Verificar que el código corresponda al variante_id seleccionado
-        if (b.variante_id && String(barcodeCheck.variante_id) !== String(b.variante_id)) {
-          return res.status(400).json({ message: `El código de barras no corresponde al producto seleccionado` });
+        // Si se escaneó código, usar el variante_id del código (ignorar el seleccionado manualmente)
+        // Esto asegura que siempre usemos el producto correcto del código escaneado
+        if (barcodeCheck.variante_id) {
+          b.variante_id = barcodeCheck.variante_id;
         }
       }
 
