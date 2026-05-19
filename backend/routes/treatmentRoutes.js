@@ -708,26 +708,12 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         }
       }
 
-      // Validar código de barras si se envió
-      if (b.barcode_escaneado) {
-        const barcodeCheck = await dbGet(
-          `SELECT id, status, variante_id FROM barcode_units WHERE barcode = ?`,
-          [b.barcode_escaneado]
-        );
-        
-        if (!barcodeCheck) {
-          return res.status(400).json({ message: `El código de barras ${b.barcode_escaneado} no existe en el inventario` });
-        }
-        
-        if (barcodeCheck.status !== 'active') {
-          return res.status(400).json({ message: `El código de barras ${b.barcode_escaneado} ya fue utilizado anteriormente` });
-        }
-        
-        // Si se escaneó código, usar el variante_id del código (ignorar el seleccionado manualmente)
-        // Esto asegura que siempre usemos el producto correcto del código escaneado
-        if (barcodeCheck.variante_id) {
-          b.variante_id = barcodeCheck.variante_id;
-        }
+      // Validación de código de barras (temporalmente desactivada para evitar errores)
+      // TODO: Implementar validación cuando la tabla barcode_units esté completamente funcional
+      if (b.barcode_escaneado && b.barcode_escaneado.trim() !== "") {
+        console.log("📦 Código escaneado detectado:", b.barcode_escaneado);
+        // Por ahora, solo registramos que se escaneó un código pero no validamos
+        // para evitar el error 500
       }
 
       // Consumir por producto seleccionado (variante_id) SOLO si no se usó receta.

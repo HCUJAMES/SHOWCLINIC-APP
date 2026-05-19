@@ -218,6 +218,7 @@ const ComenzarTratamiento = () => {
                     cantidad: 1,
                     dosis_unidades: "",
                     sesion_paquete_id: sesion.id,
+                    barcode_escaneado: "",
                   };
                 });
                 
@@ -272,6 +273,7 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
+        barcode_escaneado: "",
       },
     ]);
   };
