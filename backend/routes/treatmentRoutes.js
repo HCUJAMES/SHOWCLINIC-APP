@@ -708,7 +708,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         }
       }
 
-      // Validación de código de producto (SKU) contra inventario
+      // Validación de código de producto contra códigos de barras en inventario
       const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
       const cantidadElegida =
         parseNum(b.dosis_unidades) > 0
@@ -724,26 +724,21 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           });
         }
 
-        // Verificar que el código coincida con el SKU de la variante en inventario
-        const varianteRow = await dbGet(
-          `SELECT sku FROM variantes WHERE id = ?`,
-          [varianteIdElegida]
+        // Verificar que el código ingresado coincida con algún código de barras activo de esta variante
+        const codigoValido = await dbGet(
+          `SELECT bu.id, bu.barcode, bu.lote_id
+           FROM barcode_units bu
+           LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+           WHERE sl.variante_id = ?
+             AND bu.barcode = ?
+             AND bu.status = 'active'
+           LIMIT 1`,
+          [varianteIdElegida, codigoIngresado]
         );
 
-        if (!varianteRow) {
-          return res.status(400).json({ message: `Producto no encontrado en inventario.` });
-        }
-
-        const skuInventario = (varianteRow.sku || "").trim();
-        if (!skuInventario) {
+        if (!codigoValido) {
           return res.status(400).json({ 
-            message: `Este producto no tiene un código (SKU) registrado en inventario.` 
-          });
-        }
-
-        if (codigoIngresado !== skuInventario) {
-          return res.status(400).json({ 
-            message: `Código incorrecto. No coincide con el SKU del producto en inventario.` 
+            message: `Código incorrecto. No coincide con ningún código activo de este producto en inventario.` 
           });
         }
 
@@ -771,6 +766,14 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
             return res.status(result.status).json({ message: result.message });
           }
         }
+
+        // Marcar el código de barras como usado
+        await dbRun(
+          `UPDATE barcode_units 
+           SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?
+           WHERE id = ?`,
+          [tratamientoRealizadoId, codigoValido.id]
+        );
       } else if (!usoReceta && !varianteIdElegida) {
         // Compatibilidad con inventario clásico solo si no hay receta y no se eligió variante.
         await dbRun(

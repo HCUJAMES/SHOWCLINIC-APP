@@ -458,8 +458,8 @@ const ComenzarTratamiento = () => {
     showToast({ severity: "info", message: "Presupuesto cancelado" });
   };
 
-  // Validar código de producto contra el SKU del inventario
-  const validarCodigoProducto = (index, codigo) => {
+  // Validar código de producto contra los códigos de barras registrados en inventario
+  const validarCodigoProducto = async (index, codigo) => {
     const bloque = bloques[index];
     if (!bloque.variante_id) {
       showToast({ severity: "warning", message: "Primero selecciona un producto" });
@@ -472,37 +472,45 @@ const ComenzarTratamiento = () => {
       return;
     }
 
-    // Buscar la variante seleccionada y comparar el SKU
-    const variante = variantesInv.find((v) => String(v.id) === String(bloque.variante_id));
-    if (!variante) {
-      showToast({ severity: "error", message: "Producto no encontrado en inventario" });
-      const nuevosBloques = [...bloques];
-      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
-      setBloques(nuevosBloques);
-      return;
-    }
-
-    const skuInventario = String(variante.sku || "").trim();
     const codigoIngresado = String(codigo).trim();
 
-    if (!skuInventario) {
-      showToast({ severity: "error", message: "Este producto no tiene un código (SKU) registrado en inventario. Registra el código primero." });
-      const nuevosBloques = [...bloques];
-      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
-      setBloques(nuevosBloques);
-      return;
-    }
+    try {
+      // Consultar los códigos de barras registrados para esta variante
+      const res = await axios.get(
+        `${API_BASE_URL}/api/barcodes/variant/${bloque.variante_id}/codes`,
+        { headers: authHeaders }
+      );
+      const data = res.data;
+      const codigosActivos = (data.codes || []).filter(c => c.status === "active");
 
-    if (codigoIngresado === skuInventario) {
-      const nuevosBloques = [...bloques];
-      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: true };
-      setBloques(nuevosBloques);
-      showToast({ severity: "success", message: `Código validado correctamente` });
-    } else {
+      if (codigosActivos.length === 0) {
+        showToast({ severity: "error", message: "Este producto no tiene códigos de barras activos registrados en inventario." });
+        const nuevosBloques = [...bloques];
+        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+        setBloques(nuevosBloques);
+        return;
+      }
+
+      // Verificar si el código ingresado coincide con alguno de los códigos activos
+      const coincide = codigosActivos.find(c => c.barcode === codigoIngresado);
+
+      if (coincide) {
+        const nuevosBloques = [...bloques];
+        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: true };
+        setBloques(nuevosBloques);
+        showToast({ severity: "success", message: `Código validado correctamente` });
+      } else {
+        const nuevosBloques = [...bloques];
+        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+        setBloques(nuevosBloques);
+        showToast({ severity: "error", message: `Código incorrecto. No coincide con ningún código activo de este producto.` });
+      }
+    } catch (err) {
+      console.error("Error validando código:", err);
+      showToast({ severity: "error", message: "Error al validar el código del producto" });
       const nuevosBloques = [...bloques];
       nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
       setBloques(nuevosBloques);
-      showToast({ severity: "error", message: `Código incorrecto. No coincide con el SKU del producto en inventario.` });
     }
   };
 
