@@ -708,6 +708,27 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         }
       }
 
+      // Validar código de barras si se envió
+      if (b.barcode_escaneado) {
+        const barcodeCheck = await dbGet(
+          `SELECT id, status, variante_id FROM barcode_units WHERE barcode = ?`,
+          [b.barcode_escaneado]
+        );
+        
+        if (!barcodeCheck) {
+          return res.status(400).json({ message: `El código de barras ${b.barcode_escaneado} no existe en el inventario` });
+        }
+        
+        if (barcodeCheck.status !== 'active') {
+          return res.status(400).json({ message: `El código de barras ${b.barcode_escaneado} ya fue utilizado anteriormente` });
+        }
+        
+        // Verificar que el código corresponda al variante_id seleccionado
+        if (b.variante_id && String(barcodeCheck.variante_id) !== String(b.variante_id)) {
+          return res.status(400).json({ message: `El código de barras no corresponde al producto seleccionado` });
+        }
+      }
+
       // Consumir por producto seleccionado (variante_id) SOLO si no se usó receta.
       // Esto evita descuento doble cuando hay receta Y variante seleccionada.
       const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
@@ -737,6 +758,16 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
 
         if (!result.ok) {
           return res.status(result.status).json({ message: result.message });
+        }
+
+        // Marcar código de barras como usado si se escaneó uno
+        if (b.barcode_escaneado) {
+          await dbRun(
+            `UPDATE barcode_units 
+             SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?
+             WHERE barcode = ?`,
+            [tratamientoRealizadoId, b.barcode_escaneado]
+          );
         }
       } else if (!usoReceta && !varianteIdElegida) {
         // Compatibilidad con inventario clásico solo si no hay receta y no se eligió variante.
