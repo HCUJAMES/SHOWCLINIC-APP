@@ -1229,23 +1229,33 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
-    // Migración: inicializar unidades para códigos existentes que tienen 0
+    // Migración: inicializar unidades para códigos activos
+    // Cada código activo recibe: cantidad_unidades del lote / total códigos del lote
     db.run(`
       UPDATE barcode_units SET 
         unidades_totales = (
-          SELECT COALESCE(v.contenido_por_presentacion, 0) 
+          SELECT CASE 
+            WHEN (SELECT COUNT(*) FROM barcode_units b2 WHERE b2.lote_id = barcode_units.lote_id) > 0
+            THEN COALESCE(sl.cantidad_unidades, 0) / (SELECT COUNT(*) FROM barcode_units b2 WHERE b2.lote_id = barcode_units.lote_id)
+            ELSE COALESCE(v.contenido_por_presentacion, 0)
+          END
           FROM stock_lotes sl 
           LEFT JOIN variantes v ON v.id = sl.variante_id 
           WHERE sl.id = barcode_units.lote_id
         ),
         unidades_restantes = (
-          SELECT COALESCE(v.contenido_por_presentacion, 0) 
+          SELECT CASE 
+            WHEN (SELECT COUNT(*) FROM barcode_units b2 WHERE b2.lote_id = barcode_units.lote_id) > 0
+            THEN COALESCE(sl.cantidad_unidades, 0) / (SELECT COUNT(*) FROM barcode_units b2 WHERE b2.lote_id = barcode_units.lote_id)
+            ELSE COALESCE(v.contenido_por_presentacion, 0)
+          END
           FROM stock_lotes sl 
           LEFT JOIN variantes v ON v.id = sl.variante_id 
           WHERE sl.id = barcode_units.lote_id
         )
-      WHERE (unidades_totales IS NULL OR unidades_totales = 0)
-        AND status = 'active'
+      WHERE status = 'active'
+        AND (unidades_totales IS NULL OR unidades_totales = 0 
+             OR unidades_restantes = unidades_totales)
     `, (err) => {
       if (err) {
         console.log("Error inicializando unidades de barcode_units:", err.message);

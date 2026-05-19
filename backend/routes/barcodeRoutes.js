@@ -123,8 +123,16 @@ router.post("/lotes/:loteId/generate", requireBarcodeAccess, async (req, res) =>
     }
 
     const tipo = inferirTipoProducto(lote.marca, lote.variante_nombre);
-    const unidadesPorCodigo = parseFloat(lote.contenido_por_presentacion) || 0;
+    const cantidadLote = parseFloat(lote.cantidad_unidades) || 0;
     
+    // Contar códigos existentes del lote
+    const codigosExistentes = await dbGet(
+      `SELECT COUNT(*) AS total FROM barcode_units WHERE lote_id = ?`,
+      [loteId]
+    );
+    const totalCodigosFinal = (codigosExistentes?.total || 0) + quantity;
+    const unidadesPorCodigo = totalCodigosFinal > 0 ? cantidadLote / totalCodigosFinal : 0;
+
     const maxIndex = await dbGet(
       `SELECT COALESCE(MAX(unit_index), 0) AS max_idx FROM barcode_units WHERE lote_id = ?`,
       [loteId]
@@ -140,6 +148,15 @@ router.post("/lotes/:loteId/generate", requireBarcodeAccess, async (req, res) =>
       );
       barcodes.push({ barcode: codigo, unit_index: correlativo, unidades_totales: unidadesPorCodigo });
       correlativo++;
+    }
+
+    // Recalcular unidades para códigos activos existentes del mismo lote
+    if (codigosExistentes?.total > 0) {
+      await dbRun(
+        `UPDATE barcode_units SET unidades_totales = ?, unidades_restantes = ? 
+         WHERE lote_id = ? AND status = 'active' AND unit_index < ?`,
+        [unidadesPorCodigo, unidadesPorCodigo, loteId, correlativo - quantity]
+      );
     }
 
     res.json({ 
@@ -250,17 +267,23 @@ router.post("/register-batch", requireBarcodeAccess, async (req, res) => {
     return res.status(400).json({ message: "Prefijo y cantidad son obligatorios" });
   }
   try {
-    // Obtener contenido por presentación del lote para inicializar unidades
+    // Calcular unidades por código basado en cantidad del lote / total de códigos
     let unidadesPorCodigo = 0;
     if (lote_id) {
       const loteInfo = await dbGet(
-        `SELECT v.contenido_por_presentacion
+        `SELECT sl.cantidad_unidades, v.contenido_por_presentacion
          FROM stock_lotes sl
          LEFT JOIN variantes v ON v.id = sl.variante_id
          WHERE sl.id = ?`,
         [lote_id]
       );
-      unidadesPorCodigo = parseFloat(loteInfo?.contenido_por_presentacion) || 0;
+      const cantidadLote = parseFloat(loteInfo?.cantidad_unidades) || 0;
+      const codigosExistentes = await dbGet(
+        `SELECT COUNT(*) AS total FROM barcode_units WHERE lote_id = ?`,
+        [lote_id]
+      );
+      const totalCodigosFinal = (codigosExistentes?.total || 0) + quantity;
+      unidadesPorCodigo = totalCodigosFinal > 0 ? cantidadLote / totalCodigosFinal : (parseFloat(loteInfo?.contenido_por_presentacion) || 0);
     }
 
     const row = await dbGet(
@@ -280,6 +303,16 @@ router.post("/register-batch", requireBarcodeAccess, async (req, res) => {
       codes.push(codigo);
       correlativo++;
     }
+
+    // Recalcular códigos existentes del mismo lote
+    if (lote_id) {
+      await dbRun(
+        `UPDATE barcode_units SET unidades_totales = ?, unidades_restantes = ? 
+         WHERE lote_id = ? AND status = 'active' AND unit_index < ?`,
+        [unidadesPorCodigo, unidadesPorCodigo, lote_id, correlativo - quantity]
+      );
+    }
+
     res.json({ codes, prefix, start: correlativo - quantity, end: correlativo - 1 });
   } catch (err) {
     console.error("Error registrando batch de códigos:", err.message);
@@ -368,6 +401,56 @@ router.get("/variant/:varianteId/codes", requireBarcodeAccess, async (req, res) 
   } catch (err) {
     console.error("Error obteniendo códigos de variante:", err.message);
     res.status(500).json({ message: "Error al obtener códigos de barras" });
+  }
+});
+
+// Eliminar un código de barras individual
+router.delete("/:barcodeId", requireBarcodeAccess, async (req, res) => {
+  const { barcodeId } = req.params;
+
+  try {
+    const code = await dbGet(`SELECT id, status FROM barcode_units WHERE id = ?`, [barcodeId]);
+    if (!code) {
+      return res.status(404).json({ message: "Código no encontrado" });
+    }
+
+    await dbRun(`DELETE FROM barcode_units WHERE id = ?`, [barcodeId]);
+    res.json({ message: "Código eliminado correctamente" });
+  } catch (err) {
+    console.error("Error eliminando código:", err.message);
+    res.status(500).json({ message: "Error al eliminar código de barras" });
+  }
+});
+
+// Eliminar todos los códigos de una variante (o solo los activos/usados)
+router.delete("/variant/:varianteId/codes", requireBarcodeAccess, async (req, res) => {
+  const { varianteId } = req.params;
+  const { filter } = req.query; // 'active', 'scanned', o 'all'
+
+  if (!varianteId) {
+    return res.status(400).json({ message: "ID de variante requerido" });
+  }
+
+  try {
+    let condition = "";
+    if (filter === "active") {
+      condition = "AND bu.status = 'active'";
+    } else if (filter === "scanned") {
+      condition = "AND bu.status = 'scanned'";
+    }
+
+    const result = await dbRun(`
+      DELETE FROM barcode_units WHERE id IN (
+        SELECT bu.id FROM barcode_units bu
+        LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+        WHERE sl.variante_id = ? ${condition}
+      )
+    `, [varianteId]);
+
+    res.json({ message: `Códigos eliminados correctamente`, deleted: result.changes || 0 });
+  } catch (err) {
+    console.error("Error eliminando códigos:", err.message);
+    res.status(500).json({ message: "Error al eliminar códigos de barras" });
   }
 });
 

@@ -519,6 +519,47 @@ export default function Inventario() {
     }
   };
 
+  const handleEliminarCodigo = async (codeId) => {
+    if (!window.confirm("¿Estás seguro de eliminar este código?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/barcodes/${codeId}`, { method: "DELETE", headers });
+      if (res.ok) {
+        // Recargar códigos
+        if (productoDetalle?.variante_id) {
+          cargarCodigosProducto(productoDetalle.variante_id);
+        }
+      } else {
+        const error = await res.json();
+        alert(`❌ ${error.message}`);
+      }
+    } catch (err) {
+      console.error("Error eliminando código:", err);
+      alert("❌ Error al eliminar código");
+    }
+  };
+
+  const handleEliminarTodosCodigos = async (filter = "all") => {
+    const textoFiltro = filter === "active" ? "activos" : filter === "scanned" ? "usados" : "todos los";
+    if (!window.confirm(`¿Estás seguro de eliminar ${textoFiltro} códigos de este producto?`)) return;
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/barcodes/variant/${productoDetalle?.variante_id}/codes?filter=${filter}`,
+        { method: "DELETE", headers }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        alert(`✅ ${data.deleted} código(s) eliminado(s)`);
+        cargarCodigosProducto(productoDetalle.variante_id);
+      } else {
+        const error = await res.json();
+        alert(`❌ ${error.message}`);
+      }
+    } catch (err) {
+      console.error("Error eliminando códigos:", err);
+      alert("❌ Error al eliminar códigos");
+    }
+  };
+
   const handleAjustarStock = async () => {
     if (!loteAjustando || !formAjusteStock.cantidad_a_reducir) {
       alert("Por favor ingresa la cantidad a reducir");
@@ -1075,12 +1116,24 @@ export default function Inventario() {
                             mr: 1,
                           }}
                         />
-                        <Typography variant="body2" sx={{ color: "#666", minWidth: 80 }}>
+                        {code.unidades_restantes != null && code.unidades_totales > 0 && (
+                          <Typography variant="body2" sx={{ color: "#666", mr: 1, fontSize: "0.75rem" }}>
+                            {code.unidades_restantes}/{code.unidades_totales}u
+                          </Typography>
+                        )}
+                        <Typography variant="body2" sx={{ color: "#666", minWidth: 60 }}>
                           {code.unit_type}
                         </Typography>
-                        <Typography variant="body2" sx={{ color: "#666", minWidth: 60, textAlign: "center" }}>
+                        <Typography variant="body2" sx={{ color: "#666", minWidth: 40, textAlign: "center" }}>
                           #{code.unit_index}
                         </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEliminarCodigo(code.id)}
+                          sx={{ color: "#d32f2f", ml: 0.5 }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
                       </Box>
                     ))
                   ) : (
@@ -1092,7 +1145,26 @@ export default function Inventario() {
               </>
             )}
           </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2 }}>
+          <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <Button
+                size="small"
+                startIcon={<Delete />}
+                onClick={() => handleEliminarTodosCodigos("all")}
+                sx={{ color: "#d32f2f", fontWeight: 600, fontSize: "0.8rem" }}
+                disabled={!codigosProducto.codes || codigosProducto.codes.length === 0}
+              >
+                Eliminar todos
+              </Button>
+              <Button
+                size="small"
+                onClick={() => handleEliminarTodosCodigos("scanned")}
+                sx={{ color: "#888", fontWeight: 600, fontSize: "0.8rem" }}
+                disabled={!codigosProducto.usados || codigosProducto.usados === 0}
+              >
+                Eliminar usados
+              </Button>
+            </Box>
             <Button
               onClick={() => setOpenCodigosModal(false)}
               sx={{ color: colorPrincipal, fontWeight: 700 }}
