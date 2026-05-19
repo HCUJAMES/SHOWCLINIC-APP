@@ -109,6 +109,8 @@ router.post("/lotes/:loteId/generate", requireBarcodeAccess, async (req, res) =>
       SELECT 
         sl.*,
         v.nombre AS variante_nombre,
+        v.contenido_por_presentacion,
+        v.unidad_base,
         pb.nombre AS marca
       FROM stock_lotes sl
       LEFT JOIN variantes v ON v.id = sl.variante_id
@@ -121,6 +123,7 @@ router.post("/lotes/:loteId/generate", requireBarcodeAccess, async (req, res) =>
     }
 
     const tipo = inferirTipoProducto(lote.marca, lote.variante_nombre);
+    const unidadesPorCodigo = parseFloat(lote.contenido_por_presentacion) || 0;
     
     const maxIndex = await dbGet(
       `SELECT COALESCE(MAX(unit_index), 0) AS max_idx FROM barcode_units WHERE lote_id = ?`,
@@ -132,10 +135,10 @@ router.post("/lotes/:loteId/generate", requireBarcodeAccess, async (req, res) =>
     for (let i = 0; i < quantity; i++) {
       const codigo = generarCodigoBarras(tipo, loteId, lote.fecha_vencimiento, correlativo);
       await dbRun(
-        `INSERT INTO barcode_units (lote_id, barcode, unit_type, unit_index, status) VALUES (?, ?, ?, ?, 'active')`,
-        [loteId, codigo, unit_type, correlativo]
+        `INSERT INTO barcode_units (lote_id, barcode, unit_type, unit_index, status, unidades_totales, unidades_restantes) VALUES (?, ?, ?, ?, 'active', ?, ?)`,
+        [loteId, codigo, unit_type, correlativo, unidadesPorCodigo, unidadesPorCodigo]
       );
-      barcodes.push({ barcode: codigo, unit_index: correlativo });
+      barcodes.push({ barcode: codigo, unit_index: correlativo, unidades_totales: unidadesPorCodigo });
       correlativo++;
     }
 
@@ -247,6 +250,19 @@ router.post("/register-batch", requireBarcodeAccess, async (req, res) => {
     return res.status(400).json({ message: "Prefijo y cantidad son obligatorios" });
   }
   try {
+    // Obtener contenido por presentación del lote para inicializar unidades
+    let unidadesPorCodigo = 0;
+    if (lote_id) {
+      const loteInfo = await dbGet(
+        `SELECT v.contenido_por_presentacion
+         FROM stock_lotes sl
+         LEFT JOIN variantes v ON v.id = sl.variante_id
+         WHERE sl.id = ?`,
+        [lote_id]
+      );
+      unidadesPorCodigo = parseFloat(loteInfo?.contenido_por_presentacion) || 0;
+    }
+
     const row = await dbGet(
       `SELECT COALESCE(MAX(CAST(SUBSTR(barcode, LENGTH(?) + 1) AS INTEGER)), 0) AS max_corr
        FROM barcode_units
@@ -258,8 +274,8 @@ router.post("/register-batch", requireBarcodeAccess, async (req, res) => {
     for (let i = 0; i < quantity; i++) {
       const codigo = `${prefix}${correlativo.toString().padStart(4, "0")}`;
       await dbRun(
-        `INSERT INTO barcode_units (lote_id, barcode, unit_type, unit_index, status) VALUES (?, ?, 'caja', ?, 'active')`,
-        [lote_id || null, codigo, correlativo]
+        `INSERT INTO barcode_units (lote_id, barcode, unit_type, unit_index, status, unidades_totales, unidades_restantes) VALUES (?, ?, 'caja', ?, 'active', ?, ?)`,
+        [lote_id || null, codigo, correlativo, unidadesPorCodigo, unidadesPorCodigo]
       );
       codes.push(codigo);
       correlativo++;
@@ -327,6 +343,8 @@ router.get("/variant/:varianteId/codes", requireBarcodeAccess, async (req, res) 
         bu.status,
         bu.unit_type,
         bu.unit_index,
+        bu.unidades_totales,
+        bu.unidades_restantes,
         sl.lote,
         sl.fecha_vencimiento,
         sl.cantidad_unidades
@@ -336,9 +354,9 @@ router.get("/variant/:varianteId/codes", requireBarcodeAccess, async (req, res) 
       ORDER BY bu.status DESC, bu.unit_index ASC
     `, [varianteId]);
 
-    // Agrupar por estado
-    const activos = codes.filter(c => c.status === 'active');
-    const usados = codes.filter(c => c.status === 'scanned');
+    // Un código es "disponible" si está activo O si aún tiene unidades restantes > 0
+    const activos = codes.filter(c => c.status === 'active' || (c.unidades_restantes > 0));
+    const usados = codes.filter(c => c.status === 'scanned' && (c.unidades_restantes || 0) <= 0);
 
     res.json({
       variante_id: varianteId,

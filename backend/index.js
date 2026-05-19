@@ -1213,6 +1213,47 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_barcode_units_barcode ON barcode_units(barcode)");
     console.log("✅ Tabla barcode_units creada");
 
+    // Migración: agregar columnas de unidades para rastreo parcial de uso
+    db.run(`ALTER TABLE barcode_units ADD COLUMN unidades_totales REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna unidades_totales ya existe o error:", err.message);
+      } else if (!err) {
+        console.log("✅ Columna unidades_totales agregada a barcode_units");
+      }
+    });
+    db.run(`ALTER TABLE barcode_units ADD COLUMN unidades_restantes REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.log("Columna unidades_restantes ya existe o error:", err.message);
+      } else if (!err) {
+        console.log("✅ Columna unidades_restantes agregada a barcode_units");
+      }
+    });
+
+    // Migración: inicializar unidades para códigos existentes que tienen 0
+    db.run(`
+      UPDATE barcode_units SET 
+        unidades_totales = (
+          SELECT COALESCE(v.contenido_por_presentacion, 0) 
+          FROM stock_lotes sl 
+          LEFT JOIN variantes v ON v.id = sl.variante_id 
+          WHERE sl.id = barcode_units.lote_id
+        ),
+        unidades_restantes = (
+          SELECT COALESCE(v.contenido_por_presentacion, 0) 
+          FROM stock_lotes sl 
+          LEFT JOIN variantes v ON v.id = sl.variante_id 
+          WHERE sl.id = barcode_units.lote_id
+        )
+      WHERE (unidades_totales IS NULL OR unidades_totales = 0)
+        AND status = 'active'
+    `, (err) => {
+      if (err) {
+        console.log("Error inicializando unidades de barcode_units:", err.message);
+      } else {
+        console.log("✅ Unidades de barcode_units existentes inicializadas");
+      }
+    });
+
     // 📉 Tabla para registrar ajustes de stock
     db.run(`
       CREATE TABLE IF NOT EXISTS stock_ajustes (

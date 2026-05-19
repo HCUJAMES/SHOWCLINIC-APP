@@ -467,7 +467,7 @@ const ComenzarTratamiento = () => {
     }
     if (!codigo || codigo.trim() === "") {
       const nuevosBloques = [...bloques];
-      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false, unidades_restantes_codigo: null };
       setBloques(nuevosBloques);
       return;
     }
@@ -481,35 +481,57 @@ const ComenzarTratamiento = () => {
         { headers: authHeaders }
       );
       const data = res.data;
-      const codigosActivos = (data.codes || []).filter(c => c.status === "active");
+      // Un código es disponible si está activo O si aún tiene unidades restantes > 0
+      const codigosDisponibles = (data.codes || []).filter(
+        c => c.status === "active" || (c.unidades_restantes > 0)
+      );
 
-      if (codigosActivos.length === 0) {
-        showToast({ severity: "error", message: "Este producto no tiene códigos de barras activos registrados en inventario." });
+      if (codigosDisponibles.length === 0) {
+        showToast({ severity: "error", message: "Este producto no tiene códigos disponibles registrados en inventario." });
         const nuevosBloques = [...bloques];
-        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false, unidades_restantes_codigo: null };
         setBloques(nuevosBloques);
         return;
       }
 
-      // Verificar si el código ingresado coincide con alguno de los códigos activos
-      const coincide = codigosActivos.find(c => c.barcode === codigoIngresado);
+      // Verificar si el código ingresado coincide con alguno de los disponibles
+      const coincide = codigosDisponibles.find(c => c.barcode === codigoIngresado);
 
       if (coincide) {
+        const restantes = parseFloat(coincide.unidades_restantes) || 0;
+        const totales = parseFloat(coincide.unidades_totales) || 0;
         const nuevosBloques = [...bloques];
-        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: true };
+        nuevosBloques[index] = { 
+          ...nuevosBloques[index], 
+          codigo_validado: true, 
+          unidades_restantes_codigo: restantes,
+          unidades_totales_codigo: totales,
+        };
         setBloques(nuevosBloques);
-        showToast({ severity: "success", message: `Código validado correctamente` });
+        if (restantes > 0 && restantes < totales) {
+          showToast({ severity: "success", message: `Código validado - Restantes: ${restantes} de ${totales} unidades` });
+        } else if (restantes > 0) {
+          showToast({ severity: "success", message: `Código validado - ${restantes} unidades disponibles` });
+        } else {
+          showToast({ severity: "success", message: `Código validado correctamente` });
+        }
       } else {
+        // Verificar si el código existe pero ya está agotado
+        const codigoAgotado = (data.codes || []).find(c => c.barcode === codigoIngresado);
         const nuevosBloques = [...bloques];
-        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false, unidades_restantes_codigo: null };
         setBloques(nuevosBloques);
-        showToast({ severity: "error", message: `Código incorrecto. No coincide con ningún código activo de este producto.` });
+        if (codigoAgotado) {
+          showToast({ severity: "error", message: `Este código ya fue agotado (0 unidades restantes). Usa otro código.` });
+        } else {
+          showToast({ severity: "error", message: `Código incorrecto. No coincide con ningún código de este producto.` });
+        }
       }
     } catch (err) {
       console.error("Error validando código:", err);
       showToast({ severity: "error", message: "Error al validar el código del producto" });
       const nuevosBloques = [...bloques];
-      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false };
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false, unidades_restantes_codigo: null };
       setBloques(nuevosBloques);
     }
   };
@@ -1002,10 +1024,12 @@ const ComenzarTratamiento = () => {
                               }}
                               helperText={
                                 b.codigo_validado 
-                                  ? "Código correcto - coincide con inventario" 
+                                  ? (b.unidades_restantes_codigo != null && b.unidades_totales_codigo
+                                    ? `Código validado - ${b.unidades_restantes_codigo} de ${b.unidades_totales_codigo} unidades disponibles`
+                                    : "Código correcto - coincide con inventario")
                                   : b.codigo_ingresado 
                                     ? "Presiona Validar o Enter para verificar el código" 
-                                    : "Obligatorio: ingresa el código SKU del producto"
+                                    : "Obligatorio: ingresa el código del producto"
                               }
                               sx={{
                                 "& .MuiInputBase-root": {

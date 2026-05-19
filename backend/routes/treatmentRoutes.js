@@ -724,21 +724,30 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           });
         }
 
-        // Verificar que el código ingresado coincida con algún código de barras activo de esta variante
+        // Verificar que el código ingresado coincida con algún código disponible de esta variante
+        // Un código es válido si está 'active' O si aún tiene unidades_restantes > 0
         const codigoValido = await dbGet(
-          `SELECT bu.id, bu.barcode, bu.lote_id
+          `SELECT bu.id, bu.barcode, bu.lote_id, bu.unidades_totales, bu.unidades_restantes, bu.status
            FROM barcode_units bu
            LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
            WHERE sl.variante_id = ?
              AND bu.barcode = ?
-             AND bu.status = 'active'
+             AND (bu.status = 'active' OR bu.unidades_restantes > 0)
            LIMIT 1`,
           [varianteIdElegida, codigoIngresado]
         );
 
         if (!codigoValido) {
           return res.status(400).json({ 
-            message: `Código incorrecto. No coincide con ningún código activo de este producto en inventario.` 
+            message: `Código incorrecto o agotado. No coincide con ningún código disponible de este producto.` 
+          });
+        }
+
+        // Verificar que hay suficientes unidades restantes en este código
+        const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
+        if (cantidadElegida > 0 && unidadesRestantes > 0 && cantidadElegida > unidadesRestantes) {
+          return res.status(400).json({ 
+            message: `Este código solo tiene ${unidadesRestantes} unidades restantes. Necesitas ${cantidadElegida}.` 
           });
         }
 
@@ -767,13 +776,25 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           }
         }
 
-        // Marcar el código de barras como usado
-        await dbRun(
-          `UPDATE barcode_units 
-           SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?
-           WHERE id = ?`,
-          [tratamientoRealizadoId, codigoValido.id]
-        );
+        // Actualizar unidades restantes del código de barras
+        const nuevasRestantes = Math.max(0, unidadesRestantes - (cantidadElegida || 0));
+        if (nuevasRestantes <= 0) {
+          // Agotado: marcar como escaneado/usado
+          await dbRun(
+            `UPDATE barcode_units 
+             SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?, unidades_restantes = 0
+             WHERE id = ?`,
+            [tratamientoRealizadoId, codigoValido.id]
+          );
+        } else {
+          // Aún tiene unidades: mantener activo con las restantes actualizadas
+          await dbRun(
+            `UPDATE barcode_units 
+             SET unidades_restantes = ?, treatment_id = ?
+             WHERE id = ?`,
+            [nuevasRestantes, tratamientoRealizadoId, codigoValido.id]
+          );
+        }
       } else if (!usoReceta && !varianteIdElegida) {
         // Compatibilidad con inventario clásico solo si no hay receta y no se eligió variante.
         await dbRun(
