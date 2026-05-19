@@ -311,4 +311,46 @@ router.post("/scan", requireBarcodeAccess, async (req, res) => {
   }
 });
 
+// Obtener códigos de barras disponibles para una variante específica
+router.get("/variant/:varianteId/codes", requireBarcodeAccess, async (req, res) => {
+  const { varianteId } = req.params;
+
+  if (!varianteId) {
+    return res.status(400).json({ message: "ID de variante requerido" });
+  }
+
+  try {
+    const codes = await dbAll(`
+      SELECT 
+        bu.id,
+        bu.barcode,
+        bu.status,
+        bu.unit_type,
+        bu.unit_index,
+        sl.lote,
+        sl.fecha_vencimiento,
+        sl.cantidad_unidades
+      FROM barcode_units bu
+      LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+      WHERE sl.variante_id = ?
+      ORDER BY bu.status DESC, bu.unit_index ASC
+    `, [varianteId]);
+
+    // Agrupar por estado
+    const activos = codes.filter(c => c.status === 'active');
+    const usados = codes.filter(c => c.status === 'scanned');
+
+    res.json({
+      variante_id: varianteId,
+      total_codes: codes.length,
+      activos: activos.length,
+      usados: usados.length,
+      codes: codes
+    });
+  } catch (err) {
+    console.error("Error obteniendo códigos de variante:", err.message);
+    res.status(500).json({ message: "Error al obtener códigos de barras" });
+  }
+});
+
 export default router;

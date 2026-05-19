@@ -40,6 +40,7 @@ import {
   ExpandMore,
   ExpandLess,
   Close,
+  QrCodeScanner,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import bwipjs from "bwip-js";
@@ -222,6 +223,11 @@ export default function Inventario() {
   });
   const [imprimirAlGuardar, setImprimirAlGuardar] = useState(false);
   const [codigoPreview, setCodigoPreview] = useState({ prefijo: "", correlativo: "", codigo: "" });
+
+  // Estados para códigos de barras
+  const [openCodigosModal, setOpenCodigosModal] = useState(false);
+  const [codigosProducto, setCodigosProducto] = useState([]);
+  const [loadingCodigos, setLoadingCodigos] = useState(false);
 
   const obtenerSiguienteCorrelativo = async (nombreProducto, lote) => {
     const prefijo = construirPrefijoCodigo(nombreProducto, lote);
@@ -485,6 +491,26 @@ export default function Inventario() {
     setFormLote({ variante_id: "", lote: "", fecha_vencimiento: "", cantidad_unidades: "", cajas: "", jeringas: "", fecha_ingreso: new Date().toISOString().slice(0, 10) });
     setFormNuevoProducto({ marca: "", nombre: "", laboratorio: "", unidad_base: "UI", contenido_por_presentacion: "" });
     setCodigoPreview({ prefijo: "", correlativo: "", codigo: "" });
+  };
+
+  const cargarCodigosProducto = async (varianteId) => {
+    if (!varianteId) return;
+    setLoadingCodigos(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/barcodes/variant/${varianteId}/codes`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setCodigosProducto(data);
+      } else {
+        console.error("Error cargando códigos:", await res.text());
+        setCodigosProducto([]);
+      }
+    } catch (err) {
+      console.error("Error cargando códigos:", err);
+      setCodigosProducto([]);
+    } finally {
+      setLoadingCodigos(false);
+    }
   };
 
   const eliminarProducto = async (varianteId, nombreProducto) => {
@@ -853,10 +879,111 @@ export default function Inventario() {
           onNuevoLote={() => { setFormLote(prev => ({ ...prev, variante_id: productoDetalle.variante_id })); setOpenRegistrar(true); }}
           onEditarLote={(lote) => { setLoteEditando({ ...lote }); setOpenEditarLote(true); }}
           onImprimirSticker={(lote) => handleImprimirSticker(lote, productoDetalle)}
+          onVerCodigos={(varianteId) => {
+            cargarCodigosProducto(varianteId);
+            setOpenCodigosModal(true);
+          }}
           formatVencimiento={formatVencimiento}
           formatStock={formatStock}
         />
         {renderModals()}
+        
+        {/* Modal de códigos de barras */}
+        <Dialog
+          open={openCodigosModal}
+          onClose={() => setOpenCodigosModal(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 4,
+              background: "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.95) 100%)",
+            },
+          }}
+        >
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: 800, display: "flex", alignItems: "center", gap: 1 }}>
+            <QrCodeScanner />
+            Códigos de barras - {productoDetalle?.variante}
+          </DialogTitle>
+          <DialogContent dividers>
+            {loadingCodigos ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <LinearProgress sx={{ width: "60%" }} />
+              </Box>
+            ) : (
+              <>
+                {/* Resumen */}
+                <Box sx={{ display: "flex", gap: 2, mb: 3, p: 2, backgroundColor: "rgba(163,105,32,0.08)", borderRadius: 2 }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ color: "#666" }}>Total de códigos</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: colorPrincipal }}>{codigosProducto.total_codes || 0}</Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ color: "#666" }}>Activos</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#2e7d32" }}>{codigosProducto.activos || 0}</Typography>
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ color: "#666" }}>Usados</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#d32f2f" }}>{codigosProducto.usados || 0}</Typography>
+                  </Box>
+                </Box>
+
+                {/* Lista de códigos */}
+                <Box sx={{ maxHeight: 400, overflowY: "auto" }}>
+                  {codigosProducto.codes && codigosProducto.codes.length > 0 ? (
+                    codigosProducto.codes.map((code, idx) => (
+                      <Box
+                        key={code.id}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          p: 1.5,
+                          mb: 1,
+                          borderRadius: 2,
+                          backgroundColor: code.status === "active" ? "rgba(46,125,50,0.08)" : "rgba(211,47,47,0.08)",
+                          border: code.status === "active" ? "1px solid rgba(46,125,50,0.2)" : "1px solid rgba(211,47,47,0.2)",
+                        }}
+                      >
+                        <Typography sx={{ fontFamily: "monospace", fontSize: "0.9rem", fontWeight: 600, flex: 1 }}>
+                          {code.barcode}
+                        </Typography>
+                        <Chip
+                          label={code.status === "active" ? "Activo" : "Usado"}
+                          size="small"
+                          sx={{
+                            backgroundColor: code.status === "active" ? "#2e7d32" : "#d32f2f",
+                            color: "white",
+                            fontWeight: 600,
+                            fontSize: "0.75rem",
+                            mr: 1,
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ color: "#666", minWidth: 80 }}>
+                          {code.unit_type}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: "#666", minWidth: 60, textAlign: "center" }}>
+                          #{code.unit_index}
+                        </Typography>
+                      </Box>
+                    ))
+                  ) : (
+                    <Typography sx={{ textAlign: "center", py: 4, color: "#999" }}>
+                      No hay códigos de barras registrados para este producto
+                    </Typography>
+                  )}
+                </Box>
+              </>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button
+              onClick={() => setOpenCodigosModal(false)}
+              sx={{ color: colorPrincipal, fontWeight: 700 }}
+            >
+              Cerrar
+            </Button>
+          </DialogActions>
+        </Dialog>
       </>
     );
   }
@@ -1025,7 +1152,7 @@ export default function Inventario() {
 }
 
 /* ===== DETALLE PRODUCTO ===== */
-function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoLote, onEditarLote, onImprimirSticker, formatVencimiento, formatStock }) {
+function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoLote, onEditarLote, onImprimirSticker, onVerCodigos, formatVencimiento, formatStock }) {
   const [tabLotes, setTabLotes] = useState("activos");
 
   const lotesActivos = lotesDelProducto.filter(l => l.disponible > 0);
@@ -1061,9 +1188,14 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d", mb: 0.5 }}>{productoDetalle.variante}</Typography>
             <Typography variant="body2" sx={{ color: "#888", mb: 2 }}>{productoDetalle.marca} · {productoDetalle.unidad_base || "Unidad"}</Typography>
-            <Button variant="contained" startIcon={<Add />} onClick={onNuevoLote} sx={{ background: colorPrincipal, borderRadius: 2, "&:hover": { background: "#8a5a1a" } }}>
-              Nuevo lote
-            </Button>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+              <Button variant="contained" startIcon={<Add />} onClick={onNuevoLote} sx={{ background: colorPrincipal, borderRadius: 2, "&:hover": { background: "#8a5a1a" } }}>
+                Nuevo lote
+              </Button>
+              <Button variant="outlined" startIcon={<QrCodeScanner />} onClick={() => onVerCodigos(productoDetalle.variante_id)} sx={{ borderColor: colorPrincipal, color: colorPrincipal, borderRadius: 2, "&:hover": { background: "rgba(163,105,32,0.08)" } }}>
+                Ver códigos
+              </Button>
+            </Box>
 
             <Grid container spacing={3} sx={{ mt: 2 }}>
               <Grid item xs={4}>

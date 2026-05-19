@@ -453,8 +453,17 @@ const ComenzarTratamiento = () => {
         { barcode: codigo.trim() },
         { headers: authHeaders }
       );
-      const { barcode_info } = res.data;
+      const { barcode_info, message } = res.data;
       if (barcode_info && barcode_info.variante_id) {
+        // Verificar que el código esté activo
+        if (barcode_info.status !== "active") {
+          showToast({ 
+            severity: "warning", 
+            message: `⚠️ Este código ya fue utilizado (${barcode_info.status}). Usa un código activo.` 
+          });
+          return;
+        }
+        
         // Auto-seleccionar el producto en el bloque
         const variante = variantesInv.find(v => String(v.id) === String(barcode_info.variante_id));
         const nuevosBloques = [...bloques];
@@ -464,6 +473,7 @@ const ComenzarTratamiento = () => {
           producto: `${barcode_info.marca || ""} - ${barcode_info.variante_nombre || ""}`.trim(),
           marca: barcode_info.marca || "",
           barcode_escaneado: codigo.trim(),
+          barcode_info: barcode_info, // Guardar info completa del código
         };
         setBloques(nuevosBloques);
         showToast({
