@@ -19,7 +19,7 @@ const dbGet = promisify(db.get.bind(db));
 
 const requireBarcodeAccess = (req, res, next) => {
   const role = req.user?.role;
-  if (role === "master" || role === "doctor") {
+  if (role === "master" || role === "doctor" || role === "admin" || role === "asistente") {
     return next();
   }
   return res.status(403).json({ message: "Acceso denegado al módulo de códigos de barras" });
@@ -285,7 +285,9 @@ router.post("/scan", requireBarcodeAccess, async (req, res) => {
         sl.lote,
         sl.fecha_vencimiento,
         sl.cantidad_unidades,
+        sl.variante_id,
         v.nombre AS variante_nombre,
+        v.unidad_base,
         pb.nombre AS marca
       FROM barcode_units bu
       LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id

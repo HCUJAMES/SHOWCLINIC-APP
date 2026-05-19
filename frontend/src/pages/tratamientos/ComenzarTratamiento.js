@@ -20,8 +20,10 @@ import {
   List,
   ListItemButton,
   ListItemText,
+  InputAdornment,
+  Chip,
 } from "@mui/material";
-import { ArrowBack, Receipt, Home } from "@mui/icons-material";
+import { ArrowBack, Receipt, Home, QrCodeScanner } from "@mui/icons-material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "../../components/ToastProvider";
@@ -442,6 +444,41 @@ const ComenzarTratamiento = () => {
     showToast({ severity: "info", message: "Presupuesto cancelado" });
   };
 
+  // Escanear código de barras y autoseleccionar producto
+  const escanearCodigo = async (index, codigo) => {
+    if (!codigo || codigo.trim().length < 4) return;
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/barcodes/scan`,
+        { barcode: codigo.trim() },
+        { headers: authHeaders }
+      );
+      const { barcode_info } = res.data;
+      if (barcode_info && barcode_info.variante_id) {
+        // Auto-seleccionar el producto en el bloque
+        const variante = variantesInv.find(v => String(v.id) === String(barcode_info.variante_id));
+        const nuevosBloques = [...bloques];
+        nuevosBloques[index] = {
+          ...nuevosBloques[index],
+          variante_id: barcode_info.variante_id,
+          producto: `${barcode_info.marca || ""} - ${barcode_info.variante_nombre || ""}`.trim(),
+          marca: barcode_info.marca || "",
+          barcode_escaneado: codigo.trim(),
+        };
+        setBloques(nuevosBloques);
+        showToast({
+          severity: "success",
+          message: `✅ Producto identificado: ${barcode_info.marca} - ${barcode_info.variante_nombre}`,
+        });
+      } else {
+        showToast({ severity: "error", message: "Código no asociado a ningún producto" });
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.message || "Código no encontrado";
+      showToast({ severity: "error", message: msg });
+    }
+  };
+
   // Guardar tratamiento (solo registra en historial, sin pagos)
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -858,6 +895,53 @@ const ComenzarTratamiento = () => {
                                 />
                               );
                             })()}
+                          </Grid>
+
+                          {/* Campo para escanear código de barras */}
+                          <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 200 }}>
+                            <TextField
+                              label="Escanear código de barras"
+                              placeholder="Escanea o escribe el código"
+                              fullWidth
+                              value={b.barcode_escaneado || ""}
+                              onChange={(e) => {
+                                const nuevosBloques = [...bloques];
+                                nuevosBloques[index] = { ...nuevosBloques[index], barcode_escaneado: e.target.value };
+                                setBloques(nuevosBloques);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  escanearCodigo(index, e.target.value);
+                                }
+                              }}
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <QrCodeScanner sx={{ color: "#a36920" }} />
+                                  </InputAdornment>
+                                ),
+                                endAdornment: b.barcode_escaneado ? (
+                                  <InputAdornment position="end">
+                                    <Button
+                                      size="small"
+                                      onClick={() => escanearCodigo(index, b.barcode_escaneado)}
+                                      sx={{ color: "#a36920", fontWeight: 700, minWidth: "auto" }}
+                                    >
+                                      Buscar
+                                    </Button>
+                                  </InputAdornment>
+                                ) : null,
+                              }}
+                              helperText={b.variante_id && b.barcode_escaneado ? "✅ Producto vinculado" : "Presiona Enter al escanear"}
+                              sx={{
+                                "& .MuiInputBase-root": {
+                                  backgroundColor: "rgba(255,255,255,0.95)",
+                                  borderRadius: 3,
+                                  minHeight: "56px",
+                                },
+                              }}
+                            />
                           </Grid>
 
                           {/* Solo mostrar cantidad si se seleccionó un producto */}
