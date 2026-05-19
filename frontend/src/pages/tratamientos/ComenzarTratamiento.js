@@ -463,11 +463,18 @@ const ComenzarTratamiento = () => {
             severity: "warning", 
             message: `⚠️ Este código ya fue utilizado (${barcode_info.status}). Usa un código activo.` 
           });
+          // Limpiar el código no válido
+          const nuevosBloques = [...bloques];
+          nuevosBloques[index] = {
+            ...nuevosBloques[index],
+            barcode_escaneado: "",
+            barcode_validado: false,
+          };
+          setBloques(nuevosBloques);
           return;
         }
         
         // Auto-seleccionar el producto en el bloque
-        const variante = variantesInv.find(v => String(v.id) === String(barcode_info.variante_id));
         const nuevosBloques = [...bloques];
         nuevosBloques[index] = {
           ...nuevosBloques[index],
@@ -475,7 +482,7 @@ const ComenzarTratamiento = () => {
           producto: `${barcode_info.marca || ""} - ${barcode_info.variante_nombre || ""}`.trim(),
           marca: barcode_info.marca || "",
           barcode_escaneado: codigo.trim(),
-          barcode_info: barcode_info, // Guardar info completa del código
+          barcode_validado: true, // Marcar como validado
         };
         setBloques(nuevosBloques);
         showToast({
@@ -484,10 +491,26 @@ const ComenzarTratamiento = () => {
         });
       } else {
         showToast({ severity: "error", message: "Código no asociado a ningún producto" });
+        // Limpiar
+        const nuevosBloques = [...bloques];
+        nuevosBloques[index] = {
+          ...nuevosBloques[index],
+          barcode_escaneado: "",
+          barcode_validado: false,
+        };
+        setBloques(nuevosBloques);
       }
     } catch (err) {
-      const msg = err?.response?.data?.message || "Código no encontrado";
+      const msg = err?.response?.data?.message || "Código no encontrado en inventario";
       showToast({ severity: "error", message: msg });
+      // Limpiar el código inválido
+      const nuevosBloques = [...bloques];
+      nuevosBloques[index] = {
+        ...nuevosBloques[index],
+        barcode_escaneado: "",
+        barcode_validado: false,
+      };
+      setBloques(nuevosBloques);
     }
   };
 
@@ -503,6 +526,18 @@ const ComenzarTratamiento = () => {
     if (bloquesValidos.length === 0) {
       showToast({ severity: "warning", message: "Agrega al menos un tratamiento antes de guardar" });
       return;
+    }
+
+    // Validar que si se ingresó un código de barras, este haya sido validado
+    for (let i = 0; i < bloquesValidos.length; i++) {
+      const bloque = bloquesValidos[i];
+      if (bloque.barcode_escaneado && bloque.barcode_escaneado.trim() !== "" && !bloque.barcode_validado) {
+        showToast({ 
+          severity: "error", 
+          message: `⚠️ El código "${bloque.barcode_escaneado}" del tratamiento #${i + 1} no ha sido validado. Presiona "Buscar" para verificarlo.` 
+        });
+        return;
+      }
     }
 
     const data = new FormData();
@@ -918,7 +953,11 @@ const ComenzarTratamiento = () => {
                               value={b.barcode_escaneado || ""}
                               onChange={(e) => {
                                 const nuevosBloques = [...bloques];
-                                nuevosBloques[index] = { ...nuevosBloques[index], barcode_escaneado: e.target.value };
+                                nuevosBloques[index] = { 
+                                  ...nuevosBloques[index], 
+                                  barcode_escaneado: e.target.value,
+                                  barcode_validado: false, // Invalidar al cambiar texto
+                                };
                                 setBloques(nuevosBloques);
                               }}
                               onKeyDown={(e) => {
@@ -930,7 +969,7 @@ const ComenzarTratamiento = () => {
                               InputProps={{
                                 startAdornment: (
                                   <InputAdornment position="start">
-                                    <QrCodeScanner sx={{ color: "#a36920" }} />
+                                    <QrCodeScanner sx={{ color: b.barcode_validado ? "#2e7d32" : "#a36920" }} />
                                   </InputAdornment>
                                 ),
                                 endAdornment: b.barcode_escaneado ? (
@@ -945,12 +984,19 @@ const ComenzarTratamiento = () => {
                                   </InputAdornment>
                                 ) : null,
                               }}
-                              helperText={b.variante_id && b.barcode_escaneado ? "✅ Producto vinculado" : "Presiona Enter al escanear"}
+                              helperText={
+                                b.barcode_validado 
+                                  ? "✅ Código validado - listo para guardar" 
+                                  : b.barcode_escaneado 
+                                    ? "⚠️ Presiona Buscar para validar el código" 
+                                    : "Escanea o escribe el código y presiona Buscar"
+                              }
                               sx={{
                                 "& .MuiInputBase-root": {
                                   backgroundColor: "rgba(255,255,255,0.95)",
                                   borderRadius: 3,
                                   minHeight: "56px",
+                                  border: b.barcode_validado ? "2px solid #2e7d32" : b.barcode_escaneado && !b.barcode_validado ? "2px solid #f57c00" : "none",
                                 },
                               }}
                             />
