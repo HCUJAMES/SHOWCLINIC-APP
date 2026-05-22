@@ -841,6 +841,19 @@ router.patch("/:id/especial", requirePatientWrite, (req, res) => {
   });
 });
 
+// ✅ Actualizar clasificación de un paciente
+router.patch("/:id/clasificacion", requirePatientWrite, (req, res) => {
+  const { id } = req.params;
+  const { clasificacion } = req.body;
+  db.run(`UPDATE patients SET clasificacion = ? WHERE id = ?`, [clasificacion || null, id], function (err) {
+    if (err) {
+      console.error("❌ Error al actualizar clasificacion:", err.message);
+      return res.status(500).json({ message: "Error al actualizar clasificacion" });
+    }
+    res.json({ message: "Clasificación actualizada correctamente", clasificacion });
+  });
+});
+
 // ✅ Actualizar observaciones de un paciente
 router.put("/:id/observaciones", requirePatientWrite, (req, res) => {
   const { id } = req.params;

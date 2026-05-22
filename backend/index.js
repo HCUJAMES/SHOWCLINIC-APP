@@ -256,6 +256,17 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
           });
         }
 
+        const tieneClasificacion = rows.some((col) => col.name === "clasificacion");
+        if (!tieneClasificacion) {
+          db.run("ALTER TABLE patients ADD COLUMN clasificacion TEXT", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna clasificacion:", alterErr.message);
+            } else {
+              console.log("✅ Columna clasificacion agregada a patients");
+            }
+          });
+        }
+
         const tieneEspecial = rows.some((col) => col.name === "especial");
         if (!tieneEspecial) {
           db.run("ALTER TABLE patients ADD COLUMN especial INTEGER DEFAULT 0", (alterErr) => {
