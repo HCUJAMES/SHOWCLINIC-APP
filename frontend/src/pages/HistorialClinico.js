@@ -2883,6 +2883,7 @@ const HistorialClinico = () => {
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
+                            e.preventDefault();
                             setPacienteClasificando(pac);
                             setAnchorElClasificacion(e.currentTarget);
                           }}
@@ -2904,62 +2905,6 @@ const HistorialClinico = () => {
                         >
                           {pac.clasificacion || "Clasificar"}
                         </Button>
-                        <Menu
-                          anchorEl={anchorElClasificacion}
-                          open={Boolean(anchorElClasificacion)}
-                          onClose={() => {
-                            setAnchorElClasificacion(null);
-                            setPacienteClasificando(null);
-                          }}
-                          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                          transformOrigin={{ vertical: "top", horizontal: "right" }}
-                          PaperProps={{
-                            sx: {
-                              borderRadius: 2,
-                              boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-                              minWidth: 180,
-                              border: "1px solid rgba(163,105,32,0.15)",
-                            },
-                          }}
-                        >
-                          <MenuItem 
-                            onClick={() => handleCambiarClasificacion("Solo consulta")}
-                            sx={{ fontSize: "0.9rem", py: 1.2 }}
-                          >
-                            Solo consulta
-                          </MenuItem>
-                          <MenuItem 
-                            onClick={() => handleCambiarClasificacion("Tratamiento")}
-                            sx={{ fontSize: "0.9rem", py: 1.2 }}
-                          >
-                            Tratamiento
-                          </MenuItem>
-                          <MenuItem 
-                            onClick={() => handleCambiarClasificacion("Convenio")}
-                            sx={{ fontSize: "0.9rem", py: 1.2 }}
-                          >
-                            Convenio
-                          </MenuItem>
-                          <MenuItem 
-                            onClick={() => handleCambiarClasificacion("Código")}
-                            sx={{ fontSize: "0.9rem", py: 1.2 }}
-                          >
-                            Código
-                          </MenuItem>
-                          <MenuItem 
-                            onClick={() => handleCambiarClasificacion("Reincorporado")}
-                            sx={{ fontSize: "0.9rem", py: 1.2 }}
-                          >
-                            Reincorporado
-                          </MenuItem>
-                          <Divider />
-                          <MenuItem 
-                            onClick={() => handleCambiarClasificacion(null)}
-                            sx={{ fontSize: "0.9rem", py: 1.2, color: "#666" }}
-                          >
-                            Sin clasificación
-                          </MenuItem>
-                        </Menu>
                         {isMaster && (
                           <IconButton
                             size="small"
@@ -2982,6 +2927,64 @@ const HistorialClinico = () => {
                   );
                 })}
               </Box>
+
+              {/* Menu de clasificación fuera del Paper */}
+              <Menu
+                anchorEl={anchorElClasificacion}
+                open={Boolean(anchorElClasificacion)}
+                onClose={() => {
+                  setAnchorElClasificacion(null);
+                  setPacienteClasificando(null);
+                }}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                PaperProps={{
+                  sx: {
+                    borderRadius: 2,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
+                    minWidth: 180,
+                    border: "1px solid rgba(163,105,32,0.15)",
+                  },
+                }}
+              >
+                <MenuItem 
+                  onClick={() => handleCambiarClasificacion("Solo consulta")}
+                  sx={{ fontSize: "0.9rem", py: 1.2 }}
+                >
+                  Solo consulta
+                </MenuItem>
+                <MenuItem 
+                  onClick={() => handleCambiarClasificacion("Tratamiento")}
+                  sx={{ fontSize: "0.9rem", py: 1.2 }}
+                >
+                  Tratamiento
+                </MenuItem>
+                <MenuItem 
+                  onClick={() => handleCambiarClasificacion("Convenio")}
+                  sx={{ fontSize: "0.9rem", py: 1.2 }}
+                >
+                  Convenio
+                </MenuItem>
+                <MenuItem 
+                  onClick={() => handleCambiarClasificacion("Código")}
+                  sx={{ fontSize: "0.9rem", py: 1.2 }}
+                >
+                  Código
+                </MenuItem>
+                <MenuItem 
+                  onClick={() => handleCambiarClasificacion("Reincorporado")}
+                  sx={{ fontSize: "0.9rem", py: 1.2 }}
+                >
+                  Reincorporado
+                </MenuItem>
+                <Divider />
+                <MenuItem 
+                  onClick={() => handleCambiarClasificacion(null)}
+                  sx={{ fontSize: "0.9rem", py: 1.2, color: "#666" }}
+                >
+                  Sin clasificación
+                </MenuItem>
+              </Menu>
             </>
           ) : (
             <>
