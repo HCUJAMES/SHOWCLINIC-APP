@@ -67,7 +67,8 @@ const ComenzarTratamiento = () => {
       dosis_unidades: "",
       codigo_ingresado: "",
       codigo_validado: false,
-      codigos_extra: [], // Array de códigos adicionales: [{ codigo: "ABC123", unidades_usadas: 20 }]
+      unidades_usadas_principal: "", // Cantidad a usar del código principal
+      codigos_extra: [], // Array de códigos adicionales: [{ codigo: "ABC123", unidades_usadas: 20, validado: false }]
     },
   ]);
 
@@ -180,6 +181,7 @@ const ComenzarTratamiento = () => {
                   dosis_unidades: "",
                   codigo_ingresado: "",
                   codigo_validado: false,
+                  unidades_usadas_principal: "",
                   codigos_extra: [],
                 };
               });
@@ -226,6 +228,7 @@ const ComenzarTratamiento = () => {
                     sesion_paquete_id: sesion.id,
                     codigo_ingresado: "",
                     codigo_validado: false,
+                  unidades_usadas_principal: "",
                     codigos_extra: [],
                   };
                 });
@@ -283,6 +286,7 @@ const ComenzarTratamiento = () => {
         dosis_unidades: "",
         codigo_ingresado: "",
         codigo_validado: false,
+        unidades_usadas_principal: "",
         codigos_extra: [],
       },
     ]);
@@ -379,6 +383,7 @@ const ComenzarTratamiento = () => {
         dosis_unidades: "",
         codigo_ingresado: "",
         codigo_validado: false,
+        unidades_usadas_principal: "",
         codigos_extra: [],
       };
     });
@@ -430,6 +435,7 @@ const ComenzarTratamiento = () => {
         sesion_paquete_id: sesion.id, // Guardar referencia a la sesión del paquete
         codigo_ingresado: "",
         codigo_validado: false,
+        unidades_usadas_principal: "",
         codigos_extra: [],
       };
     });
@@ -457,6 +463,7 @@ const ComenzarTratamiento = () => {
         dosis_unidades: "",
         codigo_ingresado: "",
         codigo_validado: false,
+        unidades_usadas_principal: "",
         codigos_extra: [],
       },
     ]);
@@ -550,10 +557,61 @@ const ComenzarTratamiento = () => {
       ...nuevosBloques[index],
       codigos_extra: [
         ...(nuevosBloques[index].codigos_extra || []),
-        { codigo: "", unidades_usadas: "" }
+        { codigo: "", unidades_usadas: "", validado: false }
       ]
     };
     setBloques(nuevosBloques);
+  };
+
+  // Validar código extra individualmente
+  const validarCodigoExtra = async (indexBloque, indexCodigo) => {
+    const bloque = bloques[indexBloque];
+    const codigoExtra = bloque.codigos_extra[indexCodigo];
+    
+    if (!bloque.variante_id) {
+      alert("Primero selecciona un producto");
+      return;
+    }
+    
+    if (!codigoExtra.codigo || codigoExtra.codigo.trim() === "") {
+      alert("Ingresa un código para validar");
+      return;
+    }
+
+    const codigoIngresado = String(codigoExtra.codigo).trim();
+
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/barcodes/variant/${bloque.variante_id}/codes`,
+        { headers: authHeaders }
+      );
+      const data = res.data;
+      const codigosDisponibles = (data.codes || []).filter(
+        c => c.status === "active" || (c.unidades_restantes > 0)
+      );
+
+      if (codigosDisponibles.length === 0) {
+        alert("Este producto no tiene códigos disponibles registrados en inventario.");
+        return;
+      }
+
+      const coincide = codigosDisponibles.find(c => c.barcode === codigoIngresado);
+
+      if (coincide) {
+        const nuevosBloques = [...bloques];
+        nuevosBloques[indexBloque].codigos_extra[indexCodigo] = {
+          ...nuevosBloques[indexBloque].codigos_extra[indexCodigo],
+          validado: true,
+        };
+        setBloques(nuevosBloques);
+        alert("Código validado correctamente");
+      } else {
+        alert("Código incorrecto. No coincide con ningún código de este producto.");
+      }
+    } catch (err) {
+      console.error("Error validando código extra:", err);
+      alert("Error al validar el código");
+    }
   };
 
   // Eliminar código extra
@@ -573,16 +631,15 @@ const ComenzarTratamiento = () => {
   // Calcular total de unidades (principal + extras)
   const calcularTotalUnidades = (bloque) => {
     let total = 0;
-    // Usar dosis_unidades si el usuario lo especificó manualmente
-    if (bloque.dosis_unidades && parseFloat(bloque.dosis_unidades) > 0) {
-      total += parseFloat(bloque.dosis_unidades) || 0;
-    } else {
-      // Si no hay dosis_unidades, sumar solo las unidades de códigos extra
-      if (bloque.codigos_extra && bloque.codigos_extra.length > 0) {
-        bloque.codigos_extra.forEach(c => {
-          total += parseFloat(c.unidades_usadas) || 0;
-        });
-      }
+    // Sumar unidades usadas del código principal
+    if (bloque.unidades_usadas_principal) {
+      total += parseFloat(bloque.unidades_usadas_principal) || 0;
+    }
+    // Sumar unidades de códigos extra
+    if (bloque.codigos_extra && bloque.codigos_extra.length > 0) {
+      bloque.codigos_extra.forEach(c => {
+        total += parseFloat(c.unidades_usadas) || 0;
+      });
     }
     return total;
   };
@@ -677,6 +734,7 @@ const ComenzarTratamiento = () => {
           dosis_unidades: "",
           codigo_ingresado: "",
           codigo_validado: false,
+          unidades_usadas_principal: "",
           codigos_extra: [],
         },
       ]);
@@ -1015,6 +1073,7 @@ const ComenzarTratamiento = () => {
                                         : "",
                                       codigo_ingresado: "",
                                       codigo_validado: false,
+                  unidades_usadas_principal: "",
                                       codigos_extra: [],
                                     };
                                     setBloques(nuevosBloques);
@@ -1057,6 +1116,7 @@ const ComenzarTratamiento = () => {
                                   ...nuevosBloques[index], 
                                   codigo_ingresado: e.target.value,
                                   codigo_validado: false,
+                  unidades_usadas_principal: "",
                                 };
                                 setBloques(nuevosBloques);
                               }}
@@ -1101,6 +1161,25 @@ const ComenzarTratamiento = () => {
                                   border: b.codigo_validado ? "2px solid #2e7d32" : b.codigo_ingresado && !b.codigo_validado ? "2px solid #f57c00" : "none",
                                 },
                               }}
+                            />
+                          </Grid>
+                          )}
+
+                          {/* Campo para cantidad a usar del código principal */}
+                          {b.variante_id && b.codigo_validado && (
+                          <Grid item xs={12} sm={6} md sx={{ minWidth: 140 }}>
+                            <TextField
+                              label="Unidades a usar"
+                              placeholder="0"
+                              type="number"
+                              fullWidth
+                              value={b.unidades_usadas_principal || ""}
+                              onChange={(e) => {
+                                const nuevosBloques = [...bloques];
+                                nuevosBloques[index] = { ...nuevosBloques[index], unidades_usadas_principal: e.target.value };
+                                setBloques(nuevosBloques);
+                              }}
+                              helperText="Cantidad del código principal"
                             />
                           </Grid>
                           )}
@@ -1166,6 +1245,25 @@ const ComenzarTratamiento = () => {
                                       size="small"
                                       value={codigo.codigo || ""}
                                       onChange={(e) => actualizarCodigoExtra(index, idx, "codigo", e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          validarCodigoExtra(index, idx);
+                                        }
+                                      }}
+                                      InputProps={{
+                                        endAdornment: codigo.codigo ? (
+                                          <InputAdornment position="end">
+                                            <Button
+                                              size="small"
+                                              onClick={() => validarCodigoExtra(index, idx)}
+                                              sx={{ color: codigo.validado ? "#2e7d32" : "#a36920", fontWeight: 700, minWidth: "auto" }}
+                                            >
+                                              {codigo.validado ? "Validado" : "Validar"}
+                                            </Button>
+                                          </InputAdornment>
+                                        ) : null,
+                                      }}
                                       sx={{ flexGrow: 1, minWidth: 150 }}
                                     />
                                     <TextField
@@ -1175,6 +1273,7 @@ const ComenzarTratamiento = () => {
                                       size="small"
                                       value={codigo.unidades_usadas || ""}
                                       onChange={(e) => actualizarCodigoExtra(index, idx, "unidades_usadas", e.target.value)}
+                                      disabled={!codigo.validado}
                                       sx={{ width: 120 }}
                                     />
                                     <IconButton
