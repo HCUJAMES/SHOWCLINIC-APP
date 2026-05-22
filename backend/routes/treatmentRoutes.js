@@ -500,23 +500,14 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       const cantidadMl = parseNum(b.cantidad) || 1;
       const totalDelFrontend = parseNum(b.total);
       
-      // Calcular total de unidades de los códigos si existen
-      const codigosArray = b.codigos || [];
-      const totalUnidadesCodigos = codigosArray.length > 0 
-        ? codigosArray.reduce((sum, c) => sum + (parseFloat(c.unidades) || 0), 0)
-        : 0;
-      
-      // Usar el total de códigos si existe, sino usar la cantidad manual
-      const cantidadFinal = totalUnidadesCodigos > 0 ? totalUnidadesCodigos : cantidadMl;
-      
       // Si el frontend envía total, usarlo; sino calcular
-      let subtotal = totalDelFrontend > 0 ? totalDelFrontend : precioUnitario * cantidadFinal;
+      let subtotal = totalDelFrontend > 0 ? totalDelFrontend : precioUnitario * cantidadMl;
       
       // Si aún no hay subtotal, intentar obtener precio de la variante
       if (!(subtotal > 0) && b.variante_id) {
         const v = await dbGet(`SELECT precio_cliente, precio_unitario FROM variantes WHERE id = ?`, [b.variante_id]);
         const precioVariante = parseFloat(v?.precio_cliente) || parseFloat(v?.precio_unitario) || 0;
-        subtotal = precioVariante * cantidadFinal;
+        subtotal = precioVariante * cantidadMl;
       }
 
       // Permitir precio 0 si viene de un paquete o si es sin pago
@@ -526,7 +517,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
 
       // El descuento ya está aplicado en el total del frontend, pero por si acaso
       const totalFinal = subtotal;
-      const cantidadParaPrecio = cantidadFinal;
+      const cantidadParaPrecio = cantidadMl;
 
       // Obtener información completa del producto/variante para guardar
       let nombreProducto = b.producto || "Producto";
@@ -717,61 +708,51 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         }
       }
 
-      // Validación de códigos de producto contra códigos de barras en inventario
+      // Validación de código de producto contra códigos de barras en inventario
       const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
-      const codigosValidacion = b.codigos || [];
       const cantidadElegida =
         parseNum(b.dosis_unidades) > 0
           ? parseNum(b.dosis_unidades)
           : parseNum(b.cantidad) || 0;
 
       if (varianteIdElegida) {
-        // Si se seleccionó un producto, DEBE tener al menos un código válido
-        if (!codigosValidacion || codigosValidacion.length === 0) {
+        // Si se seleccionó un producto, DEBE tener código válido
+        const codigoIngresado = (b.codigo_ingresado || "").trim();
+        if (!codigoIngresado) {
           return res.status(400).json({ 
-            message: `Debes agregar al menos un código del producto para validar el inventario.` 
+            message: `Debes ingresar el código del producto para validar el inventario.` 
           });
         }
 
-        // Calcular total de unidades de todos los códigos
-        const totalUnidadesCodigos = codigosValidacion.reduce((sum, c) => sum + (parseFloat(c.unidades) || 0), 0);
-        
-        // Validar cada código individualmente
-        for (const codigoItem of codigosValidacion) {
-          const codigoIngresado = (codigoItem.codigo || "").trim();
-          if (!codigoIngresado) continue;
+        // Verificar que el código ingresado coincida con algún código disponible de esta variante
+        // Un código es válido si está 'active' O si aún tiene unidades_restantes > 0
+        const codigoValido = await dbGet(
+          `SELECT bu.id, bu.barcode, bu.lote_id, bu.unidades_totales, bu.unidades_restantes, bu.status
+           FROM barcode_units bu
+           LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+           WHERE sl.variante_id = ?
+             AND bu.barcode = ?
+             AND (bu.status = 'active' OR bu.unidades_restantes > 0)
+           LIMIT 1`,
+          [varianteIdElegida, codigoIngresado]
+        );
 
-          // Verificar que el código ingresado coincida con algún código disponible de esta variante
-          const codigoValido = await dbGet(
-            `SELECT bu.id, bu.barcode, bu.lote_id, bu.unidades_totales, bu.unidades_restantes, bu.status
-             FROM barcode_units bu
-             LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
-             WHERE sl.variante_id = ?
-               AND bu.barcode = ?
-               AND (bu.status = 'active' OR bu.unidades_restantes > 0)
-             LIMIT 1`,
-            [varianteIdElegida, codigoIngresado]
-          );
-
-          if (!codigoValido) {
-            return res.status(400).json({ 
-              message: `Código "${codigoIngresado}" incorrecto o agotado. No coincide con ningún código disponible de este producto.` 
-            });
-          }
-
-          // Verificar que hay suficientes unidades restantes en este código
-          const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
-          const unidadesCodigo = parseFloat(codigoItem.unidades) || 0;
-          
-          if (unidadesCodigo > 0 && unidadesRestantes > 0 && unidadesCodigo > unidadesRestantes) {
-            return res.status(400).json({ 
-              message: `El código "${codigoIngresado}" solo tiene ${unidadesRestantes} unidades restantes. Necesitas ${unidadesCodigo}.` 
-            });
-          }
+        if (!codigoValido) {
+          return res.status(400).json({ 
+            message: `Código incorrecto o agotado. No coincide con ningún código disponible de este producto.` 
+          });
         }
 
-        // Proceder con descuento de stock usando el total de unidades de los códigos
-        if (!usoReceta && totalUnidadesCodigos > 0) {
+        // Verificar que hay suficientes unidades restantes en este código
+        const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
+        if (cantidadElegida > 0 && unidadesRestantes > 0 && cantidadElegida > unidadesRestantes) {
+          return res.status(400).json({ 
+            message: `Este código solo tiene ${unidadesRestantes} unidades restantes. Necesitas ${cantidadElegida}.` 
+          });
+        }
+
+        // Código validado - proceder con descuento de stock
+        if (!usoReceta && cantidadElegida > 0) {
           const movimiento = await dbRun(
             `
               INSERT INTO movimientos_inventario
@@ -786,7 +767,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
             dbRun,
             movimientoId: movimiento.lastID,
             varianteId: varianteIdElegida,
-            cantidad: totalUnidadesCodigos,
+            cantidad: cantidadElegida,
             stockLoteId: null,
           });
 
@@ -795,44 +776,24 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           }
         }
 
-        // Actualizar unidades restantes de cada código de barras individualmente
-        for (const codigoItem of codigosValidacion) {
-          const codigoIngresado = (codigoItem.codigo || "").trim();
-          if (!codigoIngresado) continue;
-
-          const codigoValido = await dbGet(
-            `SELECT bu.id, bu.unidades_restantes
-             FROM barcode_units bu
-             LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
-             WHERE sl.variante_id = ?
-               AND bu.barcode = ?
-             LIMIT 1`,
-            [varianteIdElegida, codigoIngresado]
+        // Actualizar unidades restantes del código de barras
+        const nuevasRestantes = Math.max(0, unidadesRestantes - (cantidadElegida || 0));
+        if (nuevasRestantes <= 0) {
+          // Agotado: marcar como escaneado/usado
+          await dbRun(
+            `UPDATE barcode_units 
+             SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?, unidades_restantes = 0
+             WHERE id = ?`,
+            [tratamientoRealizadoId, codigoValido.id]
           );
-
-          if (codigoValido) {
-            const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
-            const unidadesCodigo = parseFloat(codigoItem.unidades) || 0;
-            const nuevasRestantes = Math.max(0, unidadesRestantes - unidadesCodigo);
-            
-            if (nuevasRestantes <= 0) {
-              // Agotado: marcar como escaneado/usado
-              await dbRun(
-                `UPDATE barcode_units 
-                 SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?, unidades_restantes = 0
-                 WHERE id = ?`,
-                [tratamientoRealizadoId, codigoValido.id]
-              );
-            } else {
-              // Aún tiene unidades: mantener activo con las restantes actualizadas
-              await dbRun(
-                `UPDATE barcode_units 
-                 SET unidades_restantes = ?, treatment_id = ?
-                 WHERE id = ?`,
-                [nuevasRestantes, tratamientoRealizadoId, codigoValido.id]
-              );
-            }
-          }
+        } else {
+          // Aún tiene unidades: mantener activo con las restantes actualizadas
+          await dbRun(
+            `UPDATE barcode_units 
+             SET unidades_restantes = ?, treatment_id = ?
+             WHERE id = ?`,
+            [nuevasRestantes, tratamientoRealizadoId, codigoValido.id]
+          );
         }
       } else if (!usoReceta && !varianteIdElegida) {
         // Compatibilidad con inventario clásico solo si no hay receta y no se eligió variante.

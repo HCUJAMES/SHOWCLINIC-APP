@@ -23,7 +23,7 @@ import {
   InputAdornment,
   Chip,
 } from "@mui/material";
-import { ArrowBack, Receipt, Home, QrCodeScanner, Close } from "@mui/icons-material";
+import { ArrowBack, Receipt, Home, QrCodeScanner, Close, Add as AddIcon } from "@mui/icons-material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "../../components/ToastProvider";
@@ -65,7 +65,9 @@ const ComenzarTratamiento = () => {
       marca: "",
       cantidad: 1,
       dosis_unidades: "",
-      codigos: [], // Array de códigos: [{ codigo: "ABC123", unidades: 20, validado: true }]
+      codigo_ingresado: "",
+      codigo_validado: false,
+      codigos_extra: [], // Array de códigos adicionales: [{ codigo: "ABC123", unidades_usadas: 20 }]
     },
   ]);
 
@@ -176,7 +178,9 @@ const ComenzarTratamiento = () => {
                   marca: "",
                   cantidad: 1,
                   dosis_unidades: "",
-                  codigos: [],
+                  codigo_ingresado: "",
+                  codigo_validado: false,
+                  codigos_extra: [],
                 };
               });
               
@@ -220,7 +224,9 @@ const ComenzarTratamiento = () => {
                     cantidad: 1,
                     dosis_unidades: "",
                     sesion_paquete_id: sesion.id,
-                    codigos: [],
+                    codigo_ingresado: "",
+                    codigo_validado: false,
+                    codigos_extra: [],
                   };
                 });
                 
@@ -275,7 +281,9 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
-        codigos: [],
+        codigo_ingresado: "",
+        codigo_validado: false,
+        codigos_extra: [],
       },
     ]);
   };
@@ -369,7 +377,9 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
-        codigos: [],
+        codigo_ingresado: "",
+        codigo_validado: false,
+        codigos_extra: [],
       };
     });
 
@@ -418,7 +428,9 @@ const ComenzarTratamiento = () => {
         cantidad: 1,
         dosis_unidades: "",
         sesion_paquete_id: sesion.id, // Guardar referencia a la sesión del paquete
-        codigos: [],
+        codigo_ingresado: "",
+        codigo_validado: false,
+        codigos_extra: [],
       };
     });
 
@@ -443,7 +455,9 @@ const ComenzarTratamiento = () => {
         marca: "",
         cantidad: 1,
         dosis_unidades: "",
-        codigos: [],
+        codigo_ingresado: "",
+        codigo_validado: false,
+        codigos_extra: [],
       },
     ]);
     setPresupuestoAplicado(false);
@@ -459,16 +473,13 @@ const ComenzarTratamiento = () => {
       return;
     }
     if (!codigo || codigo.trim() === "") {
+      const nuevosBloques = [...bloques];
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false, unidades_restantes_codigo: null };
+      setBloques(nuevosBloques);
       return;
     }
 
     const codigoIngresado = String(codigo).trim();
-
-    // Verificar si el código ya está agregado
-    if (bloque.codigos && bloque.codigos.some(c => c.codigo === codigoIngresado)) {
-      showToast({ severity: "warning", message: "Este código ya está agregado" });
-      return;
-    }
 
     try {
       // Consultar los códigos de barras registrados para esta variante
@@ -484,6 +495,9 @@ const ComenzarTratamiento = () => {
 
       if (codigosDisponibles.length === 0) {
         showToast({ severity: "error", message: "Este producto no tiene códigos disponibles registrados en inventario." });
+        const nuevosBloques = [...bloques];
+        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false, unidades_restantes_codigo: null };
+        setBloques(nuevosBloques);
         return;
       }
 
@@ -493,30 +507,27 @@ const ComenzarTratamiento = () => {
       if (coincide) {
         const restantes = parseFloat(coincide.unidades_restantes) || 0;
         const totales = parseFloat(coincide.unidades_totales) || 0;
-        
-        // Agregar el código al array de códigos del bloque
         const nuevosBloques = [...bloques];
         nuevosBloques[index] = { 
           ...nuevosBloques[index], 
-          codigos: [
-            ...(nuevosBloques[index].codigos || []),
-            {
-              codigo: codigoIngresado,
-              unidades: restantes,
-              unidades_totales: totales,
-              validado: true,
-              barcode_id: coincide.id,
-            }
-          ]
+          codigo_validado: true, 
+          unidades_restantes_codigo: restantes,
+          unidades_totales_codigo: totales,
         };
         setBloques(nuevosBloques);
-        
-        // Calcular total de unidades
-        const totalUnidades = nuevosBloques[index].codigos.reduce((sum, c) => sum + c.unidades, 0);
-        showToast({ severity: "success", message: `Código agregado - ${restantes} unidades. Total: ${totalUnidades} unidades` });
+        if (restantes > 0 && restantes < totales) {
+          showToast({ severity: "success", message: `Código validado - Restantes: ${restantes} de ${totales} unidades` });
+        } else if (restantes > 0) {
+          showToast({ severity: "success", message: `Código validado - ${restantes} unidades disponibles` });
+        } else {
+          showToast({ severity: "success", message: `Código validado correctamente` });
+        }
       } else {
         // Verificar si el código existe pero ya está agotado
         const codigoAgotado = (data.codes || []).find(c => c.barcode === codigoIngresado);
+        const nuevosBloques = [...bloques];
+        nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false, unidades_restantes_codigo: null };
+        setBloques(nuevosBloques);
         if (codigoAgotado) {
           showToast({ severity: "error", message: `Este código ya fue agotado (0 unidades restantes). Usa otro código.` });
         } else {
@@ -526,20 +537,53 @@ const ComenzarTratamiento = () => {
     } catch (err) {
       console.error("Error validando código:", err);
       showToast({ severity: "error", message: "Error al validar el código del producto" });
+      const nuevosBloques = [...bloques];
+      nuevosBloques[index] = { ...nuevosBloques[index], codigo_validado: false, unidades_restantes_codigo: null };
+      setBloques(nuevosBloques);
     }
   };
 
-  // Eliminar un código del array de códigos
-  const eliminarCodigo = (indexBloque, indexCodigo) => {
+  // Agregar código extra con botón +
+  const agregarCodigoExtra = (index) => {
     const nuevosBloques = [...bloques];
-    nuevosBloques[indexBloque].codigos = nuevosBloques[indexBloque].codigos.filter((_, i) => i !== indexCodigo);
+    nuevosBloques[index] = {
+      ...nuevosBloques[index],
+      codigos_extra: [
+        ...(nuevosBloques[index].codigos_extra || []),
+        { codigo: "", unidades_usadas: "" }
+      ]
+    };
     setBloques(nuevosBloques);
   };
 
-  // Calcular total de unidades de todos los códigos de un bloque
+  // Eliminar código extra
+  const eliminarCodigoExtra = (indexBloque, indexCodigo) => {
+    const nuevosBloques = [...bloques];
+    nuevosBloques[indexBloque].codigos_extra = nuevosBloques[indexBloque].codigos_extra.filter((_, i) => i !== indexCodigo);
+    setBloques(nuevosBloques);
+  };
+
+  // Actualizar código extra
+  const actualizarCodigoExtra = (indexBloque, indexCodigo, campo, valor) => {
+    const nuevosBloques = [...bloques];
+    nuevosBloques[indexBloque].codigos_extra[indexCodigo][campo] = valor;
+    setBloques(nuevosBloques);
+  };
+
+  // Calcular total de unidades (principal + extras)
   const calcularTotalUnidades = (bloque) => {
-    if (!bloque.codigos || bloque.codigos.length === 0) return 0;
-    return bloque.codigos.reduce((sum, c) => sum + (c.unidades || 0), 0);
+    let total = 0;
+    // Unidades del código principal
+    if (bloque.unidades_restantes_codigo) {
+      total += parseFloat(bloque.unidades_restantes_codigo) || 0;
+    }
+    // Unidades de códigos extra
+    if (bloque.codigos_extra && bloque.codigos_extra.length > 0) {
+      bloque.codigos_extra.forEach(c => {
+        total += parseFloat(c.unidades_usadas) || 0;
+      });
+    }
+    return total;
   };
 
   // Guardar tratamiento (solo registra en historial, sin pagos)
@@ -560,32 +604,39 @@ const ComenzarTratamiento = () => {
     for (let i = 0; i < bloquesValidos.length; i++) {
       const bloque = bloquesValidos[i];
       if (bloque.variante_id) {
-        // Si tiene producto seleccionado, DEBE tener al menos un código validado
-        if (!bloque.codigos || bloque.codigos.length === 0) {
+        // Si tiene producto seleccionado, DEBE tener código validado
+        if (!bloque.codigo_ingresado || bloque.codigo_ingresado.trim() === "") {
           showToast({ 
             severity: "error", 
-            message: `Debes agregar al menos un código del producto en el tratamiento #${i + 1}` 
+            message: `Debes ingresar el código del producto en el tratamiento #${i + 1}` 
           });
           return;
         }
-        // Verificar que todos los códigos estén validados
-        const invalidos = bloque.codigos.filter(c => !c.validado);
-        if (invalidos.length > 0) {
+        if (!bloque.codigo_validado) {
           showToast({ 
             severity: "error", 
-            message: `Hay códigos no validados en el tratamiento #${i + 1}` 
+            message: `El código del producto en el tratamiento #${i + 1} no es válido. Debe coincidir con el SKU del inventario.` 
           });
           return;
         }
       }
     }
 
+    // Calcular total de unidades para cada bloque y actualizar dosis_unidades
+    const bloquesConTotal = bloquesValidos.map(bloque => {
+      const totalUnidades = calcularTotalUnidades(bloque);
+      return {
+        ...bloque,
+        dosis_unidades: totalUnidades > 0 ? totalUnidades : bloque.dosis_unidades,
+      };
+    });
+
     const data = new FormData();
     data.append("tipoAtencion", tipoAtencion);
     data.append("paciente_id", paciente_id);
     data.append("especialista", especialista);
     data.append("sesion", sesion);
-    data.append("productos", JSON.stringify(bloquesValidos));
+    data.append("productos", JSON.stringify(bloquesConTotal));
     data.append("sinPago", "true"); // Indicar que no hay pago en esta sesión
 
     try {
@@ -623,7 +674,9 @@ const ComenzarTratamiento = () => {
           marca: "",
           cantidad: 1,
           dosis_unidades: "",
-          codigos: [],
+          codigo_ingresado: "",
+          codigo_validado: false,
+          codigos_extra: [],
         },
       ]);
       setPresupuestoAplicado(false);
@@ -959,7 +1012,9 @@ const ComenzarTratamiento = () => {
                                       producto: val
                                         ? `${val.producto_base_nombre || ""} - ${val.nombre || ""}`.trim()
                                         : "",
-                                      codigos: [],
+                                      codigo_ingresado: "",
+                                      codigo_validado: false,
+                                      codigos_extra: [],
                                     };
                                     setBloques(nuevosBloques);
                                   }}
@@ -987,129 +1042,150 @@ const ComenzarTratamiento = () => {
                             })()}
                           </Grid>
 
-                          {/* Campo para ingresar códigos del producto (múltiples) */}
+                          {/* Campo para ingresar código del producto (SKU) */}
                           {b.variante_id && (
-                          <Grid item xs={12}>
-                            <Box sx={{ mb: 2 }}>
-                              <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.75)", mb: 1, fontWeight: 600 }}>
-                                Códigos del producto (agrega múltiples frascos/códigos)
-                              </Typography>
-                              
-                              {/* Campo para ingresar nuevo código */}
-                              <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-                                <TextField
-                                  label="Código del producto"
-                                  placeholder="Ingresa el código y presiona Enter"
-                                  fullWidth
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      validarCodigoProducto(index, e.target.value);
-                                      e.target.value = "";
-                                    }
-                                  }}
-                                  InputProps={{
-                                    startAdornment: (
-                                      <InputAdornment position="start">
-                                        <QrCodeScanner sx={{ color: colorPrincipal }} />
-                                      </InputAdornment>
-                                    ),
-                                  }}
-                                  sx={{
-                                    "& .MuiInputBase-root": {
-                                      backgroundColor: "rgba(255,255,255,0.95)",
-                                      borderRadius: 3,
-                                      minHeight: "56px",
-                                    },
-                                  }}
-                                />
-                                <Button
-                                  variant="contained"
-                                  onClick={() => {
-                                    const input = document.querySelector(`input[placeholder="Ingresa el código y presiona Enter"]`);
-                                    if (input && input.value) {
-                                      validarCodigoProducto(index, input.value);
-                                      input.value = "";
-                                    }
-                                  }}
-                                  sx={{
-                                    backgroundColor: colorPrincipal,
-                                    "&:hover": { backgroundColor: "#8a5a1a" },
-                                    borderRadius: 3,
-                                    minWidth: 100,
-                                  }}
-                                >
-                                  Agregar
-                                </Button>
-                              </Box>
-
-                              {/* Lista de códigos agregados */}
-                              {b.codigos && b.codigos.length > 0 && (
-                                <Box sx={{ 
+                          <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 200 }}>
+                            <TextField
+                              label="Código del producto"
+                              placeholder="Ingresa el código del producto"
+                              fullWidth
+                              value={b.codigo_ingresado || ""}
+                              onChange={(e) => {
+                                const nuevosBloques = [...bloques];
+                                nuevosBloques[index] = { 
+                                  ...nuevosBloques[index], 
+                                  codigo_ingresado: e.target.value,
+                                  codigo_validado: false,
+                                };
+                                setBloques(nuevosBloques);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  validarCodigoProducto(index, e.target.value);
+                                }
+                              }}
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <QrCodeScanner sx={{ color: b.codigo_validado ? "#2e7d32" : "#a36920" }} />
+                                  </InputAdornment>
+                                ),
+                                endAdornment: b.codigo_ingresado ? (
+                                  <InputAdornment position="end">
+                                    <Button
+                                      size="small"
+                                      onClick={() => validarCodigoProducto(index, b.codigo_ingresado)}
+                                      sx={{ color: b.codigo_validado ? "#2e7d32" : "#a36920", fontWeight: 700, minWidth: "auto" }}
+                                    >
+                                      {b.codigo_validado ? "Validado" : "Validar"}
+                                    </Button>
+                                  </InputAdornment>
+                                ) : null,
+                              }}
+                              helperText={
+                                b.codigo_validado 
+                                  ? (b.unidades_restantes_codigo != null && b.unidades_totales_codigo
+                                    ? `Código validado - ${b.unidades_restantes_codigo} de ${b.unidades_totales_codigo} unidades disponibles`
+                                    : "Código correcto - coincide con inventario")
+                                  : b.codigo_ingresado 
+                                    ? "Presiona Validar o Enter para verificar el código" 
+                                    : "Obligatorio: ingresa el código del producto"
+                              }
+                              sx={{
+                                "& .MuiInputBase-root": {
                                   backgroundColor: "rgba(255,255,255,0.95)",
                                   borderRadius: 3,
-                                  p: 2,
-                                  border: "1px solid rgba(163,105,32,0.2)",
-                                }}>
-                                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 700, color: colorPrincipal }}>
-                                      Códigos agregados ({b.codigos.length})
-                                    </Typography>
-                                    <Chip
-                                      label={`Total: ${calcularTotalUnidades(b)} unidades`}
-                                      sx={{
-                                        backgroundColor: "#e8f5e9",
-                                        color: "#2e7d32",
-                                        fontWeight: 700,
-                                      }}
-                                    />
-                                  </Box>
-                                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                                    {b.codigos.map((codigo, idx) => (
-                                      <Box
-                                        key={idx}
-                                        sx={{
-                                          display: "flex",
-                                          justifyContent: "space-between",
-                                          alignItems: "center",
-                                          p: 1,
-                                          backgroundColor: "rgba(163,105,32,0.05)",
-                                          borderRadius: 2,
-                                        }}
-                                      >
-                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                          <Typography variant="body2" sx={{ fontWeight: 600, fontFamily: "monospace" }}>
-                                            {codigo.codigo}
-                                          </Typography>
-                                          <Chip
-                                            label={`${codigo.unidades} U`}
-                                            size="small"
-                                            sx={{
-                                              backgroundColor: "#fff3e0",
-                                              color: "#e65100",
-                                              fontSize: "0.75rem",
-                                              height: 24,
-                                            }}
-                                          />
-                                        </Box>
-                                        <IconButton
-                                          size="small"
-                                          onClick={() => eliminarCodigo(index, idx)}
-                                          sx={{ color: "#d32f2f" }}
-                                        >
-                                          <Close fontSize="small" />
-                                        </IconButton>
-                                      </Box>
-                                    ))}
-                                  </Box>
-                                </Box>
-                              )}
+                                  minHeight: "56px",
+                                  border: b.codigo_validado ? "2px solid #2e7d32" : b.codigo_ingresado && !b.codigo_validado ? "2px solid #f57c00" : "none",
+                                },
+                              }}
+                            />
+                          </Grid>
+                          )}
 
-                              {(!b.codigos || b.codigos.length === 0) && (
-                                <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.5)", fontStyle: "italic" }}>
-                                  No hay códigos agregados. Ingresa un código arriba y presiona Enter o Agregar.
+                          {/* Botón para agregar código extra */}
+                          {b.variante_id && b.codigo_validado && (
+                          <Grid item xs={12} sm="auto">
+                            <Button
+                              variant="outlined"
+                              startIcon={<AddIcon />}
+                              onClick={() => agregarCodigoExtra(index)}
+                              sx={{
+                                borderColor: colorPrincipal,
+                                color: colorPrincipal,
+                                "&:hover": {
+                                  borderColor: "#8a5a1a",
+                                  backgroundColor: "rgba(163,105,32,0.05)",
+                                },
+                                borderRadius: 3,
+                                height: "56px",
+                              }}
+                            >
+                              Agregar código
+                            </Button>
+                          </Grid>
+                          )}
+
+                          {/* Lista de códigos extra */}
+                          {b.codigos_extra && b.codigos_extra.length > 0 && (
+                          <Grid item xs={12}>
+                            <Box sx={{ 
+                              backgroundColor: "rgba(255,255,255,0.95)",
+                              borderRadius: 3,
+                              p: 2,
+                              border: "1px solid rgba(163,105,32,0.2)",
+                            }}>
+                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: colorPrincipal }}>
+                                  Códigos adicionales
                                 </Typography>
-                              )}
+                                <Chip
+                                  label={`Total: ${calcularTotalUnidades(b)} unidades`}
+                                  sx={{
+                                    backgroundColor: "#e8f5e9",
+                                    color: "#2e7d32",
+                                    fontWeight: 700,
+                                  }}
+                                />
+                              </Box>
+                              <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                                {b.codigos_extra.map((codigo, idx) => (
+                                  <Box
+                                    key={idx}
+                                    sx={{
+                                      display: "flex",
+                                      gap: 1,
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <TextField
+                                      label="Código"
+                                      placeholder="Código adicional"
+                                      size="small"
+                                      value={codigo.codigo || ""}
+                                      onChange={(e) => actualizarCodigoExtra(index, idx, "codigo", e.target.value)}
+                                      sx={{ flexGrow: 1, minWidth: 150 }}
+                                    />
+                                    <TextField
+                                      label="Unidades usadas"
+                                      placeholder="0"
+                                      type="number"
+                                      size="small"
+                                      value={codigo.unidades_usadas || ""}
+                                      onChange={(e) => actualizarCodigoExtra(index, idx, "unidades_usadas", e.target.value)}
+                                      sx={{ width: 120 }}
+                                    />
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => eliminarCodigoExtra(index, idx)}
+                                      sx={{ color: "#d32f2f" }}
+                                    >
+                                      <Close fontSize="small" />
+                                    </IconButton>
+                                  </Box>
+                                ))}
+                              </Box>
                             </Box>
                           </Grid>
                           )}
