@@ -267,6 +267,17 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
           });
         }
 
+        const tieneCodigoSmsc = rows.some((col) => col.name === "codigo_smsc");
+        if (!tieneCodigoSmsc) {
+          db.run("ALTER TABLE patients ADD COLUMN codigo_smsc TEXT", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna codigo_smsc:", alterErr.message);
+            } else {
+              console.log("✅ Columna codigo_smsc agregada a patients");
+            }
+          });
+        }
+
         const tieneEspecial = rows.some((col) => col.name === "especial");
         if (!tieneEspecial) {
           db.run("ALTER TABLE patients ADD COLUMN especial INTEGER DEFAULT 0", (alterErr) => {

@@ -126,6 +126,9 @@ const HistorialClinico = () => {
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null);
   const [anchorElClasificacion, setAnchorElClasificacion] = useState(null);
   const [pacienteClasificando, setPacienteClasificando] = useState(null);
+  const [modalCodigoSmsc, setModalCodigoSmsc] = useState(false);
+  const [codigoSmscInput, setCodigoSmscInput] = useState("");
+  const [clasificacionTemporal, setClasificacionTemporal] = useState(null);
   const [tratamientos, setTratamientos] = useState([]);
   const [resumenDeuda, setResumenDeuda] = useState({ cantidad_pendiente: 0, total_pendiente: 0 });
   const [nuevaObservacion, setNuevaObservacion] = useState("");
@@ -460,13 +463,22 @@ const HistorialClinico = () => {
 
   const handleCambiarClasificacion = async (clasificacion) => {
     if (!pacienteClasificando) return;
+    
+    if (clasificacion === "Código") {
+      setClasificacionTemporal("Código");
+      setCodigoSmscInput(pacienteClasificando.codigo_smsc || "");
+      setModalCodigoSmsc(true);
+      setAnchorElClasificacion(null);
+      return;
+    }
+    
     try {
       await axios.patch(`${API_BASE_URL}/api/pacientes/${pacienteClasificando.id}/clasificacion`, 
-        { clasificacion },
+        { clasificacion, codigo_smsc: null },
         { headers: authHeaders }
       );
       setPacientes(prev => prev.map(p => 
-        p.id === pacienteClasificando.id ? { ...p, clasificacion } : p
+        p.id === pacienteClasificando.id ? { ...p, clasificacion, codigo_smsc: null } : p
       ));
       showToast({ severity: "success", message: "Clasificación actualizada" });
     } catch (err) {
@@ -475,6 +487,27 @@ const HistorialClinico = () => {
     } finally {
       setAnchorElClasificacion(null);
       setPacienteClasificando(null);
+    }
+  };
+
+  const handleGuardarCodigoSmsc = async () => {
+    if (!pacienteClasificando) return;
+    
+    try {
+      await axios.patch(`${API_BASE_URL}/api/pacientes/${pacienteClasificando.id}/clasificacion`, 
+        { clasificacion: "Código", codigo_smsc: codigoSmscInput },
+        { headers: authHeaders }
+      );
+      setPacientes(prev => prev.map(p => 
+        p.id === pacienteClasificando.id ? { ...p, clasificacion: "Código", codigo_smsc: codigoSmscInput } : p
+      ));
+      showToast({ severity: "success", message: "Clasificación y código SMSC actualizados" });
+      setModalCodigoSmsc(false);
+      setCodigoSmscInput("");
+      setClasificacionTemporal(null);
+    } catch (err) {
+      console.error("Error al actualizar clasificación:", err);
+      showToast({ severity: "error", message: "Error al actualizar clasificación" });
     }
   };
 
@@ -2888,22 +2921,42 @@ const HistorialClinico = () => {
                             setAnchorElClasificacion(e.currentTarget);
                           }}
                           sx={{
-                            borderColor: pac.clasificacion ? "#a36920" : "rgba(163,105,32,0.2)",
-                            color: pac.clasificacion ? "#a36920" : "#5a3e1b",
+                            borderColor: pac.clasificacion === "Tratamiento" ? "#2e7d32" :
+                                      pac.clasificacion === "Convenio" ? "#7b1fa2" :
+                                      pac.clasificacion === "Código" ? "#0288d1" :
+                                      pac.clasificacion === "Reincorporado" ? "#ef6c00" :
+                                      pac.clasificacion ? "#a36920" : "rgba(163,105,32,0.2)",
+                            color: pac.clasificacion === "Tratamiento" ? "#2e7d32" :
+                                   pac.clasificacion === "Convenio" ? "#7b1fa2" :
+                                   pac.clasificacion === "Código" ? "#0288d1" :
+                                   pac.clasificacion === "Reincorporado" ? "#ef6c00" :
+                                   pac.clasificacion ? "#a36920" : "#5a3e1b",
                             borderRadius: 8,
                             px: 2,
                             py: 0.8,
                             fontWeight: 500,
                             textTransform: "none",
                             fontSize: "0.85rem",
-                            backgroundColor: pac.clasificacion ? "rgba(163,105,32,0.08)" : "transparent",
+                            backgroundColor: pac.clasificacion === "Tratamiento" ? "rgba(46,125,50,0.08)" :
+                                             pac.clasificacion === "Convenio" ? "rgba(123,31,162,0.08)" :
+                                             pac.clasificacion === "Código" ? "rgba(2,136,209,0.08)" :
+                                             pac.clasificacion === "Reincorporado" ? "rgba(239,108,0,0.08)" :
+                                             pac.clasificacion ? "rgba(163,105,32,0.08)" : "transparent",
                             "&:hover": { 
-                              borderColor: "#a36920",
-                              backgroundColor: "rgba(163,105,32,0.12)",
+                              borderColor: pac.clasificacion === "Tratamiento" ? "#2e7d32" :
+                                         pac.clasificacion === "Convenio" ? "#7b1fa2" :
+                                         pac.clasificacion === "Código" ? "#0288d1" :
+                                         pac.clasificacion === "Reincorporado" ? "#ef6c00" :
+                                         "#a36920",
+                              backgroundColor: pac.clasificacion === "Tratamiento" ? "rgba(46,125,50,0.12)" :
+                                               pac.clasificacion === "Convenio" ? "rgba(123,31,162,0.12)" :
+                                               pac.clasificacion === "Código" ? "rgba(2,136,209,0.12)" :
+                                               pac.clasificacion === "Reincorporado" ? "rgba(239,108,0,0.12)" :
+                                               "rgba(163,105,32,0.12)",
                             },
                           }}
                         >
-                          {pac.clasificacion || "Clasificar"}
+                          {pac.clasificacion === "Código" && pac.codigo_smsc ? `Código (${pac.codigo_smsc})` : pac.clasificacion || "Clasificar"}
                         </Button>
                         {isMaster && (
                           <IconButton
@@ -2985,6 +3038,51 @@ const HistorialClinico = () => {
                   Sin clasificación
                 </MenuItem>
               </Menu>
+
+              {/* Modal para ingresar código SMSC */}
+              <Dialog
+                open={modalCodigoSmsc}
+                onClose={() => {
+                  setModalCodigoSmsc(false);
+                  setCodigoSmscInput("");
+                  setClasificacionTemporal(null);
+                }}
+                maxWidth="xs"
+                fullWidth
+              >
+                <DialogTitle sx={{ backgroundColor: "#a36920", color: "white" }}>
+                  Ingresar código SMSC
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                  <TextField
+                    autoFocus
+                    fullWidth
+                    label="Código SMSC"
+                    value={codigoSmscInput}
+                    onChange={(e) => setCodigoSmscInput(e.target.value)}
+                    placeholder="Ej: SMSC-123"
+                    sx={{ mt: 1 }}
+                  />
+                </DialogContent>
+                <DialogActions sx={{ p: 2.5 }}>
+                  <Button 
+                    onClick={() => {
+                      setModalCodigoSmsc(false);
+                      setCodigoSmscInput("");
+                      setClasificacionTemporal(null);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    variant="contained"
+                    onClick={handleGuardarCodigoSmsc}
+                    sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" } }}
+                  >
+                    Guardar
+                  </Button>
+                </DialogActions>
+              </Dialog>
             </>
           ) : (
             <>
