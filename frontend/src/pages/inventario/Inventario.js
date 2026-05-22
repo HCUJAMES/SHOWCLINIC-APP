@@ -228,6 +228,10 @@ export default function Inventario() {
   const [openCodigosModal, setOpenCodigosModal] = useState(false);
   const [codigosProducto, setCodigosProducto] = useState([]);
   const [loadingCodigos, setLoadingCodigos] = useState(false);
+  const [openEditarCantidadModal, setOpenEditarCantidadModal] = useState(false);
+  const [codigoEditando, setCodigoEditando] = useState(null);
+  const [formEditarCantidad, setFormEditarCantidad] = useState({ unidades_totales: "", unidades_restantes: "" });
+  const [editandoCantidad, setEditandoCantidad] = useState(false);
 
   // Estados para ajuste de stock
   const [openAjusteStockModal, setOpenAjusteStockModal] = useState(false);
@@ -535,6 +539,43 @@ export default function Inventario() {
     } catch (err) {
       console.error("Error eliminando código:", err);
       alert("❌ Error al eliminar código");
+    }
+  };
+
+  const handleEditarCantidad = (code) => {
+    setCodigoEditando(code);
+    setFormEditarCantidad({
+      unidades_totales: code.unidades_totales || "",
+      unidades_restantes: code.unidades_restantes || "",
+    });
+    setOpenEditarCantidadModal(true);
+  };
+
+  const handleGuardarCantidad = async () => {
+    if (!codigoEditando) return;
+    setEditandoCantidad(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/barcodes/${codigoEditando.id}/cantidad`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(formEditarCantidad),
+      });
+      if (res.ok) {
+        alert("✅ Cantidad actualizada correctamente");
+        setOpenEditarCantidadModal(false);
+        // Recargar códigos
+        if (productoDetalle?.variante_id) {
+          cargarCodigosProducto(productoDetalle.variante_id);
+        }
+      } else {
+        const error = await res.json();
+        alert(`❌ ${error.message}`);
+      }
+    } catch (err) {
+      console.error("Error actualizando cantidad:", err);
+      alert("❌ Error al actualizar cantidad");
+    } finally {
+      setEditandoCantidad(false);
     }
   };
 
@@ -1129,6 +1170,13 @@ export default function Inventario() {
                         </Typography>
                         <IconButton
                           size="small"
+                          onClick={() => handleEditarCantidad(code)}
+                          sx={{ color: colorPrincipal, ml: 0.5 }}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
                           onClick={() => handleEliminarCodigo(code.id)}
                           sx={{ color: "#d32f2f", ml: 0.5 }}
                         >
@@ -1170,6 +1218,61 @@ export default function Inventario() {
               sx={{ color: colorPrincipal, fontWeight: 700 }}
             >
               Cerrar
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Modal de edición de cantidad */}
+        <Dialog
+          open={openEditarCantidadModal}
+          onClose={() => setOpenEditarCantidadModal(false)}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: 4,
+              background: "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.95) 100%)",
+            },
+          }}
+        >
+          <DialogTitle sx={{ color: colorPrincipal, fontWeight: 800, display: "flex", alignItems: "center", gap: 1 }}>
+            <Edit />
+            Editar cantidad - {codigoEditando?.barcode}
+          </DialogTitle>
+          <DialogContent dividers>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 1 }}>
+              <TextField
+                label="Unidades totales"
+                type="number"
+                fullWidth
+                value={formEditarCantidad.unidades_totales}
+                onChange={(e) => setFormEditarCantidad({ ...formEditarCantidad, unidades_totales: e.target.value })}
+                helperText="Cantidad total de unidades en este código"
+              />
+              <TextField
+                label="Unidades restantes"
+                type="number"
+                fullWidth
+                value={formEditarCantidad.unidades_restantes}
+                onChange={(e) => setFormEditarCantidad({ ...formEditarCantidad, unidades_restantes: e.target.value })}
+                helperText="Cantidad de unidades disponibles actualmente"
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button
+              onClick={() => setOpenEditarCantidadModal(false)}
+              sx={{ color: colorPrincipal, fontWeight: 700 }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleGuardarCantidad}
+              disabled={editandoCantidad || !formEditarCantidad.unidades_totales}
+              variant="contained"
+              sx={{ background: colorPrincipal, "&:hover": { background: "#8a5a1a" } }}
+            >
+              {editandoCantidad ? "Guardando..." : "Guardar"}
             </Button>
           </DialogActions>
         </Dialog>

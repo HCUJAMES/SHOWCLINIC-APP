@@ -422,6 +422,56 @@ router.delete("/:barcodeId", requireBarcodeAccess, async (req, res) => {
   }
 });
 
+// Actualizar cantidad de un código (unidades_totales y unidades_restantes)
+router.patch("/:barcodeId/cantidad", requireBarcodeAccess, async (req, res) => {
+  const { barcodeId } = req.params;
+  const { unidades_totales, unidades_restantes } = req.body;
+
+  if (!unidades_totales && unidades_totales !== 0) {
+    return res.status(400).json({ message: "unidades_totales es requerido" });
+  }
+
+  try {
+    const code = await dbGet(`SELECT id, status FROM barcode_units WHERE id = ?`, [barcodeId]);
+    if (!code) {
+      return res.status(404).json({ message: "Código no encontrado" });
+    }
+
+    const nuevasTotales = parseFloat(unidades_totales) || 0;
+    const nuevasRestantes = unidades_restantes !== undefined ? parseFloat(unidades_restantes) : nuevasTotales;
+
+    // Validar que unidades_restantes no sea mayor que unidades_totales
+    if (nuevasRestantes > nuevasTotales) {
+      return res.status(400).json({ message: "unidades_restantes no puede ser mayor que unidades_totales" });
+    }
+
+    // Actualizar el código
+    await dbRun(
+      `UPDATE barcode_units SET unidades_totales = ?, unidades_restantes = ? WHERE id = ?`,
+      [nuevasTotales, nuevasRestantes, barcodeId]
+    );
+
+    // Si unidades_restantes es 0, marcar como escaneado
+    if (nuevasRestantes <= 0) {
+      await dbRun(
+        `UPDATE barcode_units SET status = 'scanned' WHERE id = ?`,
+        [barcodeId]
+      );
+    } else if (code.status === 'scanned') {
+      // Si tenía unidades restantes y estaba escaneado, reactivarlo
+      await dbRun(
+        `UPDATE barcode_units SET status = 'active' WHERE id = ?`,
+        [barcodeId]
+      );
+    }
+
+    res.json({ message: "Cantidad actualizada correctamente" });
+  } catch (err) {
+    console.error("Error actualizando cantidad:", err.message);
+    res.status(500).json({ message: "Error al actualizar cantidad del código" });
+  }
+});
+
 // Eliminar todos los códigos de una variante (o solo los activos/usados)
 router.delete("/variant/:varianteId/codes", requireBarcodeAccess, async (req, res) => {
   const { varianteId } = req.params;
