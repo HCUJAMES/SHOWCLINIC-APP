@@ -2672,13 +2672,13 @@ const HistorialClinico = () => {
                 </Box>
 
                 {/* Tarjetas de estadísticas */}
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid item xs={12} md={6}>
+                <Grid container spacing={1.5} sx={{ mb: 3 }}>
+                  <Grid item xs={4} md={1.7}>
                     <Paper
                       elevation={0}
                       sx={{
-                        p: 3,
-                        borderRadius: 4,
+                        p: 2,
+                        borderRadius: 3,
                         backgroundColor: "#f5f1e4",
                         border: "1px solid rgba(163,105,32,0.15)",
                         height: "100%",
@@ -2686,10 +2686,10 @@ const HistorialClinico = () => {
                     >
                       <Typography
                         sx={{
-                          fontSize: "2.5rem",
+                          fontSize: "1.8rem",
                           fontWeight: 300,
                           lineHeight: 1,
-                          mb: 0.5,
+                          mb: 0.3,
                           color: "#5a3e1b",
                         }}
                       >
@@ -2697,22 +2697,22 @@ const HistorialClinico = () => {
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: "0.85rem",
+                          fontSize: "0.65rem",
                           textTransform: "uppercase",
-                          letterSpacing: 1.5,
+                          letterSpacing: 0.8,
                           color: "#8b6914",
                         }}
                       >
-                        TOTAL PACIENTES
+                        Total
                       </Typography>
                     </Paper>
                   </Grid>
-                  <Grid item xs={12} md={6}>
+                  <Grid item xs={4} md={1.7}>
                     <Paper
                       elevation={0}
                       sx={{
-                        p: 3,
-                        borderRadius: 4,
+                        p: 2,
+                        borderRadius: 3,
                         backgroundColor: "white",
                         border: "1px solid rgba(163,105,32,0.15)",
                         height: "100%",
@@ -2720,10 +2720,10 @@ const HistorialClinico = () => {
                     >
                       <Typography
                         sx={{
-                          fontSize: "2.5rem",
+                          fontSize: "1.8rem",
                           fontWeight: 300,
                           lineHeight: 1,
-                          mb: 0.5,
+                          mb: 0.3,
                           color: "#2E2E2E",
                         }}
                       >
@@ -2740,13 +2740,183 @@ const HistorialClinico = () => {
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: "0.85rem",
+                          fontSize: "0.65rem",
                           textTransform: "uppercase",
-                          letterSpacing: 1.5,
+                          letterSpacing: 0.8,
                           color: "#999",
                         }}
                       >
-                        NUEVOS ESTE MES
+                        Nuevos mes
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={4} md={1.7}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        backgroundColor: "rgba(46,125,50,0.08)",
+                        border: "1px solid rgba(46,125,50,0.2)",
+                        height: "100%",
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "1.8rem",
+                          fontWeight: 300,
+                          lineHeight: 1,
+                          mb: 0.3,
+                          color: "#2e7d32",
+                        }}
+                      >
+                        {pacientes.filter(p => p.clasificacion === "Tratamiento").length}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.65rem",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.8,
+                          color: "#2e7d32",
+                        }}
+                      >
+                        Tratamiento
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={4} md={1.7}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        backgroundColor: "rgba(123,31,162,0.08)",
+                        border: "1px solid rgba(123,31,162,0.2)",
+                        height: "100%",
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "1.8rem",
+                          fontWeight: 300,
+                          lineHeight: 1,
+                          mb: 0.3,
+                          color: "#7b1fa2",
+                        }}
+                      >
+                        {pacientes.filter(p => p.clasificacion === "Convenio").length}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.65rem",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.8,
+                          color: "#7b1fa2",
+                        }}
+                      >
+                        Convenio
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={4} md={1.7}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        backgroundColor: "rgba(2,136,209,0.08)",
+                        border: "1px solid rgba(2,136,209,0.2)",
+                        height: "100%",
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "1.8rem",
+                          fontWeight: 300,
+                          lineHeight: 1,
+                          mb: 0.3,
+                          color: "#0288d1",
+                        }}
+                      >
+                        {pacientes.filter(p => p.clasificacion === "Código").length}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.65rem",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.8,
+                          color: "#0288d1",
+                        }}
+                      >
+                        Código
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={4} md={1.7}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        backgroundColor: "rgba(239,108,0,0.08)",
+                        border: "1px solid rgba(239,108,0,0.2)",
+                        height: "100%",
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "1.8rem",
+                          fontWeight: 300,
+                          lineHeight: 1,
+                          mb: 0.3,
+                          color: "#ef6c00",
+                        }}
+                      >
+                        {pacientes.filter(p => p.clasificacion === "Reincorporado").length}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.65rem",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.8,
+                          color: "#ef6c00",
+                        }}
+                      >
+                        Retorno
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={4} md={1.7}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        backgroundColor: "rgba(163,105,32,0.08)",
+                        border: "1px solid rgba(163,105,32,0.2)",
+                        height: "100%",
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: "1.8rem",
+                          fontWeight: 300,
+                          lineHeight: 1,
+                          mb: 0.3,
+                          color: "#a36920",
+                        }}
+                      >
+                        {pacientes.filter(p => p.clasificacion === "Solo consulta").length}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "0.65rem",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.8,
+                          color: "#a36920",
+                        }}
+                      >
+                        Solo consulta
                       </Typography>
                     </Paper>
                   </Grid>
