@@ -38,6 +38,7 @@ export default function CrearTratamiento() {
   const [tratamientos, setTratamientos] = useState([]);
   const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
   const [editId, setEditId] = useState(null);
+  const [filtroProcedimiento, setFiltroProcedimiento] = useState("");
   const isDoctor = checkIsDoctor(role);
   const canCreate = canCreateTreatments(role);
 
@@ -432,6 +433,82 @@ export default function CrearTratamiento() {
           </Box>
         ) : null}
 
+        {/* Filtros por procedimiento */}
+        <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap" }}>
+          <Button
+            size="small"
+            variant={filtroProcedimiento === "" ? "contained" : "outlined"}
+            onClick={() => setFiltroProcedimiento("")}
+            sx={{
+              borderColor: colorPrincipal,
+              color: filtroProcedimiento === "" ? "white" : colorPrincipal,
+              backgroundColor: filtroProcedimiento === "" ? colorPrincipal : "transparent",
+              "&:hover": {
+                backgroundColor: filtroProcedimiento === "" ? "#8a5a1a" : "rgba(163,105,32,0.1)",
+              },
+              borderRadius: 2,
+              px: 2,
+              fontSize: "0.85rem",
+            }}
+          >
+            Todos
+          </Button>
+          <Button
+            size="small"
+            variant={filtroProcedimiento === "Armonización" ? "contained" : "outlined"}
+            onClick={() => setFiltroProcedimiento("Armonización")}
+            sx={{
+              borderColor: colorPrincipal,
+              color: filtroProcedimiento === "Armonización" ? "white" : colorPrincipal,
+              backgroundColor: filtroProcedimiento === "Armonización" ? colorPrincipal : "transparent",
+              "&:hover": {
+                backgroundColor: filtroProcedimiento === "Armonización" ? "#8a5a1a" : "rgba(163,105,32,0.1)",
+              },
+              borderRadius: 2,
+              px: 2,
+              fontSize: "0.85rem",
+            }}
+          >
+            Armonización
+          </Button>
+          <Button
+            size="small"
+            variant={filtroProcedimiento === "Cosmiatría Facial" ? "contained" : "outlined"}
+            onClick={() => setFiltroProcedimiento("Cosmiatría Facial")}
+            sx={{
+              borderColor: colorPrincipal,
+              color: filtroProcedimiento === "Cosmiatría Facial" ? "white" : colorPrincipal,
+              backgroundColor: filtroProcedimiento === "Cosmiatría Facial" ? colorPrincipal : "transparent",
+              "&:hover": {
+                backgroundColor: filtroProcedimiento === "Cosmiatría Facial" ? "#8a5a1a" : "rgba(163,105,32,0.1)",
+              },
+              borderRadius: 2,
+              px: 2,
+              fontSize: "0.85rem",
+            }}
+          >
+            Cosmiatría Facial
+          </Button>
+          <Button
+            size="small"
+            variant={filtroProcedimiento === "Cosmiatría Corporal" ? "contained" : "outlined"}
+            onClick={() => setFiltroProcedimiento("Cosmiatría Corporal")}
+            sx={{
+              borderColor: colorPrincipal,
+              color: filtroProcedimiento === "Cosmiatría Corporal" ? "white" : colorPrincipal,
+              backgroundColor: filtroProcedimiento === "Cosmiatría Corporal" ? colorPrincipal : "transparent",
+              "&:hover": {
+                backgroundColor: filtroProcedimiento === "Cosmiatría Corporal" ? "#8a5a1a" : "rgba(163,105,32,0.1)",
+              },
+              borderRadius: 2,
+              px: 2,
+              fontSize: "0.85rem",
+            }}
+          >
+            Cosmiatría Corporal
+          </Button>
+        </Box>
+
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: colorPrincipal }}>
@@ -443,7 +520,7 @@ export default function CrearTratamiento() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {tratamientos.map((t) => (
+            {tratamientos.filter(t => !filtroProcedimiento || t.procedimiento === filtroProcedimiento).map((t) => (
               <TableRow key={t.id}>
                 <TableCell>{t.nombre}</TableCell>
                 <TableCell>
