@@ -573,15 +573,16 @@ const ComenzarTratamiento = () => {
   // Calcular total de unidades (principal + extras)
   const calcularTotalUnidades = (bloque) => {
     let total = 0;
-    // Unidades del código principal
-    if (bloque.unidades_restantes_codigo) {
-      total += parseFloat(bloque.unidades_restantes_codigo) || 0;
-    }
-    // Unidades de códigos extra
-    if (bloque.codigos_extra && bloque.codigos_extra.length > 0) {
-      bloque.codigos_extra.forEach(c => {
-        total += parseFloat(c.unidades_usadas) || 0;
-      });
+    // Usar dosis_unidades si el usuario lo especificó manualmente
+    if (bloque.dosis_unidades && parseFloat(bloque.dosis_unidades) > 0) {
+      total += parseFloat(bloque.dosis_unidades) || 0;
+    } else {
+      // Si no hay dosis_unidades, sumar solo las unidades de códigos extra
+      if (bloque.codigos_extra && bloque.codigos_extra.length > 0) {
+        bloque.codigos_extra.forEach(c => {
+          total += parseFloat(c.unidades_usadas) || 0;
+        });
+      }
     }
     return total;
   };
