@@ -497,7 +497,8 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
 
       // Usar el total calculado por el frontend (precio * cantidad - descuento)
       const precioUnitario = parseNum(b.precio);
-      const cantidadMl = parseNum(b.cantidad) || 1;
+      // Usar dosis_unidades (total de códigos) si está disponible, de lo contrario usar cantidad
+      const cantidadMl = parseNum(b.dosis_unidades) > 0 ? parseNum(b.dosis_unidades) : parseNum(b.cantidad) || 1;
       const totalDelFrontend = parseNum(b.total);
       
       // Si el frontend envía total, usarlo; sino calcular
