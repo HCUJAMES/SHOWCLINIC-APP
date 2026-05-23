@@ -708,7 +708,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         }
       }
 
-      // Validación de código de producto contra códigos de barras en inventario
+      // Validación de códigos de producto contra códigos de barras en inventario
       const varianteIdElegida = b.variante_id ? Number(b.variante_id) : null;
       const cantidadElegida =
         parseNum(b.dosis_unidades) > 0
@@ -716,42 +716,53 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           : parseNum(b.cantidad) || 0;
 
       if (varianteIdElegida) {
-        // Si se seleccionó un producto, DEBE tener código válido
-        const codigoIngresado = (b.codigo_ingresado || "").trim();
-        if (!codigoIngresado) {
+        // Si se seleccionó un producto, DEBE tener códigos válidos
+        const codigos = b.codigos || [];
+        if (!codigos || codigos.length === 0) {
           return res.status(400).json({ 
-            message: `Debes ingresar el código del producto para validar el inventario.` 
+            message: `Debes ingresar al menos un código del producto para validar el inventario.` 
           });
         }
 
-        // Verificar que el código ingresado coincida con algún código disponible de esta variante
-        // Un código es válido si está 'active' O si aún tiene unidades_restantes > 0
-        const codigoValido = await dbGet(
-          `SELECT bu.id, bu.barcode, bu.lote_id, bu.unidades_totales, bu.unidades_restantes, bu.status
-           FROM barcode_units bu
-           LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
-           WHERE sl.variante_id = ?
-             AND bu.barcode = ?
-             AND (bu.status = 'active' OR bu.unidades_restantes > 0)
-           LIMIT 1`,
-          [varianteIdElegida, codigoIngresado]
-        );
+        // Validar cada código y verificar que hay suficientes unidades
+        for (const codigoItem of codigos) {
+          const codigoIngresado = (codigoItem.codigo || "").trim();
+          const unidadesUsadas = parseNum(codigoItem.unidades_usadas) || 0;
 
-        if (!codigoValido) {
-          return res.status(400).json({ 
-            message: `Código incorrecto o agotado. No coincide con ningún código disponible de este producto.` 
-          });
+          if (!codigoIngresado) {
+            return res.status(400).json({ 
+              message: `Todos los códigos deben tener un valor.` 
+            });
+          }
+
+          // Verificar que el código ingresado coincida con algún código disponible de esta variante
+          const codigoValido = await dbGet(
+            `SELECT bu.id, bu.barcode, bu.lote_id, bu.unidades_totales, bu.unidades_restantes, bu.status
+             FROM barcode_units bu
+             LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+             WHERE sl.variante_id = ?
+               AND bu.barcode = ?
+               AND (bu.status = 'active' OR bu.unidades_restantes > 0)
+             LIMIT 1`,
+            [varianteIdElegida, codigoIngresado]
+          );
+
+          if (!codigoValido) {
+            return res.status(400).json({ 
+              message: `Código incorrecto o agotado: ${codigoIngresado}. No coincide con ningún código disponible de este producto.` 
+            });
+          }
+
+          // Verificar que hay suficientes unidades restantes en este código
+          const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
+          if (unidadesUsadas > 0 && unidadesRestantes > 0 && unidadesUsadas > unidadesRestantes) {
+            return res.status(400).json({ 
+              message: `El código ${codigoIngresado} solo tiene ${unidadesRestantes} unidades restantes. Necesitas ${unidadesUsadas}.` 
+            });
+          }
         }
 
-        // Verificar que hay suficientes unidades restantes en este código
-        const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
-        if (cantidadElegida > 0 && unidadesRestantes > 0 && cantidadElegida > unidadesRestantes) {
-          return res.status(400).json({ 
-            message: `Este código solo tiene ${unidadesRestantes} unidades restantes. Necesitas ${cantidadElegida}.` 
-          });
-        }
-
-        // Código validado - proceder con descuento de stock
+        // Códigos validados - proceder con descuento de stock usando FEFO
         if (!usoReceta && cantidadElegida > 0) {
           const movimiento = await dbRun(
             `

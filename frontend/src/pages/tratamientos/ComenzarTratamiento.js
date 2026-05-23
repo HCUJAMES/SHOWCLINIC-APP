@@ -594,9 +594,13 @@ const ComenzarTratamiento = () => {
         nuevosBloques[indexBloque].codigos[indexCodigo] = {
           ...nuevosBloques[indexBloque].codigos[indexCodigo],
           validado: true,
+          unidades_restantes: coincide.unidades_restantes,
+          unidades_totales: coincide.unidades_totales,
         };
         setBloques(nuevosBloques);
-        alert("Código validado correctamente");
+        const unidadesRestantes = coincide.unidades_restantes != null ? coincide.unidades_restantes : "N/A";
+        const unidadesTotales = coincide.unidades_totales != null ? coincide.unidades_totales : "N/A";
+        alert(`✅ Código validado - ${unidadesRestantes} de ${unidadesTotales} unidades disponibles`);
       } else {
         alert("Código incorrecto. No coincide con ningún código de este producto.");
       }
