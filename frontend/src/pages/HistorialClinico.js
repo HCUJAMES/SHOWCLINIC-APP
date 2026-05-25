@@ -308,6 +308,7 @@ const HistorialClinico = () => {
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
   const [especialistaPorPresupuesto, setEspecialistaPorPresupuesto] = useState({});
   const [extraWeeks, setExtraWeeks] = useState({});
+  const [hiddenTimelines, setHiddenTimelines] = useState({});
 
   const [openConfirmarEliminarPaciente, setOpenConfirmarEliminarPaciente] = useState(false);
   const [pacienteEliminar, setPacienteEliminar] = useState(null);
@@ -5317,6 +5318,8 @@ const HistorialClinico = () => {
                   };
                 });
 
+                if (hiddenTimelines[presupuesto.id]) return null;
+
                 return (
                   <div key={`timeline-${presupuesto.id}`} style={{ marginBottom: 24 }}>
                     <TreatmentTimelineMatrix
@@ -5346,6 +5349,7 @@ const HistorialClinico = () => {
                       onAssignSpecialist={(milestoneId) => {
                         console.log('Assign specialist for:', milestoneId);
                       }}
+                      onDelete={() => setHiddenTimelines(prev => ({ ...prev, [presupuesto.id]: true }))}
                     />
                   </div>
                 );

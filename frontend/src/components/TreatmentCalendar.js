@@ -391,13 +391,20 @@ const TreatmentCalendar = ({
               <stop offset="0%" stopColor={C.gold} stopOpacity="0.12" />
               <stop offset="100%" stopColor={C.purple} stopOpacity="0.03" />
             </linearGradient>
+            {/* Grid pattern - cuadriculado tenue */}
+            <pattern id="gridPattern" width="30" height="30" patternUnits="userSpaceOnUse">
+              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(163,105,32,0.15)" strokeWidth="0.8" />
+            </pattern>
           </defs>
+
+          {/* Fondo cuadriculado tenue */}
+          <rect x={0} y={0} width={SVG_W} height={SVG_H + 80} fill="url(#gridPattern)" />
 
           {/* Week background sections */}
           {weekBounds.map((wb, i) => (
             <g key={`wbg-${i}`}>
               <rect x={wb.x} y={0} width={wb.w} height={SVG_H + 80} fill={wb.bg} opacity={0.5} />
-              {i > 0 && <line x1={wb.x} y1={0} x2={wb.x} y2={SVG_H + 80} stroke={wb.border} strokeWidth={1} strokeDasharray="4,4" opacity={0.6} />}
+              {i > 0 && <line x1={wb.x} y1={0} x2={wb.x} y2={SVG_H + 80} stroke={C.gold} strokeWidth={1.5} opacity={0.45} />}
               <text x={wb.x + wb.w / 2} y={20} textAnchor="middle" fontSize={10} fontWeight={700} fill={C.muted} letterSpacing={1}>
                 SEMANA {String(i + 1).padStart(2, "0")}
               </text>

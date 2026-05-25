@@ -1283,7 +1283,7 @@ export default function Inventario() {
   /* ===== LIST VIEW ===== */
   return (
     <Box sx={{ minHeight: "100vh", backgroundColor: colorFondo, p: { xs: 2, md: 3 } }}>
-      <Box sx={{ maxWidth: 1200, margin: "0 auto" }}>
+      <Box sx={{ maxWidth: 1600, margin: "0 auto" }}>
 
         {/* Header */}
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3, flexWrap: "wrap", gap: 1 }}>
@@ -1339,6 +1339,216 @@ export default function Inventario() {
                 </Box>
                 <Typography variant="h4" sx={{ fontWeight: 800, color: "#f57c00" }}>{porVencer}</Typography>
                 <Typography variant="caption" sx={{ color: "#aaa" }}>En menos de 30 días</Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        {/* Gráficos Section */}
+        <Grid container spacing={4} sx={{ mb: 3 }}>
+          {/* Distribución por categoría */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ borderRadius: 3, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", height: "100%" }}>
+              <CardContent sx={{ p: 2.5, px: 5, pb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#2d2d2d", mb: 0.5 }}>Distribución por categoría</Typography>
+                <Typography variant="caption" sx={{ color: "#888", mb: 2, display: "block" }}>
+                  {productos.length} productos · {categorias.length} categorías
+                </Typography>
+                
+                <Box sx={{ display: "flex", alignItems: "center", gap: 3, mt: 1.5, justifyContent: "space-between" }}>
+                  {/* Gráfico de dona */}
+                  <Box sx={{ position: "relative", width: 180, height: 180, flexShrink: 0 }}>
+                    <svg width="180" height="180" viewBox="0 0 180 180">
+                      <circle cx="90" cy="90" r="68" fill="none" stroke="#f5f1e4" strokeWidth="40" />
+                      {(() => {
+                        const total = productos.length;
+                        let currentAngle = -90;
+                        const colors = {
+                          "Otro": "#8b6f47",
+                          "Filler": "#ba9a63",
+                          "Bioestim.": "#5b9bd5",
+                          "Skincare": "#c5a3d9",
+                          "Enzima": "#e89b9b",
+                          "Toxina": "#a8c5a8"
+                        };
+                        return categorias.map((cat, idx) => {
+                          const percentage = (cat.count / total) * 100;
+                          const angle = (percentage / 100) * 360;
+                          const startAngle = currentAngle;
+                          const endAngle = currentAngle + angle;
+                          currentAngle = endAngle;
+                          
+                          const startRad = (startAngle * Math.PI) / 180;
+                          const endRad = (endAngle * Math.PI) / 180;
+                          const x1 = 90 + 68 * Math.cos(startRad);
+                          const y1 = 90 + 68 * Math.sin(startRad);
+                          const x2 = 90 + 68 * Math.cos(endRad);
+                          const y2 = 90 + 68 * Math.sin(endRad);
+                          const largeArc = angle > 180 ? 1 : 0;
+                          
+                          return (
+                            <path
+                              key={cat.label}
+                              d={`M 90 90 L ${x1} ${y1} A 68 68 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                              fill={colors[cat.label] || "#999"}
+                              opacity="0.9"
+                            />
+                          );
+                        });
+                      })()}
+                      <circle cx="90" cy="90" r="48" fill="white" />
+                    </svg>
+                    <Box sx={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
+                      <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d", lineHeight: 1 }}>{productos.length}</Typography>
+                      <Typography variant="caption" sx={{ color: "#888", fontSize: 10 }}>productos</Typography>
+                    </Box>
+                  </Box>
+                  
+                  {/* Leyenda */}
+                  <Box sx={{ flex: 1 }}>
+                    {categorias.map((cat) => {
+                      const colors = {
+                        "Otro": "#8b6f47",
+                        "Filler": "#ba9a63",
+                        "Bioestim.": "#5b9bd5",
+                        "Skincare": "#c5a3d9",
+                        "Enzima": "#e89b9b",
+                        "Toxina": "#a8c5a8"
+                      };
+                      return (
+                        <Box key={cat.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Box sx={{ width: 10, height: 10, borderRadius: 1, background: colors[cat.label] || "#999" }} />
+                            <Typography variant="body2" sx={{ color: "#2d2d2d", fontWeight: 500, fontSize: 13 }}>{cat.label}</Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 13 }}>{cat.count}</Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Ranking de stock */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ borderRadius: 3, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", height: "100%" }}>
+              <CardContent sx={{ p: 2.5, px: 5, pb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#2d2d2d", mb: 0.5 }}>Ranking de stock</Typography>
+                <Typography variant="caption" sx={{ color: "#888", mb: 1.5, display: "block" }}>Cantidad disponible por producto</Typography>
+                
+                <Box sx={{ mt: 1.5 }}>
+                  {productos
+                    .filter(p => p.stock > 0)
+                    .sort((a, b) => b.stock - a.stock)
+                    .slice(0, 5)
+                    .map((p, idx) => {
+                      const maxStock = Math.max(...productos.map(pr => pr.stock));
+                      const percentage = maxStock > 0 ? (p.stock / maxStock) * 100 : 0;
+                      return (
+                        <Box key={p.variante_id} sx={{ mb: 2 }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Typography variant="body2" sx={{ color: "#888", fontWeight: 600, minWidth: 16, fontSize: 13 }}>{idx + 1}</Typography>
+                              <Typography variant="body2" sx={{ color: "#2d2d2d", fontWeight: 600, fontSize: 13 }}>{p.variante}</Typography>
+                            </Box>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: colorPrincipal, fontSize: 13 }}>
+                              {p.stock.toLocaleString()} {p.unidad_base || "u"}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ 
+                            width: "100%", 
+                            height: 8, 
+                            background: "#f0f0f0", 
+                            borderRadius: 1,
+                            overflow: "hidden"
+                          }}>
+                            <Box sx={{ 
+                              width: `${percentage}%`, 
+                              height: "100%", 
+                              background: `linear-gradient(90deg, ${colorPrincipal}, ${colorSecundario})`,
+                              borderRadius: 1,
+                              transition: "width 0.3s ease"
+                            }} />
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Gráfico de Laboratorios */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ borderRadius: 3, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", height: "100%" }}>
+              <CardContent sx={{ p: 2.5, px: 5, pb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "#2d2d2d", mb: 0.5 }}>Lotes por laboratorio</Typography>
+                <Typography variant="caption" sx={{ color: "#888", mb: 1.5, display: "block" }}>
+                  Total de lotes en circulación
+                </Typography>
+                
+                <Box sx={{ mt: 1.5 }}>
+                  {(() => {
+                    // Agrupar por marca (laboratorio)
+                    const laboratorios = {};
+                    stockLotes.forEach((lote) => {
+                      const lab = lote.producto_base_nombre || "Sin marca";
+                      if (!laboratorios[lab]) {
+                        laboratorios[lab] = 0;
+                      }
+                      laboratorios[lab] += 1;
+                    });
+                    
+                    // Convertir a array y ordenar
+                    const labArray = Object.entries(laboratorios)
+                      .map(([nombre, count]) => ({ nombre, count }))
+                      .sort((a, b) => b.count - a.count)
+                      .slice(0, 5);
+                    
+                    const maxCount = Math.max(...labArray.map(l => l.count));
+                    
+                    const barColors = [
+                      "#5b9bd5",
+                      "#ba9a63", 
+                      "#a8c5a8",
+                      "#c5a3d9",
+                      "#e89b9b"
+                    ];
+                    
+                    return labArray.map((lab, idx) => {
+                      const percentage = maxCount > 0 ? (lab.count / maxCount) * 100 : 0;
+                      return (
+                        <Box key={lab.nombre} sx={{ mb: 2 }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                            <Typography variant="body2" sx={{ color: "#2d2d2d", fontWeight: 600, fontSize: 13 }}>
+                              {lab.nombre}
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: colorPrincipal, fontSize: 13 }}>
+                              {lab.count}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ 
+                            width: "100%", 
+                            height: 8, 
+                            background: "#f0f0f0", 
+                            borderRadius: 1,
+                            overflow: "hidden"
+                          }}>
+                            <Box sx={{ 
+                              width: `${percentage}%`, 
+                              height: "100%", 
+                              background: barColors[idx % barColors.length],
+                              borderRadius: 1,
+                              transition: "width 0.3s ease"
+                            }} />
+                          </Box>
+                        </Box>
+                      );
+                    });
+                  })()}
+                </Box>
               </CardContent>
             </Card>
           </Grid>

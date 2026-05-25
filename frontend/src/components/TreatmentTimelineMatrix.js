@@ -23,8 +23,8 @@ const FONTS = {
 };
 
 // ─── Constantes de layout ───
-const WEEK_WIDTH = 220;
-const LANE_HEIGHT = 120;
+const WEEK_WIDTH = 320;
+const LANE_HEIGHT = 160;
 const FIRST_LANE_Y = 130;
 const HEADER_HEIGHT = 80;
 const CATEGORY_PANEL_WIDTH = 220;
@@ -40,6 +40,7 @@ const TreatmentTimelineMatrix = ({
   onAssignSpecialist,
   onAddWeek,
   onRemoveWeek,
+  onDelete,
   className = "",
   presupuestoId,
   especialistas = [],
@@ -162,6 +163,19 @@ const TreatmentTimelineMatrix = ({
       segments.push({ d, isPending, key: `seg-${i}` });
     }
     return segments;
+  }, [sortedMilestones]);
+
+  // ─── Full connector path (for fill area under the curve) ───
+  const fullConnectorPath = useMemo(() => {
+    if (sortedMilestones.length < 2) return "";
+    let path = `M ${sortedMilestones[0].x} ${sortedMilestones[0].y}`;
+    for (let i = 0; i < sortedMilestones.length - 1; i++) {
+      const prev = sortedMilestones[i];
+      const curr = sortedMilestones[i + 1];
+      const midX = (prev.x + curr.x) / 2;
+      path += ` C ${midX} ${prev.y}, ${midX} ${curr.y}, ${curr.x} ${curr.y}`;
+    }
+    return path;
   }, [sortedMilestones]);
 
   // ─── Category counts ───
@@ -307,6 +321,17 @@ const TreatmentTimelineMatrix = ({
           >
             ✎ Editar
           </button>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              style={{ background: "transparent", border: `0.5px solid #d32f2f`, borderRadius: 6, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontFamily: FONTS.sans, fontWeight: 700, color: "#d32f2f", cursor: "pointer", transition: "all 0.2s", lineHeight: 1 }}
+              onMouseEnter={(e) => { e.target.style.background = "rgba(211,47,47,0.08)"; }}
+              onMouseLeave={(e) => { e.target.style.background = "transparent"; }}
+              title="Eliminar gráfico"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
@@ -371,7 +396,30 @@ const TreatmentTimelineMatrix = ({
                   <stop offset="100%" stopColor={idx % 3 === 0 ? "rgba(240,229,210,0.15)" : idx % 3 === 1 ? "rgba(245,237,223,0.2)" : "rgba(250,243,232,0.25)"} />
                 </linearGradient>
               ))}
+              {/* Grid pattern - cuadriculado visible */}
+              <pattern id="matrixGridPattern" width="28" height="28" patternUnits="userSpaceOnUse">
+                <path d="M 28 0 L 0 0 0 28" fill="none" stroke="rgba(163,105,32,0.13)" strokeWidth="0.8" />
+              </pattern>
+              {/* Gradient for connector lines - vertical shadow effect */}
+              <linearGradient id="connectorGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor={COLORS.gold} stopOpacity="0.4" />
+                <stop offset="50%" stopColor={COLORS.gold} stopOpacity="1" />
+                <stop offset="100%" stopColor={COLORS.brownMedium} stopOpacity="0.8" />
+              </linearGradient>
+              <linearGradient id="connectorGradientPending" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor={COLORS.brownLight} stopOpacity="0.3" />
+                <stop offset="50%" stopColor={COLORS.brownLight} stopOpacity="0.7" />
+                <stop offset="100%" stopColor={COLORS.brownMedium} stopOpacity="0.5" />
+              </linearGradient>
+              {/* Gradient for fill area under curve */}
+              <linearGradient id="fillAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor={COLORS.gold} stopOpacity="0.15" />
+                <stop offset="100%" stopColor={COLORS.gold} stopOpacity="0.02" />
+              </linearGradient>
             </defs>
+
+            {/* Fondo cuadriculado */}
+            <rect x={0} y={0} width={svgWidth} height={svgHeight} fill="url(#matrixGridPattern)" />
 
             {/* ─── Week Headers ─── */}
             {weeks.map((week, idx) => {
@@ -388,11 +436,11 @@ const TreatmentTimelineMatrix = ({
               );
             })}
 
-            {/* ─── Vertical Dividers ─── */}
+            {/* ─── Vertical Dividers (week separators - más notorias) ─── */}
             {weeks.map((_, idx) => {
               if (idx === 0) return null;
               const x = idx * WEEK_WIDTH;
-              return <line key={`vdiv-${idx}`} x1={x} y1={HEADER_HEIGHT - 10} x2={x} y2={svgHeight} stroke="rgba(200,169,110,0.25)" strokeDasharray="3,4" strokeWidth={0.5} />;
+              return <line key={`vdiv-${idx}`} x1={x} y1={0} x2={x} y2={svgHeight} stroke="rgba(163,105,32,0.35)" strokeWidth={1.8} />;
             })}
 
             {/* ─── Lane Backgrounds + Guide Lines ─── */}
@@ -407,16 +455,46 @@ const TreatmentTimelineMatrix = ({
               );
             })}
 
+            {/* ─── Starting Line (from category panel edge to first node) ─── */}
+            {sortedMilestones.length >= 1 && (() => {
+              const first = sortedMilestones[0];
+              const startX = 0; // Start from left edge of SVG (which is right after category panel)
+              const startY = svgHeight / 2; // Start from middle height
+              const midX = first.x / 2; // Control point for curve
+              const curvePath = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${first.y}, ${first.x} ${first.y}`;
+              return (
+                <path
+                  d={curvePath}
+                  fill="none"
+                  stroke={first.status === "pending" ? "url(#connectorGradientPending)" : "url(#connectorGradient)"}
+                  strokeWidth={first.status === "pending" ? 2.5 : 3}
+                  strokeDasharray={first.status === "pending" ? "4,4" : "none"}
+                  strokeLinecap="round"
+                />
+              );
+            })()}
+
+            {/* ─── Fill Area Under Curve ─── */}
+            {sortedMilestones.length >= 2 && fullConnectorPath && (() => {
+              const last = sortedMilestones[sortedMilestones.length - 1];
+              const first = sortedMilestones[0];
+              const startX = 0;
+              const startY = svgHeight / 2; // Same starting point as the line
+              const midX = first.x / 2;
+              // Create fill path that follows the starting curve, then the connector path, then closes at bottom
+              const fillPath = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${first.y}, ${fullConnectorPath.substring(2)} L ${last.x},${svgHeight} L ${startX},${svgHeight} Z`;
+              return <path d={fillPath} fill="url(#fillAreaGradient)" />;
+            })()}
+
             {/* ─── Connector Path ─── */}
             {connectorSegments.map((seg) => (
               <path
                 key={seg.key}
                 d={seg.d}
                 fill="none"
-                stroke={seg.isPending ? COLORS.brownLight : COLORS.gold}
-                strokeWidth={seg.isPending ? 2 : 2.2}
+                stroke={seg.isPending ? "url(#connectorGradientPending)" : "url(#connectorGradient)"}
+                strokeWidth={seg.isPending ? 2.5 : 3}
                 strokeDasharray={seg.isPending ? "4,4" : "none"}
-                opacity={seg.isPending ? 0.55 : 1}
                 strokeLinecap="round"
               />
             ))}
@@ -427,50 +505,50 @@ const TreatmentTimelineMatrix = ({
               const specialistName = specialistNames[m.id] || (m.specialist ? m.specialist.fullName : "");
               const specialistInitials = specialistName ? specialistName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : "";
               return (
-                <g key={m.id} style={{ cursor: isDragging ? "grabbing" : "grab", opacity: isDragging ? 0.85 : 1 }}>
+                <g key={`${m.id}-${m.x}-${m.y}`} style={{ cursor: isDragging ? "grabbing" : "grab", opacity: isDragging ? 0.85 : 1 }}>
                   {/* Halo */}
-                  <circle cx={m.x} cy={m.y} r={22} fill={COLORS.creamMain} />
+                  <circle cx={m.x} cy={m.y} r={16} fill={COLORS.creamMain} />
 
                   {/* Main circle */}
                   {m.status === "completed" && (
                     <>
-                      <circle cx={m.x} cy={m.y} r={17} fill={COLORS.brownMedium} />
-                      <path d={`M ${m.x - 8} ${m.y} L ${m.x - 3} ${m.y + 6} L ${m.x + 9} ${m.y - 7}`} stroke={COLORS.creamMain} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                      <circle cx={m.x} cy={m.y} r={12} fill={COLORS.brownMedium} />
+                      <path d={`M ${m.x - 6} ${m.y} L ${m.x - 2} ${m.y + 4} L ${m.x + 6} ${m.y - 5}`} stroke={COLORS.creamMain} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
                     </>
                   )}
                   {m.status === "assigned" && (
-                    <circle cx={m.x} cy={m.y} r={17} fill={COLORS.creamMain} stroke={COLORS.gold} strokeWidth={2.5} />
+                    <circle cx={m.x} cy={m.y} r={12} fill={COLORS.creamMain} stroke={COLORS.gold} strokeWidth={2} />
                   )}
                   {m.status === "pending" && (
-                    <circle cx={m.x} cy={m.y} r={17} fill={COLORS.creamMain} stroke={COLORS.brownLight} strokeWidth={2} strokeDasharray="3,2" />
+                    <circle cx={m.x} cy={m.y} r={12} fill={COLORS.creamMain} stroke={COLORS.brownLight} strokeWidth={1.8} strokeDasharray="3,2" />
                   )}
 
                   {/* Invisible drag handle (larger area) */}
                   <circle
                     cx={m.x}
                     cy={m.y}
-                    r={22}
+                    r={18}
                     fill="transparent"
                     style={{ cursor: isDragging ? "grabbing" : "grab" }}
                     onMouseDown={(e) => handleMouseDown(e, m.id)}
                   />
 
                   {/* Order number badge */}
-                  <circle cx={m.x} cy={m.y - 28} r={9} fill={m.status === "completed" ? COLORS.brownMain : COLORS.creamMain} stroke={COLORS.gold} strokeWidth={0.8} strokeDasharray={m.status === "pending" ? "2,2" : "none"} />
-                  <text x={m.x} y={m.y - 24} textAnchor="middle" style={{ fontFamily: FONTS.serif, fontSize: 11, fontWeight: 500, fill: m.status === "completed" ? COLORS.gold : COLORS.brownDark, opacity: m.status === "pending" ? 0.6 : 1 }}>
+                  <circle cx={m.x} cy={m.y - 22} r={8} fill={m.status === "completed" ? COLORS.brownMain : COLORS.creamMain} stroke={COLORS.gold} strokeWidth={0.8} strokeDasharray={m.status === "pending" ? "2,2" : "none"} />
+                  <text x={m.x} y={m.y - 18} textAnchor="middle" style={{ fontFamily: FONTS.serif, fontSize: 10, fontWeight: 500, fill: m.status === "completed" ? COLORS.gold : COLORS.brownDark, opacity: m.status === "pending" ? 0.6 : 1 }}>
                     {String(m.order).padStart(2, "0")}
                   </text>
 
                   {/* Floating card below node */}
-                  <foreignObject x={m.x - 82} y={m.y + 30} width={164} height={60} style={{ overflow: "visible", pointerEvents: "none" }}>
-                    <div style={{ width: 164, minHeight: 44, borderRadius: 8, background: COLORS.creamMain, border: `0.6px ${m.status === "pending" ? "dashed" : "solid"} ${COLORS.gold}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5px 8px", boxShadow: "0 2px 8px rgba(93,64,55,0.06)", pointerEvents: "auto" }}>
+                  <foreignObject x={m.x - 82} y={m.y + 22} width={164} height={70} style={{ overflow: "visible", pointerEvents: "none" }}>
+                    <div style={{ width: 164, minHeight: 44, borderRadius: 8, background: COLORS.creamMain, border: `0.6px ${m.status === "pending" ? "dashed" : "solid"} ${COLORS.gold}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5px 8px", boxShadow: "0 2px 8px rgba(93,64,55,0.06)", pointerEvents: "auto", userSelect: "none" }}>
                       {/* Treatment name */}
                       <div style={{ fontFamily: FONTS.serif, fontSize: 13, fontWeight: 500, color: COLORS.brownDark, textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
                         {m.name}
                       </div>
-                      {/* Specialist - selectable dropdown */}
-                      {editingSpecialist === m.id ? (
-                        <div style={{ marginTop: 3, width: "100%", position: "relative" }}>
+                      {/* Specialist - click to edit */}
+                      <div style={{ marginTop: 3, width: "100%", position: "relative" }}>
+                        {editingSpecialist === m.id ? (
                           <select
                             autoFocus
                             value={specialistNames[m.id] || ""}
@@ -480,38 +558,41 @@ const TreatmentTimelineMatrix = ({
                               width: "100%", fontSize: 10, fontFamily: FONTS.sans,
                               border: `1px solid ${COLORS.gold}`, borderRadius: 4,
                               padding: "3px 4px", outline: "none", background: COLORS.creamSoft,
-                              color: COLORS.brownDark, cursor: "pointer", appearance: "auto",
+                              color: COLORS.brownDark, cursor: "pointer", appearance: "auto", fontWeight: 500,
                             }}
                           >
-                            <option value="">-- Seleccionar --</option>
+                            <option value="">-- Seleccionar especialista --</option>
                             {especialistas.map((esp) => (
                               <option key={esp.id} value={esp.nombre}>{esp.nombre}</option>
                             ))}
                           </select>
-                        </div>
-                      ) : (
-                        <div
-                          onClick={() => startEditSpecialist(m.id)}
-                          style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3, cursor: "pointer", pointerEvents: "auto" }}
-                          title="Click para editar especialista"
-                        >
-                          {specialistName ? (
-                            <>
-                              <div style={{ width: 12, height: 12, borderRadius: "50%", background: COLORS.brownMain, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <span style={{ fontFamily: FONTS.sans, fontSize: 7, fontWeight: 600, color: COLORS.gold }}>{specialistInitials}</span>
-                              </div>
-                              <span style={{ fontFamily: FONTS.sans, fontSize: 10, color: COLORS.brownMain }}>{specialistName}</span>
-                            </>
-                          ) : (
-                            <>
-                              <div style={{ width: 12, height: 12, borderRadius: "50%", background: "rgba(200,169,110,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <span style={{ fontSize: 8, color: COLORS.brownMain, fontWeight: 600 }}>+</span>
-                              </div>
-                              <span style={{ fontFamily: FONTS.sans, fontSize: 10, fontStyle: "italic", color: COLORS.brownMain, opacity: 0.55 }}>Asignar especialista</span>
-                            </>
-                          )}
-                        </div>
-                      )}
+                        ) : (
+                          <div
+                            onClick={() => startEditSpecialist(m.id)}
+                            style={{
+                              width: "100%", fontSize: 10, fontFamily: FONTS.sans,
+                              border: `1px solid ${COLORS.gold}`, borderRadius: 4,
+                              padding: "4px 6px", background: specialistNames[m.id] ? "rgba(200,169,110,0.08)" : COLORS.creamSoft,
+                              color: specialistNames[m.id] ? COLORS.brownDark : COLORS.brownLight,
+                              cursor: "pointer", fontWeight: 500, textAlign: "center",
+                              transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(200,169,110,0.15)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = specialistNames[m.id] ? "rgba(200,169,110,0.08)" : COLORS.creamSoft; }}
+                          >
+                            {specialistNames[m.id] ? (
+                              <>
+                                <div style={{ width: 14, height: 14, borderRadius: "50%", background: COLORS.brownMain, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                  <span style={{ fontSize: 7, fontWeight: 700, color: COLORS.gold }}>{specialistInitials}</span>
+                                </div>
+                                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{specialistNames[m.id]}</span>
+                              </>
+                            ) : (
+                              <span style={{ fontStyle: "italic" }}>Seleccionar especialista</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </foreignObject>
                 </g>
