@@ -23,7 +23,7 @@ const FONTS = {
 };
 
 // ─── Constantes de layout ───
-const WEEK_WIDTH = 320;
+const WEEK_WIDTH = 420;
 const LANE_HEIGHT = 160;
 const FIRST_LANE_Y = 130;
 const HEADER_HEIGHT = 80;
@@ -540,14 +540,14 @@ const TreatmentTimelineMatrix = ({
                   </text>
 
                   {/* Floating card below node */}
-                  <foreignObject x={m.x - 82} y={m.y + 22} width={164} height={70} style={{ overflow: "visible", pointerEvents: "none" }}>
-                    <div style={{ width: 164, minHeight: 44, borderRadius: 8, background: COLORS.creamMain, border: `0.6px ${m.status === "pending" ? "dashed" : "solid"} ${COLORS.gold}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5px 8px", boxShadow: "0 2px 8px rgba(93,64,55,0.06)", pointerEvents: "auto", userSelect: "none" }}>
+                  <foreignObject x={m.x - 65} y={m.y + 22} width={130} height={70} style={{ overflow: "visible", pointerEvents: "none" }}>
+                    <div style={{ width: 130, minHeight: 38, borderRadius: 6, background: COLORS.creamMain, border: `0.6px ${m.status === "pending" ? "dashed" : "solid"} ${COLORS.gold}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4px 6px", boxShadow: "0 2px 8px rgba(93,64,55,0.06)", pointerEvents: "auto", userSelect: "none" }}>
                       {/* Treatment name */}
-                      <div style={{ fontFamily: FONTS.serif, fontSize: 13, fontWeight: 500, color: COLORS.brownDark, textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                      <div style={{ fontFamily: FONTS.serif, fontSize: 11, fontWeight: 500, color: COLORS.brownDark, textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
                         {m.name}
                       </div>
                       {/* Specialist - click to edit */}
-                      <div style={{ marginTop: 3, width: "100%", position: "relative" }}>
+                      <div style={{ marginTop: 2, width: "100%", position: "relative" }}>
                         {editingSpecialist === m.id ? (
                           <select
                             autoFocus
@@ -555,13 +555,13 @@ const TreatmentTimelineMatrix = ({
                             onChange={(e) => selectSpecialist(m.id, e.target.value)}
                             onBlur={() => setEditingSpecialist(null)}
                             style={{
-                              width: "100%", fontSize: 10, fontFamily: FONTS.sans,
-                              border: `1px solid ${COLORS.gold}`, borderRadius: 4,
-                              padding: "3px 4px", outline: "none", background: COLORS.creamSoft,
+                              width: "100%", fontSize: 9, fontFamily: FONTS.sans,
+                              border: `1px solid ${COLORS.gold}`, borderRadius: 3,
+                              padding: "2px 3px", outline: "none", background: COLORS.creamSoft,
                               color: COLORS.brownDark, cursor: "pointer", appearance: "auto", fontWeight: 500,
                             }}
                           >
-                            <option value="">-- Seleccionar especialista --</option>
+                            <option value="">-- Seleccionar --</option>
                             {especialistas.map((esp) => (
                               <option key={esp.id} value={esp.nombre}>{esp.nombre}</option>
                             ))}
@@ -570,25 +570,25 @@ const TreatmentTimelineMatrix = ({
                           <div
                             onClick={() => startEditSpecialist(m.id)}
                             style={{
-                              width: "100%", fontSize: 10, fontFamily: FONTS.sans,
-                              border: `1px solid ${COLORS.gold}`, borderRadius: 4,
-                              padding: "4px 6px", background: specialistNames[m.id] ? "rgba(200,169,110,0.08)" : COLORS.creamSoft,
+                              width: "100%", fontSize: 9, fontFamily: FONTS.sans,
+                              border: `1px solid ${COLORS.gold}`, borderRadius: 3,
+                              padding: "3px 4px", background: specialistNames[m.id] ? "rgba(200,169,110,0.08)" : COLORS.creamSoft,
                               color: specialistNames[m.id] ? COLORS.brownDark : COLORS.brownLight,
                               cursor: "pointer", fontWeight: 500, textAlign: "center",
-                              transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                              transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 3,
                             }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(200,169,110,0.15)"; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = specialistNames[m.id] ? "rgba(200,169,110,0.08)" : COLORS.creamSoft; }}
                           >
                             {specialistNames[m.id] ? (
                               <>
-                                <div style={{ width: 14, height: 14, borderRadius: "50%", background: COLORS.brownMain, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                  <span style={{ fontSize: 7, fontWeight: 700, color: COLORS.gold }}>{specialistInitials}</span>
+                                <div style={{ width: 12, height: 12, borderRadius: "50%", background: COLORS.brownMain, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                  <span style={{ fontSize: 6, fontWeight: 700, color: COLORS.gold }}>{specialistInitials}</span>
                                 </div>
-                                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{specialistNames[m.id]}</span>
+                                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: 9 }}>{specialistNames[m.id]}</span>
                               </>
                             ) : (
-                              <span style={{ fontStyle: "italic" }}>Seleccionar especialista</span>
+                              <span style={{ fontStyle: "italic", fontSize: 8 }}>Seleccionar</span>
                             )}
                           </div>
                         )}
