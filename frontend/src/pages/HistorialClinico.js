@@ -5265,9 +5265,9 @@ const HistorialClinico = () => {
 
                 // Fixed 3 categories
                 const matrixCategories = [
-                  { key: "armonizacion", label: "Armonización", initial: "A", subtitle: "Inyectables y rellenos" },
-                  { key: "facial", label: "Cosmiatría Facial", initial: "F", subtitle: "Aparatología y limpieza" },
                   { key: "corporal", label: "Cosmiatría Corporal", initial: "C", subtitle: "Modelado y reductivos" },
+                  { key: "facial", label: "Cosmiatría Facial", initial: "F", subtitle: "Aparatología y limpieza" },
+                  { key: "armonizacion", label: "Armonización", initial: "A", subtitle: "Inyectables y rellenos" },
                 ];
 
                 // Map treatments to categories based on keywords
