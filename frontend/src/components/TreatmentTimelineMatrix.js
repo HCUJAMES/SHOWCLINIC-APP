@@ -52,6 +52,7 @@ const TreatmentTimelineMatrix = ({
   const [draggingNode, setDraggingNode] = useState(null);
   const [editingSpecialist, setEditingSpecialist] = useState(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
+  const [startNodePosition, setStartNodePosition] = useState(null);
   const scrollContainerRef = useRef(null);
   const svgRef = useRef(null);
   const saveTimerRef = useRef(null);
@@ -77,6 +78,9 @@ const TreatmentTimelineMatrix = ({
         }
         if (data && data.specialistNames) {
           setSpecialistNames(data.specialistNames);
+        }
+        if (data && data.startNodePosition) {
+          setStartNodePosition(data.startNodePosition);
         }
         setLayoutLoaded(true);
       })
@@ -104,7 +108,7 @@ const TreatmentTimelineMatrix = ({
   }, [milestones, weeks, categories, layoutLoaded]);
 
   // ─── Save layout to DB (debounced) ───
-  const saveLayout = useCallback((positions, specialists) => {
+  const saveLayout = useCallback((positions, specialists, startPos) => {
     if (!presupuestoId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
@@ -112,7 +116,7 @@ const TreatmentTimelineMatrix = ({
       fetch(`${API}/api/tratamientos/calendar-layout/${presupuestoId}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ matrixPositions: positions, specialistNames: specialists }),
+        body: JSON.stringify({ matrixPositions: positions, specialistNames: specialists, startNodePosition: startPos }),
       }).catch((err) => console.error("Error guardando layout:", err));
     }, 500);
   }, [presupuestoId]);
@@ -187,6 +191,12 @@ const TreatmentTimelineMatrix = ({
     return counts;
   }, [categories, milestones]);
 
+  // ─── Init start node position ───
+  useEffect(() => {
+    if (!layoutLoaded || startNodePosition) return;
+    setStartNodePosition({ x: 60, y: svgHeight / 2 });
+  }, [layoutLoaded, startNodePosition, svgHeight]);
+
   // ─── Free drag handlers (mouse-based SVG drag) ───
   const handleMouseDown = useCallback((e, milestoneId) => {
     e.preventDefault();
@@ -202,18 +212,29 @@ const TreatmentTimelineMatrix = ({
       const rect = svg.getBoundingClientRect();
       const x = Math.max(20, Math.min(svgWidth - 20, e.clientX - rect.left));
       const y = Math.max(20, Math.min(svgHeight - 20, e.clientY - rect.top));
-      setNodePositions((prev) => {
-        const next = { ...prev, [draggingNode]: { x, y } };
-        return next;
-      });
+      if (draggingNode === 'start-node') {
+        setStartNodePosition({ x, y });
+      } else {
+        setNodePositions((prev) => {
+          const next = { ...prev, [draggingNode]: { x, y } };
+          return next;
+        });
+      }
     };
     const handleMouseUp = () => {
       setDraggingNode(null);
       // Save after drop
-      setNodePositions((prev) => {
-        saveLayout(prev, specialistNames);
-        return prev;
-      });
+      if (draggingNode === 'start-node') {
+        setStartNodePosition((prev) => {
+          saveLayout(nodePositions, specialistNames, prev);
+          return prev;
+        });
+      } else {
+        setNodePositions((prev) => {
+          saveLayout(prev, specialistNames, startNodePosition);
+          return prev;
+        });
+      }
     };
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
@@ -221,7 +242,7 @@ const TreatmentTimelineMatrix = ({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [draggingNode, svgWidth, svgHeight, saveLayout, specialistNames]);
+  }, [draggingNode, svgWidth, svgHeight, saveLayout, specialistNames, nodePositions, startNodePosition]);
 
   // ─── Specialist edit handlers ───
   const startEditSpecialist = useCallback((milestoneId) => {
@@ -232,8 +253,8 @@ const TreatmentTimelineMatrix = ({
     const newNames = { ...specialistNames, [milestoneId]: nombre };
     setSpecialistNames(newNames);
     setEditingSpecialist(null);
-    saveLayout(nodePositions, newNames);
-  }, [specialistNames, nodePositions, saveLayout]);
+    saveLayout(nodePositions, newNames, startNodePosition);
+  }, [specialistNames, nodePositions, saveLayout, startNodePosition]);
 
   return (
     <div
@@ -455,12 +476,12 @@ const TreatmentTimelineMatrix = ({
               );
             })}
 
-            {/* ─── Starting Line (from category panel edge to first node) ─── */}
-            {sortedMilestones.length >= 1 && (() => {
+            {/* ─── Starting Line (from start node to first milestone) ─── */}
+            {sortedMilestones.length >= 1 && startNodePosition && (() => {
               const first = sortedMilestones[0];
-              const startX = 0; // Start from left edge of SVG (which is right after category panel)
-              const startY = svgHeight / 2; // Start from middle height
-              const midX = first.x / 2; // Control point for curve
+              const startX = startNodePosition.x;
+              const startY = startNodePosition.y;
+              const midX = (startX + first.x) / 2;
               const curvePath = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${first.y}, ${first.x} ${first.y}`;
               return (
                 <path
@@ -475,12 +496,12 @@ const TreatmentTimelineMatrix = ({
             })()}
 
             {/* ─── Fill Area Under Curve ─── */}
-            {sortedMilestones.length >= 2 && fullConnectorPath && (() => {
+            {sortedMilestones.length >= 2 && fullConnectorPath && startNodePosition && (() => {
               const last = sortedMilestones[sortedMilestones.length - 1];
               const first = sortedMilestones[0];
-              const startX = 0;
-              const startY = svgHeight / 2; // Same starting point as the line
-              const midX = first.x / 2;
+              const startX = startNodePosition.x;
+              const startY = startNodePosition.y;
+              const midX = (startX + first.x) / 2;
               // Create fill path that follows the starting curve, then the connector path, then closes at bottom
               const fillPath = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${first.y}, ${fullConnectorPath.substring(2)} L ${last.x},${svgHeight} L ${startX},${svgHeight} Z`;
               return <path d={fillPath} fill="url(#fillAreaGradient)" />;
@@ -498,6 +519,36 @@ const TreatmentTimelineMatrix = ({
                 strokeLinecap="round"
               />
             ))}
+
+            {/* ─── Start Node (movible, sin cuadro) ─── */}
+            {startNodePosition && (() => {
+              const isDragging = draggingNode === 'start-node';
+              return (
+                <g key="start-node" style={{ cursor: isDragging ? "grabbing" : "grab", opacity: isDragging ? 0.85 : 1 }}>
+                  {/* Halo */}
+                  <circle cx={startNodePosition.x} cy={startNodePosition.y} r={16} fill={COLORS.creamMain} />
+                  
+                  {/* Main circle - estilo distintivo para el nodo inicial */}
+                  <circle cx={startNodePosition.x} cy={startNodePosition.y} r={12} fill={COLORS.gold} stroke={COLORS.brownMain} strokeWidth={2} />
+                  
+                  {/* Icon - play/start symbol */}
+                  <path 
+                    d={`M ${startNodePosition.x - 3} ${startNodePosition.y - 5} L ${startNodePosition.x - 3} ${startNodePosition.y + 5} L ${startNodePosition.x + 5} ${startNodePosition.y} Z`} 
+                    fill={COLORS.brownMain}
+                  />
+                  
+                  {/* Invisible drag handle (larger area) */}
+                  <circle
+                    cx={startNodePosition.x}
+                    cy={startNodePosition.y}
+                    r={18}
+                    fill="transparent"
+                    style={{ cursor: isDragging ? "grabbing" : "grab" }}
+                    onMouseDown={(e) => handleMouseDown(e, 'start-node')}
+                  />
+                </g>
+              );
+            })()}
 
             {/* ─── Milestone Nodes (freely draggable) ─── */}
             {milestonePositions.map((m) => {
