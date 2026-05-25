@@ -386,9 +386,9 @@ export default function CrearTratamiento() {
                 onChange={(e) => setNuevo({ ...nuevo, procedimiento: e.target.value })}
               >
                 <MenuItem value=""><em>Sin asignar</em></MenuItem>
-                <MenuItem value="Armonización">Armonización</MenuItem>
-                <MenuItem value="Cosmiatría Facial">Cosmiatría Facial</MenuItem>
                 <MenuItem value="Cosmiatría Corporal">Cosmiatría Corporal</MenuItem>
+                <MenuItem value="Cosmiatría Facial">Cosmiatría Facial</MenuItem>
+                <MenuItem value="Armonización">Armonización</MenuItem>
               </Select>
             </FormControl>
             <TextField
@@ -455,21 +455,21 @@ export default function CrearTratamiento() {
           </Button>
           <Button
             size="small"
-            variant={filtroProcedimiento === "Armonización" ? "contained" : "outlined"}
-            onClick={() => setFiltroProcedimiento("Armonización")}
+            variant={filtroProcedimiento === "Cosmiatría Corporal" ? "contained" : "outlined"}
+            onClick={() => setFiltroProcedimiento("Cosmiatría Corporal")}
             sx={{
               borderColor: colorPrincipal,
-              color: filtroProcedimiento === "Armonización" ? "white" : colorPrincipal,
-              backgroundColor: filtroProcedimiento === "Armonización" ? colorPrincipal : "transparent",
+              color: filtroProcedimiento === "Cosmiatría Corporal" ? "white" : colorPrincipal,
+              backgroundColor: filtroProcedimiento === "Cosmiatría Corporal" ? colorPrincipal : "transparent",
               "&:hover": {
-                backgroundColor: filtroProcedimiento === "Armonización" ? "#8a5a1a" : "rgba(163,105,32,0.1)",
+                backgroundColor: filtroProcedimiento === "Cosmiatría Corporal" ? "#8a5a1a" : "rgba(163,105,32,0.1)",
               },
               borderRadius: 2,
               px: 2,
               fontSize: "0.85rem",
             }}
           >
-            Armonización
+            Cosmiatría Corporal
           </Button>
           <Button
             size="small"
@@ -491,21 +491,21 @@ export default function CrearTratamiento() {
           </Button>
           <Button
             size="small"
-            variant={filtroProcedimiento === "Cosmiatría Corporal" ? "contained" : "outlined"}
-            onClick={() => setFiltroProcedimiento("Cosmiatría Corporal")}
+            variant={filtroProcedimiento === "Armonización" ? "contained" : "outlined"}
+            onClick={() => setFiltroProcedimiento("Armonización")}
             sx={{
               borderColor: colorPrincipal,
-              color: filtroProcedimiento === "Cosmiatría Corporal" ? "white" : colorPrincipal,
-              backgroundColor: filtroProcedimiento === "Cosmiatría Corporal" ? colorPrincipal : "transparent",
+              color: filtroProcedimiento === "Armonización" ? "white" : colorPrincipal,
+              backgroundColor: filtroProcedimiento === "Armonización" ? colorPrincipal : "transparent",
               "&:hover": {
-                backgroundColor: filtroProcedimiento === "Cosmiatría Corporal" ? "#8a5a1a" : "rgba(163,105,32,0.1)",
+                backgroundColor: filtroProcedimiento === "Armonización" ? "#8a5a1a" : "rgba(163,105,32,0.1)",
               },
               borderRadius: 2,
               px: 2,
               fontSize: "0.85rem",
             }}
           >
-            Cosmiatría Corporal
+            Armonización
           </Button>
         </Box>
 
