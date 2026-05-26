@@ -56,7 +56,7 @@ const upload = multer({ storage });
 
 // ✅ Crear tratamiento
 router.post("/crear", requireTreatmentBaseCreate, (req, res) => {
-  const { nombre, descripcion, precio, procedimiento } = req.body;
+  const { nombre, descripcion, precio, procedimiento, sesiones } = req.body;
   if (!nombre) {
     return res.status(400).json({ message: "Falta nombre" });
   }
@@ -65,16 +65,19 @@ router.post("/crear", requireTreatmentBaseCreate, (req, res) => {
     return res.status(400).json({ message: "Precio inválido" });
   }
 
+  const sesionesNum = sesiones == null || sesiones === "" ? 1 : parseInt(sesiones);
+  const sesionesVal = Number.isFinite(sesionesNum) && sesionesNum >= 1 ? sesionesNum : 1;
+
   const procValid = ["Armonización", "Cosmiatría Facial", "Cosmiatría Corporal"];
   const procStr = procedimiento && procValid.includes(procedimiento) ? procedimiento : null;
 
   db.run(
-    `INSERT INTO tratamientos (nombre, descripcion, precio, procedimiento) VALUES (?, ?, ?, ?)`,
-    [nombre, descripcion || "", precioNum, procStr],
+    `INSERT INTO tratamientos (nombre, descripcion, precio, procedimiento, sesiones) VALUES (?, ?, ?, ?, ?)`,
+    [nombre, descripcion || "", precioNum, procStr, sesionesVal],
     function (err) {
       if (err)
         return res.status(500).json({ message: "Error al crear tratamiento" });
-      res.json({ id: this.lastID, nombre, descripcion: descripcion || "", precio: precioNum, procedimiento: procStr });
+      res.json({ id: this.lastID, nombre, descripcion: descripcion || "", precio: precioNum, procedimiento: procStr, sesiones: sesionesVal });
     }
   );
 });
@@ -246,7 +249,7 @@ router.put("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "maste
 router.put("/:id", requireDoctor, async (req, res) => {
   const { id } = req.params;
   const idNum = Number(id);
-  const { nombre, descripcion, precio, procedimiento } = req.body || {};
+  const { nombre, descripcion, precio, procedimiento, sesiones } = req.body || {};
 
   if (!Number.isFinite(idNum) || idNum <= 0) {
     return res.status(400).json({ message: "ID inválido" });
@@ -262,6 +265,9 @@ router.put("/:id", requireDoctor, async (req, res) => {
     return res.status(400).json({ message: "Precio inválido" });
   }
 
+  const sesionesNum = sesiones == null || sesiones === "" ? 1 : parseInt(sesiones);
+  const sesionesVal = Number.isFinite(sesionesNum) && sesionesNum >= 1 ? sesionesNum : 1;
+
   const descripcionStr = typeof descripcion === "string" ? descripcion : "";
 
   const procValid = ["Armonización", "Cosmiatría Facial", "Cosmiatría Corporal"];
@@ -269,15 +275,15 @@ router.put("/:id", requireDoctor, async (req, res) => {
 
   try {
     const result = await dbRun(
-      `UPDATE tratamientos SET nombre = ?, descripcion = ?, precio = ?, procedimiento = ? WHERE id = ?`,
-      [nombreStr, descripcionStr, precioNum, procStr, idNum]
+      `UPDATE tratamientos SET nombre = ?, descripcion = ?, precio = ?, procedimiento = ?, sesiones = ? WHERE id = ?`,
+      [nombreStr, descripcionStr, precioNum, procStr, sesionesVal, idNum]
     );
 
     if ((result?.changes || 0) === 0) {
       return res.status(404).json({ message: "Tratamiento no encontrado" });
     }
 
-    res.json({ id: idNum, nombre: nombreStr, descripcion: descripcionStr, precio: precioNum, procedimiento: procStr });
+    res.json({ id: idNum, nombre: nombreStr, descripcion: descripcionStr, precio: precioNum, procedimiento: procStr, sesiones: sesionesVal });
   } catch (err) {
     console.error("❌ Error al editar tratamiento:", err.message);
     res.status(500).json({ message: "Error al editar tratamiento" });

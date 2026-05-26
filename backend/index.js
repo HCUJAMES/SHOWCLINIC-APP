@@ -353,6 +353,17 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
             }
           });
         }
+
+        const tieneSesiones = rows.some((col) => col.name === "sesiones");
+        if (!tieneSesiones) {
+          db.run("ALTER TABLE tratamientos ADD COLUMN sesiones INTEGER DEFAULT 1", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna sesiones en tratamientos:", alterErr.message);
+            } else {
+              console.log("✅ Columna sesiones agregada a tratamientos");
+            }
+          });
+        }
       }
     });
 

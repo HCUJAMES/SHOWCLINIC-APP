@@ -1851,12 +1851,12 @@ const HistorialClinico = () => {
     setOfertaItems((prev) => {
       const exists = prev.some((x) => x.tratamientoId === t.id);
       if (exists) return prev.filter((x) => x.tratamientoId !== t.id);
-      return [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: "1", producto: "", ml: "" }];
+      return [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: t.sesiones ? String(t.sesiones) : "1", producto: "", ml: "" }];
     });
   };
 
   const addOfertaItem = (t) => {
-    setOfertaItems((prev) => [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: "1", producto: "", ml: "" }]);
+    setOfertaItems((prev) => [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: t.sesiones ? String(t.sesiones) : "1", producto: "", ml: "" }]);
   };
 
   const removeOneOfertaItem = (t) => {

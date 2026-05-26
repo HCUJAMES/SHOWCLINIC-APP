@@ -5,11 +5,6 @@ import {
   Typography,
   TextField,
   Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   IconButton,
   Dialog,
   DialogTitle,
@@ -23,7 +18,7 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close } from "@mui/icons-material";
+import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/ToastProvider";
 import { useAuth } from "../../hooks/useAuth";
@@ -36,8 +31,8 @@ export default function CrearTratamiento() {
   const { showToast } = useToast();
   const { role, token } = useAuth();
   const [tratamientos, setTratamientos] = useState([]);
-  const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
-  const [editId, setEditId] = useState(null);
+  const [nuevo, setNuevo] = useState({ nombre: "", descripcion: "", precio: "", procedimiento: "", sesiones: "1" });
+  const [inlineEdit, setInlineEdit] = useState(null);
   const [filtroProcedimiento, setFiltroProcedimiento] = useState("");
   const isDoctor = checkIsDoctor(role);
   const canCreate = canCreateTreatments(role);
@@ -218,51 +213,54 @@ export default function CrearTratamiento() {
     }
   };
 
-  const guardarEdicion = async () => {
+  const iniciarEdicionInline = (t) => {
+    setInlineEdit({
+      id: t.id,
+      nombre: t.nombre || "",
+      descripcion: t.descripcion || "",
+      precio: t.precio == null ? "" : String(t.precio),
+      procedimiento: t.procedimiento || "",
+      sesiones: t.sesiones == null ? "1" : String(t.sesiones),
+    });
+  };
+
+  const cancelarEdicionInline = () => {
+    setInlineEdit(null);
+  };
+
+  const guardarEdicionInline = async () => {
     if (!isDoctor) {
       showToast({ severity: "warning", message: "Solo el rol doctor puede modificar tratamientos" });
       return;
     }
-
-    if (!editId) return;
-
-    if (!nuevo.nombre) {
+    if (!inlineEdit) return;
+    if (!inlineEdit.nombre) {
       showToast({ severity: "warning", message: "Por favor, completa el Nombre del tratamiento." });
       return;
     }
 
-    const res = await fetch(`${API_BASE_URL}/api/tratamientos/${editId}`, {
+    const res = await fetch(`${API_BASE_URL}/api/tratamientos/${inlineEdit.id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify(nuevo),
+      body: JSON.stringify({
+        nombre: inlineEdit.nombre,
+        descripcion: inlineEdit.descripcion,
+        precio: inlineEdit.precio,
+        procedimiento: inlineEdit.procedimiento,
+        sesiones: inlineEdit.sesiones,
+      }),
     });
 
     if (res.ok) {
-      showToast({ severity: "success", message: "Tratamiento actualizado correctamente" });
-      setNuevo({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
-      setEditId(null);
+      showToast({ severity: "success", message: "Tratamiento actualizado" });
+      setInlineEdit(null);
       cargarTratamientos();
     } else {
       showToast({ severity: "error", message: "Error al actualizar tratamiento" });
     }
-  };
-
-  const editarTratamiento = (t) => {
-    setEditId(t.id);
-    setNuevo({
-      nombre: t.nombre || "",
-      descripcion: t.descripcion || "",
-      precio: t.precio == null ? "" : String(t.precio),
-      procedimiento: t.procedimiento || "",
-    });
-  };
-
-  const cancelarEdicion = () => {
-    setEditId(null);
-    setNuevo({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
   };
 
   const crearTratamiento = async () => {
@@ -287,7 +285,7 @@ export default function CrearTratamiento() {
 
     if (res.ok) {
       showToast({ severity: "success", message: "Tratamiento creado correctamente" });
-      setNuevo({ nombre: "", descripcion: "", precio: "", procedimiento: "" });
+      setNuevo({ nombre: "", descripcion: "", precio: "", procedimiento: "", sesiones: "1" });
       cargarTratamientos();
     } else {
       showToast({ severity: "error", message: "Error al crear tratamiento" });
@@ -365,6 +363,7 @@ export default function CrearTratamiento() {
           <Box sx={{ display: "grid", gap: 2, mb: 3 }}>
             <TextField
               label="Nombre del tratamiento *"
+              size="small"
               value={nuevo.nombre}
               onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
               placeholder="Ej: Diseño de labios, Botox facial, etc."
@@ -372,34 +371,48 @@ export default function CrearTratamiento() {
             <TextField
               label="Descripción"
               multiline
-              rows={3}
+              rows={2}
+              size="small"
               value={nuevo.descripcion}
               onChange={(e) =>
                 setNuevo({ ...nuevo, descripcion: e.target.value })
               }
             />
-            <FormControl fullWidth>
-              <InputLabel>Procedimiento</InputLabel>
-              <Select
-                value={nuevo.procedimiento}
-                label="Procedimiento"
-                onChange={(e) => setNuevo({ ...nuevo, procedimiento: e.target.value })}
-              >
-                <MenuItem value=""><em>Sin asignar</em></MenuItem>
-                <MenuItem value="Cosmiatría Corporal">Cosmiatría Corporal</MenuItem>
-                <MenuItem value="Cosmiatría Facial">Cosmiatría Facial</MenuItem>
-                <MenuItem value="Armonización">Armonización</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              label="Precio del tratamiento (S/)"
-              type="number"
-              value={nuevo.precio}
-              onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value })}
-              placeholder="Ej: 1200"
-              inputProps={{ min: 0, step: 0.01 }}
-              helperText="Precio fijo que se cobra al paciente por este tratamiento"
-            />
+            <Box sx={{ display: "flex", gap: 1.5 }}>
+              <FormControl size="small" sx={{ flex: 1 }}>
+                <InputLabel>Procedimiento</InputLabel>
+                <Select
+                  value={nuevo.procedimiento}
+                  label="Procedimiento"
+                  onChange={(e) => setNuevo({ ...nuevo, procedimiento: e.target.value })}
+                >
+                  <MenuItem value=""><em>Sin asignar</em></MenuItem>
+                  <MenuItem value="Cosmiatría Corporal">Cosmiatría Corporal</MenuItem>
+                  <MenuItem value="Cosmiatría Facial">Cosmiatría Facial</MenuItem>
+                  <MenuItem value="Armonización">Armonización</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                label="Precio (S/)"
+                type="number"
+                size="small"
+                value={nuevo.precio}
+                onChange={(e) => setNuevo({ ...nuevo, precio: e.target.value })}
+                placeholder="1200"
+                inputProps={{ min: 0, step: 0.01 }}
+                sx={{ width: 130 }}
+              />
+              <TextField
+                label="Sesiones"
+                type="number"
+                size="small"
+                value={nuevo.sesiones}
+                onChange={(e) => setNuevo({ ...nuevo, sesiones: e.target.value })}
+                placeholder="3"
+                inputProps={{ min: 1, step: 1 }}
+                sx={{ width: 100 }}
+              />
+            </Box>
             <Button
               variant="contained"
               sx={{
@@ -410,26 +423,10 @@ export default function CrearTratamiento() {
                 borderRadius: 3,
                 fontWeight: "bold",
               }}
-              onClick={editId ? guardarEdicion : crearTratamiento}
+              onClick={crearTratamiento}
             >
-              {editId ? "Guardar cambios" : "Guardar Tratamiento"}
+              Guardar Tratamiento
             </Button>
-
-            {isDoctor && editId ? (
-              <Button
-                variant="outlined"
-                sx={{
-                  borderColor: colorPrincipal,
-                  color: colorPrincipal,
-                  py: 1.2,
-                  borderRadius: 3,
-                  fontWeight: "bold",
-                }}
-                onClick={cancelarEdicion}
-              >
-                Cancelar edición
-              </Button>
-            ) : null}
           </Box>
         ) : null}
 
@@ -509,89 +506,218 @@ export default function CrearTratamiento() {
           </Button>
         </Box>
 
-        <Table>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: colorPrincipal }}>
-              <TableCell sx={{ color: "white" }}>Nombre</TableCell>
-              <TableCell sx={{ color: "white" }}>Procedimiento</TableCell>
-              <TableCell sx={{ color: "white" }}>Descripción</TableCell>
-              <TableCell sx={{ color: "white" }} align="right">Precio</TableCell>
-              <TableCell sx={{ color: "white" }}>Acciones</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {tratamientos.filter(t => !filtroProcedimiento || t.procedimiento === filtroProcedimiento).map((t) => (
-              <TableRow key={t.id}>
-                <TableCell>{t.nombre}</TableCell>
-                <TableCell>
-                  {t.procedimiento ? (
-                    <Chip
-                      label={t.procedimiento}
+        {/* Lista de tratamientos con edición inline */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {tratamientos.filter(t => !filtroProcedimiento || t.procedimiento === filtroProcedimiento).map((t) => {
+            const isEditing = inlineEdit?.id === t.id;
+            return (
+              <Paper
+                key={t.id}
+                elevation={isEditing ? 3 : 0}
+                sx={{
+                  p: isEditing ? 2 : 1.5,
+                  borderRadius: 2.5,
+                  border: isEditing ? `2px solid ${colorPrincipal}` : "1px solid rgba(163,105,32,0.15)",
+                  backgroundColor: isEditing ? "#fffdf7" : "white",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                {isEditing ? (
+                  /* ─── Modo edición inline ─── */
+                  <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                    <TextField
+                      label="Nombre *"
                       size="small"
-                      sx={{
-                        backgroundColor: t.procedimiento === "Armonización" ? "rgba(163,105,32,0.15)" :
-                          t.procedimiento === "Cosmiatría Facial" ? "rgba(76,175,80,0.15)" :
-                          "rgba(33,150,243,0.15)",
-                        color: t.procedimiento === "Armonización" ? "#a36920" :
-                          t.procedimiento === "Cosmiatría Facial" ? "#2e7d32" :
-                          "#1565c0",
-                        fontWeight: "bold",
-                        fontSize: "0.7rem",
-                      }}
+                      value={inlineEdit.nombre}
+                      onChange={(e) => setInlineEdit({ ...inlineEdit, nombre: e.target.value })}
+                      fullWidth
+                      autoFocus
+                      sx={{ "& .MuiInputBase-root": { backgroundColor: "white" } }}
                     />
-                  ) : (
-                    <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.35)", fontStyle: "italic" }}>—</Typography>
-                  )}
-                </TableCell>
-                <TableCell>{t.descripcion}</TableCell>
-                <TableCell align="right">
-                  {t.precio != null && t.precio !== "" ? (
-                    <strong>S/ {Number(t.precio).toFixed(2)}</strong>
-                  ) : (
-                    <Typography variant="body2" sx={{ color: "rgba(0,0,0,0.35)", fontStyle: "italic" }}>—</Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {isDoctor ? (
-                    <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                    <TextField
+                      label="Descripción"
+                      size="small"
+                      multiline
+                      rows={2}
+                      value={inlineEdit.descripcion}
+                      onChange={(e) => setInlineEdit({ ...inlineEdit, descripcion: e.target.value })}
+                      fullWidth
+                      sx={{ "& .MuiInputBase-root": { backgroundColor: "white" } }}
+                    />
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                      <FormControl size="small" sx={{ flex: 1, minWidth: 150 }}>
+                        <InputLabel>Procedimiento</InputLabel>
+                        <Select
+                          value={inlineEdit.procedimiento}
+                          label="Procedimiento"
+                          onChange={(e) => setInlineEdit({ ...inlineEdit, procedimiento: e.target.value })}
+                          sx={{ backgroundColor: "white" }}
+                        >
+                          <MenuItem value=""><em>Sin asignar</em></MenuItem>
+                          <MenuItem value="Cosmiatría Corporal">Cosmiatría Corporal</MenuItem>
+                          <MenuItem value="Cosmiatría Facial">Cosmiatría Facial</MenuItem>
+                          <MenuItem value="Armonización">Armonización</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <TextField
+                        label="Precio (S/)"
+                        type="number"
+                        size="small"
+                        value={inlineEdit.precio}
+                        onChange={(e) => setInlineEdit({ ...inlineEdit, precio: e.target.value })}
+                        inputProps={{ min: 0, step: 0.01 }}
+                        sx={{ width: 120, "& .MuiInputBase-root": { backgroundColor: "white" } }}
+                      />
+                      <TextField
+                        label="Sesiones"
+                        type="number"
+                        size="small"
+                        value={inlineEdit.sesiones}
+                        onChange={(e) => setInlineEdit({ ...inlineEdit, sesiones: e.target.value })}
+                        inputProps={{ min: 1, step: 1 }}
+                        sx={{ width: 90, "& .MuiInputBase-root": { backgroundColor: "white" } }}
+                      />
+                    </Box>
+                    <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
                       <Button
                         size="small"
-                        onClick={() => editarTratamiento(t)}
+                        variant="contained"
+                        startIcon={<Check />}
+                        onClick={guardarEdicionInline}
+                        sx={{
+                          backgroundColor: colorPrincipal,
+                          "&:hover": { backgroundColor: "#8a5a1a" },
+                          fontWeight: 700,
+                          borderRadius: 2,
+                          textTransform: "none",
+                        }}
                       >
-                        Editar
+                        Guardar
                       </Button>
                       <Button
                         size="small"
                         variant="outlined"
-                        startIcon={<Settings />}
-                        onClick={() => abrirConfigProductos(t)}
-                        sx={{ borderColor: colorPrincipal, color: colorPrincipal }}
+                        onClick={cancelarEdicionInline}
+                        sx={{ borderColor: "#999", color: "#666", borderRadius: 2, textTransform: "none" }}
                       >
-                        Productos
+                        Cancelar
                       </Button>
-                      <Button
+                      <IconButton
                         size="small"
-                        color="error"
-                        onClick={() => eliminarTratamiento(t.id)}
+                        onClick={() => abrirConfigProductos(t)}
+                        title="Productos"
+                        sx={{ color: colorPrincipal }}
                       >
-                        Eliminar
-                      </Button>
+                        <Settings fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        onClick={() => eliminarTratamiento(t.id)}
+                        title="Eliminar"
+                        sx={{ color: "#d32f2f" }}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
                     </Box>
-                  ) : (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => abrirConfigProductos(t)}
-                      sx={{ borderColor: colorPrincipal, color: colorPrincipal }}
-                    >
-                      Ver productos
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                  </Box>
+                ) : (
+                  /* ─── Modo visualización ─── */
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.3 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: "#1a1a1a" }}>
+                          {t.nombre}
+                        </Typography>
+                        {t.procedimiento && (
+                          <Chip
+                            label={t.procedimiento}
+                            size="small"
+                            sx={{
+                              height: 20,
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              backgroundColor: t.procedimiento === "Armonización" ? "rgba(163,105,32,0.12)" :
+                                t.procedimiento === "Cosmiatría Facial" ? "rgba(76,175,80,0.12)" :
+                                "rgba(33,150,243,0.12)",
+                              color: t.procedimiento === "Armonización" ? "#a36920" :
+                                t.procedimiento === "Cosmiatría Facial" ? "#2e7d32" :
+                                "#1565c0",
+                            }}
+                          />
+                        )}
+                      </Box>
+                      {t.descripcion && (
+                        <Typography sx={{ fontSize: "0.78rem", color: "#888", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {t.descripcion}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Precio + Sesiones */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexShrink: 0 }}>
+                      <Box sx={{ textAlign: "right" }}>
+                        <Typography sx={{ fontWeight: 800, fontSize: "0.88rem", color: "#1a1a1a" }}>
+                          {t.precio != null && t.precio !== "" ? `S/ ${Number(t.precio).toFixed(2)}` : "—"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.68rem", color: "#999" }}>
+                          {t.sesiones && t.sesiones > 1 ? `${t.sesiones} sesiones` : "1 sesión"}
+                        </Typography>
+                      </Box>
+
+                      {/* Acciones */}
+                      {isDoctor ? (
+                        <Box sx={{ display: "flex", gap: 0.3 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => iniciarEdicionInline(t)}
+                            title="Editar"
+                            sx={{
+                              color: colorPrincipal,
+                              "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
+                            }}
+                          >
+                            <Edit fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => abrirConfigProductos(t)}
+                            title="Productos"
+                            sx={{
+                              color: "#ba9a63",
+                              "&:hover": { backgroundColor: "rgba(186,154,99,0.08)" },
+                            }}
+                          >
+                            <Settings fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => eliminarTratamiento(t.id)}
+                            title="Eliminar"
+                            sx={{
+                              color: "#ccc",
+                              "&:hover": { color: "#d32f2f", backgroundColor: "rgba(211,47,47,0.06)" },
+                            }}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      ) : (
+                        <IconButton
+                          size="small"
+                          onClick={() => abrirConfigProductos(t)}
+                          title="Ver productos"
+                          sx={{ color: colorPrincipal }}
+                        >
+                          <Settings fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                  </Box>
+                )}
+              </Paper>
+            );
+          })}
+        </Box>
       </Paper>
 
       {/* Modal para configurar productos del tratamiento */}
