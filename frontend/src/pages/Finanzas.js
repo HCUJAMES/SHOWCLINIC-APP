@@ -1220,7 +1220,7 @@ const Finanzas = () => {
                       <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Total Bruto
                       </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#ba9a63", mt: 0.5 }}>
+                      <Typography variant="h5" sx={{ fontFamily: "'DM Sans', 'Inter', sans-serif", fontWeight: "bold", color: "#ba9a63", mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
                         S/ {Number(totalBruto || 0).toFixed(2)}
                       </Typography>
                     </Paper>
@@ -1244,7 +1244,7 @@ const Finanzas = () => {
                       <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Total Neto
                       </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: "bold", color: colorPrincipal, mt: 0.5 }}>
+                      <Typography variant="h5" sx={{ fontFamily: "'DM Sans', 'Inter', sans-serif", fontWeight: "bold", color: colorPrincipal, mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
                         S/ {Number(totalGeneral || 0).toFixed(2)}
                       </Typography>
                     </Paper>
@@ -1268,7 +1268,7 @@ const Finanzas = () => {
                       <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Comisión POS (4%)
                       </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: "bold", color: "#a36920", mt: 0.5, fontSize: "1.3rem" }}>
+                      <Typography variant="h5" sx={{ fontFamily: "'DM Sans', 'Inter', sans-serif", fontWeight: "bold", color: "#a36920", mt: 0.5, fontSize: "1.3rem", fontVariantNumeric: "tabular-nums" }}>
                         S/ {Number(totalComision || 0).toFixed(2)}
                       </Typography>
                     </Paper>
@@ -1798,7 +1798,7 @@ const Finanzas = () => {
                     <Typography variant="h6" sx={{ fontWeight: 700, color: colorPrincipal }}>
                       TOTAL EGRESOS:
                     </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: colorPrincipal }}>
+                    <Typography variant="h5" sx={{ fontFamily: "'DM Sans', 'Inter', sans-serif", fontWeight: 700, color: colorPrincipal, fontVariantNumeric: "tabular-nums" }}>
                       S/ {Number(totalEgresos).toFixed(2)}
                     </Typography>
                   </Box>
