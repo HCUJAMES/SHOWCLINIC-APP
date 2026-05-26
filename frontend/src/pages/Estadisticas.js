@@ -109,6 +109,7 @@ export default function Estadisticas() {
   for (let y = currentYear; y >= currentYear - 5; y--) yearOptions.push(y);
 
   const colorPrincipal = "#A36920";
+  const numFont = "'DM Sans', 'Inter', -apple-system, sans-serif";
 
   const kpiCardStyle = {
     p: { xs: 2, sm: 2.5 },
@@ -281,7 +282,7 @@ export default function Estadisticas() {
                   Sesiones
                 </Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: "#2E2E2E", lineHeight: 1 }}>
+              <Typography variant="h4" sx={{ fontFamily: numFont, fontWeight: 900, color: "#2E2E2E", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {loading ? "—" : Number(kpi?.sesiones || 0)}
               </Typography>
               <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
@@ -300,7 +301,7 @@ export default function Estadisticas() {
                   Pacientes
                 </Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: "#2E2E2E", lineHeight: 1 }}>
+              <Typography variant="h4" sx={{ fontFamily: numFont, fontWeight: 900, color: "#2E2E2E", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {loading ? "—" : Number(kpi?.pacientes_unicos || 0)}
               </Typography>
               <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
@@ -319,7 +320,7 @@ export default function Estadisticas() {
                   Ingresos
                 </Typography>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: "#27ae60", lineHeight: 1 }}>
+              <Typography variant="h5" sx={{ fontFamily: numFont, fontWeight: 900, color: "#27ae60", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {loading ? "—" : money(ingresosBruto)}
               </Typography>
               <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
@@ -338,7 +339,7 @@ export default function Estadisticas() {
                   Comisión POS
                 </Typography>
               </Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: "#c0392b", lineHeight: 1 }}>
+              <Typography variant="h5" sx={{ fontFamily: numFont, fontWeight: 900, color: "#c0392b", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {loading ? "—" : money(comisionPos)}
               </Typography>
               <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
@@ -369,7 +370,7 @@ export default function Estadisticas() {
             <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.60)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
               Ticket Promedio por Sesión
             </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 900, color: colorPrincipal, lineHeight: 1.2 }}>
+            <Typography variant="h5" sx={{ fontFamily: numFont, fontWeight: 900, color: colorPrincipal, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
               {loading ? "—" : money(kpi?.ticket_promedio)}
             </Typography>
           </Box>
