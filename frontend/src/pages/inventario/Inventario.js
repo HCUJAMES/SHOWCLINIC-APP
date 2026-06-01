@@ -1282,8 +1282,8 @@ export default function Inventario() {
 
   /* ===== LIST VIEW ===== */
   return (
-    <Box sx={{ minHeight: "100vh", backgroundColor: colorFondo, p: { xs: 2, md: 3 } }}>
-      <Box sx={{ maxWidth: 1600, margin: "0 auto" }}>
+    <Box sx={{ minHeight: "200vh", backgroundColor: colorFondo, p: { xs: 2, md: 3 } }}>
+      <Box sx={{ maxWidth: 10000, margin: "0 auto" }}>
 
         {/* Header */}
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3, flexWrap: "wrap", gap: 1 }}>

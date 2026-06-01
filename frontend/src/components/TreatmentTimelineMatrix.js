@@ -94,14 +94,42 @@ const TreatmentTimelineMatrix = ({
       const needsInit = milestones.some((m) => !prev[m.id]);
       if (!needsInit) return prev;
       const merged = { ...prev };
+
+      // Auto-orden: repartir nodos que comparten celda (semana × categoría)
+      // para que no se apilen unos sobre otros.
+      const cellTotals = {};
+      milestones.forEach((m) => {
+        if (merged[m.id]) return;
+        const weekIdx = weeks.findIndex((w) => w.number === m.week);
+        const catIdx = categories.findIndex((c) => c.key === m.categoryKey);
+        const cellKey = `${weekIdx}-${catIdx}`;
+        cellTotals[cellKey] = (cellTotals[cellKey] || 0) + 1;
+      });
+
+      const cellSeen = {};
       milestones.forEach((m, idx) => {
-        if (!merged[m.id]) {
-          const weekIdx = weeks.findIndex((w) => w.number === m.week);
-          const catIdx = categories.findIndex((c) => c.key === m.categoryKey);
-          const x = weekIdx >= 0 ? (weekIdx + 0.5) * WEEK_WIDTH : (idx + 0.5) * WEEK_WIDTH;
-          const y = catIdx >= 0 ? FIRST_LANE_Y + catIdx * LANE_HEIGHT : FIRST_LANE_Y + idx * 50;
-          merged[m.id] = { x, y };
-        }
+        if (merged[m.id]) return;
+        const weekIdx = weeks.findIndex((w) => w.number === m.week);
+        const catIdx = categories.findIndex((c) => c.key === m.categoryKey);
+        const cellKey = `${weekIdx}-${catIdx}`;
+        const total = cellTotals[cellKey] || 1;
+        const within = cellSeen[cellKey] || 0;
+        cellSeen[cellKey] = within + 1;
+
+        const baseX = weekIdx >= 0 ? (weekIdx + 0.5) * WEEK_WIDTH : (idx + 0.5) * WEEK_WIDTH;
+        const baseY = catIdx >= 0 ? FIRST_LANE_Y + catIdx * LANE_HEIGHT : FIRST_LANE_Y + idx * 50;
+
+        // Distribución en rejilla centrada dentro de la celda
+        const perRow = Math.min(total, 3);
+        const numRows = Math.ceil(total / perRow);
+        const col = within % perRow;
+        const row = Math.floor(within / perRow);
+        const colSpacing = 110;
+        const rowSpacing = 56;
+        const x = baseX + (col - (perRow - 1) / 2) * colSpacing;
+        const y = baseY + (row - (numRows - 1) / 2) * rowSpacing;
+
+        merged[m.id] = { x, y };
       });
       return merged;
     });

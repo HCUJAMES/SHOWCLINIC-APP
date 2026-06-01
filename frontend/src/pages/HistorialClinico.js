@@ -269,6 +269,9 @@ const HistorialClinico = () => {
   const [paquetesPromoExpanded, setPaquetesPromoExpanded] = useState(false);
   const [tratamientosMarcados, setTratamientosMarcadosRaw] = useState({});
   const marcadosTimerRef = useRef(null);
+  // Control para la regla automática de exosomas en el editor de presupuesto:
+  // si el doctor lo elimina manualmente, no se vuelve a agregar en esa sesión de edición.
+  const exosomasRemovedRef = useRef(false);
 
   // Wrapper que persiste marcas en la base de datos (sincroniza entre dispositivos)
   const setTratamientosMarcados = (valOrFn) => {
@@ -1847,22 +1850,56 @@ const HistorialClinico = () => {
     ventana.document.close();
   };
 
+  // ─── Regla automática: Diseño de Labios + Rinomodelación ⇒ Exosomas (3 sesiones) ───
+  // Cuando el presupuesto contiene ambos tratamientos, se agrega automáticamente
+  // "Exosomas" con 3 sesiones (repartidas luego en las semanas 1-2-3 del seguimiento).
+  // Queda totalmente editable: el doctor puede cambiar precio/sesiones o eliminarlo.
+  const aplicarReglaExosomas = (items) => {
+    if (exosomasRemovedRef.current) return items;
+    const lower = (s) => (s || "").toLowerCase();
+    const tieneLabios = items.some((x) => lower(x.nombre).includes("labio"));
+    const tieneRino = items.some((x) => lower(x.nombre).includes("rino"));
+    const yaTieneExosomas = items.some((x) => lower(x.nombre).includes("exosoma"));
+    if (!tieneLabios || !tieneRino || yaTieneExosomas) return items;
+
+    const exoTrat = (tratamientosBase || []).find((t) => lower(t.nombre).includes("exosoma"));
+    // El panel de resumen solo muestra items que existen en el catálogo, así que
+    // solo auto-agregamos si "Exosomas" está registrado como tratamiento.
+    if (!exoTrat) return items;
+    showToast({ severity: "info", message: "Se agregaron 3 sesiones de Exosomas automáticamente (Diseño de Labios + Rinomodelación)" });
+    return [
+      ...items,
+      {
+        tratamientoId: exoTrat.id,
+        nombre: exoTrat.nombre,
+        precio: exoTrat.precio ? String(exoTrat.precio) : "",
+        sesiones: "3",
+        producto: "",
+        ml: "",
+      },
+    ];
+  };
+
   const toggleOfertaItem = (t) => {
     setOfertaItems((prev) => {
       const exists = prev.some((x) => x.tratamientoId === t.id);
       if (exists) return prev.filter((x) => x.tratamientoId !== t.id);
-      return [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: t.sesiones ? String(t.sesiones) : "1", producto: "", ml: "" }];
+      return aplicarReglaExosomas([...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: t.sesiones ? String(t.sesiones) : "1", producto: "", ml: "" }]);
     });
   };
 
   const addOfertaItem = (t) => {
-    setOfertaItems((prev) => [...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: t.sesiones ? String(t.sesiones) : "1", producto: "", ml: "" }]);
+    setOfertaItems((prev) => aplicarReglaExosomas([...prev, { tratamientoId: t.id, nombre: t.nombre, precio: t.precio ? String(t.precio) : "", sesiones: t.sesiones ? String(t.sesiones) : "1", producto: "", ml: "" }]));
   };
 
   const removeOneOfertaItem = (t) => {
     setOfertaItems((prev) => {
       const idx = prev.findLastIndex((x) => x.tratamientoId === t.id);
       if (idx === -1) return prev;
+      // Si el doctor elimina los exosomas manualmente, no volver a agregarlos automáticamente.
+      if ((prev[idx]?.nombre || "").toLowerCase().includes("exosoma")) {
+        exosomasRemovedRef.current = true;
+      }
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
     });
   };
@@ -3985,6 +4022,7 @@ const HistorialClinico = () => {
                         }).catch(() => {});
                         setCatalogoCarouselIdx(0);
                         setCatalogoFiltro("");
+                        exosomasRemovedRef.current = false;
                       }
                       return !v;
                     });
@@ -5213,6 +5251,7 @@ const HistorialClinico = () => {
                                 variant="outlined"
                                 onClick={() => {
                                   setOfertaEditId(o.id);
+                                  exosomasRemovedRef.current = false;
                                   setDescuentoOferta(Number(o.descuento) > 0 ? String(o.descuento) : "");
                                   setOfertaItems(
                                     (o.items || []).map((it) => ({
@@ -5299,10 +5338,22 @@ const HistorialClinico = () => {
                 }));
 
                 // Build milestones from sessions
+                // Auto-orden: cada categoría reparte sus sesiones en semanas sucesivas
+                // (1, 2, 3...) y los exosomas se anclan a las semanas 1-2-3 según su número de sesión.
+                const catWeekCounter = {};
                 const matrixMilestones = sesiones.map((s, idx) => {
-                  const catKey = categorizeTreatment(s.tratamiento_nombre);
-                  // Distribute across weeks based on order
-                  const weekNum = Math.min(idx + 1, numWeeks);
+                  const nombreTrat = s.tratamiento_nombre || '';
+                  const esExosoma = nombreTrat.toLowerCase().includes('exosoma');
+                  const catKey = categorizeTreatment(nombreTrat);
+                  let weekNum;
+                  if (esExosoma) {
+                    // Repartir en semanas consecutivas desde el inicio (1, 2, 3)
+                    weekNum = Math.min(Math.max(1, Number(s.sesion_numero) || 1), numWeeks);
+                  } else {
+                    const c = (catWeekCounter[catKey] || 0) + 1;
+                    catWeekCounter[catKey] = c;
+                    weekNum = Math.min(c, numWeeks);
+                  }
                   const espNombre = s.especialista_nombre || presupuesto.especialista_nombre || null;
                   return {
                     id: `s-${s.id}`,
