@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 
 const API = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -16,18 +17,35 @@ const COLORS = {
   alertSoft: "#B47A3A",
 };
 
+// ─── Color por categoría (carriles) ───
+const CATEGORY_COLORS = {
+  corporal: "#5F938A",
+  facial: "#C0846D",
+  armonizacion: "#C8A96E",
+};
+const laneColor = (key) => CATEGORY_COLORS[key] || COLORS.gold;
+
+// hex (#rrggbb) → rgba(r,g,b,a)
+const hexToRgba = (hex, alpha) => {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 // ─── Tipografía ───
 const FONTS = {
   serif: "'Cormorant Garamond', Georgia, serif",
-  sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  sans: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 
 // ─── Constantes de layout ───
-const WEEK_WIDTH = 420;
-const LANE_HEIGHT = 160;
-const FIRST_LANE_Y = 130;
-const HEADER_HEIGHT = 80;
+const WEEK_WIDTH = 280;
+const LANE_HEIGHT = 168;
+const HEADER_HEIGHT = 56;
 const CATEGORY_PANEL_WIDTH = 220;
+const NODE_R = 13;
 
 const TreatmentTimelineMatrix = ({
   budget = {},
@@ -45,98 +63,33 @@ const TreatmentTimelineMatrix = ({
   presupuestoId,
   especialistas = [],
 }) => {
-  // ─── Free-position state (persisted) ───
-  const [nodePositions, setNodePositions] = useState({});
+  // ─── State ───
   const [specialistNames, setSpecialistNames] = useState({});
-  const [layoutLoaded, setLayoutLoaded] = useState(false);
-  const [draggingNode, setDraggingNode] = useState(null);
   const [editingSpecialist, setEditingSpecialist] = useState(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
-  const [startNodePosition, setStartNodePosition] = useState(null);
   const scrollContainerRef = useRef(null);
-  const svgRef = useRef(null);
   const saveTimerRef = useRef(null);
 
-  // ─── Derived values ───
-  const svgWidth = weeks.length * WEEK_WIDTH;
-  const svgHeight = useMemo(
-    () => FIRST_LANE_Y + categories.length * LANE_HEIGHT + 40,
-    [categories.length]
-  );
+  // ─── Derived dimensions ───
+  const totalWeeks = Math.max(weeks.length, 1);
+  const contentWidth = totalWeeks * WEEK_WIDTH;
 
-  // ─── Load layout from DB ───
+  // ─── Load specialist names from DB ───
   useEffect(() => {
-    if (!presupuestoId) { setLayoutLoaded(true); return; }
+    if (!presupuestoId) return;
     const token = localStorage.getItem("token");
     fetch(`${API}/api/tratamientos/calendar-layout/${presupuestoId}`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     })
       .then((r) => r.json())
       .then((data) => {
-        if (data && data.matrixPositions) {
-          setNodePositions(data.matrixPositions);
-        }
-        if (data && data.specialistNames) {
-          setSpecialistNames(data.specialistNames);
-        }
-        if (data && data.startNodePosition) {
-          setStartNodePosition(data.startNodePosition);
-        }
-        setLayoutLoaded(true);
+        if (data && data.specialistNames) setSpecialistNames(data.specialistNames);
       })
-      .catch(() => setLayoutLoaded(true));
+      .catch(() => {});
   }, [presupuestoId]);
 
-  // ─── Init default positions for milestones not yet placed ───
-  useEffect(() => {
-    if (!layoutLoaded) return;
-    setNodePositions((prev) => {
-      const needsInit = milestones.some((m) => !prev[m.id]);
-      if (!needsInit) return prev;
-      const merged = { ...prev };
-
-      // Auto-orden: repartir nodos que comparten celda (semana × categoría)
-      // para que no se apilen unos sobre otros.
-      const cellTotals = {};
-      milestones.forEach((m) => {
-        if (merged[m.id]) return;
-        const weekIdx = weeks.findIndex((w) => w.number === m.week);
-        const catIdx = categories.findIndex((c) => c.key === m.categoryKey);
-        const cellKey = `${weekIdx}-${catIdx}`;
-        cellTotals[cellKey] = (cellTotals[cellKey] || 0) + 1;
-      });
-
-      const cellSeen = {};
-      milestones.forEach((m, idx) => {
-        if (merged[m.id]) return;
-        const weekIdx = weeks.findIndex((w) => w.number === m.week);
-        const catIdx = categories.findIndex((c) => c.key === m.categoryKey);
-        const cellKey = `${weekIdx}-${catIdx}`;
-        const total = cellTotals[cellKey] || 1;
-        const within = cellSeen[cellKey] || 0;
-        cellSeen[cellKey] = within + 1;
-
-        const baseX = weekIdx >= 0 ? (weekIdx + 0.5) * WEEK_WIDTH : (idx + 0.5) * WEEK_WIDTH;
-        const baseY = catIdx >= 0 ? FIRST_LANE_Y + catIdx * LANE_HEIGHT : FIRST_LANE_Y + idx * 50;
-
-        // Distribución en rejilla centrada dentro de la celda
-        const perRow = Math.min(total, 3);
-        const numRows = Math.ceil(total / perRow);
-        const col = within % perRow;
-        const row = Math.floor(within / perRow);
-        const colSpacing = 110;
-        const rowSpacing = 56;
-        const x = baseX + (col - (perRow - 1) / 2) * colSpacing;
-        const y = baseY + (row - (numRows - 1) / 2) * rowSpacing;
-
-        merged[m.id] = { x, y };
-      });
-      return merged;
-    });
-  }, [milestones, weeks, categories, layoutLoaded]);
-
-  // ─── Save layout to DB (debounced) ───
-  const saveLayout = useCallback((positions, specialists, startPos) => {
+  // ─── Save specialist names to DB (debounced) ───
+  const saveSpecialists = useCallback((names) => {
     if (!presupuestoId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
@@ -144,8 +97,8 @@ const TreatmentTimelineMatrix = ({
       fetch(`${API}/api/tratamientos/calendar-layout/${presupuestoId}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ matrixPositions: positions, specialistNames: specialists, startNodePosition: startPos }),
-      }).catch((err) => console.error("Error guardando layout:", err));
+        body: JSON.stringify({ specialistNames: names }),
+      }).catch((err) => console.error("Error guardando especialistas:", err));
     }, 500);
   }, [presupuestoId]);
 
@@ -165,50 +118,31 @@ const TreatmentTimelineMatrix = ({
     };
   }, [weeks.length]);
 
-  // ─── Milestone positions (using free positions) ───
-  const milestonePositions = useMemo(() => {
-    return milestones.map((m) => {
-      const pos = nodePositions[m.id];
-      const weekIdx = weeks.findIndex((w) => w.number === m.week);
-      const catIdx = categories.findIndex((c) => c.key === m.categoryKey);
-      const defaultX = weekIdx >= 0 ? (weekIdx + 0.5) * WEEK_WIDTH : 110;
-      const defaultY = catIdx >= 0 ? FIRST_LANE_Y + catIdx * LANE_HEIGHT : FIRST_LANE_Y;
-      return { ...m, x: pos?.x ?? defaultX, y: pos?.y ?? defaultY };
+  // ─── Lanes: one per category, nodes positioned by xFrac ───
+  // xFrac = ((week-1) + slot) / totalWeeks ; slot = (idx+1)/(count+1)
+  // para varios tratamientos en la misma semana+categoría.
+  const lanes = useMemo(() => {
+    return categories.map((cat) => {
+      const catMilestones = milestones.filter((m) => m.categoryKey === cat.key);
+      const byWeek = {};
+      catMilestones.forEach((m) => {
+        (byWeek[m.week] = byWeek[m.week] || []).push(m);
+      });
+      const nodes = [];
+      Object.keys(byWeek).forEach((wk) => {
+        const group = byWeek[wk].slice().sort((a, b) => a.order - b.order);
+        const count = group.length;
+        group.forEach((m, idx) => {
+          const slot = (idx + 1) / (count + 1);
+          const week = Math.max(1, Number(m.week) || 1);
+          const xFrac = ((week - 1) + slot) / totalWeeks;
+          nodes.push({ ...m, xFrac, x: xFrac * contentWidth });
+        });
+      });
+      nodes.sort((a, b) => a.x - b.x);
+      return { cat, color: laneColor(cat.key), nodes };
     });
-  }, [milestones, nodePositions, weeks, categories]);
-
-  // ─── Sorted milestones for connector path ───
-  const sortedMilestones = useMemo(() => {
-    return [...milestonePositions].sort((a, b) => a.order - b.order);
-  }, [milestonePositions]);
-
-  // ─── Connector path segments ───
-  const connectorSegments = useMemo(() => {
-    if (sortedMilestones.length < 2) return [];
-    const segments = [];
-    for (let i = 0; i < sortedMilestones.length - 1; i++) {
-      const prev = sortedMilestones[i];
-      const curr = sortedMilestones[i + 1];
-      const midX = (prev.x + curr.x) / 2;
-      const d = `M ${prev.x} ${prev.y} C ${midX} ${prev.y}, ${midX} ${curr.y}, ${curr.x} ${curr.y}`;
-      const isPending = prev.status === "pending" || curr.status === "pending";
-      segments.push({ d, isPending, key: `seg-${i}` });
-    }
-    return segments;
-  }, [sortedMilestones]);
-
-  // ─── Full connector path (for fill area under the curve) ───
-  const fullConnectorPath = useMemo(() => {
-    if (sortedMilestones.length < 2) return "";
-    let path = `M ${sortedMilestones[0].x} ${sortedMilestones[0].y}`;
-    for (let i = 0; i < sortedMilestones.length - 1; i++) {
-      const prev = sortedMilestones[i];
-      const curr = sortedMilestones[i + 1];
-      const midX = (prev.x + curr.x) / 2;
-      path += ` C ${midX} ${prev.y}, ${midX} ${curr.y}, ${curr.x} ${curr.y}`;
-    }
-    return path;
-  }, [sortedMilestones]);
+  }, [categories, milestones, totalWeeks, contentWidth]);
 
   // ─── Category counts ───
   const categoryCounts = useMemo(() => {
@@ -219,70 +153,19 @@ const TreatmentTimelineMatrix = ({
     return counts;
   }, [categories, milestones]);
 
-  // ─── Init start node position ───
-  useEffect(() => {
-    if (!layoutLoaded || startNodePosition) return;
-    setStartNodePosition({ x: 60, y: svgHeight / 2 });
-  }, [layoutLoaded, startNodePosition, svgHeight]);
-
-  // ─── Free drag handlers (mouse-based SVG drag) ───
-  const handleMouseDown = useCallback((e, milestoneId) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDraggingNode(milestoneId);
-  }, []);
-
-  useEffect(() => {
-    if (!draggingNode) return;
-    const handleMouseMove = (e) => {
-      const svg = svgRef.current;
-      if (!svg) return;
-      const rect = svg.getBoundingClientRect();
-      const x = Math.max(20, Math.min(svgWidth - 20, e.clientX - rect.left));
-      const y = Math.max(20, Math.min(svgHeight - 20, e.clientY - rect.top));
-      if (draggingNode === 'start-node') {
-        setStartNodePosition({ x, y });
-      } else {
-        setNodePositions((prev) => {
-          const next = { ...prev, [draggingNode]: { x, y } };
-          return next;
-        });
-      }
-    };
-    const handleMouseUp = () => {
-      setDraggingNode(null);
-      // Save after drop
-      if (draggingNode === 'start-node') {
-        setStartNodePosition((prev) => {
-          saveLayout(nodePositions, specialistNames, prev);
-          return prev;
-        });
-      } else {
-        setNodePositions((prev) => {
-          saveLayout(prev, specialistNames, startNodePosition);
-          return prev;
-        });
-      }
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [draggingNode, svgWidth, svgHeight, saveLayout, specialistNames, nodePositions, startNodePosition]);
-
   // ─── Specialist edit handlers ───
   const startEditSpecialist = useCallback((milestoneId) => {
     setEditingSpecialist((prev) => prev === milestoneId ? null : milestoneId);
   }, []);
 
   const selectSpecialist = useCallback((milestoneId, nombre) => {
-    const newNames = { ...specialistNames, [milestoneId]: nombre };
-    setSpecialistNames(newNames);
+    setSpecialistNames((prev) => {
+      const next = { ...prev, [milestoneId]: nombre };
+      saveSpecialists(next);
+      return next;
+    });
     setEditingSpecialist(null);
-    saveLayout(nodePositions, newNames, startNodePosition);
-  }, [specialistNames, nodePositions, saveLayout, startNodePosition]);
+  }, [saveSpecialists]);
 
   return (
     <div
@@ -410,19 +293,22 @@ const TreatmentTimelineMatrix = ({
             borderRight: `1px solid rgba(200,169,110,0.15)`,
           }}
         >
-          {categories.map((cat, idx) => (
-            <div key={cat.key} style={{ height: LANE_HEIGHT, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
-              <div style={{ width: 180, height: 64, borderRadius: 10, background: COLORS.creamMain, border: `0.8px solid rgba(200,169,110,0.4)`, display: "flex", alignItems: "center", padding: "0 12px", gap: 10, boxShadow: "0 2px 8px rgba(93,64,55,0.04)" }}>
-                <div style={{ width: 28, height: 28, minWidth: 28, borderRadius: "50%", background: COLORS.brownMain, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontFamily: FONTS.sans, fontSize: 13, fontWeight: 600, color: COLORS.gold }}>{cat.initial}</span>
-                </div>
-                <div style={{ overflow: "hidden" }}>
-                  <div style={{ fontFamily: FONTS.serif, fontSize: 14, fontWeight: 500, letterSpacing: "1px", color: COLORS.brownDark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.label}</div>
-                  <div style={{ fontFamily: FONTS.sans, fontSize: 10, color: COLORS.brownMain, opacity: categoryCounts[cat.key] === 0 ? 0.4 : 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.subtitle} · {categoryCounts[cat.key]}</div>
+          {categories.map((cat) => {
+            const cColor = laneColor(cat.key);
+            return (
+              <div key={cat.key} style={{ height: LANE_HEIGHT, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
+                <div style={{ width: 180, height: 64, borderRadius: 10, background: COLORS.creamMain, border: `0.8px solid rgba(200,169,110,0.4)`, borderLeft: `4px solid ${cColor}`, display: "flex", alignItems: "center", padding: "0 12px", gap: 10, boxShadow: "0 2px 8px rgba(93,64,55,0.04)" }}>
+                  <div style={{ width: 28, height: 28, minWidth: 28, borderRadius: "50%", background: cColor, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontFamily: FONTS.sans, fontSize: 13, fontWeight: 700, color: COLORS.creamMain }}>{cat.initial}</span>
+                  </div>
+                  <div style={{ overflow: "hidden" }}>
+                    <div style={{ fontFamily: FONTS.serif, fontSize: 14, fontWeight: 500, letterSpacing: "1px", color: COLORS.brownDark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.label}</div>
+                    <div style={{ fontFamily: FONTS.sans, fontSize: 10, color: COLORS.brownMain, opacity: categoryCounts[cat.key] === 0 ? 0.4 : 0.6, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cat.subtitle} · {categoryCounts[cat.key]}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* ─── Right Panel (Scrollable Matrix) ─── */}
@@ -431,260 +317,196 @@ const TreatmentTimelineMatrix = ({
           style={{ flex: 1, overflowX: "auto", overflowY: "hidden", position: "relative", scrollbarWidth: "thin", scrollbarColor: "rgba(200,169,110,0.4) rgba(245,237,223,0.5)" }}
           className="timeline-matrix-scroll"
         >
-          <svg
-            ref={svgRef}
-            width={svgWidth}
-            height={svgHeight}
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            style={{ display: "block", cursor: draggingNode ? "grabbing" : "default" }}
-          >
-            <defs>
-              {categories.map((_, idx) => (
-                <linearGradient key={`lane-grad-${idx}`} id={`lane-grad-${idx}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor={idx % 3 === 0 ? "rgba(240,229,210,0.35)" : idx % 3 === 1 ? "rgba(245,237,223,0.4)" : "rgba(250,243,232,0.5)"} />
-                  <stop offset="100%" stopColor={idx % 3 === 0 ? "rgba(240,229,210,0.15)" : idx % 3 === 1 ? "rgba(245,237,223,0.2)" : "rgba(250,243,232,0.25)"} />
-                </linearGradient>
-              ))}
-              {/* Grid pattern - cuadriculado visible */}
-              <pattern id="matrixGridPattern" width="28" height="28" patternUnits="userSpaceOnUse">
-                <path d="M 28 0 L 0 0 0 28" fill="none" stroke="rgba(163,105,32,0.13)" strokeWidth="0.8" />
-              </pattern>
-              {/* Gradient for connector lines - vertical shadow effect */}
-              <linearGradient id="connectorGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor={COLORS.gold} stopOpacity="0.4" />
-                <stop offset="50%" stopColor={COLORS.gold} stopOpacity="1" />
-                <stop offset="100%" stopColor={COLORS.brownMedium} stopOpacity="0.8" />
-              </linearGradient>
-              <linearGradient id="connectorGradientPending" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor={COLORS.brownLight} stopOpacity="0.3" />
-                <stop offset="50%" stopColor={COLORS.brownLight} stopOpacity="0.7" />
-                <stop offset="100%" stopColor={COLORS.brownMedium} stopOpacity="0.5" />
-              </linearGradient>
-              {/* Gradient for fill area under curve */}
-              <linearGradient id="fillAreaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor={COLORS.gold} stopOpacity="0.15" />
-                <stop offset="100%" stopColor={COLORS.gold} stopOpacity="0.02" />
-              </linearGradient>
-            </defs>
-
-            {/* Fondo cuadriculado */}
-            <rect x={0} y={0} width={svgWidth} height={svgHeight} fill="url(#matrixGridPattern)" />
-
+          <div style={{ width: contentWidth, minWidth: "100%", position: "relative", paddingBottom: 28 }}>
             {/* ─── Week Headers ─── */}
-            {weeks.map((week, idx) => {
-              const cx = (idx + 0.5) * WEEK_WIDTH;
-              return (
-                <g key={`week-header-${week.number}`}>
-                  <text x={cx} y={30} textAnchor="middle" style={{ fontFamily: FONTS.serif, fontSize: 14, letterSpacing: "3px", fontWeight: 500, fill: COLORS.brownMain }}>
-                    SEMANA {String(week.number).padStart(2, "0")}
-                  </text>
-                  <text x={cx} y={48} textAnchor="middle" style={{ fontFamily: FONTS.sans, fontSize: 9, fill: COLORS.brownMain, opacity: 0.55 }}>
-                    {week.dateRange}
-                  </text>
-                </g>
-              );
-            })}
+            <div style={{ position: "relative", height: HEADER_HEIGHT }}>
+              {weeks.map((week, idx) => {
+                const cx = (idx + 0.5) * WEEK_WIDTH;
+                return (
+                  <div key={`week-header-${week.number}`} style={{ position: "absolute", left: cx, top: 10, transform: "translateX(-50%)", textAlign: "center", width: WEEK_WIDTH - 20 }}>
+                    <div style={{ fontFamily: FONTS.serif, fontSize: 14, letterSpacing: "3px", fontWeight: 500, color: COLORS.brownMain }}>
+                      SEMANA {String(week.number).padStart(2, "0")}
+                    </div>
+                    <div style={{ fontFamily: FONTS.sans, fontSize: 9, color: COLORS.brownMain, opacity: 0.55, marginTop: 2 }}>
+                      {week.dateRange}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-            {/* ─── Vertical Dividers (week separators - más notorias) ─── */}
+            {/* ─── Vertical week dividers (span lanes) ─── */}
             {weeks.map((_, idx) => {
               if (idx === 0) return null;
-              const x = idx * WEEK_WIDTH;
-              return <line key={`vdiv-${idx}`} x1={x} y1={0} x2={x} y2={svgHeight} stroke="rgba(163,105,32,0.35)" strokeWidth={1.8} />;
-            })}
-
-            {/* ─── Lane Backgrounds + Guide Lines ─── */}
-            {categories.map((_, idx) => {
-              const laneY = FIRST_LANE_Y + idx * LANE_HEIGHT - LANE_HEIGHT / 2;
-              const centerY = FIRST_LANE_Y + idx * LANE_HEIGHT;
               return (
-                <g key={`lane-${idx}`}>
-                  <rect x={0} y={laneY} width={svgWidth} height={LANE_HEIGHT} fill={`url(#lane-grad-${idx})`} />
-                  <line x1={0} y1={centerY} x2={svgWidth} y2={centerY} stroke="rgba(200,169,110,0.18)" strokeDasharray="2,4" strokeWidth={0.5} />
-                </g>
-              );
-            })}
-
-            {/* ─── Starting Line (from start node to first milestone) ─── */}
-            {sortedMilestones.length >= 1 && startNodePosition && (() => {
-              const first = sortedMilestones[0];
-              const startX = startNodePosition.x;
-              const startY = startNodePosition.y;
-              const midX = (startX + first.x) / 2;
-              const curvePath = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${first.y}, ${first.x} ${first.y}`;
-              return (
-                <path
-                  d={curvePath}
-                  fill="none"
-                  stroke={first.status === "pending" ? "url(#connectorGradientPending)" : "url(#connectorGradient)"}
-                  strokeWidth={first.status === "pending" ? 2.5 : 3}
-                  strokeDasharray={first.status === "pending" ? "4,4" : "none"}
-                  strokeLinecap="round"
+                <div
+                  key={`vdiv-${idx}`}
+                  style={{ position: "absolute", left: idx * WEEK_WIDTH, top: HEADER_HEIGHT, bottom: 0, width: 0, borderLeft: "1.5px solid rgba(163,105,32,0.18)", zIndex: 0 }}
                 />
               );
-            })()}
+            })}
 
-            {/* ─── Fill Area Under Curve ─── */}
-            {sortedMilestones.length >= 2 && fullConnectorPath && startNodePosition && (() => {
-              const last = sortedMilestones[sortedMilestones.length - 1];
-              const first = sortedMilestones[0];
-              const startX = startNodePosition.x;
-              const startY = startNodePosition.y;
-              const midX = (startX + first.x) / 2;
-              // Create fill path that follows the starting curve, then the connector path, then closes at bottom
-              const fillPath = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${first.y}, ${fullConnectorPath.substring(2)} L ${last.x},${svgHeight} L ${startX},${svgHeight} Z`;
-              return <path d={fillPath} fill="url(#fillAreaGradient)" />;
-            })()}
+            {/* ─── Lanes (one per category) ─── */}
+            {lanes.map((lane) => {
+              const color = lane.color;
+              const nodes = lane.nodes;
+              const firstX = nodes.length ? nodes[0].x : 0;
+              const lastX = nodes.length ? nodes[nodes.length - 1].x : 0;
+              const completedNodes = nodes.filter((n) => n.status === "completed");
+              const hasCompleted = completedNodes.length > 0;
+              const lastCompletedX = hasCompleted ? completedNodes[completedNodes.length - 1].x : firstX;
+              const solidW = hasCompleted ? Math.max(0, lastCompletedX - firstX) : 0;
+              const dottedStart = hasCompleted ? lastCompletedX : firstX;
+              const dottedW = Math.max(0, lastX - dottedStart);
 
-            {/* ─── Connector Path ─── */}
-            {connectorSegments.map((seg) => (
-              <path
-                key={seg.key}
-                d={seg.d}
-                fill="none"
-                stroke={seg.isPending ? "url(#connectorGradientPending)" : "url(#connectorGradient)"}
-                strokeWidth={seg.isPending ? 2.5 : 3}
-                strokeDasharray={seg.isPending ? "4,4" : "none"}
-                strokeLinecap="round"
-              />
-            ))}
-
-            {/* ─── Start Node (movible, sin cuadro) ─── */}
-            {startNodePosition && (() => {
-              const isDragging = draggingNode === 'start-node';
               return (
-                <g key="start-node" style={{ cursor: isDragging ? "grabbing" : "grab", opacity: isDragging ? 0.85 : 1 }}>
-                  {/* Halo */}
-                  <circle cx={startNodePosition.x} cy={startNodePosition.y} r={16} fill={COLORS.creamMain} />
-                  
-                  {/* Main circle - estilo distintivo para el nodo inicial */}
-                  <circle cx={startNodePosition.x} cy={startNodePosition.y} r={12} fill={COLORS.gold} stroke={COLORS.brownMain} strokeWidth={2} />
-                  
-                  {/* Icon - play/start symbol */}
-                  <path 
-                    d={`M ${startNodePosition.x - 3} ${startNodePosition.y - 5} L ${startNodePosition.x - 3} ${startNodePosition.y + 5} L ${startNodePosition.x + 5} ${startNodePosition.y} Z`} 
-                    fill={COLORS.brownMain}
-                  />
-                  
-                  {/* Invisible drag handle (larger area) */}
-                  <circle
-                    cx={startNodePosition.x}
-                    cy={startNodePosition.y}
-                    r={18}
-                    fill="transparent"
-                    style={{ cursor: isDragging ? "grabbing" : "grab" }}
-                    onMouseDown={(e) => handleMouseDown(e, 'start-node')}
-                  />
-                </g>
-              );
-            })()}
+                <div key={lane.cat.key} style={{ position: "relative", height: LANE_HEIGHT }}>
+                  {/* Lane band: tinted ~7% of category color */}
+                  <div style={{ position: "absolute", left: 8, right: 8, top: 12, bottom: 12, background: hexToRgba(color, 0.07), borderRadius: 16, border: `1px solid ${hexToRgba(color, 0.18)}` }} />
 
-            {/* ─── Milestone Nodes (freely draggable) ─── */}
-            {milestonePositions.map((m) => {
-              const isDragging = draggingNode === m.id;
-              const specialistName = specialistNames[m.id] || (m.specialist ? m.specialist.fullName : "");
-              const specialistInitials = specialistName ? specialistName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) : "";
-              return (
-                <g key={`${m.id}-${m.x}-${m.y}`} style={{ cursor: isDragging ? "grabbing" : "grab", opacity: isDragging ? 0.85 : 1 }}>
-                  {/* Halo */}
-                  <circle cx={m.x} cy={m.y} r={16} fill={COLORS.creamMain} />
+                  {/* Lane central horizontal guide line */}
+                  <div style={{ position: "absolute", left: 8, right: 8, top: "50%", height: 0, borderTop: `1px dashed ${hexToRgba(color, 0.3)}`, zIndex: 0 }} />
 
-                  {/* Main circle */}
-                  {m.status === "completed" && (
-                    <>
-                      <circle cx={m.x} cy={m.y} r={12} fill={COLORS.brownMedium} />
-                      <path d={`M ${m.x - 6} ${m.y} L ${m.x - 2} ${m.y + 4} L ${m.x + 6} ${m.y - 5}`} stroke={COLORS.creamMain} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                    </>
+                  {/* Connector line: solid until last completed, dotted after — draw-in scaleX */}
+                  {nodes.length >= 2 && solidW > 0 && (
+                    <motion.div
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
+                      transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+                      style={{ position: "absolute", left: firstX, top: "50%", width: solidW, height: 0, borderTop: `3px solid ${color}`, transformOrigin: "left center", zIndex: 1 }}
+                    />
                   )}
-                  {m.status === "assigned" && (
-                    <circle cx={m.x} cy={m.y} r={12} fill={COLORS.creamMain} stroke={COLORS.gold} strokeWidth={2} />
-                  )}
-                  {m.status === "pending" && (
-                    <circle cx={m.x} cy={m.y} r={12} fill={COLORS.creamMain} stroke={COLORS.brownLight} strokeWidth={1.8} strokeDasharray="3,2" />
+                  {nodes.length >= 2 && dottedW > 0 && (
+                    <motion.div
+                      initial={{ scaleX: 0 }}
+                      animate={{ scaleX: 1 }}
+                      transition={{ duration: 0.6, delay: 0.35, ease: "easeOut" }}
+                      style={{ position: "absolute", left: dottedStart, top: "50%", width: dottedW, height: 0, borderTop: `2.5px dashed ${hexToRgba(color, 0.7)}`, transformOrigin: "left center", zIndex: 1 }}
+                    />
                   )}
 
-                  {/* Invisible drag handle (larger area) */}
-                  <circle
-                    cx={m.x}
-                    cy={m.y}
-                    r={18}
-                    fill="transparent"
-                    style={{ cursor: isDragging ? "grabbing" : "grab" }}
-                    onMouseDown={(e) => handleMouseDown(e, m.id)}
-                  />
+                  {/* Nodes */}
+                  {nodes.map((n, nIdx) => {
+                    const labelAbove = nIdx % 2 === 0;
+                    const specialistName = specialistNames[n.id] || (n.specialist ? n.specialist.fullName : "");
+                    const specialistInitials = specialistName ? specialistName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "";
+                    return (
+                      <motion.div
+                        key={n.id}
+                        initial={{ opacity: 0, scale: 0.4 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.35, delay: 0.15 + nIdx * 0.09, ease: "easeOut" }}
+                        style={{ position: "absolute", left: n.x, top: "50%", transform: "translate(-50%, -50%)", zIndex: 2 }}
+                      >
+                        {/* Order badge */}
+                        <div style={{ position: "absolute", top: -(NODE_R + 18), left: "50%", transform: "translateX(-50%)", width: 16, height: 16, borderRadius: "50%", background: n.status === "completed" ? color : COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${color}`, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
+                          <span style={{ fontFamily: FONTS.serif, fontSize: 9, fontWeight: 600, color: n.status === "completed" ? COLORS.creamMain : COLORS.brownDark }}>
+                            {String(n.order).padStart(2, "0")}
+                          </span>
+                        </div>
 
-                  {/* Order number badge */}
-                  <circle cx={m.x} cy={m.y - 22} r={8} fill={m.status === "completed" ? COLORS.brownMain : COLORS.creamMain} stroke={COLORS.gold} strokeWidth={0.8} strokeDasharray={m.status === "pending" ? "2,2" : "none"} />
-                  <text x={m.x} y={m.y - 18} textAnchor="middle" style={{ fontFamily: FONTS.serif, fontSize: 10, fontWeight: 500, fill: m.status === "completed" ? COLORS.gold : COLORS.brownDark, opacity: m.status === "pending" ? 0.6 : 1 }}>
-                    {String(m.order).padStart(2, "0")}
-                  </text>
+                        {/* Node circle */}
+                        <div
+                          style={{
+                            width: NODE_R * 2,
+                            height: NODE_R * 2,
+                            borderRadius: "50%",
+                            background: n.status === "completed" ? color : COLORS.creamMain,
+                            border:
+                              n.status === "completed"
+                                ? "none"
+                                : n.status === "assigned"
+                                ? `2.5px solid ${color}`
+                                : `2px dashed ${hexToRgba(color, 0.75)}`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 2px 6px rgba(93,64,55,0.12)",
+                          }}
+                        >
+                          {n.status === "completed" && (
+                            <span style={{ color: COLORS.creamMain, fontSize: 14, fontWeight: 700, lineHeight: 1 }}>✓</span>
+                          )}
+                        </div>
 
-                  {/* Floating card below node */}
-                  <foreignObject x={m.x - 65} y={m.y + 22} width={130} height={70} style={{ overflow: "visible", pointerEvents: "none" }}>
-                    <div style={{ width: 130, minHeight: 38, borderRadius: 6, background: COLORS.creamMain, border: `0.6px ${m.status === "pending" ? "dashed" : "solid"} ${COLORS.gold}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4px 6px", boxShadow: "0 2px 8px rgba(93,64,55,0.06)", pointerEvents: "auto", userSelect: "none" }}>
-                      {/* Treatment name */}
-                      <div style={{ fontFamily: FONTS.serif, fontSize: 11, fontWeight: 500, color: COLORS.brownDark, textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
-                        {m.name}
-                      </div>
-                      {/* Specialist - click to edit */}
-                      <div style={{ marginTop: 2, width: "100%", position: "relative" }}>
-                        {editingSpecialist === m.id ? (
-                          <select
-                            autoFocus
-                            value={specialistNames[m.id] || ""}
-                            onChange={(e) => selectSpecialist(m.id, e.target.value)}
-                            onBlur={() => setEditingSpecialist(null)}
-                            style={{
-                              width: "100%", fontSize: 9, fontFamily: FONTS.sans,
-                              border: `1px solid ${COLORS.gold}`, borderRadius: 3,
-                              padding: "2px 3px", outline: "none", background: COLORS.creamSoft,
-                              color: COLORS.brownDark, cursor: "pointer", appearance: "auto", fontWeight: 500,
-                            }}
-                          >
-                            <option value="">-- Seleccionar --</option>
-                            {especialistas.map((esp) => (
-                              <option key={esp.id} value={esp.nombre}>{esp.nombre}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div
-                            onClick={() => startEditSpecialist(m.id)}
-                            style={{
-                              width: "100%", fontSize: 9, fontFamily: FONTS.sans,
-                              border: `1px solid ${COLORS.gold}`, borderRadius: 3,
-                              padding: "3px 4px", background: specialistNames[m.id] ? "rgba(200,169,110,0.08)" : COLORS.creamSoft,
-                              color: specialistNames[m.id] ? COLORS.brownDark : COLORS.brownLight,
-                              cursor: "pointer", fontWeight: 500, textAlign: "center",
-                              transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 3,
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(200,169,110,0.15)"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = specialistNames[m.id] ? "rgba(200,169,110,0.08)" : COLORS.creamSoft; }}
-                          >
-                            {specialistNames[m.id] ? (
-                              <>
-                                <div style={{ width: 12, height: 12, borderRadius: "50%", background: COLORS.brownMain, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                  <span style={{ fontSize: 6, fontWeight: 700, color: COLORS.gold }}>{specialistInitials}</span>
+                        {/* Label card alternating above/below */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            ...(labelAbove ? { bottom: NODE_R * 2 + 16 } : { top: NODE_R * 2 + 16 }),
+                            width: 132,
+                          }}
+                        >
+                          <div style={{ width: "100%", minHeight: 38, borderRadius: 8, background: COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${hexToRgba(color, 0.55)}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5px 6px", boxShadow: "0 2px 8px rgba(93,64,55,0.08)" }}>
+                            {/* Treatment name */}
+                            <div style={{ fontFamily: FONTS.serif, fontSize: 11.5, fontWeight: 500, color: COLORS.brownDark, textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                              {n.name}
+                            </div>
+                            {/* Specialist - click to edit */}
+                            <div style={{ marginTop: 3, width: "100%", position: "relative" }}>
+                              {editingSpecialist === n.id ? (
+                                <select
+                                  autoFocus
+                                  value={specialistNames[n.id] || ""}
+                                  onChange={(e) => selectSpecialist(n.id, e.target.value)}
+                                  onBlur={() => setEditingSpecialist(null)}
+                                  style={{
+                                    width: "100%", fontSize: 9, fontFamily: FONTS.sans,
+                                    border: `1px solid ${color}`, borderRadius: 4,
+                                    padding: "2px 3px", outline: "none", background: COLORS.creamSoft,
+                                    color: COLORS.brownDark, cursor: "pointer", appearance: "auto", fontWeight: 500,
+                                  }}
+                                >
+                                  <option value="">-- Seleccionar --</option>
+                                  {especialistas.map((esp) => (
+                                    <option key={esp.id} value={esp.nombre}>{esp.nombre}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <div
+                                  onClick={() => startEditSpecialist(n.id)}
+                                  style={{
+                                    width: "100%", fontSize: 9, fontFamily: FONTS.sans,
+                                    border: `1px solid ${hexToRgba(color, 0.6)}`, borderRadius: 4,
+                                    padding: "3px 4px", background: specialistNames[n.id] ? hexToRgba(color, 0.1) : COLORS.creamSoft,
+                                    color: specialistNames[n.id] ? COLORS.brownDark : COLORS.brownLight,
+                                    cursor: "pointer", fontWeight: 500, textAlign: "center",
+                                    transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 3,
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = hexToRgba(color, 0.18); }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = specialistNames[n.id] ? hexToRgba(color, 0.1) : COLORS.creamSoft; }}
+                                >
+                                  {specialistNames[n.id] ? (
+                                    <>
+                                      <div style={{ width: 12, height: 12, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <span style={{ fontSize: 6, fontWeight: 700, color: COLORS.creamMain }}>{specialistInitials}</span>
+                                      </div>
+                                      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: 9 }}>{specialistNames[n.id]}</span>
+                                    </>
+                                  ) : (
+                                    <span style={{ fontStyle: "italic", fontSize: 8 }}>Seleccionar</span>
+                                  )}
                                 </div>
-                                <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: 9 }}>{specialistNames[m.id]}</span>
-                              </>
-                            ) : (
-                              <span style={{ fontStyle: "italic", fontSize: 8 }}>Seleccionar</span>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  </foreignObject>
-                </g>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               );
             })}
 
             {/* ─── Empty state ─── */}
             {milestones.length === 0 && (
-              <text x={svgWidth / 2} y={svgHeight / 2} textAnchor="middle" style={{ fontFamily: FONTS.sans, fontSize: 13, fill: COLORS.brownMain, opacity: 0.45, fontStyle: "italic" }}>
+              <div style={{ position: "absolute", left: 0, right: 0, top: HEADER_HEIGHT, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONTS.sans, fontSize: 13, color: COLORS.brownMain, opacity: 0.45, fontStyle: "italic" }}>
                 Aún no hay sesiones agendadas
-              </text>
+              </div>
             )}
-          </svg>
+          </div>
 
           {/* Scroll hint */}
           {showScrollHint && weeks.length > 4 && (
