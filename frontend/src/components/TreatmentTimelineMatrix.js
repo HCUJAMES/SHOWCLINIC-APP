@@ -76,6 +76,8 @@ const TreatmentTimelineMatrix = ({
   // ─── Derived dimensions ───
   const totalWeeks = Math.max(weeks.length, 1);
   const contentWidth = totalWeeks * WEEK_WIDTH;
+  const lanesHeight = Math.max(categories.length, 1) * LANE_HEIGHT;
+  const contentHeight = HEADER_HEIGHT + lanesHeight;
 
   // ─── Load specialist names and positions from DB ───
   useEffect(() => {
@@ -363,9 +365,27 @@ const TreatmentTimelineMatrix = ({
           style={{ flex: 1, overflowX: "auto", overflowY: "hidden", position: "relative", scrollbarWidth: "thin", scrollbarColor: "rgba(200,169,110,0.4) rgba(245,237,223,0.5)" }}
           className="timeline-matrix-scroll"
         >
-          <div ref={matrixContainerRef} style={{ width: contentWidth, minWidth: "100%", position: "relative", paddingBottom: 28 }}>
+          <div ref={matrixContainerRef} style={{ width: contentWidth, minWidth: "100%", height: contentHeight + 28, position: "relative", paddingBottom: 28 }}>
+            {/* ─── Grid background cuadriculado tenue ─── */}
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                top: HEADER_HEIGHT,
+                height: lanesHeight,
+                backgroundImage: `
+                  linear-gradient(to right, rgba(163,105,32,0.05) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(163,105,32,0.05) 1px, transparent 1px)
+                `,
+                backgroundSize: `${WEEK_WIDTH / 4}px 40px`,
+                zIndex: 0,
+                pointerEvents: "none",
+              }}
+            />
+
             {/* ─── Week Headers ─── */}
-            <div style={{ position: "relative", height: HEADER_HEIGHT }}>
+            <div style={{ position: "relative", height: HEADER_HEIGHT, zIndex: 2 }}>
               {weeks.map((week, idx) => {
                 const cx = (idx + 0.5) * WEEK_WIDTH;
                 return (
@@ -381,16 +401,37 @@ const TreatmentTimelineMatrix = ({
               })}
             </div>
 
-            {/* ─── Vertical week dividers (span lanes) ─── */}
-            {weeks.map((_, idx) => {
+            {/* ─── Week column bands (alternating subtle tint) ─── */}
+            {weeks.map((_, idx) => (
+              <div
+                key={`wband-${idx}`}
+                style={{
+                  position: "absolute",
+                  left: idx * WEEK_WIDTH,
+                  top: HEADER_HEIGHT,
+                  width: WEEK_WIDTH,
+                  height: lanesHeight,
+                  background: idx % 2 === 1 ? "rgba(163,105,32,0.025)" : "transparent",
+                  zIndex: 0,
+                  pointerEvents: "none",
+                }}
+              />
+            ))}
+
+            {/* ─── Vertical week dividers (span lanes) — más visibles ─── */}
+            {weeks.map((week, idx) => {
               if (idx === 0) return null;
               return (
                 <div
                   key={`vdiv-${idx}`}
-                  style={{ position: "absolute", left: idx * WEEK_WIDTH, top: HEADER_HEIGHT, bottom: 0, width: 0, borderLeft: "1.5px solid rgba(163,105,32,0.18)", zIndex: 0 }}
+                  style={{ position: "absolute", left: idx * WEEK_WIDTH, top: HEADER_HEIGHT - 8, height: lanesHeight + 8, width: 0, borderLeft: "2px solid rgba(163,105,32,0.35)", zIndex: 1 }}
                 />
               );
             })}
+            {/* Borde derecho final */}
+            <div style={{ position: "absolute", left: contentWidth, top: HEADER_HEIGHT - 8, height: lanesHeight + 8, width: 0, borderLeft: "2px solid rgba(163,105,32,0.35)", zIndex: 1 }} />
+            {/* Borde izquierdo inicial */}
+            <div style={{ position: "absolute", left: 0, top: HEADER_HEIGHT - 8, height: lanesHeight + 8, width: 0, borderLeft: "2px solid rgba(163,105,32,0.35)", zIndex: 1 }} />
 
             {/* ─── Lanes (one per category) ─── */}
             {lanes.map((lane, laneIdx) => {
