@@ -183,19 +183,17 @@ const TreatmentTimelineMatrix = ({
     if (!container) return;
     const rect = container.getBoundingClientRect();
     const startX = e.clientX;
-    const startY = e.clientY;
     const nodeStartX = node.x;
-    const nodeStartY = node.y;
+    // Mantener Y fijo en el centro del carril
+    const laneY = HEADER_HEIGHT + node.laneIdx * LANE_HEIGHT + LANE_HEIGHT / 2;
 
     const handleMouseMove = (moveEvent) => {
       const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
-      const newX = Math.max(0, Math.min(contentWidth, nodeStartX + dx));
-      const newY = Math.max(HEADER_HEIGHT, Math.min(HEADER_HEIGHT + categories.length * LANE_HEIGHT, nodeStartY + dy));
+      const newX = Math.max(NODE_R, Math.min(contentWidth - NODE_R, nodeStartX + dx));
       
       setNodePositions((prev) => ({
         ...prev,
-        [node.id]: { x: newX, y: newY },
+        [node.id]: { x: newX, y: laneY }, // Y siempre fijo en el centro del carril
       }));
     };
 
@@ -213,7 +211,7 @@ const TreatmentTimelineMatrix = ({
     setDraggingNode(node.id);
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
-  }, [contentWidth, categories.length, saveLayout, specialistNames]);
+  }, [contentWidth, saveLayout, specialistNames]);
 
   return (
     <div
@@ -410,6 +408,51 @@ const TreatmentTimelineMatrix = ({
               );
             })}
 
+            {/* ─── Connector Lines between nodes in each lane ─── */}
+            {lanes.map((lane) => {
+              const color = lane.color;
+              const nodes = lane.nodes;
+              if (nodes.length < 2) return null;
+
+              return nodes.slice(0, -1).map((n, idx) => {
+                const nextNode = nodes[idx + 1];
+                const x1 = n.x;
+                const y1 = n.y;
+                const x2 = nextNode.x;
+                const y2 = nextNode.y;
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                
+                // Determinar si es sólida o punteada según el estado
+                const isSolid = n.status === "completed" && nextNode.status === "completed";
+                const lineStyle = isSolid 
+                  ? `3px solid ${color}` 
+                  : `2.5px dashed ${hexToRgba(color, 0.7)}`;
+
+                return (
+                  <motion.div
+                    key={`line-${n.id}-${nextNode.id}`}
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: 0.6, delay: 0.2 + idx * 0.1, ease: "easeOut" }}
+                    style={{
+                      position: "absolute",
+                      left: x1,
+                      top: y1,
+                      width: length,
+                      height: 0,
+                      borderTop: lineStyle,
+                      transformOrigin: "left center",
+                      transform: `rotate(${angle}deg)`,
+                      zIndex: 1,
+                    }}
+                  />
+                );
+              });
+            })}
+
             {/* ─── All Nodes (positioned absolutely) ─── */}
             {lanes.flatMap((lane) => {
               const color = lane.color;
@@ -431,7 +474,7 @@ const TreatmentTimelineMatrix = ({
                       top: n.y, 
                       transform: "translate(-50%, -50%)", 
                       zIndex: isDragging ? 100 : 10,
-                      cursor: "grab"
+                      cursor: isDragging ? "grabbing" : "ew-resize"
                     }}
                     onMouseDown={(e) => handleMouseDown(e, n)}
                   >
