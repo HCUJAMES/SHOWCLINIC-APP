@@ -1220,7 +1220,55 @@ router.delete("/presupuesto/paciente/:presupuesto_asignado_id", requirePaquetesA
 });
 
 /* ==============================
-   💊 REGISTRAR PAGO DE CONSULTA EN PRESUPUESTO
+   �‍⚕️ ASIGNAR / CAMBIAR ESPECIALISTA DE UN PRESUPUESTO YA ASIGNADO
+   Solo actualiza el especialista_id, sin tocar precios, sesiones ni pagos.
+   Sirve para que el presupuesto aparezca en Gestión Clínica del especialista.
+============================== */
+router.put("/presupuesto/:presupuesto_asignado_id/especialista", requirePaquetesAsignar, async (req, res) => {
+  const { presupuesto_asignado_id } = req.params;
+  const { especialista_id } = req.body;
+
+  if (!especialista_id) {
+    return res.status(400).json({ message: "especialista_id es requerido" });
+  }
+
+  try {
+    const presupuesto = await dbGet(
+      `SELECT id FROM presupuestos_asignados WHERE id = ?`,
+      [presupuesto_asignado_id]
+    );
+    if (!presupuesto) {
+      return res.status(404).json({ message: "Presupuesto asignado no encontrado" });
+    }
+
+    const especialista = await dbGet(
+      `SELECT id, nombre FROM especialistas WHERE id = ?`,
+      [especialista_id]
+    );
+    if (!especialista) {
+      return res.status(404).json({ message: "Especialista no encontrado" });
+    }
+
+    // Solo se actualiza el especialista del presupuesto. No se modifican
+    // sesiones ya realizadas (su especialista queda como histórico).
+    await dbRun(
+      `UPDATE presupuestos_asignados SET especialista_id = ? WHERE id = ?`,
+      [especialista_id, presupuesto_asignado_id]
+    );
+
+    res.json({
+      message: "✅ Especialista asignado al presupuesto",
+      especialista_id: especialista.id,
+      especialista_nombre: especialista.nombre
+    });
+  } catch (err) {
+    console.error("❌ Error al asignar especialista al presupuesto:", err.message);
+    res.status(500).json({ message: "Error al asignar especialista" });
+  }
+});
+
+/* ==============================
+   �💊 REGISTRAR PAGO DE CONSULTA EN PRESUPUESTO
 ============================== */
 router.post("/presupuesto/:presupuesto_asignado_id/consulta", requirePaquetesAsignar, async (req, res) => {
   const { presupuesto_asignado_id } = req.params;

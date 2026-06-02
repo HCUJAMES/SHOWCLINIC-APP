@@ -512,13 +512,59 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
 });
 
 // ✅ Obtener presupuestos asignados a un especialista
+// MATCHING ROBUSTO: el especialista_id en presupuestos_asignados suele estar NULL.
+// Por eso resolvemos el especialista también desde sus sesiones realizadas
+// (presupuestos_sesiones.especialista_id o el texto normalizado), igual que /estadisticas.
 router.get("/especialista/:id/presupuestos", authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const { fecha_inicio, fecha_fin } = req.query;
+    const espId = parseInt(id);
 
-    let conditions = ["pa.especialista_id = ?"];
-    let params = [parseInt(id)];
+    if (!espId || isNaN(espId)) {
+      return res.status(400).json({ message: "ID de especialista no válido" });
+    }
+
+    // Nombre del especialista para el matching por texto normalizado
+    const espData = await dbGet("SELECT id, nombre FROM especialistas WHERE id = ?", [espId]);
+    if (!espData) {
+      return res.status(404).json({ message: "Especialista no encontrado" });
+    }
+    const nombreNorm = espData.nombre.trim().toLowerCase();
+
+    // 1) Presupuestos asignados directamente a este especialista
+    const idsDirectos = await dbAll(
+      "SELECT id FROM presupuestos_asignados WHERE especialista_id = ?",
+      [espId]
+    );
+
+    // 2) Presupuestos cuyas sesiones fueron realizadas por este especialista
+    const sesionesEsp = await dbAll(`
+      SELECT DISTINCT presupuesto_asignado_id, especialista, especialista_id
+      FROM presupuestos_sesiones
+      WHERE especialista_id IS NOT NULL OR (especialista IS NOT NULL AND especialista != '')
+    `);
+
+    const idSet = new Set(idsDirectos.map(r => r.id));
+    sesionesEsp.forEach(row => {
+      if (row.especialista_id && parseInt(row.especialista_id) === espId) {
+        idSet.add(row.presupuesto_asignado_id);
+        return;
+      }
+      if (!row.especialista_id && row.especialista && normalizarEspecialista(row.especialista) === nombreNorm) {
+        idSet.add(row.presupuesto_asignado_id);
+      }
+    });
+
+    if (idSet.size === 0) {
+      return res.json([]);
+    }
+
+    const ids = Array.from(idSet);
+    const placeholders = ids.map(() => "?").join(",");
+
+    let conditions = [`pa.id IN (${placeholders})`];
+    let params = [...ids];
 
     if (fecha_inicio) {
       conditions.push("DATE(pa.creado_en) >= ?");
@@ -544,13 +590,33 @@ router.get("/especialista/:id/presupuestos", authMiddleware, async (req, res) =>
       ORDER BY pa.creado_en DESC
     `, params);
 
-    // Parse tratamientos_json for each
+    // Parsear tratamientos y recalcular pagado/saldo desde finanzas (fuente de verdad, sin escribir en BD)
     for (const pres of presupuestos) {
       try {
         pres.tratamientos = pres.tratamientos_json ? JSON.parse(pres.tratamientos_json) : [];
       } catch (e) {
         pres.tratamientos = [];
       }
+
+      const sumaPagos = await dbGet(
+        `SELECT COALESCE(SUM(monto), 0) as total_pagado FROM finanzas 
+         WHERE referencia_id = ? AND referencia_tipo = 'presupuesto_asignado' AND tipo = 'ingreso'`,
+        [pres.id]
+      );
+      const montoPagadoReal = parseFloat(sumaPagos?.total_pagado) || 0;
+      const montoPagadoAnterior = parseFloat(pres.monto_pagado) || 0;
+      const montoPagado = Math.max(montoPagadoReal, montoPagadoAnterior);
+
+      const precioTotal = parseFloat(pres.precio_total) || 0;
+      const descuento = parseFloat(pres.descuento) || 0;
+      const precioConDescuento = precioTotal - descuento;
+
+      pres.monto_pagado = montoPagado;
+      pres.saldo_pendiente = Math.max(0, precioConDescuento - montoPagado);
+      pres.estado_pago = (montoPagado >= precioConDescuento - 0.01 && precioConDescuento > 0)
+        ? 'pagado'
+        : (montoPagado > 0 ? 'adelanto' : 'pendiente_pago');
+      pres.pagado = pres.estado_pago === 'pagado' ? 1 : 0;
     }
 
     res.json(presupuestos);

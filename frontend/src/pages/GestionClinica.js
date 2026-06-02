@@ -1238,8 +1238,11 @@ const GestionClinica = () => {
                               const precioTotal = Number(pres.precio_total || 0);
                               const descuento = Number(pres.descuento || 0);
                               const pagado = Number(pres.monto_pagado || 0);
-                              const saldo = Math.max(0, precioTotal - descuento - pagado);
+                              const saldo = pres.saldo_pendiente != null ? Number(pres.saldo_pendiente) : Math.max(0, precioTotal - descuento - pagado);
                               const estadoColor = pres.estado === 'completado' ? '#4CAF50' : pres.estado === 'activo' ? BRAND_COLORS.warning : '#999';
+                              const estadoPago = pres.estado_pago || (saldo <= 0.01 && (precioTotal - descuento) > 0 ? 'pagado' : pagado > 0 ? 'adelanto' : 'pendiente_pago');
+                              const pagoLabel = estadoPago === 'pagado' ? 'Pagado' : estadoPago === 'adelanto' ? 'Adelanto' : 'Pendiente';
+                              const pagoColor = estadoPago === 'pagado' ? '#4CAF50' : estadoPago === 'adelanto' ? '#ff9800' : '#f44336';
                               
                               return (
                                 <Paper key={pres.id} sx={{ p: 2, backgroundColor: '#3A3A3A', borderRadius: 2, border: `1px solid ${estadoColor}40` }}>
@@ -1262,6 +1265,11 @@ const GestionClinica = () => {
                                         label={pres.estado === 'completado' ? 'Completado' : pres.estado === 'activo' ? 'Activo' : pres.estado}
                                         size="small"
                                         sx={{ backgroundColor: `${estadoColor}30`, color: estadoColor, fontWeight: 600, fontSize: '0.7rem' }}
+                                      />
+                                      <Chip 
+                                        label={pagoLabel}
+                                        size="small"
+                                        sx={{ backgroundColor: `${pagoColor}30`, color: pagoColor, fontWeight: 600, fontSize: '0.7rem' }}
                                       />
                                     </Box>
                                   </Box>

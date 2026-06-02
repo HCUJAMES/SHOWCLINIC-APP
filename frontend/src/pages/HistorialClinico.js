@@ -1085,6 +1085,35 @@ const HistorialClinico = () => {
     }
   };
 
+  // Asignar especialista a un presupuesto YA asignado (sin tocar precios ni sesiones)
+  // Solo sirve para que el presupuesto aparezca en Gestión Clínica del especialista
+  const asignarEspecialistaAPresupuesto = async (presupuestoAsignadoId, espId, ofertaId) => {
+    if (!espId) {
+      showToast({ severity: "warning", message: "Selecciona un especialista primero" });
+      return;
+    }
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/paquetes/presupuesto/${presupuestoAsignadoId}/especialista`,
+        { especialista_id: espId },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Especialista asignado al presupuesto" });
+
+      // Recargar presupuestos asignados para reflejar el cambio
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+      if (ofertaId != null) {
+        setEspecialistaPorPresupuesto(prev => ({ ...prev, [ofertaId]: '' }));
+      }
+    } catch (error) {
+      console.error("Error al asignar especialista al presupuesto:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al asignar especialista" });
+    }
+  };
+
   // Completar sesión de presupuesto
   const completarSesionPresupuesto = async (sesionId) => {
     const especialistaId = especialistasPorSesion[`presupuesto_${sesionId}`];
@@ -4809,7 +4838,8 @@ const HistorialClinico = () => {
                           )}
                           {yaAsignado && (() => {
                             const presAsig = presupuestosAsignados.find(p => p.oferta_id === o.id);
-                            return presAsig?.especialista_nombre ? (
+                            if (!presAsig) return null;
+                            return presAsig.especialista_nombre ? (
                               <Box sx={{ mt: 0.5, mb: 1 }}>
                                 <Chip
                                   icon={<Person sx={{ fontSize: 16 }} />}
@@ -4824,7 +4854,54 @@ const HistorialClinico = () => {
                                   }}
                                 />
                               </Box>
-                            ) : null;
+                            ) : (
+                              <Box sx={{ mt: 0.5, mb: 1, display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                                <Chip
+                                  icon={<Person sx={{ fontSize: 16 }} />}
+                                  label="Sin especialista asignado"
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: "rgba(244,67,54,0.12)",
+                                    color: "#c62828",
+                                    fontWeight: 600,
+                                    fontSize: "0.75rem",
+                                    '& .MuiChip-icon': { color: '#c62828' }
+                                  }}
+                                />
+                                <FormControl size="small" sx={{ minWidth: 200 }}>
+                                  <InputLabel sx={{ fontSize: "0.8rem" }}>Asignar especialista</InputLabel>
+                                  <Select
+                                    value={especialistaPorPresupuesto[o.id] || ''}
+                                    onChange={(e) => setEspecialistaPorPresupuesto(prev => ({
+                                      ...prev,
+                                      [o.id]: e.target.value
+                                    }))}
+                                    label="Asignar especialista"
+                                    sx={{ fontSize: "0.8rem" }}
+                                  >
+                                    {especialistas.map((esp) => (
+                                      <MenuItem key={esp.id} value={esp.id} sx={{ fontSize: "0.8rem" }}>
+                                        {esp.nombre}
+                                      </MenuItem>
+                                    ))}
+                                  </Select>
+                                </FormControl>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  disabled={!especialistaPorPresupuesto[o.id]}
+                                  onClick={() => asignarEspecialistaAPresupuesto(presAsig.id, especialistaPorPresupuesto[o.id], o.id)}
+                                  sx={{
+                                    backgroundColor: "#a36920",
+                                    textTransform: "none",
+                                    fontSize: "0.75rem",
+                                    "&:hover": { backgroundColor: "#8a5a1a" }
+                                  }}
+                                >
+                                  Asignar
+                                </Button>
+                              </Box>
+                            );
                           })()}
 
                           {/* Carrusel de tratamientos del presupuesto */}
