@@ -1054,7 +1054,11 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
     // Para cada presupuesto, obtener sus sesiones y calcular saldo correctamente
     for (const p of presupuestos) {
       const sesiones = await dbAll(
-        `SELECT * FROM presupuestos_sesiones WHERE presupuesto_asignado_id = ? ORDER BY id ASC`,
+        `SELECT ps.*, t.procedimiento as tratamiento_procedimiento 
+         FROM presupuestos_sesiones ps
+         LEFT JOIN tratamientos t ON ps.tratamiento_id = t.id
+         WHERE ps.presupuesto_asignado_id = ? 
+         ORDER BY ps.id ASC`,
         [p.id]
       );
       p.sesiones = sesiones;

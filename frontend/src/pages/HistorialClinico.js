@@ -5309,16 +5309,22 @@ const HistorialClinico = () => {
                   { key: "armonizacion", label: "Armonización", initial: "A", subtitle: "Inyectables y rellenos" },
                 ];
 
-                // Map treatments to categories based on keywords
-                const categorizeTreatment = (nombre) => {
+                // Map treatments to categories based on procedimiento field from DB
+                const categorizeTreatment = (procedimiento, nombre) => {
+                  // Usar el procedimiento de la BD si existe
+                  if (procedimiento) {
+                    const proc = procedimiento.toLowerCase();
+                    if (proc.includes('corporal')) return 'corporal';
+                    if (proc.includes('facial')) return 'facial';
+                    if (proc.includes('armonización') || proc.includes('armonizacion')) return 'armonizacion';
+                  }
+                  // Fallback: inferir por keywords del nombre (para sesiones antiguas sin procedimiento)
                   const n = (nombre || '').toLowerCase();
-                  // Corporal keywords
                   if (n.includes('corporal') || n.includes('reducti') || n.includes('lipopapada') || n.includes('lipo') || 
                       n.includes('masaje') || n.includes('modelado') || n.includes('criolipo') || n.includes('cavita') ||
                       n.includes('drenaje') || n.includes('reafirm') || n.includes('gluteo') || n.includes('abdomen')) {
                     return 'corporal';
                   }
-                  // Facial keywords
                   if (n.includes('facial') || n.includes('hifu') || n.includes('radiofrecuencia') || n.includes('limpieza') || 
                       n.includes('peeling') || n.includes('microneeld') || n.includes('dermapen') || n.includes('led') ||
                       n.includes('cosm') || n.includes('rejuvenec') || n.includes('mancha') || n.includes('acne') ||
@@ -5344,7 +5350,7 @@ const HistorialClinico = () => {
                 const matrixMilestones = sesiones.map((s, idx) => {
                   const nombreTrat = s.tratamiento_nombre || '';
                   const esExosoma = nombreTrat.toLowerCase().includes('exosoma');
-                  const catKey = categorizeTreatment(nombreTrat);
+                  const catKey = categorizeTreatment(s.tratamiento_procedimiento, nombreTrat);
                   let weekNum;
                   if (esExosoma) {
                     // Repartir en semanas consecutivas desde el inicio (1, 2, 3)
