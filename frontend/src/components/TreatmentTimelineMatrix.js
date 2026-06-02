@@ -41,8 +41,8 @@ const FONTS = {
 };
 
 // ─── Constantes de layout ───
-const WEEK_WIDTH = 280;
-const LANE_HEIGHT = 168;
+const WEEK_WIDTH = 360;  // Aumentado de 280 a 360 para más espacio entre semanas
+const LANE_HEIGHT = 200; // Aumentado de 168 a 200 para más espacio entre carriles
 const HEADER_HEIGHT = 56;
 const CATEGORY_PANEL_WIDTH = 220;
 const NODE_R = 13;
@@ -67,14 +67,17 @@ const TreatmentTimelineMatrix = ({
   const [specialistNames, setSpecialistNames] = useState({});
   const [editingSpecialist, setEditingSpecialist] = useState(null);
   const [showScrollHint, setShowScrollHint] = useState(false);
+  const [nodePositions, setNodePositions] = useState({}); // { [milestoneId]: { x, y } }
+  const [draggingNode, setDraggingNode] = useState(null);
   const scrollContainerRef = useRef(null);
+  const matrixContainerRef = useRef(null);
   const saveTimerRef = useRef(null);
 
   // ─── Derived dimensions ───
   const totalWeeks = Math.max(weeks.length, 1);
   const contentWidth = totalWeeks * WEEK_WIDTH;
 
-  // ─── Load specialist names from DB ───
+  // ─── Load specialist names and positions from DB ───
   useEffect(() => {
     if (!presupuestoId) return;
     const token = localStorage.getItem("token");
@@ -84,12 +87,13 @@ const TreatmentTimelineMatrix = ({
       .then((r) => r.json())
       .then((data) => {
         if (data && data.specialistNames) setSpecialistNames(data.specialistNames);
+        if (data && data.matrixPositions) setNodePositions(data.matrixPositions);
       })
       .catch(() => {});
   }, [presupuestoId]);
 
-  // ─── Save specialist names to DB (debounced) ───
-  const saveSpecialists = useCallback((names) => {
+  // ─── Save specialist names and positions to DB (debounced) ───
+  const saveLayout = useCallback((names, positions) => {
     if (!presupuestoId) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
@@ -97,8 +101,8 @@ const TreatmentTimelineMatrix = ({
       fetch(`${API}/api/tratamientos/calendar-layout/${presupuestoId}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ specialistNames: names }),
-      }).catch((err) => console.error("Error guardando especialistas:", err));
+        body: JSON.stringify({ specialistNames: names, matrixPositions: positions }),
+      }).catch((err) => console.error("Error guardando layout:", err));
     }, 500);
   }, [presupuestoId]);
 
@@ -118,11 +122,11 @@ const TreatmentTimelineMatrix = ({
     };
   }, [weeks.length]);
 
-  // ─── Lanes: one per category, nodes positioned by xFrac ───
+  // ─── Lanes: one per category, nodes positioned by xFrac or manual position ───
   // xFrac = ((week-1) + slot) / totalWeeks ; slot = (idx+1)/(count+1)
   // para varios tratamientos en la misma semana+categoría.
   const lanes = useMemo(() => {
-    return categories.map((cat) => {
+    return categories.map((cat, laneIdx) => {
       const catMilestones = milestones.filter((m) => m.categoryKey === cat.key);
       const byWeek = {};
       catMilestones.forEach((m) => {
@@ -136,13 +140,17 @@ const TreatmentTimelineMatrix = ({
           const slot = (idx + 1) / (count + 1);
           const week = Math.max(1, Number(m.week) || 1);
           const xFrac = ((week - 1) + slot) / totalWeeks;
-          nodes.push({ ...m, xFrac, x: xFrac * contentWidth });
+          const defaultX = xFrac * contentWidth;
+          const defaultY = HEADER_HEIGHT + laneIdx * LANE_HEIGHT + LANE_HEIGHT / 2;
+          // Use manual position if exists, otherwise use calculated position
+          const pos = nodePositions[m.id] || { x: defaultX, y: defaultY };
+          nodes.push({ ...m, xFrac, x: pos.x, y: pos.y, laneIdx });
         });
       });
       nodes.sort((a, b) => a.x - b.x);
-      return { cat, color: laneColor(cat.key), nodes };
+      return { cat, color: laneColor(cat.key), nodes, laneIdx };
     });
-  }, [categories, milestones, totalWeeks, contentWidth]);
+  }, [categories, milestones, totalWeeks, contentWidth, nodePositions]);
 
   // ─── Category counts ───
   const categoryCounts = useMemo(() => {
@@ -161,11 +169,51 @@ const TreatmentTimelineMatrix = ({
   const selectSpecialist = useCallback((milestoneId, nombre) => {
     setSpecialistNames((prev) => {
       const next = { ...prev, [milestoneId]: nombre };
-      saveSpecialists(next);
+      saveLayout(next, nodePositions);
       return next;
     });
     setEditingSpecialist(null);
-  }, [saveSpecialists]);
+  }, [saveLayout, nodePositions]);
+
+  // ─── Drag handlers ───
+  const handleMouseDown = useCallback((e, node) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const container = matrixContainerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const nodeStartX = node.x;
+    const nodeStartY = node.y;
+
+    const handleMouseMove = (moveEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      const newX = Math.max(0, Math.min(contentWidth, nodeStartX + dx));
+      const newY = Math.max(HEADER_HEIGHT, Math.min(HEADER_HEIGHT + categories.length * LANE_HEIGHT, nodeStartY + dy));
+      
+      setNodePositions((prev) => ({
+        ...prev,
+        [node.id]: { x: newX, y: newY },
+      }));
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      setDraggingNode(null);
+      // Save to DB
+      setNodePositions((prev) => {
+        saveLayout(specialistNames, prev);
+        return prev;
+      });
+    };
+
+    setDraggingNode(node.id);
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [contentWidth, categories.length, saveLayout, specialistNames]);
 
   return (
     <div
@@ -317,7 +365,7 @@ const TreatmentTimelineMatrix = ({
           style={{ flex: 1, overflowX: "auto", overflowY: "hidden", position: "relative", scrollbarWidth: "thin", scrollbarColor: "rgba(200,169,110,0.4) rgba(245,237,223,0.5)" }}
           className="timeline-matrix-scroll"
         >
-          <div style={{ width: contentWidth, minWidth: "100%", position: "relative", paddingBottom: 28 }}>
+          <div ref={matrixContainerRef} style={{ width: contentWidth, minWidth: "100%", position: "relative", paddingBottom: 28 }}>
             {/* ─── Week Headers ─── */}
             <div style={{ position: "relative", height: HEADER_HEIGHT }}>
               {weeks.map((week, idx) => {
@@ -347,57 +395,46 @@ const TreatmentTimelineMatrix = ({
             })}
 
             {/* ─── Lanes (one per category) ─── */}
-            {lanes.map((lane) => {
+            {lanes.map((lane, laneIdx) => {
               const color = lane.color;
-              const nodes = lane.nodes;
-              const firstX = nodes.length ? nodes[0].x : 0;
-              const lastX = nodes.length ? nodes[nodes.length - 1].x : 0;
-              const completedNodes = nodes.filter((n) => n.status === "completed");
-              const hasCompleted = completedNodes.length > 0;
-              const lastCompletedX = hasCompleted ? completedNodes[completedNodes.length - 1].x : firstX;
-              const solidW = hasCompleted ? Math.max(0, lastCompletedX - firstX) : 0;
-              const dottedStart = hasCompleted ? lastCompletedX : firstX;
-              const dottedW = Math.max(0, lastX - dottedStart);
+              const laneY = HEADER_HEIGHT + laneIdx * LANE_HEIGHT;
 
               return (
-                <div key={lane.cat.key} style={{ position: "relative", height: LANE_HEIGHT }}>
+                <div key={lane.cat.key} style={{ position: "absolute", left: 0, right: 0, top: laneY, height: LANE_HEIGHT }}>
                   {/* Lane band: tinted ~7% of category color */}
                   <div style={{ position: "absolute", left: 8, right: 8, top: 12, bottom: 12, background: hexToRgba(color, 0.07), borderRadius: 16, border: `1px solid ${hexToRgba(color, 0.18)}` }} />
 
                   {/* Lane central horizontal guide line */}
                   <div style={{ position: "absolute", left: 8, right: 8, top: "50%", height: 0, borderTop: `1px dashed ${hexToRgba(color, 0.3)}`, zIndex: 0 }} />
+                </div>
+              );
+            })}
 
-                  {/* Connector line: solid until last completed, dotted after — draw-in scaleX */}
-                  {nodes.length >= 2 && solidW > 0 && (
-                    <motion.div
-                      initial={{ scaleX: 0 }}
-                      animate={{ scaleX: 1 }}
-                      transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
-                      style={{ position: "absolute", left: firstX, top: "50%", width: solidW, height: 0, borderTop: `3px solid ${color}`, transformOrigin: "left center", zIndex: 1 }}
-                    />
-                  )}
-                  {nodes.length >= 2 && dottedW > 0 && (
-                    <motion.div
-                      initial={{ scaleX: 0 }}
-                      animate={{ scaleX: 1 }}
-                      transition={{ duration: 0.6, delay: 0.35, ease: "easeOut" }}
-                      style={{ position: "absolute", left: dottedStart, top: "50%", width: dottedW, height: 0, borderTop: `2.5px dashed ${hexToRgba(color, 0.7)}`, transformOrigin: "left center", zIndex: 1 }}
-                    />
-                  )}
-
-                  {/* Nodes */}
-                  {nodes.map((n, nIdx) => {
-                    const labelAbove = nIdx % 2 === 0;
-                    const specialistName = specialistNames[n.id] || (n.specialist ? n.specialist.fullName : "");
-                    const specialistInitials = specialistName ? specialistName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "";
-                    return (
-                      <motion.div
-                        key={n.id}
-                        initial={{ opacity: 0, scale: 0.4 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.35, delay: 0.15 + nIdx * 0.09, ease: "easeOut" }}
-                        style={{ position: "absolute", left: n.x, top: "50%", transform: "translate(-50%, -50%)", zIndex: 2 }}
-                      >
+            {/* ─── All Nodes (positioned absolutely) ─── */}
+            {lanes.flatMap((lane) => {
+              const color = lane.color;
+              return lane.nodes.map((n, nIdx) => {
+                const labelAbove = nIdx % 2 === 0;
+                const specialistName = specialistNames[n.id] || (n.specialist ? n.specialist.fullName : "");
+                const specialistInitials = specialistName ? specialistName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2) : "";
+                const isDragging = draggingNode === n.id;
+                
+                return (
+                  <motion.div
+                    key={n.id}
+                    initial={{ opacity: 0, scale: 0.4 }}
+                    animate={{ opacity: 1, scale: isDragging ? 1.1 : 1 }}
+                    transition={{ duration: 0.35, delay: 0.15 + nIdx * 0.09, ease: "easeOut" }}
+                    style={{ 
+                      position: "absolute", 
+                      left: n.x, 
+                      top: n.y, 
+                      transform: "translate(-50%, -50%)", 
+                      zIndex: isDragging ? 100 : 10,
+                      cursor: "grab"
+                    }}
+                    onMouseDown={(e) => handleMouseDown(e, n)}
+                  >
                         {/* Order badge */}
                         <div style={{ position: "absolute", top: -(NODE_R + 18), left: "50%", transform: "translateX(-50%)", width: 16, height: 16, borderRadius: "50%", background: n.status === "completed" ? color : COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${color}`, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
                           <span style={{ fontFamily: FONTS.serif, fontSize: 9, fontWeight: 600, color: n.status === "completed" ? COLORS.creamMain : COLORS.brownDark }}>
@@ -495,9 +532,7 @@ const TreatmentTimelineMatrix = ({
                         </div>
                       </motion.div>
                     );
-                  })}
-                </div>
-              );
+              });
             })}
 
             {/* ─── Empty state ─── */}
