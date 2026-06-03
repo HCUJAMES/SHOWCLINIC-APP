@@ -7071,7 +7071,7 @@ const HistorialClinico = () => {
                     </Typography>
                     <Grid container spacing={1.5}>
                       {(mostrarTodasFotos ? fotosPaciente : fotosPaciente.slice(0, 5)).map((foto) => (
-                        <Grid item xs={6} sm={4} md={3} key={foto.id}>
+                        <Grid item xs={6} sm={4} md={3} lg={2} xl={2} key={foto.id}>
                           <Paper
                             elevation={0}
                             sx={{
@@ -7095,7 +7095,7 @@ const HistorialClinico = () => {
                                 alt={foto.nombre_tratamiento}
                                 style={{
                                   width: "100%",
-                                  height: 200,
+                                  aspectRatio: "1 / 1",
                                   objectFit: "cover",
                                   display: "block",
                                 }}
