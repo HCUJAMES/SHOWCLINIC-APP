@@ -7079,6 +7079,8 @@ const HistorialClinico = () => {
                               overflow: "hidden",
                               border: "1px solid rgba(163,105,32,0.18)",
                               backgroundColor: "rgba(255,255,255,0.80)",
+                              maxWidth: 160,
+                              mx: "auto",
                               transition: "box-shadow 0.2s, transform 0.2s",
                               "&:hover": {
                                 boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
@@ -7095,7 +7097,7 @@ const HistorialClinico = () => {
                                 alt={foto.nombre_tratamiento}
                                 style={{
                                   width: "100%",
-                                  aspectRatio: "1 / 1",
+                                  height: 140,
                                   objectFit: "cover",
                                   display: "block",
                                 }}
