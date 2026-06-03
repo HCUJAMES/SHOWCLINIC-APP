@@ -1287,8 +1287,7 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
           WHERE sl.id = barcode_units.lote_id
         )
       WHERE status = 'active'
-        AND (unidades_totales IS NULL OR unidades_totales = 0 
-             OR unidades_restantes = unidades_totales)
+        AND (unidades_totales IS NULL OR unidades_totales = 0)
     `, (err) => {
       if (err) {
         console.log("Error inicializando unidades de barcode_units:", err.message);
