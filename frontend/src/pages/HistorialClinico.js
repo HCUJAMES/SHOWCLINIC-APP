@@ -34,7 +34,7 @@ import {
   Tooltip,
   Menu,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -167,7 +167,8 @@ const HistorialClinico = () => {
   const [subiendoFotosPaciente, setSubiendoFotosPaciente] = useState(false);
   const [archivosFotosPaciente, setArchivosFotosPaciente] = useState([]);
   const [nombreTratamientoFoto, setNombreTratamientoFoto] = useState("");
-  const [fotoPreview, setFotoPreview] = useState(null);
+  const [fotoPreviewIdx, setFotoPreviewIdx] = useState(null);
+  const [fotoSlideDir, setFotoSlideDir] = useState(1);
 
   // Estado para modal de recibo
   const [openReciboModal, setOpenReciboModal] = useState(false);
@@ -537,7 +538,7 @@ const HistorialClinico = () => {
       setMostrarTodasFotos(false);
       setArchivosFotosPaciente([]);
       setNombreTratamientoFoto("");
-      setFotoPreview(null);
+      setFotoPreviewIdx(null);
       try {
         const obsRes = await axios.get(`${API_BASE_URL}/api/pacientes/${id}/observaciones`, {
           headers: authHeaders,
@@ -1448,6 +1449,35 @@ const HistorialClinico = () => {
       showToast({ severity: "error", message: "Error al eliminar foto" });
     }
   };
+
+  // Lista de fotos visible en la galería (para navegar en el visor)
+  const fotosVisibles = mostrarTodasFotos ? fotosPaciente : fotosPaciente.slice(0, 5);
+
+  const verFotoEn = (idx) => {
+    setFotoSlideDir(1);
+    setFotoPreviewIdx(idx);
+  };
+
+  const fotoPreviewSiguiente = useCallback(() => {
+    setFotoSlideDir(1);
+    setFotoPreviewIdx((i) => (i === null ? i : (i + 1) % fotosVisibles.length));
+  }, [fotosVisibles.length]);
+
+  const fotoPreviewAnterior = useCallback(() => {
+    setFotoSlideDir(-1);
+    setFotoPreviewIdx((i) => (i === null ? i : (i - 1 + fotosVisibles.length) % fotosVisibles.length));
+  }, [fotosVisibles.length]);
+
+  useEffect(() => {
+    if (fotoPreviewIdx === null) return;
+    const handler = (e) => {
+      if (e.key === "ArrowRight") fotoPreviewSiguiente();
+      else if (e.key === "ArrowLeft") fotoPreviewAnterior();
+      else if (e.key === "Escape") setFotoPreviewIdx(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [fotoPreviewIdx, fotoPreviewSiguiente, fotoPreviewAnterior]);
 
   const guardarEdicionObservacion = async () => {
     if (!pacienteSeleccionado?.id) return;
@@ -7070,7 +7100,7 @@ const HistorialClinico = () => {
                       Últimas fotos ({fotosPaciente.length} en total)
                     </Typography>
                     <Grid container spacing={1.5}>
-                      {(mostrarTodasFotos ? fotosPaciente : fotosPaciente.slice(0, 5)).map((foto) => (
+                      {fotosVisibles.map((foto, fotoIdx) => (
                         <Grid item xs={6} sm={4} md={3} lg={2} xl={2} key={foto.id}>
                           <Paper
                             elevation={0}
@@ -7090,7 +7120,7 @@ const HistorialClinico = () => {
                           >
                             <Box
                               sx={{ position: "relative", cursor: "pointer" }}
-                              onClick={() => setFotoPreview(foto)}
+                              onClick={() => verFotoEn(fotoIdx)}
                             >
                               <img
                                 src={`${API_BASE_URL}${foto.archivo}`}
@@ -7163,8 +7193,8 @@ const HistorialClinico = () => {
 
               {/* Modal de previsualización de foto */}
               <Dialog
-                open={Boolean(fotoPreview)}
-                onClose={() => setFotoPreview(null)}
+                open={fotoPreviewIdx !== null}
+                onClose={() => setFotoPreviewIdx(null)}
                 maxWidth="md"
                 fullWidth
                 PaperProps={{
@@ -7175,32 +7205,100 @@ const HistorialClinico = () => {
                   },
                 }}
               >
-                {fotoPreview && (
+                {fotoPreviewIdx !== null && fotosVisibles[fotoPreviewIdx] && (
                   <>
                     <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", pb: 1 }}>
                       <Box>
                         <Typography variant="h6" sx={{ color: "#a36920", fontWeight: "bold" }}>
-                          {fotoPreview.nombre_tratamiento}
+                          {fotosVisibles[fotoPreviewIdx].nombre_tratamiento}
                         </Typography>
                         <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.50)" }}>
-                          {fotoPreview.creado_en}
+                          {fotosVisibles[fotoPreviewIdx].creado_en}
+                          {fotosVisibles.length > 1 ? `  ·  ${fotoPreviewIdx + 1} / ${fotosVisibles.length}` : ""}
                         </Typography>
                       </Box>
-                      <IconButton onClick={() => setFotoPreview(null)}>
+                      <IconButton onClick={() => setFotoPreviewIdx(null)}>
                         <Close />
                       </IconButton>
                     </DialogTitle>
-                    <DialogContent sx={{ display: "flex", justifyContent: "center", p: 2 }}>
-                      <img
-                        src={`${API_BASE_URL}${fotoPreview.archivo}`}
-                        alt={fotoPreview.nombre_tratamiento}
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "70vh",
-                          objectFit: "contain",
-                          borderRadius: 8,
+                    <DialogContent
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        position: "relative",
+                        p: 2,
+                        overflow: "hidden",
+                      }}
+                    >
+                      {fotosVisibles.length > 1 && (
+                        <IconButton
+                          onClick={fotoPreviewAnterior}
+                          sx={{
+                            position: "absolute",
+                            left: 12,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            zIndex: 2,
+                            backgroundColor: "rgba(163,105,32,0.85)",
+                            color: "#fff",
+                            "&:hover": { backgroundColor: "#a36920" },
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+                          }}
+                        >
+                          <ChevronLeft />
+                        </IconButton>
+                      )}
+
+                      <Box
+                        key={fotoPreviewIdx}
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          width: "100%",
+                          animation: "fotoSlideIn 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
+                          "@keyframes fotoSlideIn": {
+                            from: {
+                              opacity: 0,
+                              transform: `translateX(${fotoSlideDir * 42}px) scale(0.97)`,
+                            },
+                            to: {
+                              opacity: 1,
+                              transform: "translateX(0) scale(1)",
+                            },
+                          },
                         }}
-                      />
+                      >
+                        <img
+                          src={`${API_BASE_URL}${fotosVisibles[fotoPreviewIdx].archivo}`}
+                          alt={fotosVisibles[fotoPreviewIdx].nombre_tratamiento}
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: "70vh",
+                            objectFit: "contain",
+                            borderRadius: 8,
+                          }}
+                        />
+                      </Box>
+
+                      {fotosVisibles.length > 1 && (
+                        <IconButton
+                          onClick={fotoPreviewSiguiente}
+                          sx={{
+                            position: "absolute",
+                            right: 12,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            zIndex: 2,
+                            backgroundColor: "rgba(163,105,32,0.85)",
+                            color: "#fff",
+                            "&:hover": { backgroundColor: "#a36920" },
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+                          }}
+                        >
+                          <ChevronRight />
+                        </IconButton>
+                      )}
                     </DialogContent>
                   </>
                 )}
