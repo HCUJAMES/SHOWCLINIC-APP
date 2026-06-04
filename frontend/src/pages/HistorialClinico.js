@@ -169,6 +169,7 @@ const HistorialClinico = () => {
   const [nombreTratamientoFoto, setNombreTratamientoFoto] = useState("");
   const [fotoPreviewIdx, setFotoPreviewIdx] = useState(null);
   const [fotoSlideDir, setFotoSlideDir] = useState(1);
+  const [fotoSaliente, setFotoSaliente] = useState(null);
 
   // Estado para modal de recibo
   const [openReciboModal, setOpenReciboModal] = useState(false);
@@ -1455,18 +1456,33 @@ const HistorialClinico = () => {
 
   const verFotoEn = (idx) => {
     setFotoSlideDir(1);
+    setFotoSaliente(null);
     setFotoPreviewIdx(idx);
   };
 
-  const fotoPreviewSiguiente = useCallback(() => {
-    setFotoSlideDir(1);
-    setFotoPreviewIdx((i) => (i === null ? i : (i + 1) % fotosVisibles.length));
-  }, [fotosVisibles.length]);
+  const navegarFoto = useCallback(
+    (dir) => {
+      if (fotoPreviewIdx === null || fotosVisibles.length < 2) return;
+      const len = fotosVisibles.length;
+      const actual = fotosVisibles[fotoPreviewIdx];
+      setFotoSlideDir(dir);
+      if (actual) {
+        setFotoSaliente({ src: actual.archivo, alt: actual.nombre_tratamiento, dir });
+      }
+      setFotoPreviewIdx((fotoPreviewIdx + dir + len) % len);
+    },
+    [fotoPreviewIdx, fotosVisibles]
+  );
 
-  const fotoPreviewAnterior = useCallback(() => {
-    setFotoSlideDir(-1);
-    setFotoPreviewIdx((i) => (i === null ? i : (i - 1 + fotosVisibles.length) % fotosVisibles.length));
-  }, [fotosVisibles.length]);
+  const fotoPreviewSiguiente = useCallback(() => navegarFoto(1), [navegarFoto]);
+  const fotoPreviewAnterior = useCallback(() => navegarFoto(-1), [navegarFoto]);
+
+  // Limpia la imagen saliente al terminar el crossfade
+  useEffect(() => {
+    if (!fotoSaliente) return;
+    const t = setTimeout(() => setFotoSaliente(null), 480);
+    return () => clearTimeout(t);
+  }, [fotoSaliente]);
 
   useEffect(() => {
     if (fotoPreviewIdx === null) return;
@@ -7194,7 +7210,7 @@ const HistorialClinico = () => {
               {/* Modal de previsualización de foto */}
               <Dialog
                 open={fotoPreviewIdx !== null}
-                onClose={() => setFotoPreviewIdx(null)}
+                onClose={() => { setFotoPreviewIdx(null); setFotoSaliente(null); }}
                 maxWidth="md"
                 fullWidth
                 PaperProps={{
@@ -7251,34 +7267,81 @@ const HistorialClinico = () => {
                       )}
 
                       <Box
-                        key={fotoPreviewIdx}
                         sx={{
+                          position: "relative",
                           display: "flex",
                           justifyContent: "center",
+                          alignItems: "center",
                           width: "100%",
-                          animation: "fotoSlideIn 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
-                          "@keyframes fotoSlideIn": {
-                            from: {
-                              opacity: 0,
-                              transform: `translateX(${fotoSlideDir * 42}px) scale(0.97)`,
-                            },
-                            to: {
-                              opacity: 1,
-                              transform: "translateX(0) scale(1)",
-                            },
-                          },
+                          minHeight: "40vh",
                         }}
                       >
-                        <img
-                          src={`${API_BASE_URL}${fotosVisibles[fotoPreviewIdx].archivo}`}
-                          alt={fotosVisibles[fotoPreviewIdx].nombre_tratamiento}
-                          style={{
-                            maxWidth: "100%",
-                            maxHeight: "70vh",
-                            objectFit: "contain",
-                            borderRadius: 8,
+                        {/* Imagen saliente (se desvanece) */}
+                        {fotoSaliente && (
+                          <Box
+                            key={`out-${fotoSaliente.src}`}
+                            sx={{
+                              position: "absolute",
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              display: "flex",
+                              justifyContent: "center",
+                              alignItems: "center",
+                              pointerEvents: "none",
+                              animation: "fotoFadeOut 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards",
+                              "@keyframes fotoFadeOut": {
+                                from: { opacity: 1, transform: "translateX(0) scale(1)" },
+                                to: {
+                                  opacity: 0,
+                                  transform: `translateX(${-fotoSaliente.dir * 36}px) scale(0.98)`,
+                                },
+                              },
+                            }}
+                          >
+                            <img
+                              src={`${API_BASE_URL}${fotoSaliente.src}`}
+                              alt={fotoSaliente.alt}
+                              style={{
+                                maxWidth: "100%",
+                                maxHeight: "70vh",
+                                objectFit: "contain",
+                                borderRadius: 8,
+                              }}
+                            />
+                          </Box>
+                        )}
+
+                        {/* Imagen entrante (aparece) */}
+                        <Box
+                          key={`in-${fotoPreviewIdx}`}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            width: "100%",
+                            animation: "fotoFadeIn 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
+                            "@keyframes fotoFadeIn": {
+                              from: {
+                                opacity: 0,
+                                transform: `translateX(${fotoSlideDir * 36}px) scale(0.98)`,
+                              },
+                              to: { opacity: 1, transform: "translateX(0) scale(1)" },
+                            },
                           }}
-                        />
+                        >
+                          <img
+                            src={`${API_BASE_URL}${fotosVisibles[fotoPreviewIdx].archivo}`}
+                            alt={fotosVisibles[fotoPreviewIdx].nombre_tratamiento}
+                            style={{
+                              maxWidth: "100%",
+                              maxHeight: "70vh",
+                              objectFit: "contain",
+                              borderRadius: 8,
+                            }}
+                          />
+                        </Box>
                       </Box>
 
                       {fotosVisibles.length > 1 && (
