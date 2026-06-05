@@ -519,7 +519,17 @@ const HistorialClinico = () => {
 
   const cargarHistorial = async (id) => {
     try {
-      const paciente = pacientes.find((p) => p.id === id) || null;
+      // Obtener datos actualizados del paciente desde el backend
+      let paciente = pacientes.find((p) => p.id === id) || null;
+      try {
+        const pacienteRes = await axios.get(`${API_BASE_URL}/api/pacientes/${id}`, { headers: authHeaders });
+        if (pacienteRes.data) {
+          paciente = pacienteRes.data;
+          setPacientes(prev => prev.map(p => p.id === id ? pacienteRes.data : p));
+        }
+      } catch (e) {
+        console.error("Error al obtener datos del paciente:", e);
+      }
       setPacienteSeleccionado(paciente);
       setTratamientos([]);
       setResumenDeuda({ cantidad_pendiente: 0, total_pendiente: 0 });
@@ -633,13 +643,18 @@ const HistorialClinico = () => {
     const id = pacienteSeleccionado?.id;
     if (!id) return;
     try {
-      const [ofertasRes, presupuestosRes, tratRes, deudaRes, paquetesRes] = await Promise.all([
+      const [pacienteRes, ofertasRes, presupuestosRes, tratRes, deudaRes, paquetesRes] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/pacientes/${id}`, { headers: authHeaders }).catch(() => ({ data: null })),
         axios.get(`${API_BASE_URL}/api/pacientes/${id}/ofertas`, { headers: authHeaders }).catch(() => ({ data: [] })),
         axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${id}`, { headers: authHeaders }).catch(() => ({ data: [] })),
         axios.get(`${API_BASE_URL}/api/tratamientos/historial/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => ({ data: [] })),
         axios.get(`${API_BASE_URL}/api/deudas/resumen/${id}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => ({ data: {} })),
         axios.get(`${API_BASE_URL}/api/paquetes/paciente/${id}`, { headers: authHeaders }).catch(() => ({ data: [] })),
       ]);
+      if (pacienteRes.data) {
+        setPacienteSeleccionado(pacienteRes.data);
+        setPacientes(prev => prev.map(p => p.id === id ? pacienteRes.data : p));
+      }
       setOfertas(Array.isArray(ofertasRes.data) ? ofertasRes.data : []);
       setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
       setTratamientos(Array.isArray(tratRes.data) ? tratRes.data : []);
@@ -3780,30 +3795,30 @@ const HistorialClinico = () => {
                         <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Tabaco</Typography>
                         <Typography sx={{ 
                           fontWeight: 700, 
-                          color: pacienteSeleccionado.tabaco === "Sí" ? "#d32f2f" : "#2e7d32",
+                          color: pacienteSeleccionado.tabaco === "Sí" || pacienteSeleccionado.tabaco === "Ocasional" || pacienteSeleccionado.tabaco === "Frecuente" ? "#d32f2f" : "#2e7d32",
                           fontSize: "1.1rem"
                         }}>
-                          {pacienteSeleccionado.tabaco === "Sí" ? "Sí" : "No"}
+                          {pacienteSeleccionado.tabaco || "No especificado"}
                         </Typography>
                       </Box>
                       <Box sx={{ textAlign: "center", flex: 1 }}>
                         <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Alcohol</Typography>
                         <Typography sx={{ 
                           fontWeight: 700, 
-                          color: pacienteSeleccionado.alcohol === "Sí" ? "#d32f2f" : "#2e7d32",
+                          color: pacienteSeleccionado.alcohol === "Sí" || pacienteSeleccionado.alcohol === "Ocasional" || pacienteSeleccionado.alcohol === "Frecuente" ? "#d32f2f" : "#2e7d32",
                           fontSize: "1.1rem"
                         }}>
-                          {pacienteSeleccionado.alcohol === "Sí" ? "Sí" : "No"}
+                          {pacienteSeleccionado.alcohol || "No especificado"}
                         </Typography>
                       </Box>
                       <Box sx={{ textAlign: "center", flex: 1 }}>
                         <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Drogas</Typography>
                         <Typography sx={{ 
                           fontWeight: 700, 
-                          color: pacienteSeleccionado.drogas === "Sí" ? "#d32f2f" : "#2e7d32",
+                          color: pacienteSeleccionado.drogas === "Sí" || pacienteSeleccionado.drogas === "Ocasional" || pacienteSeleccionado.drogas === "Frecuente" ? "#d32f2f" : "#2e7d32",
                           fontSize: "1.1rem"
                         }}>
-                          {pacienteSeleccionado.drogas === "Sí" ? "Sí" : "No"}
+                          {pacienteSeleccionado.drogas || "No especificado"}
                         </Typography>
                       </Box>
                     </Box>

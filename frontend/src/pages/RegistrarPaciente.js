@@ -396,35 +396,71 @@ export default function RegistrarPaciente() {
 
           <Grid item xs={12} sm={6} md={3}>
             <TextField
+              select
               label="Consumo de tabaco"
               name="tabaco"
               value={formData.tabaco}
               onChange={handleChange}
               fullWidth
-              placeholder="Ej: No, Ocasional, Frecuente"
-            />
+              sx={{
+                "& .MuiInputBase-root": {
+                  backgroundColor: "rgba(255,255,255,0.72)",
+                  borderRadius: 2,
+                },
+              }}
+            >
+              <MenuItem value="">No especificado</MenuItem>
+              <MenuItem value="No">No</MenuItem>
+              <MenuItem value="Sí">Sí</MenuItem>
+              <MenuItem value="Ocasional">Ocasional</MenuItem>
+              <MenuItem value="Frecuente">Frecuente</MenuItem>
+            </TextField>
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
             <TextField
+              select
               label="Consumo de alcohol"
               name="alcohol"
               value={formData.alcohol}
               onChange={handleChange}
               fullWidth
-              placeholder="Ej: No, Ocasional, Frecuente"
-            />
+              sx={{
+                "& .MuiInputBase-root": {
+                  backgroundColor: "rgba(255,255,255,0.72)",
+                  borderRadius: 2,
+                },
+              }}
+            >
+              <MenuItem value="">No especificado</MenuItem>
+              <MenuItem value="No">No</MenuItem>
+              <MenuItem value="Sí">Sí</MenuItem>
+              <MenuItem value="Ocasional">Ocasional</MenuItem>
+              <MenuItem value="Frecuente">Frecuente</MenuItem>
+            </TextField>
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
             <TextField
+              select
               label="Consumo de drogas"
               name="drogas"
               value={formData.drogas}
               onChange={handleChange}
               fullWidth
-              placeholder="Ej: No, Ocasional, Frecuente"
-            />
+              sx={{
+                "& .MuiInputBase-root": {
+                  backgroundColor: "rgba(255,255,255,0.72)",
+                  borderRadius: 2,
+                },
+              }}
+            >
+              <MenuItem value="">No especificado</MenuItem>
+              <MenuItem value="No">No</MenuItem>
+              <MenuItem value="Sí">Sí</MenuItem>
+              <MenuItem value="Ocasional">Ocasional</MenuItem>
+              <MenuItem value="Frecuente">Frecuente</MenuItem>
+            </TextField>
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
