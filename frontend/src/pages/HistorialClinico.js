@@ -633,6 +633,15 @@ const HistorialClinico = () => {
       } catch (e) {
         setCarritoPaciente([]);
       }
+
+      // Cargar mapa facial del paciente
+      try {
+        const facialRes = await axios.get(`${API_BASE_URL}/api/pacientes/${id}/mapa-facial`, { headers: authHeaders });
+        setFacialRegistros(Array.isArray(facialRes.data) ? facialRes.data : []);
+      } catch (e) {
+        console.error("Error al cargar mapa facial:", e);
+        setFacialRegistros([]);
+      }
     } catch (error) {
       console.error("Error al obtener historial clínico:", error);
     }
@@ -4730,22 +4739,25 @@ const HistorialClinico = () => {
               )}
 
               {Array.isArray(ofertas) && ofertas.length > 0 && (
-                <Paper
-                  elevation={0}
-                  sx={{
-                    mb: 4,
-                    p: 2.5,
-                    borderRadius: 3,
-                    backgroundColor: "rgba(163, 105, 32, 0.08)",
-                    border: "1px solid rgba(163, 105, 32, 0.3)",
-                  }}
-                >
-                  <Typography
-                    variant="h6"
-                    sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
-                  >
-                    📋 Presupuestos del Paciente
-                  </Typography>
+                <Grid container spacing={2} sx={{ mb: 4 }}>
+                  {/* Columna izquierda: Presupuestos */}
+                  <Grid item xs={12} md={6}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        backgroundColor: "rgba(163, 105, 32, 0.08)",
+                        border: "1px solid rgba(163, 105, 32, 0.3)",
+                        height: "100%",
+                      }}
+                    >
+                      <Typography
+                        variant="h6"
+                        sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        📋 Presupuestos del Paciente
+                      </Typography>
 
                   {/* Leyenda de estados */}
                   <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
@@ -5720,6 +5732,42 @@ const HistorialClinico = () => {
                   </Box>
                   </Collapse>
                 </Paper>
+              )}
+                  </Grid>
+
+                  {/* Columna derecha: Mapa Facial 3D */}
+                  <Grid item xs={12} md={6}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: 3,
+                        backgroundColor: "rgba(163, 105, 32, 0.08)",
+                        border: "1px solid rgba(163, 105, 32, 0.3)",
+                        height: "100%",
+                        minHeight: 600,
+                      }}
+                    >
+                      <Typography
+                        variant="h6"
+                        sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        🎭 Mapa Facial 3D
+                      </Typography>
+                      
+                      <Box sx={{ height: "calc(100% - 50px)", position: "relative" }}>
+                        <FacialMap3D
+                          paciente={pacienteSeleccionado}
+                          registros={facialRegistros}
+                          onGuardar={null}
+                          onActualizar={null}
+                          onEliminar={null}
+                          viewOnly={true}
+                        />
+                      </Box>
+                    </Paper>
+                  </Grid>
+                </Grid>
               )}
 
               {/* Presupuestos Asignados al Paciente */}
