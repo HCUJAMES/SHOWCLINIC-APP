@@ -407,6 +407,28 @@ export default function RegistrarPaciente() {
 
           <Grid item xs={12} sm={6} md={3}>
             <TextField
+              label="Consumo de alcohol"
+              name="alcohol"
+              value={formData.alcohol}
+              onChange={handleChange}
+              fullWidth
+              placeholder="Ej: No, Ocasional, Frecuente"
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              label="Consumo de drogas"
+              name="drogas"
+              value={formData.drogas}
+              onChange={handleChange}
+              fullWidth
+              placeholder="Ej: No, Ocasional, Frecuente"
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
               select
               label="¿Cómo se enteró?"
               name="referencia"
