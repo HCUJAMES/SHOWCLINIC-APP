@@ -211,6 +211,7 @@ export default function FacialMap3D({
   onActualizar,
   onEliminar,
   guardando,
+  viewOnly = false,
 }) {
   // Estado: puntos marcados { pointId: { color, position, treatmentId } }
   const [markedPoints, setMarkedPoints] = useState({});
@@ -427,6 +428,37 @@ export default function FacialMap3D({
   });
 
   const usedTreatments = Object.keys(pointsByTreatment).map(id => parseInt(id));
+
+  // Si es viewOnly, solo mostrar el Canvas 3D
+  if (viewOnly) {
+    return (
+      <Box sx={{ width: "100%", height: "100%", position: "relative", backgroundColor: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
+        <Canvas
+          camera={{ position: [0, 0.45, 1.9], fov: 45 }}
+          style={{ width: "100%", height: "100%" }}
+        >
+          <ambientLight intensity={0.6} />
+          <directionalLight position={[5, 5, 5]} intensity={0.8} />
+          <directionalLight position={[-5, 3, -5]} intensity={0.4} />
+          <Suspense fallback={null}>
+            <HeadModel
+              markedPoints={markedPoints}
+              onPointClick={() => {}}
+              showWireframe={showWireframe}
+            />
+          </Suspense>
+          <OrbitControls
+            ref={controlsRef}
+            enableDamping
+            dampingFactor={0.05}
+            minDistance={1.5}
+            maxDistance={5}
+            target={[0, 0.4, 0]}
+          />
+        </Canvas>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "#0D0D0D", overflow: "hidden" }}>

@@ -26,8 +26,8 @@ const loadImageAsBase64 = (url) => {
 };
 
 /**
- * Generar proforma en PDF con diseño profesional HORIZONTAL
- * Diseño elegante con colores de ShowClinic
+ * Generar proforma en PDF con diseño profesional VERTICAL (A4 Portrait)
+ * Diseño elegante con colores de ShowClinic según especificaciones
  */
 export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupuesto") => {
   try {
@@ -36,9 +36,9 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     // Cargar logo
     const logoBase64 = await loadImageAsBase64(LOGO_URL);
     
-    // Crear PDF en orientación HORIZONTAL (landscape)
+    // Crear PDF en orientación VERTICAL (portrait) A4
     const doc = new jsPDF({
-      orientation: "landscape",
+      orientation: "portrait",
       unit: "mm",
       format: "a4"
     });
@@ -46,215 +46,424 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    // Colores de ShowClinic
-    const dorado = [163, 105, 32];
-    const negro = [30, 30, 30];
-    const grisOscuro = [80, 80, 80];
+    // Paleta de marca ShowClinic
+    const marron = [93, 64, 55]; // #5D4037
+    const bronce = [169, 113, 46]; // #A9712E
+    const dorado = [200, 169, 110]; // #C8A96E
+    const crema = [255, 252, 247]; // #FFFCF7
     const blanco = [255, 255, 255];
+    const grisTexto = [80, 80, 80];
+    const verdeCortes = [94, 140, 97]; // #5E8C61
+    const divisor = [238, 229, 215]; // #EEE5D7
 
     // ============================================
-    // HEADER - Franja dorada superior
+    // HEADER CON GRADIENTE MARRÓN → BRONCE
     // ============================================
-    doc.setFillColor(dorado[0], dorado[1], dorado[2]);
-    doc.rect(0, 0, pageWidth, 28, "F");
+    // Simular gradiente con franjas horizontales
+    const headerHeight = 40;
+    const stripes = 40;
+    for (let i = 0; i < stripes; i++) {
+      const ratio = i / stripes;
+      const r = marron[0] + (bronce[0] - marron[0]) * ratio;
+      const g = marron[1] + (bronce[1] - marron[1]) * ratio;
+      const b = marron[2] + (bronce[2] - marron[2]) * ratio;
+      doc.setFillColor(r, g, b);
+      doc.rect(0, (headerHeight / stripes) * i, pageWidth, headerHeight / stripes, "F");
+    }
 
-    // Logo de ShowClinic (si se cargó)
+    // Logo en marco redondeado blanco (izquierda)
+    const logoX = 15;
+    const logoY = 8;
+    const logoSize = 24;
+    doc.setFillColor(blanco[0], blanco[1], blanco[2]);
+    doc.roundedRect(logoX, logoY, logoSize, logoSize, 3, 3, "F");
+    
     if (logoBase64) {
       try {
-        doc.addImage(logoBase64, "PNG", 10, 3, 22, 22);
+        doc.addImage(logoBase64, "PNG", logoX + 2, logoY + 2, logoSize - 4, logoSize - 4);
       } catch (e) {
         console.log("No se pudo agregar el logo");
       }
     }
 
-    // Nombre de la clínica en el header (después del logo)
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
+    // Nombre "ShowClinic" y subtítulo (izquierda, después del logo)
+    doc.setFontSize(20);
+    doc.setFont("times", "bold"); // Cormorant Garamond → times como aproximación
     doc.setTextColor(blanco[0], blanco[1], blanco[2]);
-    doc.text("SHOWCLINIC", 38, 15);
+    doc.text("ShowClinic", logoX + logoSize + 5, 20);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal"); // DM Sans → helvetica
+    doc.text("Clínica de Estética y Belleza", logoX + logoSize + 5, 26);
+
+    // Título "PROFORMA" y N° (derecha)
+    doc.setFontSize(24);
+    doc.setFont("times", "bold");
+    doc.text("PROFORMA", pageWidth - 15, 20, { align: "right" });
+
+    const numeroProforma = Date.now().toString().slice(-8);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setFillColor(dorado[0], dorado[1], dorado[2]);
+    doc.roundedRect(pageWidth - 50, 24, 35, 7, 2, 2, "F");
+    doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+    doc.text(`N° ${numeroProforma}`, pageWidth - 32.5, 28.5, { align: "center" });
+
+    // Línea de acento dorado debajo del header
+    doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+    doc.setLineWidth(1);
+    doc.line(0, headerHeight, pageWidth, headerHeight);
+
+    // ============================================
+    // DOS TARJETAS: DATOS DEL CLIENTE E INFORMACIÓN
+    // ============================================
+    let yPos = headerHeight + 10;
+    const cardWidth = (pageWidth - 40) / 2;
+    const cardHeight = 28;
+    const cardX1 = 15;
+    const cardX2 = cardX1 + cardWidth + 10;
+
+    // Tarjeta 1: Datos del Cliente
+    doc.setFillColor(crema[0], crema[1], crema[2]);
+    doc.roundedRect(cardX1, yPos, cardWidth, cardHeight, 3, 3, "F");
+    doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+    doc.setLineWidth(0.8);
+    doc.line(cardX1, yPos, cardX1 + cardWidth, yPos); // Borde superior dorado
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(bronce[0], bronce[1], bronce[2]);
+    doc.text("— DATOS DEL CLIENTE", cardX1 + 4, yPos + 6);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("Clínica de Estética y Belleza", 38, 22);
-
-    // Título del documento (derecha del header)
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    const titulo = tipo === "paquete" ? "PROFORMA - PAQUETE PROMOCIONAL" : "PROFORMA";
-    doc.text(titulo, pageWidth - 15, 16, { align: "right" });
-
-    // ============================================
-    // INFORMACIÓN DEL CLIENTE Y FECHA
-    // ============================================
-    let yPos = 38;
-    const colIzquierda = 15;
-
-    // Cuadro de información del cliente
-    doc.setFillColor(248, 248, 248);
-    doc.roundedRect(colIzquierda, yPos, 120, 30, 3, 3, "F");
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(dorado[0], dorado[1], dorado[2]);
-    doc.text("DATOS DEL CLIENTE", colIzquierda + 5, yPos + 8);
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(negro[0], negro[1], negro[2]);
-
-    const nombreCompleto = `${paciente.nombre || ""} ${paciente.apellido || ""}`.trim() || "Cliente";
-    doc.text(`Nombre: ${nombreCompleto}`, colIzquierda + 5, yPos + 16);
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
     
-    if (paciente.dni) {
-      doc.text(`Documento: ${paciente.tipoDocumento || 'DNI'}: ${paciente.dni}`, colIzquierda + 5, yPos + 22);
-    }
-    if (paciente.telefono) {
-      doc.text(`Teléfono: ${paciente.telefono}`, colIzquierda + 5, yPos + 28);
-    }
-
-    // Cuadro de fecha y número (derecha)
-    doc.setFillColor(248, 248, 248);
-    doc.roundedRect(pageWidth - 135, yPos, 120, 30, 3, 3, "F");
-
-    doc.setFontSize(11);
+    const nombreCompleto = `${paciente.nombre || ""} ${paciente.apellido || ""}`.trim() || "Cliente";
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(dorado[0], dorado[1], dorado[2]);
-    doc.text("INFORMACIÓN", pageWidth - 130, yPos + 8);
-
-    doc.setFontSize(10);
+    doc.text("Nombre", cardX1 + 4, yPos + 12);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(negro[0], negro[1], negro[2]);
+    doc.text(nombreCompleto, cardX1 + 4, yPos + 16);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Documento", cardX1 + 4, yPos + 21);
+    doc.setFont("helvetica", "normal");
+    const documento = paciente.dni ? `${paciente.tipoDocumento || 'DNI'} ${paciente.dni}` : "—";
+    doc.text(documento, cardX1 + 4, yPos + 25);
+
+    // Tarjeta 2: Información
+    doc.setFillColor(crema[0], crema[1], crema[2]);
+    doc.roundedRect(cardX2, yPos, cardWidth, cardHeight, 3, 3, "F");
+    doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+    doc.setLineWidth(0.8);
+    doc.line(cardX2, yPos, cardX2 + cardWidth, yPos);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(bronce[0], bronce[1], bronce[2]);
+    doc.text("— INFORMACIÓN", cardX2 + 4, yPos + 6);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
 
     const fecha = presupuesto.creado_en || obtenerFechaSoloPerú();
     const fechaFormateada = formatearFecha(fecha);
-    doc.text(`Fecha: ${fechaFormateada}`, pageWidth - 130, yPos + 16);
-    doc.text(`N° Proforma: ${Date.now().toString().slice(-8)}`, pageWidth - 130, yPos + 23);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Fecha", cardX2 + 4, yPos + 12);
+    doc.setFont("helvetica", "normal");
+    doc.text(fechaFormateada, cardX2 + 4, yPos + 16);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("N° Proforma", cardX2 + 4, yPos + 21);
+    doc.setFont("helvetica", "normal");
+    doc.text(numeroProforma, cardX2 + 4, yPos + 25);
 
     // ============================================
-    // TABLA DE TRATAMIENTOS/SERVICIOS
+    // TABLA DE SERVICIOS
     // ============================================
-    yPos = 78;
+    yPos += cardHeight + 10;
 
     const items = presupuesto.items || presupuesto.tratamientos || [];
-    const tableData = items.map((item, index) => [
-      (index + 1).toString(),
-      item.nombre || item.tratamiento || "Tratamiento",
-      item.sesiones ? item.sesiones.toString() : "1",
-      `S/ ${Number(item.precio || 0).toFixed(2)}`,
-    ]);
+    
+    // Preparar datos de la tabla con manejo especial para cortesías
+    const tableData = items.map((item, index) => {
+      const precio = Number(item.precio || 0);
+      const esCortesia = precio === 0;
+      
+      return [
+        (index + 1).toString(),
+        item.nombre || item.tratamiento || "Tratamiento",
+        item.sesiones ? item.sesiones.toString() : "1",
+        esCortesia ? "CORTESIA" : `S/ ${precio.toFixed(2)}`,
+      ];
+    });
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [["#", "DESCRIPCIÓN DEL SERVICIO", "SESIONES", "PRECIO"]],
+      body: tableData,
+      theme: "plain",
+      headStyles: {
+        fillColor: [marron[0], marron[1], marron[2]], // Marrón de marca, NO negro
+        textColor: [blanco[0], blanco[1], blanco[2]],
+        fontStyle: "bold",
+        fontSize: 9,
+        halign: "center",
+        cellPadding: 4,
+      },
+      bodyStyles: {
+        fontSize: 9,
+        textColor: [grisTexto[0], grisTexto[1], grisTexto[2]],
+        cellPadding: 4,
+      },
+      alternateRowStyles: {
+        fillColor: [crema[0], crema[1], crema[2]],
+      },
+      columnStyles: {
+        0: { 
+          halign: "center", 
+          cellWidth: 15,
+        },
+        1: { 
+          cellWidth: 95,
+          textColor: [grisTexto[0], grisTexto[1], grisTexto[2]],
+        },
+        2: { 
+          halign: "center", 
+          cellWidth: 25,
+        },
+        3: { 
+          halign: "right", 
+          cellWidth: 45,
+        },
+      },
+      margin: { left: 15, right: 15 },
+      styles: {
+        lineColor: [divisor[0], divisor[1], divisor[2]],
+        lineWidth: 0.1,
+      },
+      didDrawCell: (data) => {
+        // Dibujar círculo dorado para el número de ítem
+        if (data.section === 'body' && data.column.index === 0) {
+          const centerX = data.cell.x + data.cell.width / 2;
+          const centerY = data.cell.y + data.cell.height / 2;
+          doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+          doc.setLineWidth(0.5);
+          doc.circle(centerX, centerY, 4, 'S');
+        }
+        
+        // Dibujar chip verde de cortesía para precios S/ 0.00
+        if (data.section === 'body' && data.column.index === 3 && data.cell.raw === "CORTESIA") {
+          const cellX = data.cell.x;
+          const cellY = data.cell.y;
+          const cellWidth = data.cell.width;
+          const cellHeight = data.cell.height;
+          
+          // Chip verde con ícono de regalo
+          const chipWidth = 30;
+          const chipHeight = 6;
+          const chipX = cellX + cellWidth - chipWidth - 3;
+          const chipY = cellY + (cellHeight - chipHeight) / 2;
+          
+          doc.setFillColor(verdeCortes[0], verdeCortes[1], verdeCortes[2]);
+          doc.roundedRect(chipX, chipY, chipWidth, chipHeight, 2, 2, "F");
+          
+          // Ícono de regalo SVG inline (line icon estilo Lucide)
+          const iconX = chipX + 2;
+          const iconY = chipY + chipHeight / 2;
+          const iconSize = 3;
+          
+          doc.setDrawColor(blanco[0], blanco[1], blanco[2]);
+          doc.setLineWidth(0.3);
+          // Caja del regalo
+          doc.rect(iconX, iconY - iconSize/2, iconSize, iconSize, 'S');
+          // Lazo superior
+          doc.line(iconX, iconY - iconSize/2, iconX + iconSize, iconY - iconSize/2);
+          doc.line(iconX + iconSize/2, iconY - iconSize/2 - 1, iconX + iconSize/2, iconY - iconSize/2);
+          
+          // Texto "Cortesía"
+          doc.setFontSize(7);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+          doc.text("Cortesía", chipX + iconSize + 3, chipY + chipHeight / 2 + 1);
+        }
+      },
+    });
+
+    // ============================================
+    // CAJA DE TOTALES (alineada a la derecha)
+    // ============================================
+    let finalY = doc.lastAutoTable.finalY + 10;
+    const totalesWidth = 80;
+    const totalesX = pageWidth - totalesWidth - 15;
 
     // Calcular totales
     const subtotal = items.reduce((sum, item) => sum + Number(item.precio || 0), 0);
     const descuento = Number(presupuesto.descuento) || 0;
     const total = subtotal - descuento;
 
-    autoTable(doc, {
-      startY: yPos,
-      head: [["#", "DESCRIPCIÓN DEL SERVICIO", "SESIONES", "PRECIO"]],
-      body: tableData,
-      theme: "striped",
-      headStyles: {
-        fillColor: [30, 30, 30],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-        fontSize: 10,
-        halign: "center",
-        cellPadding: 4,
-      },
-      bodyStyles: {
-        fontSize: 10,
-        textColor: [50, 50, 50],
-        cellPadding: 3,
-      },
-      alternateRowStyles: {
-        fillColor: [250, 250, 250],
-      },
-      columnStyles: {
-        0: { halign: "center", cellWidth: 15 },
-        1: { cellWidth: 140 },
-        2: { halign: "center", cellWidth: 25 },
-        3: { halign: "right", cellWidth: 50 },
-      },
-      margin: { left: 15, right: 15 },
-      styles: {
-        lineColor: [220, 220, 220],
-        lineWidth: 0.1,
-      },
-      tableWidth: "auto",
+    // Fondo crema
+    const totalesHeight = descuento > 0 ? 32 : 22;
+    doc.setFillColor(crema[0], crema[1], crema[2]);
+    doc.roundedRect(totalesX, finalY, totalesWidth, totalesHeight, 3, 3, "F");
+
+    let totalY = finalY + 8;
+
+    // Subtotal
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.text("Subtotal", totalesX + 4, totalY);
+    doc.text(`S/ ${subtotal.toFixed(2)}`, totalesX + totalesWidth - 4, totalY, { align: "right" });
+
+    if (descuento > 0) {
+      totalY += 7;
+      doc.text("Descuentos", totalesX + 4, totalY);
+      doc.text(`S/ ${descuento.toFixed(2)}`, totalesX + totalesWidth - 4, totalY, { align: "right" });
+    }
+
+    // Caja de Total con gradiente marrón → bronce
+    totalY = finalY + totalesHeight + 2;
+    const totalBoxHeight = 14;
+    
+    // Gradiente para el total
+    const totalStripes = 20;
+    for (let i = 0; i < totalStripes; i++) {
+      const ratio = i / totalStripes;
+      const r = marron[0] + (bronce[0] - marron[0]) * ratio;
+      const g = marron[1] + (bronce[1] - marron[1]) * ratio;
+      const b = marron[2] + (bronce[2] - marron[2]) * ratio;
+      doc.setFillColor(r, g, b);
+      doc.rect(totalesX + (totalesWidth / totalStripes) * i, totalY, totalesWidth / totalStripes, totalBoxHeight, "F");
+    }
+    
+    doc.roundedRect(totalesX, totalY, totalesWidth, totalBoxHeight, 3, 3, "S");
+
+    doc.setFontSize(14);
+    doc.setFont("times", "bold");
+    doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+    doc.text("Total", totalesX + 4, totalY + 9);
+    doc.text(`S/ ${total.toFixed(2)}`, totalesX + totalesWidth - 4, totalY + 9, { align: "right" });
+
+    // ============================================
+    // DOS BLOQUES: TÉRMINOS Y CONDICIONES + MEDIOS DE PAGO
+    // ============================================
+    finalY = totalY + totalBoxHeight + 12;
+    const blockWidth = (pageWidth - 40) / 2;
+    const blockX1 = 15;
+    const blockX2 = blockX1 + blockWidth + 10;
+
+    // Bloque 1: Términos y Condiciones
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(marron[0], marron[1], marron[2]);
+    doc.text("TÉRMINOS Y CONDICIONES", blockX1, finalY);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    const terminos = [
+      "Esta proforma tiene una validez de 15 días desde la fecha",
+      "de emisión. Los precios incluyen IGV. Para confirmar su",
+      "cita y reservar el tratamiento, comuníquese con nuestra",
+      "recepción."
+    ];
+    let terminosY = finalY + 5;
+    terminos.forEach(linea => {
+      doc.text(linea, blockX1, terminosY);
+      terminosY += 4;
+    });
+
+    // Bloque 2: Medios de Pago
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(marron[0], marron[1], marron[2]);
+    doc.text("MEDIOS DE PAGO", blockX2, finalY);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    
+    let pagosY = finalY + 5;
+    const mediosPago = [
+      { label: "Efectivo / Tarjeta", value: "Aceptado" },
+      { label: "Yape / Plin", value: "974 212 114" },
+      { label: "Transferencia", value: "BCP" }
+    ];
+    
+    mediosPago.forEach(medio => {
+      doc.setFont("helvetica", "bold");
+      doc.text(medio.label, blockX2, pagosY);
+      doc.setFont("helvetica", "normal");
+      doc.text(medio.value, blockX2 + blockWidth - 4, pagosY, { align: "right" });
+      pagosY += 4.5;
     });
 
     // ============================================
-    // RESUMEN DE TOTALES (Cuadro elegante)
+    // FIRMA AUTORIZADA (alineada a la derecha)
     // ============================================
-    let finalY = doc.lastAutoTable.finalY + 10;
-    const boxWidth = 100;
-    const boxX = pageWidth - boxWidth - 15;
-
-    // Altura del cuadro depende de si hay descuento
-    const boxHeight = descuento > 0 ? 50 : 30;
-    const footerHeight = 20;
-
-    // Si el cuadro de totales no cabe antes del footer, agregar nueva página
-    if (finalY + boxHeight + footerHeight + 5 > pageHeight) {
-      doc.addPage();
-      finalY = 20;
-    }
-
-    // Fondo del cuadro de totales
-    doc.setFillColor(248, 248, 248);
-    doc.roundedRect(boxX, finalY, boxWidth, boxHeight, 3, 3, "F");
-
-    let totalY = finalY + 10;
-
-    // Siempre mostrar subtotal
-    doc.setFontSize(10);
+    const firmaY = finalY + 25;
+    const firmaX = pageWidth - 60;
+    
+    doc.setDrawColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.setLineWidth(0.3);
+    doc.line(firmaX, firmaY, firmaX + 45, firmaY);
+    
+    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(80, 80, 80);
-    doc.text("Subtotal:", boxX + 5, totalY);
-    doc.text(`S/ ${subtotal.toFixed(2)}`, boxX + boxWidth - 5, totalY, { align: "right" });
-
-    if (descuento > 0) {
-      // Descuento
-      totalY += 8;
-      doc.setTextColor(46, 125, 50); // Verde
-      doc.text("Descuento:", boxX + 5, totalY);
-      doc.text(`- S/ ${descuento.toFixed(2)}`, boxX + boxWidth - 5, totalY, { align: "right" });
-    }
-
-    // Línea separadora
-    totalY += 5;
-    doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
-    doc.setLineWidth(0.5);
-    doc.line(boxX + 5, totalY, boxX + boxWidth - 5, totalY);
-
-    // Total final
-    totalY += 8;
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(dorado[0], dorado[1], dorado[2]);
-    doc.text("TOTAL:", boxX + 5, totalY);
-    doc.text(`S/ ${total.toFixed(2)}`, boxX + boxWidth - 5, totalY, { align: "right" });
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.text("FIRMA AUTORIZADA", firmaX + 22.5, firmaY + 4, { align: "center" });
+    doc.setFontSize(7);
+    doc.text("ShowClinic - Estética y Belleza", firmaX + 22.5, firmaY + 8, { align: "center" });
 
     // ============================================
-    // FOOTER - Franja dorada inferior
+    // FOOTER CON GRADIENTE DE MARCA
     // ============================================
+    const footerHeight = 18;
     const footerY = pageHeight - footerHeight;
     
-    doc.setFillColor(dorado[0], dorado[1], dorado[2]);
-    doc.rect(0, footerY, pageWidth, 20, "F");
+    // Gradiente marrón → bronce
+    const footerStripes = 30;
+    for (let i = 0; i < footerStripes; i++) {
+      const ratio = i / footerStripes;
+      const r = marron[0] + (bronce[0] - marron[0]) * ratio;
+      const g = marron[1] + (bronce[1] - marron[1]) * ratio;
+      const b = marron[2] + (bronce[2] - marron[2]) * ratio;
+      doc.setFillColor(r, g, b);
+      doc.rect(0, footerY + (footerHeight / footerStripes) * i, pageWidth, footerHeight / footerStripes, "F");
+    }
 
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(blanco[0], blanco[1], blanco[2]);
-    doc.text("ShowClinic - Clínica de Estética y Belleza", 15, footerY + 8);
-    doc.text("Tel: +51 974 212 114  |  Av. Ejército 616, Centro de Negocios, Yanahuara, Perú", 15, footerY + 14);
-
-    // Firma (derecha del footer)
-    doc.setDrawColor(blanco[0], blanco[1], blanco[2]);
-    doc.setLineWidth(0.3);
-    doc.line(pageWidth - 80, footerY + 6, pageWidth - 15, footerY + 6);
     doc.setFontSize(8);
-    doc.text("Firma Autorizada", pageWidth - 55, footerY + 12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+    doc.text("ShowClinic", 15, footerY + 7);
+    
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text("Tel: +51 974 212 114  |  Av. Ejército 616, Centro de Negocios, Yanahuara, Perú", 15, footerY + 12);
+
+    // Handle @showclinic (derecha del footer)
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setFillColor(dorado[0], dorado[1], dorado[2]);
+    doc.roundedRect(pageWidth - 45, footerY + 5, 30, 7, 2, 2, "F");
+    doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+    doc.text("@showclinic", pageWidth - 30, footerY + 9.5, { align: "center" });
+
+    // ============================================
+    // MARCA DE AGUA OPCIONAL (monograma "S")
+    // ============================================
+    doc.setFontSize(180);
+    doc.setFont("times", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.setGState(new doc.GState({ opacity: 0.02 }));
+    doc.text("S", pageWidth / 2, pageHeight / 2, { 
+      align: "center",
+      baseline: "middle"
+    });
+    doc.setGState(new doc.GState({ opacity: 1 })); // Restaurar opacidad
 
     // ============================================
     // GUARDAR PDF

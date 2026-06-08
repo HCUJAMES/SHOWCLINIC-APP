@@ -34,7 +34,7 @@ import {
   Tooltip,
   Menu,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -3558,529 +3558,772 @@ const HistorialClinico = () => {
                 </Box>
               </Box>
 
-              {/* Información completa del paciente */}
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
-                <Typography
-                  variant="h6"
-                  sx={{ 
-                    color: "#a36920", 
-                    fontWeight: "bold",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    fontSize: "0.95rem"
-                  }}
-                >
-                  Información completa del paciente
-                </Typography>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={Boolean(pacienteSeleccionado.especial)}
-                      onChange={async (e) => {
-                        const nuevoValor = e.target.checked;
-                        try {
-                          await axios.patch(
-                            `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/especial`,
-                            { especial: nuevoValor },
-                            { headers: authHeaders }
-                          );
-                          setPacienteSeleccionado(prev => ({ ...prev, especial: nuevoValor ? 1 : 0 }));
-                          showToast({ severity: "success", message: nuevoValor ? "⭐ Marcado como cliente especial" : "Cliente normal" });
-                        } catch (err) {
-                          console.error("Error actualizando especial:", err);
-                          showToast({ severity: "error", message: "Error al actualizar" });
-                        }
-                      }}
+              {/* ========== SECCIÓN 1: DATOS DEL PACIENTE ========== */}
+              <Paper
+                elevation={0}
+                sx={{
+                  mb: 4,
+                  p: 3.5,
+                  borderRadius: "24px",
+                  backgroundColor: "#FFF8F0",
+                  border: "1px solid #EADFCF",
+                  boxShadow: "0 2px 12px rgba(93, 64, 55, 0.08)"
+                }}
+              >
+                {/* Header de Identidad */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 3, mb: 4, pb: 3, borderBottom: "2px solid #EADFCF" }}>
+                  <Box
+                    sx={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: "50%",
+                      backgroundColor: "#5D4037",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontFamily: "'Cormorant Garamond', serif",
+                      fontSize: "2rem",
+                      fontWeight: 700,
+                      color: "#C8A96E",
+                      boxShadow: "0 4px 12px rgba(93, 64, 55, 0.25)"
+                    }}
+                  >
+                    {(pacienteSeleccionado.nombre || "P").charAt(0).toUpperCase()}
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
                       sx={{
-                        "& .MuiSwitch-switchBase.Mui-checked": { color: "#d32f2f" },
-                        "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#d32f2f" },
+                        fontFamily: "'Cormorant Garamond', serif",
+                        fontSize: "2rem",
+                        fontWeight: 700,
+                        color: "#5D4037",
+                        lineHeight: 1.2,
+                        mb: 1
                       }}
-                    />
-                  }
-                  label={
-                    <Typography sx={{ fontWeight: pacienteSeleccionado.especial ? "bold" : "normal", color: pacienteSeleccionado.especial ? "#d32f2f" : "#888", fontSize: "0.85rem" }}>
-                      {pacienteSeleccionado.especial ? "⭐ Cliente Especial" : "Cliente Normal"}
+                    >
+                      {`${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim() || "Paciente"}
                     </Typography>
-                  }
-                />
-              </Box>
-
-              <Grid container spacing={3} sx={{ mb: 5 }}>
-                {/* DATOS PERSONALES */}
-                <Grid item xs={12} md={6}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 3,
-                      borderRadius: 2.5,
-                      backgroundColor: "#fff",
-                      border: "1px solid #e0e0e0",
-                      height: "100%"
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, pb: 2, borderBottom: "2px solid #f5f5f5" }}>
-                      <Person sx={{ color: "#666", fontSize: 22 }} />
-                      <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
-                        Datos Personales
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Documento</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>DNI: {pacienteSeleccionado.dni || "—"}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Edad</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"}</Typography>
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Nombre</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.nombre || "—"}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Apellido</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.apellido || "—"}</Typography>
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Sexo</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.sexo || "—"}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Fecha Nac.</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.fechaNacimiento || "—"}</Typography>
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Ocupación</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.ocupacion || "—"}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Embarazada</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.embarazada || "No especifica"}</Typography>
-                        </Box>
-                      </Box>
-                    </Box>
-                  </Paper>
-                </Grid>
-
-                {/* CONTACTO */}
-                <Grid item xs={12} md={6}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 3,
-                      borderRadius: 2.5,
-                      backgroundColor: "#fff",
-                      border: "1px solid #e0e0e0",
-                      height: "100%"
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, pb: 2, borderBottom: "2px solid #f5f5f5" }}>
-                      <Phone sx={{ color: "#666", fontSize: 22 }} />
-                      <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
-                        Contacto
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Celular</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.celular || "—"}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Correo</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem", wordBreak: "break-word" }}>{pacienteSeleccionado.correo || "—"}</Typography>
-                        </Box>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Dirección</Typography>
-                        <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.direccion || "—"}</Typography>
-                      </Box>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Ciudad Res.</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.ciudadResidencia || "—"}</Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>N° Hijos</Typography>
-                          <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.numeroHijos ?? "—"}</Typography>
-                        </Box>
-                      </Box>
-                      <Box>
-                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 0.5, letterSpacing: "0.5px" }}>Referencia</Typography>
-                        <Typography sx={{ fontWeight: 600, color: "#222", fontSize: "0.95rem" }}>{pacienteSeleccionado.referencia || "No especificada"}</Typography>
-                      </Box>
-                    </Box>
-                  </Paper>
-                </Grid>
-
-                {/* HISTORIAL MÉDICO */}
-                <Grid item xs={12} md={6}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 3,
-                      borderRadius: 2.5,
-                      backgroundColor: "#fff",
-                      border: "1px solid #e0e0e0",
-                      height: "100%"
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, pb: 2, borderBottom: "2px solid #f5f5f5" }}>
-                      <LocalHospital sx={{ color: "#666", fontSize: 22 }} />
-                      <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
-                        Historial Médico
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                      <Chip 
-                        icon={pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? <Close sx={{ fontSize: 16 }} /> : <Check sx={{ fontSize: 16 }} />}
-                        label={pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? `Alergias: ${pacienteSeleccionado.alergias}` : "Sin alergias"}
-                        sx={{ 
-                          backgroundColor: pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? "#fff3e0" : "#e8f5e9",
-                          color: pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? "#e65100" : "#2e7d32",
+                    <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+                      <Chip
+                        label={`${calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"} años`}
+                        sx={{
+                          backgroundColor: "#5D4037",
+                          color: "#FFF8F0",
+                          fontFamily: "'DM Sans', sans-serif",
                           fontWeight: 600,
                           fontSize: "0.8rem",
-                          height: "36px",
-                          justifyContent: "flex-start",
-                          px: 2
+                          height: "28px"
                         }}
                       />
-                      <Chip 
-                        icon={pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? <Close sx={{ fontSize: 16 }} /> : <Check sx={{ fontSize: 16 }} />}
-                        label={pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? `Enfermedades: ${pacienteSeleccionado.enfermedad}` : "Sin enfermedades"}
-                        sx={{ 
-                          backgroundColor: pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? "#fff3e0" : "#e8f5e9",
-                          color: pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? "#e65100" : "#2e7d32",
+                      <Chip
+                        label={pacienteSeleccionado.sexo || "—"}
+                        sx={{
+                          backgroundColor: "#C8A96E",
+                          color: "#5D4037",
+                          fontFamily: "'DM Sans', sans-serif",
                           fontWeight: 600,
                           fontSize: "0.8rem",
-                          height: "36px",
-                          justifyContent: "flex-start",
-                          px: 2
+                          height: "28px"
                         }}
                       />
-                      <Chip 
-                        label={pacienteSeleccionado.cirugiaEstetica && pacienteSeleccionado.cirugiaEstetica.trim() !== "" ? `Cirugía: ${pacienteSeleccionado.cirugiaEstetica}` : "Sin cirugía estética"}
-                        sx={{ 
-                          backgroundColor: "#f3e5f5",
-                          color: "#6a1b9a",
+                      <Chip
+                        label={pacienteSeleccionado.ocupacion || "No especificada"}
+                        sx={{
+                          backgroundColor: "#fff",
+                          color: "#5D4037",
+                          border: "1px solid #EADFCF",
+                          fontFamily: "'DM Sans', sans-serif",
                           fontWeight: 600,
                           fontSize: "0.8rem",
-                          height: "36px",
-                          justifyContent: "flex-start",
-                          px: 2
+                          height: "28px"
                         }}
                       />
-                    </Box>
-                  </Paper>
-                </Grid>
-
-                {/* HÁBITOS */}
-                <Grid item xs={12} md={6}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 3,
-                      borderRadius: 2.5,
-                      backgroundColor: "#fff",
-                      border: "1px solid #e0e0e0",
-                      height: "100%"
-                    }}
-                  >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 3, pb: 2, borderBottom: "2px solid #f5f5f5" }}>
-                      <Favorite sx={{ color: "#666", fontSize: 22 }} />
-                      <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
-                        Hábitos
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-around", gap: 3 }}>
-                      <Box sx={{ textAlign: "center", flex: 1 }}>
-                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Tabaco</Typography>
-                        <Typography sx={{ 
-                          fontWeight: 700, 
-                          color: pacienteSeleccionado.tabaco === "Sí" || pacienteSeleccionado.tabaco === "Ocasional" || pacienteSeleccionado.tabaco === "Frecuente" ? "#d32f2f" : "#2e7d32",
-                          fontSize: "1.1rem"
-                        }}>
-                          {pacienteSeleccionado.tabaco || "No especificado"}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: "center", flex: 1 }}>
-                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Alcohol</Typography>
-                        <Typography sx={{ 
-                          fontWeight: 700, 
-                          color: pacienteSeleccionado.alcohol === "Sí" || pacienteSeleccionado.alcohol === "Ocasional" || pacienteSeleccionado.alcohol === "Frecuente" ? "#d32f2f" : "#2e7d32",
-                          fontSize: "1.1rem"
-                        }}>
-                          {pacienteSeleccionado.alcohol || "No especificado"}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ textAlign: "center", flex: 1 }}>
-                        <Typography variant="caption" sx={{ color: "#999", fontSize: "0.68rem", textTransform: "uppercase", display: "block", mb: 1, letterSpacing: "0.5px" }}>Drogas</Typography>
-                        <Typography sx={{ 
-                          fontWeight: 700, 
-                          color: pacienteSeleccionado.drogas === "Sí" || pacienteSeleccionado.drogas === "Ocasional" || pacienteSeleccionado.drogas === "Frecuente" ? "#d32f2f" : "#2e7d32",
-                          fontSize: "1.1rem"
-                        }}>
-                          {pacienteSeleccionado.drogas || "No especificado"}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Paper>
-                </Grid>
-
-                {/* OTRAS OBSERVACIONES */}
-                <Grid item xs={12}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 3,
-                      borderRadius: 2.5,
-                      backgroundColor: "#fff",
-                      border: "1px solid #e0e0e0",
-                    }}
-                  >
-                    <Box 
-                      onClick={() => setShowObservaciones(prev => !prev)}
-                      sx={{ 
-                        display: "flex", 
-                        alignItems: "center", 
-                        justifyContent: "space-between",
-                        cursor: "pointer",
-                        mb: showObservaciones ? 3 : 0,
-                        pb: showObservaciones ? 2 : 0,
-                        borderBottom: showObservaciones ? "2px solid #f5f5f5" : "none",
-                        transition: "all 0.3s ease"
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                        <DescriptionOutlined sx={{ color: "#666", fontSize: 22 }} />
-                        <Typography sx={{ fontWeight: 600, color: "#555", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.8px" }}>
-                          Otras observaciones
-                        </Typography>
-                        {Array.isArray(observaciones) && observaciones.length > 0 && (
-                          <Chip 
-                            label={observaciones.length} 
-                            size="small" 
-                            sx={{ 
-                              backgroundColor: "#f5f5f5", 
-                              color: "#666", 
-                              fontWeight: 600,
-                              height: "24px",
-                              fontSize: "0.75rem"
-                            }} 
-                          />
-                        )}
-                      </Box>
-                      <IconButton size="small" sx={{ color: "#666" }}>
-                        {showObservaciones ? <ExpandLess /> : <ExpandMore />}
-                      </IconButton>
-                    </Box>
-
-                    <Collapse in={showObservaciones} timeout="auto" unmountOnExit>
-                      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                        {/* Nueva observación */}
-                        <Box sx={{ 
-                          p: 2.5, 
-                          backgroundColor: "#fafafa", 
-                          borderRadius: 2,
-                          border: "1px solid #e8e8e8"
-                        }}>
-                          <Typography variant="subtitle2" sx={{ color: "#555", mb: 1.5, fontWeight: 600, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Nueva observación
-                          </Typography>
-                          <TextField
-                            fullWidth
-                            multiline
-                            minRows={3}
-                            placeholder="Escribe aquí cualquier observación adicional..."
-                            value={nuevaObservacion}
-                            onChange={(e) => setNuevaObservacion(e.target.value)}
-                            sx={{
-                              "& .MuiInputBase-root": {
-                                backgroundColor: "#fff",
-                                borderRadius: 2,
-                              },
-                              "& .MuiOutlinedInput-root": {
-                                "&:hover fieldset": { borderColor: "#a36920" },
-                                "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                              },
-                            }}
-                          />
-                          <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5 }}>
-                            <Button
-                              variant="contained"
-                              size="medium"
-                              sx={{
-                                backgroundColor: "#a36920",
-                                "&:hover": { backgroundColor: "#8b581b" },
-                                borderRadius: 2,
-                                fontWeight: 600,
-                                textTransform: "none",
-                                px: 3,
-                                boxShadow: "0 2px 8px rgba(163,105,32,0.2)"
-                              }}
-                              disabled={guardandoObservaciones || !nuevaObservacion.trim()}
-                              onClick={guardarObservacion}
-                            >
-                              {guardandoObservaciones ? "Guardando..." : "Guardar observación"}
-                            </Button>
-                          </Box>
-                        </Box>
-
-                        {/* Historial de observaciones */}
-                        {Array.isArray(observaciones) && observaciones.length > 0 && (
-                          <Box>
-                            <Typography
-                              variant="subtitle2"
-                              sx={{ color: "#555", mb: 2, fontWeight: 600, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}
-                            >
-                              Historial ({observaciones.length})
-                            </Typography>
-                    <Box
-                      sx={{
-                        display: "grid",
-                        gap: 1.2,
-                        maxHeight: 220,
-                        overflowY: "auto",
-                        pr: 0.5,
-                      }}
-                    >
-                      {observaciones.map((o) => (
-                        <Paper
-                          key={o.id}
-                          elevation={0}
+                      {pacienteSeleccionado.especial && (
+                        <Chip
+                          label="⭐ Cliente Especial"
                           sx={{
-                            p: 2,
-                            borderRadius: 2,
-                            backgroundColor: "#fff",
-                            border: "1px solid #e8e8e8",
-                            transition: "all 0.2s ease",
-                            "&:hover": {
-                              borderColor: "#d0d0d0",
-                              boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
-                            }
+                            backgroundColor: "#d32f2f",
+                            color: "#fff",
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontWeight: 700,
+                            fontSize: "0.8rem",
+                            height: "28px"
                           }}
-                        >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "flex-start",
-                              justifyContent: "space-between",
-                              gap: 2,
-                            }}
-                          >
-                            <Box sx={{ flex: 1 }}>
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  display: "block",
-                                  color: "#999",
-                                  mb: 1,
-                                  fontSize: "0.7rem",
-                                  fontWeight: 500
-                                }}
-                              >
-                                {o.creado_en}
-                              </Typography>
-
-                              {observacionEditId === o.id ? (
-                                <TextField
-                                  fullWidth
-                                  multiline
-                                  minRows={3}
-                                  value={observacionEditTexto}
-                                  onChange={(e) =>
-                                    setObservacionEditTexto(e.target.value)
-                                  }
-                                  sx={{
-                                    "& .MuiInputBase-root": {
-                                      backgroundColor: "rgba(212, 175, 55, 0.10)",
-                                      borderRadius: 2,
-                                    },
-                                    "& .MuiOutlinedInput-root": {
-                                      "&:hover fieldset": { borderColor: "#a36920" },
-                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                    },
-                                  }}
-                                />
-                              ) : (
-                                <Typography sx={{ whiteSpace: "pre-wrap" }}>
-                                  {o.texto}
-                                </Typography>
-                              )}
-                            </Box>
-
-                            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                              {observacionEditId === o.id ? (
-                                <>
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    sx={{
-                                      backgroundColor: "#a36920",
-                                      "&:hover": { backgroundColor: "#8b581b" },
-                                      borderRadius: 3,
-                                      fontWeight: "bold",
-                                    }}
-                                    disabled={guardandoObservacionEdit}
-                                    onClick={guardarEdicionObservacion}
-                                  >
-                                    Guardar
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    sx={{
-                                      borderColor: "#a36920",
-                                      color: "#a36920",
-                                      borderRadius: 3,
-                                      fontWeight: "bold",
-                                    }}
-                                    onClick={() => {
-                                      setObservacionEditId(null);
-                                      setObservacionEditTexto("");
-                                    }}
-                                  >
-                                    Cancelar
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  sx={{
-                                    borderColor: "#a36920",
-                                    color: "#a36920",
-                                    borderRadius: 3,
-                                    fontWeight: "bold",
-                                    "&:hover": { backgroundColor: "rgba(163,105,32,0.08)" },
-                                  }}
-                                  onClick={() => {
-                                    setObservacionEditId(o.id);
-                                    setObservacionEditTexto(o.texto || "");
-                                  }}
-                                >
-                                  Editar
-                                </Button>
-                              )}
-                            </Box>
-                          </Box>
-                        </Paper>
-                      ))}
+                        />
+                      )}
                     </Box>
                   </Box>
-                )}
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={Boolean(pacienteSeleccionado.especial)}
+                        onChange={async (e) => {
+                          const nuevoValor = e.target.checked;
+                          try {
+                            await axios.patch(
+                              `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/especial`,
+                              { especial: nuevoValor },
+                              { headers: authHeaders }
+                            );
+                            setPacienteSeleccionado(prev => ({ ...prev, especial: nuevoValor ? 1 : 0 }));
+                            showToast({ severity: "success", message: nuevoValor ? "⭐ Marcado como cliente especial" : "Cliente normal" });
+                          } catch (err) {
+                            console.error("Error actualizando especial:", err);
+                            showToast({ severity: "error", message: "Error al actualizar" });
+                          }
+                        }}
+                        sx={{
+                          "& .MuiSwitch-switchBase.Mui-checked": { color: "#d32f2f" },
+                          "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#d32f2f" },
+                        }}
+                      />
+                    }
+                    label={
+                      <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.especial ? "#d32f2f" : "#888", fontSize: "0.85rem" }}>
+                        {pacienteSeleccionado.especial ? "Especial" : "Normal"}
+                      </Typography>
+                    }
+                  />
+                </Box>
+
+                {/* Tarjetas horizontales de información */}
+                <Grid container spacing={2.5}>
+                  {/* Datos Personales */}
+                  <Grid item xs={12} md={6}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "16px",
+                        backgroundColor: "#fff",
+                        border: "1px solid #EADFCF",
+                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, pb: 1.5, borderBottom: "1px solid #EADFCF" }}>
+                        <Person sx={{ color: "#5D4037", fontSize: 20 }} />
+                        <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Datos Personales
+                        </Typography>
                       </Box>
-                    </Collapse>
-                  </Paper>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 2 }}>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>DNI</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.dni ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.dni || "—"}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Edad</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: (calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad) ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Sexo</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.sexo ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.sexo || "—"}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Fecha Nac.</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.fechaNacimiento ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.fechaNacimiento || "—"}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Embarazada</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.embarazada ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.embarazada || "—"}</Typography>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  {/* Contacto */}
+                  <Grid item xs={12} md={6}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "16px",
+                        backgroundColor: "#fff",
+                        border: "1px solid #EADFCF",
+                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, pb: 1.5, borderBottom: "1px solid #EADFCF" }}>
+                        <Phone sx={{ color: "#5D4037", fontSize: 20 }} />
+                        <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Contacto
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 2 }}>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Celular</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.celular ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.celular || "—"}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Correo</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.correo ? "#5D4037" : "#ccc", fontSize: "0.9rem", wordBreak: "break-word" }}>{pacienteSeleccionado.correo || "—"}</Typography>
+                        </Box>
+                        <Box sx={{ gridColumn: "1 / -1" }}>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Dirección</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.direccion ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.direccion || "—"}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Ciudad</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.ciudadResidencia ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.ciudadResidencia || "—"}</Typography>
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>N° Hijos</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: (pacienteSeleccionado.numeroHijos !== null && pacienteSeleccionado.numeroHijos !== undefined) ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.numeroHijos ?? "—"}</Typography>
+                        </Box>
+                        <Box sx={{ gridColumn: "1 / -1" }}>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Referencia</Typography>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.referencia ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.referencia || "—"}</Typography>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  {/* Historial Médico */}
+                  <Grid item xs={12}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "16px",
+                        backgroundColor: "#fff",
+                        border: "1px solid #EADFCF",
+                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, pb: 1.5, borderBottom: "1px solid #EADFCF" }}>
+                        <LocalHospital sx={{ color: "#5D4037", fontSize: 20 }} />
+                        <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Historial Médico
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+                        <Chip 
+                          icon={pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? <Close sx={{ fontSize: 16 }} /> : <Check sx={{ fontSize: 16 }} />}
+                          label={pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? `Alergias: ${pacienteSeleccionado.alergias}` : "Sin alergias"}
+                          sx={{ 
+                            backgroundColor: pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? "#fff3e0" : "#e8f5e9",
+                            color: pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? "#e65100" : "#2e7d32",
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontWeight: 600,
+                            fontSize: "0.8rem",
+                            height: "32px"
+                          }}
+                        />
+                        <Chip 
+                          icon={pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? <Close sx={{ fontSize: 16 }} /> : <Check sx={{ fontSize: 16 }} />}
+                          label={pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? `Enfermedades: ${pacienteSeleccionado.enfermedad}` : "Sin enfermedades"}
+                          sx={{ 
+                            backgroundColor: pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? "#fff3e0" : "#e8f5e9",
+                            color: pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? "#e65100" : "#2e7d32",
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontWeight: 600,
+                            fontSize: "0.8rem",
+                            height: "32px"
+                          }}
+                        />
+                        <Chip 
+                          label={pacienteSeleccionado.cirugiaEstetica && pacienteSeleccionado.cirugiaEstetica.trim() !== "" ? `Cirugía: ${pacienteSeleccionado.cirugiaEstetica}` : "Sin cirugía estética"}
+                          sx={{ 
+                            backgroundColor: "#f3e5f5",
+                            color: "#6a1b9a",
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontWeight: 600,
+                            fontSize: "0.8rem",
+                            height: "32px"
+                          }}
+                        />
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  {/* Hábitos */}
+                  <Grid item xs={12}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "16px",
+                        backgroundColor: "#fff",
+                        border: "1px solid #EADFCF",
+                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
+                      }}
+                    >
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, pb: 1.5, borderBottom: "1px solid #EADFCF" }}>
+                        <Favorite sx={{ color: "#5D4037", fontSize: 20 }} />
+                        <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                          Hábitos
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2 }}>
+                        <Box sx={{ textAlign: "center", p: 2, borderRadius: "12px", backgroundColor: "#FFFDF7", border: "1px solid #EADFCF" }}>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", mb: 1, letterSpacing: "0.5px", fontWeight: 600 }}>Tabaco</Typography>
+                          <Typography sx={{ 
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontWeight: 700, 
+                            color: pacienteSeleccionado.tabaco === "Sí" || pacienteSeleccionado.tabaco === "Ocasional" || pacienteSeleccionado.tabaco === "Frecuente" ? "#d32f2f" : "#2e7d32",
+                            fontSize: "1rem"
+                          }}>
+                            {pacienteSeleccionado.tabaco || "N/E"}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: "center", p: 2, borderRadius: "12px", backgroundColor: "#FFFDF7", border: "1px solid #EADFCF" }}>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", mb: 1, letterSpacing: "0.5px", fontWeight: 600 }}>Alcohol</Typography>
+                          <Typography sx={{ 
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontWeight: 700, 
+                            color: pacienteSeleccionado.alcohol === "Sí" || pacienteSeleccionado.alcohol === "Ocasional" || pacienteSeleccionado.alcohol === "Frecuente" ? "#d32f2f" : "#2e7d32",
+                            fontSize: "1rem"
+                          }}>
+                            {pacienteSeleccionado.alcohol || "N/E"}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ textAlign: "center", p: 2, borderRadius: "12px", backgroundColor: "#FFFDF7", border: "1px solid #EADFCF" }}>
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", mb: 1, letterSpacing: "0.5px", fontWeight: 600 }}>Drogas</Typography>
+                          <Typography sx={{ 
+                            fontFamily: "'DM Sans', sans-serif",
+                            fontWeight: 700, 
+                            color: pacienteSeleccionado.drogas === "Sí" || pacienteSeleccionado.drogas === "Ocasional" || pacienteSeleccionado.drogas === "Frecuente" ? "#d32f2f" : "#2e7d32",
+                            fontSize: "1rem"
+                          }}>
+                            {pacienteSeleccionado.drogas || "N/E"}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Paper>
+                  </Grid>
+
+                  {/* Otras Observaciones */}
+                  <Grid item xs={12}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "16px",
+                        backgroundColor: "#fff",
+                        border: "1px solid #EADFCF",
+                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
+                      }}
+                    >
+                      <Box 
+                        onClick={() => setShowObservaciones(prev => !prev)}
+                        sx={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          justifyContent: "space-between",
+                          cursor: "pointer",
+                          mb: showObservaciones ? 2.5 : 0,
+                          pb: showObservaciones ? 2 : 0,
+                          borderBottom: showObservaciones ? "1px solid #EADFCF" : "none"
+                        }}
+                      >
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                          <DescriptionOutlined sx={{ color: "#5D4037", fontSize: 20 }} />
+                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            Otras Observaciones
+                          </Typography>
+                          {Array.isArray(observaciones) && observaciones.length > 0 && (
+                            <Chip 
+                              label={observaciones.length} 
+                              size="small" 
+                              sx={{ 
+                                backgroundColor: "#C8A96E", 
+                                color: "#5D4037", 
+                                fontFamily: "'DM Sans', sans-serif",
+                                fontWeight: 700,
+                                height: "22px",
+                                fontSize: "0.75rem"
+                              }} 
+                            />
+                          )}
+                        </Box>
+                        <IconButton size="small" sx={{ color: "#5D4037" }}>
+                          {showObservaciones ? <ExpandLess /> : <ExpandMore />}
+                        </IconButton>
+                      </Box>
+
+                      <Collapse in={showObservaciones} timeout="auto" unmountOnExit>
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+                          {/* Nueva observación */}
+                          <Box sx={{ 
+                            p: 2.5, 
+                            backgroundColor: "#FFFDF7", 
+                            borderRadius: "12px",
+                            border: "1px solid #EADFCF"
+                          }}>
+                            <Typography variant="subtitle2" sx={{ fontFamily: "'DM Sans', sans-serif", color: "#5D4037", mb: 1.5, fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                              Nueva observación
+                            </Typography>
+                            <TextField
+                              fullWidth
+                              multiline
+                              minRows={3}
+                              placeholder="Escribe aquí cualquier observación adicional..."
+                              value={nuevaObservacion}
+                              onChange={(e) => setNuevaObservacion(e.target.value)}
+                              sx={{
+                                "& .MuiInputBase-root": {
+                                  fontFamily: "'DM Sans', sans-serif",
+                                  backgroundColor: "#fff",
+                                  borderRadius: "8px",
+                                },
+                                "& .MuiOutlinedInput-root": {
+                                  "&:hover fieldset": { borderColor: "#C8A96E" },
+                                  "&.Mui-focused fieldset": { borderColor: "#5D4037" },
+                                },
+                              }}
+                            />
+                            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 1.5 }}>
+                              <Button
+                                variant="contained"
+                                size="medium"
+                                sx={{
+                                  fontFamily: "'DM Sans', sans-serif",
+                                  backgroundColor: "#5D4037",
+                                  "&:hover": { backgroundColor: "#4a332b" },
+                                  borderRadius: "8px",
+                                  fontWeight: 700,
+                                  textTransform: "none",
+                                  px: 3,
+                                  boxShadow: "0 2px 8px rgba(93, 64, 55, 0.2)"
+                                }}
+                                disabled={guardandoObservaciones || !nuevaObservacion.trim()}
+                                onClick={guardarObservacion}
+                              >
+                                {guardandoObservaciones ? "Guardando..." : "Guardar observación"}
+                              </Button>
+                            </Box>
+                          </Box>
+
+                          {/* Historial de observaciones */}
+                          {Array.isArray(observaciones) && observaciones.length > 0 && (
+                            <Box>
+                              <Typography
+                                variant="subtitle2"
+                                sx={{ fontFamily: "'DM Sans', sans-serif", color: "#5D4037", mb: 2, fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}
+                              >
+                                Historial ({observaciones.length})
+                              </Typography>
+                              <Box
+                                sx={{
+                                  display: "grid",
+                                  gap: 1.5,
+                                  maxHeight: 280,
+                                  overflowY: "auto",
+                                  pr: 0.5,
+                                }}
+                              >
+                                {observaciones.map((o) => (
+                                  <Paper
+                                    key={o.id}
+                                    elevation={0}
+                                    sx={{
+                                      p: 2,
+                                      borderRadius: "12px",
+                                      backgroundColor: "#FFFDF7",
+                                      border: "1px solid #EADFCF",
+                                      transition: "all 0.2s ease",
+                                      "&:hover": {
+                                        borderColor: "#C8A96E",
+                                        boxShadow: "0 2px 8px rgba(93, 64, 55, 0.08)"
+                                      }
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "flex-start",
+                                        justifyContent: "space-between",
+                                        gap: 2,
+                                      }}
+                                    >
+                                      <Box sx={{ flex: 1 }}>
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            fontFamily: "'DM Sans', sans-serif",
+                                            display: "block",
+                                            color: "#999",
+                                            mb: 1,
+                                            fontSize: "0.7rem",
+                                            fontWeight: 600
+                                          }}
+                                        >
+                                          {o.creado_en}
+                                        </Typography>
+
+                                        {observacionEditId === o.id ? (
+                                          <TextField
+                                            fullWidth
+                                            multiline
+                                            minRows={3}
+                                            value={observacionEditTexto}
+                                            onChange={(e) =>
+                                              setObservacionEditTexto(e.target.value)
+                                            }
+                                            sx={{
+                                              "& .MuiInputBase-root": {
+                                                fontFamily: "'DM Sans', sans-serif",
+                                                backgroundColor: "#fff",
+                                                borderRadius: "8px",
+                                              },
+                                              "& .MuiOutlinedInput-root": {
+                                                "&:hover fieldset": { borderColor: "#C8A96E" },
+                                                "&.Mui-focused fieldset": { borderColor: "#5D4037" },
+                                              },
+                                            }}
+                                          />
+                                        ) : (
+                                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", whiteSpace: "pre-wrap", color: "#5D4037" }}>
+                                            {o.texto}
+                                          </Typography>
+                                        )}
+                                      </Box>
+
+                                      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                                        {observacionEditId === o.id ? (
+                                          <>
+                                            <Button
+                                              size="small"
+                                              variant="contained"
+                                              sx={{
+                                                fontFamily: "'DM Sans', sans-serif",
+                                                backgroundColor: "#5D4037",
+                                                "&:hover": { backgroundColor: "#4a332b" },
+                                                borderRadius: "8px",
+                                                fontWeight: 700,
+                                                textTransform: "none"
+                                              }}
+                                              disabled={guardandoObservacionEdit}
+                                              onClick={guardarEdicionObservacion}
+                                            >
+                                              Guardar
+                                            </Button>
+                                            <Button
+                                              size="small"
+                                              variant="outlined"
+                                              sx={{
+                                                fontFamily: "'DM Sans', sans-serif",
+                                                borderColor: "#5D4037",
+                                                color: "#5D4037",
+                                                borderRadius: "8px",
+                                                fontWeight: 700,
+                                                textTransform: "none"
+                                              }}
+                                              onClick={() => {
+                                                setObservacionEditId(null);
+                                                setObservacionEditTexto("");
+                                              }}
+                                            >
+                                              Cancelar
+                                            </Button>
+                                          </>
+                                        ) : (
+                                          <Button
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{
+                                              fontFamily: "'DM Sans', sans-serif",
+                                              borderColor: "#5D4037",
+                                              color: "#5D4037",
+                                              borderRadius: "8px",
+                                              fontWeight: 700,
+                                              textTransform: "none",
+                                              "&:hover": { backgroundColor: "rgba(93, 64, 55, 0.08)", borderColor: "#5D4037" },
+                                            }}
+                                            onClick={() => {
+                                              setObservacionEditId(o.id);
+                                              setObservacionEditTexto(o.texto || "");
+                                            }}
+                                          >
+                                            Editar
+                                          </Button>
+                                        )}
+                                      </Box>
+                                    </Box>
+                                  </Paper>
+                                ))}
+                              </Box>
+                            </Box>
+                          )}
+                        </Box>
+                      </Collapse>
+                    </Paper>
+                  </Grid>
                 </Grid>
-              </Grid>
+              </Paper>
+
+              {/* ========== SECCIÓN 2: MAPA FACIAL 3D ========== */}
+              <Paper
+                elevation={0}
+                sx={{
+                  mb: 4,
+                  borderRadius: "24px",
+                  backgroundColor: "#2a2a2a",
+                  border: "1px solid #3a3a3a",
+                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
+                  overflow: "hidden"
+                }}
+              >
+                {/* Header del Mapa Facial */}
+                <Box sx={{ 
+                  p: 2.5, 
+                  backgroundColor: "#1a1a1a", 
+                  borderBottom: "1px solid #3a3a3a",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 2
+                }}>
+                  <Typography
+                    sx={{
+                      fontFamily: "'Cormorant Garamond', serif",
+                      fontSize: "1.5rem",
+                      fontWeight: 700,
+                      color: "#C8A96E",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5
+                    }}
+                  >
+                    Mapa Facial 3D
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    <IconButton 
+                      size="small" 
+                      sx={{ 
+                        backgroundColor: "rgba(200, 169, 110, 0.1)", 
+                        color: "#C8A96E",
+                        "&:hover": { backgroundColor: "rgba(200, 169, 110, 0.2)" }
+                      }}
+                      title="Rotar modelo"
+                    >
+                      <Refresh />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      sx={{ 
+                        backgroundColor: "rgba(200, 169, 110, 0.1)", 
+                        color: "#C8A96E",
+                        "&:hover": { backgroundColor: "rgba(200, 169, 110, 0.2)" }
+                      }}
+                      title="Ver marcadores"
+                    >
+                      <Visibility />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      sx={{ 
+                        backgroundColor: "rgba(200, 169, 110, 0.1)", 
+                        color: "#C8A96E",
+                        "&:hover": { backgroundColor: "rgba(200, 169, 110, 0.2)" }
+                      }}
+                      title="Centrar vista"
+                    >
+                      <CenterFocusStrong />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      sx={{ 
+                        backgroundColor: "rgba(200, 169, 110, 0.1)", 
+                        color: "#C8A96E",
+                        "&:hover": { backgroundColor: "rgba(200, 169, 110, 0.2)" }
+                      }}
+                      title="Pantalla completa"
+                    >
+                      <Fullscreen />
+                    </IconButton>
+                  </Box>
+                </Box>
+
+                {/* Visor 3D */}
+                <Box 
+                  className="stage"
+                  sx={{ 
+                    height: { xs: "500px", md: "calc(100vh - 150px)" },
+                    minHeight: "600px",
+                    position: "relative",
+                    backgroundColor: "#1a1a1a",
+                    backgroundImage: "radial-gradient(circle at center, rgba(200, 169, 110, 0.03) 1px, transparent 1px)",
+                    backgroundSize: "20px 20px"
+                  }}
+                >
+                  <FacialMap3D
+                    paciente={pacienteSeleccionado}
+                    registros={facialRegistros}
+                    onGuardar={null}
+                    onActualizar={null}
+                    onEliminar={null}
+                    viewOnly={true}
+                  />
+                </Box>
+
+                {/* Footer con botones de acción */}
+                <Box sx={{ 
+                  p: 2.5, 
+                  backgroundColor: "#1a1a1a", 
+                  borderTop: "1px solid #3a3a3a",
+                  display: "flex",
+                  gap: 2,
+                  flexWrap: "wrap",
+                  justifyContent: "center"
+                }}>
+                  <Button
+                    variant="outlined"
+                    sx={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      borderColor: "#C8A96E",
+                      color: "#C8A96E",
+                      fontWeight: 600,
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      px: 3,
+                      "&:hover": {
+                        borderColor: "#C8A96E",
+                        backgroundColor: "rgba(200, 169, 110, 0.1)"
+                      }
+                    }}
+                  >
+                    Marcar zona
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    sx={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      borderColor: "#C8A96E",
+                      color: "#C8A96E",
+                      fontWeight: 600,
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      px: 3,
+                      "&:hover": {
+                        borderColor: "#C8A96E",
+                        backgroundColor: "rgba(200, 169, 110, 0.1)"
+                      }
+                    }}
+                  >
+                    Notas faciales
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    sx={{
+                      fontFamily: "'DM Sans', sans-serif",
+                      borderColor: "#C8A96E",
+                      color: "#C8A96E",
+                      fontWeight: 600,
+                      textTransform: "none",
+                      borderRadius: "8px",
+                      px: 3,
+                      "&:hover": {
+                        borderColor: "#C8A96E",
+                        backgroundColor: "rgba(200, 169, 110, 0.1)"
+                      }
+                    }}
+                  >
+                    Resetear vista
+                  </Button>
+                </Box>
+              </Paper>
 
               <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, mt: 6, flexWrap: "wrap" }}>
                 <Typography
@@ -4739,19 +4982,16 @@ const HistorialClinico = () => {
               )}
 
               {Array.isArray(ofertas) && ofertas.length > 0 && (
-                <Grid container spacing={2} sx={{ mb: 4 }}>
-                  {/* Columna izquierda: Presupuestos */}
-                  <Grid item xs={12} md={6}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2.5,
-                        borderRadius: 3,
-                        backgroundColor: "rgba(163, 105, 32, 0.08)",
-                        border: "1px solid rgba(163, 105, 32, 0.3)",
-                        height: "100%",
-                      }}
-                    >
+                <Paper
+                  elevation={0}
+                  sx={{
+                    mb: 4,
+                    p: 2.5,
+                    borderRadius: 3,
+                    backgroundColor: "rgba(163, 105, 32, 0.08)",
+                    border: "1px solid rgba(163, 105, 32, 0.3)",
+                  }}
+                >
                       <Typography
                         variant="h6"
                         sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
@@ -5732,42 +5972,6 @@ const HistorialClinico = () => {
                   </Box>
                   </Collapse>
                 </Paper>
-              )}
-                  </Grid>
-
-                  {/* Columna derecha: Mapa Facial 3D */}
-                  <Grid item xs={12} md={6}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2.5,
-                        borderRadius: 3,
-                        backgroundColor: "rgba(163, 105, 32, 0.08)",
-                        border: "1px solid rgba(163, 105, 32, 0.3)",
-                        height: "100%",
-                        minHeight: 600,
-                      }}
-                    >
-                      <Typography
-                        variant="h6"
-                        sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        🎭 Mapa Facial 3D
-                      </Typography>
-                      
-                      <Box sx={{ height: "calc(100% - 50px)", position: "relative" }}>
-                        <FacialMap3D
-                          paciente={pacienteSeleccionado}
-                          registros={facialRegistros}
-                          onGuardar={null}
-                          onActualizar={null}
-                          onEliminar={null}
-                          viewOnly={true}
-                        />
-                      </Box>
-                    </Paper>
-                  </Grid>
-                </Grid>
               )}
 
               {/* Presupuestos Asignados al Paciente */}
