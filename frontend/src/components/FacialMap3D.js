@@ -434,7 +434,7 @@ export default function FacialMap3D({
     return (
       <Box sx={{ width: "100%", height: "100%", position: "relative", backgroundColor: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
         <Canvas
-          camera={{ position: [0, 0.5, 3.2], fov: 45 }}
+          camera={{ position: [0, -0.8, 3.2], fov: 45 }}
           style={{ width: "100%", height: "100%" }}
         >
           <ambientLight intensity={0.7} />
@@ -453,7 +453,7 @@ export default function FacialMap3D({
             dampingFactor={0.05}
             minDistance={3.2}
             maxDistance={3.2}
-            target={[0, 0.5, 0]}
+            target={[0, 0.75, 0]}
             enableRotate={true}
             enablePan={false}
             enableZoom={false}
