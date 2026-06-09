@@ -434,12 +434,12 @@ export default function FacialMap3D({
     return (
       <Box sx={{ width: "100%", height: "100%", position: "relative", backgroundColor: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
         <Canvas
-          camera={{ position: [0, 0.45, 1.9], fov: 45 }}
+          camera={{ position: [0, 0.4, 2.2], fov: 40 }}
           style={{ width: "100%", height: "100%" }}
         >
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[5, 5, 5]} intensity={0.8} />
-          <directionalLight position={[-5, 3, -5]} intensity={0.4} />
+          <ambientLight intensity={0.7} />
+          <directionalLight position={[0, 5, 5]} intensity={0.9} />
+          <directionalLight position={[0, 3, -5]} intensity={0.5} />
           <Suspense fallback={null}>
             <HeadModel
               markedPoints={markedPoints}
@@ -451,9 +451,11 @@ export default function FacialMap3D({
             ref={controlsRef}
             enableDamping
             dampingFactor={0.05}
-            minDistance={1.5}
-            maxDistance={5}
+            minDistance={1.8}
+            maxDistance={3.5}
             target={[0, 0.4, 0]}
+            enableRotate={false}
+            enablePan={false}
           />
         </Canvas>
       </Box>

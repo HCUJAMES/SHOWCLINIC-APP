@@ -4152,180 +4152,7 @@ const HistorialClinico = () => {
                 </Grid>
               </Paper>
 
-              {/* ========== SECCIÓN 2: MAPA FACIAL 3D ========== */}
-              <Paper
-                elevation={0}
-                sx={{
-                  mb: 4,
-                  borderRadius: "24px",
-                  backgroundColor: "#2a2a2a",
-                  border: "1px solid #3a3a3a",
-                  boxShadow: "0 4px 20px rgba(0, 0, 0, 0.3)",
-                  overflow: "hidden"
-                }}
-              >
-                {/* Header del Mapa Facial */}
-                <Box sx={{ 
-                  p: 2.5, 
-                  backgroundColor: "#1a1a1a", 
-                  borderBottom: "1px solid #3a3a3a",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: 2
-                }}>
-                  <Typography
-                    sx={{
-                      fontFamily: "'Cormorant Garamond', serif",
-                      fontSize: "1.5rem",
-                      fontWeight: 700,
-                      color: "#C8A96E",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5
-                    }}
-                  >
-                    Mapa Facial 3D
-                  </Typography>
-                  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                    <IconButton 
-                      size="small" 
-                      sx={{ 
-                        backgroundColor: "rgba(200, 169, 110, 0.1)", 
-                        color: "#C8A96E",
-                        "&:hover": { backgroundColor: "rgba(200, 169, 110, 0.2)" }
-                      }}
-                      title="Rotar modelo"
-                    >
-                      <Refresh />
-                    </IconButton>
-                    <IconButton 
-                      size="small" 
-                      sx={{ 
-                        backgroundColor: "rgba(200, 169, 110, 0.1)", 
-                        color: "#C8A96E",
-                        "&:hover": { backgroundColor: "rgba(200, 169, 110, 0.2)" }
-                      }}
-                      title="Ver marcadores"
-                    >
-                      <Visibility />
-                    </IconButton>
-                    <IconButton 
-                      size="small" 
-                      sx={{ 
-                        backgroundColor: "rgba(200, 169, 110, 0.1)", 
-                        color: "#C8A96E",
-                        "&:hover": { backgroundColor: "rgba(200, 169, 110, 0.2)" }
-                      }}
-                      title="Centrar vista"
-                    >
-                      <CenterFocusStrong />
-                    </IconButton>
-                    <IconButton 
-                      size="small" 
-                      sx={{ 
-                        backgroundColor: "rgba(200, 169, 110, 0.1)", 
-                        color: "#C8A96E",
-                        "&:hover": { backgroundColor: "rgba(200, 169, 110, 0.2)" }
-                      }}
-                      title="Pantalla completa"
-                    >
-                      <Fullscreen />
-                    </IconButton>
-                  </Box>
-                </Box>
-
-                {/* Visor 3D */}
-                <Box 
-                  className="stage"
-                  sx={{ 
-                    height: { xs: "500px", md: "calc(100vh - 150px)" },
-                    minHeight: "600px",
-                    position: "relative",
-                    backgroundColor: "#1a1a1a",
-                    backgroundImage: "radial-gradient(circle at center, rgba(200, 169, 110, 0.03) 1px, transparent 1px)",
-                    backgroundSize: "20px 20px"
-                  }}
-                >
-                  <FacialMap3D
-                    paciente={pacienteSeleccionado}
-                    registros={facialRegistros}
-                    onGuardar={null}
-                    onActualizar={null}
-                    onEliminar={null}
-                    viewOnly={true}
-                  />
-                </Box>
-
-                {/* Footer con botones de acción */}
-                <Box sx={{ 
-                  p: 2.5, 
-                  backgroundColor: "#1a1a1a", 
-                  borderTop: "1px solid #3a3a3a",
-                  display: "flex",
-                  gap: 2,
-                  flexWrap: "wrap",
-                  justifyContent: "center"
-                }}>
-                  <Button
-                    variant="outlined"
-                    sx={{
-                      fontFamily: "'DM Sans', sans-serif",
-                      borderColor: "#C8A96E",
-                      color: "#C8A96E",
-                      fontWeight: 600,
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      px: 3,
-                      "&:hover": {
-                        borderColor: "#C8A96E",
-                        backgroundColor: "rgba(200, 169, 110, 0.1)"
-                      }
-                    }}
-                  >
-                    Marcar zona
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    sx={{
-                      fontFamily: "'DM Sans', sans-serif",
-                      borderColor: "#C8A96E",
-                      color: "#C8A96E",
-                      fontWeight: 600,
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      px: 3,
-                      "&:hover": {
-                        borderColor: "#C8A96E",
-                        backgroundColor: "rgba(200, 169, 110, 0.1)"
-                      }
-                    }}
-                  >
-                    Notas faciales
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    sx={{
-                      fontFamily: "'DM Sans', sans-serif",
-                      borderColor: "#C8A96E",
-                      color: "#C8A96E",
-                      fontWeight: 600,
-                      textTransform: "none",
-                      borderRadius: "8px",
-                      px: 3,
-                      "&:hover": {
-                        borderColor: "#C8A96E",
-                        backgroundColor: "rgba(200, 169, 110, 0.1)"
-                      }
-                    }}
-                  >
-                    Resetear vista
-                  </Button>
-                </Box>
-              </Paper>
-
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, mt: 6, flexWrap: "wrap" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, mt: 4, flexWrap: "wrap" }}>
                 <Typography
                   variant="h6"
                   sx={{ color: "#a36920", fontWeight: "bold" }}
@@ -4929,6 +4756,55 @@ const HistorialClinico = () => {
                           </Typography>
                         )}
                         {!(Number(descuentoOferta) > 0) && <Box sx={{ mb: 1 }} />}
+                        
+                        {/* Mapa Facial 3D dentro del resumen */}
+                        <Box sx={{ 
+                          mt: 2,
+                          mb: 2,
+                          backgroundColor: "#2a2a2a",
+                          borderRadius: 2,
+                          border: "1px solid #3a3a3a",
+                          overflow: "hidden",
+                        }}>
+                          {/* Header */}
+                          <Box sx={{ 
+                            p: 1.5, 
+                            backgroundColor: "#1a1a1a", 
+                            borderBottom: "1px solid #3a3a3a"
+                          }}>
+                            <Typography sx={{ 
+                              fontFamily: "'Cormorant Garamond', serif",
+                              fontWeight: 700, 
+                              fontSize: "0.9rem", 
+                              color: "#C8A96E",
+                              textAlign: "center"
+                            }}>
+                              Mapa Facial 3D
+                            </Typography>
+                          </Box>
+
+                          {/* Visor 3D */}
+                          <Box 
+                            className="stage"
+                            sx={{ 
+                              height: "500px",
+                              position: "relative",
+                              backgroundColor: "#1a1a1a",
+                              backgroundImage: "radial-gradient(circle at center, rgba(200, 169, 110, 0.03) 1px, transparent 1px)",
+                              backgroundSize: "20px 20px"
+                            }}
+                          >
+                            <FacialMap3D
+                              paciente={pacienteSeleccionado}
+                              registros={facialRegistros}
+                              onGuardar={null}
+                              onActualizar={null}
+                              onEliminar={null}
+                              viewOnly={true}
+                            />
+                          </Box>
+                        </Box>
+
                         <Box sx={{ display: "flex", gap: 1 }}>
                           {ofertaEditId && (
                             <Button
