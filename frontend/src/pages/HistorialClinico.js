@@ -4529,8 +4529,8 @@ const HistorialClinico = () => {
                   {/* Resumen de seleccionados (panel lateral) */}
                   {ofertaItems.length > 0 && (
                     <Box sx={{ 
-                      width: { md: 340 },
-                      minWidth: { md: 340 },
+                      width: { md: 420 },
+                      minWidth: { md: 420 },
                       backgroundColor: "#faf8f4",
                       borderRadius: 3,
                       border: "1px solid rgba(163,105,32,0.15)",
@@ -4563,13 +4563,60 @@ const HistorialClinico = () => {
                         },
                       },
                     }}>
+                      {/* Mapa Facial 3D arriba del resumen */}
+                      <Box sx={{ 
+                        mb: 2,
+                        backgroundColor: "#2a2a2a",
+                        borderRadius: 2,
+                        border: "1px solid #3a3a3a",
+                        overflow: "hidden",
+                      }}>
+                        {/* Header */}
+                        <Box sx={{ 
+                          p: 1.5, 
+                          backgroundColor: "#1a1a1a", 
+                          borderBottom: "1px solid #3a3a3a"
+                        }}>
+                          <Typography sx={{ 
+                            fontFamily: "'Cormorant Garamond', serif",
+                            fontWeight: 700, 
+                            fontSize: "0.9rem", 
+                            color: "#C8A96E",
+                            textAlign: "center"
+                          }}>
+                            Mapa Facial 3D
+                          </Typography>
+                        </Box>
+
+                        {/* Visor 3D */}
+                        <Box 
+                          className="stage"
+                          sx={{ 
+                            height: "500px",
+                            position: "relative",
+                            backgroundColor: "#1a1a1a",
+                            backgroundImage: "radial-gradient(circle at center, rgba(200, 169, 110, 0.03) 1px, transparent 1px)",
+                            backgroundSize: "20px 20px"
+                          }}
+                        >
+                          <FacialMap3D
+                            paciente={pacienteSeleccionado}
+                            registros={facialRegistros}
+                            onGuardar={null}
+                            onActualizar={null}
+                            onEliminar={null}
+                            viewOnly={true}
+                          />
+                        </Box>
+                      </Box>
+
                       <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#1a1a1a", mb: 1.5 }}>
                         Resumen ({ofertaItems.length})
                       </Typography>
 
                       {/* Lista de items editables */}
                       <Box sx={{ 
-                        flex: 1,
+                        maxHeight: "300px",
                         overflowY: "auto",
                         mb: 1,
                         pr: 0.5,
@@ -4757,54 +4804,6 @@ const HistorialClinico = () => {
                         )}
                         {!(Number(descuentoOferta) > 0) && <Box sx={{ mb: 1 }} />}
                         
-                        {/* Mapa Facial 3D dentro del resumen */}
-                        <Box sx={{ 
-                          mt: 2,
-                          mb: 2,
-                          backgroundColor: "#2a2a2a",
-                          borderRadius: 2,
-                          border: "1px solid #3a3a3a",
-                          overflow: "hidden",
-                        }}>
-                          {/* Header */}
-                          <Box sx={{ 
-                            p: 1.5, 
-                            backgroundColor: "#1a1a1a", 
-                            borderBottom: "1px solid #3a3a3a"
-                          }}>
-                            <Typography sx={{ 
-                              fontFamily: "'Cormorant Garamond', serif",
-                              fontWeight: 700, 
-                              fontSize: "0.9rem", 
-                              color: "#C8A96E",
-                              textAlign: "center"
-                            }}>
-                              Mapa Facial 3D
-                            </Typography>
-                          </Box>
-
-                          {/* Visor 3D */}
-                          <Box 
-                            className="stage"
-                            sx={{ 
-                              height: "500px",
-                              position: "relative",
-                              backgroundColor: "#1a1a1a",
-                              backgroundImage: "radial-gradient(circle at center, rgba(200, 169, 110, 0.03) 1px, transparent 1px)",
-                              backgroundSize: "20px 20px"
-                            }}
-                          >
-                            <FacialMap3D
-                              paciente={pacienteSeleccionado}
-                              registros={facialRegistros}
-                              onGuardar={null}
-                              onActualizar={null}
-                              onEliminar={null}
-                              viewOnly={true}
-                            />
-                          </Box>
-                        </Box>
-
                         <Box sx={{ display: "flex", gap: 1 }}>
                           {ofertaEditId && (
                             <Button
