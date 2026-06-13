@@ -555,22 +555,39 @@ const ComenzarTratamiento = () => {
     setBloques(nuevosBloques);
   };
 
-  // Validar código individualmente
+  // Aplicar un mensaje inline al código (sin ventanas emergentes)
+  const setMensajeCodigo = (indexBloque, indexCodigo, mensaje, tipo, extra = {}) => {
+    setBloques((prev) => {
+      const nuevos = [...prev];
+      const codigos = [...(nuevos[indexBloque].codigos || [])];
+      codigos[indexCodigo] = {
+        ...codigos[indexCodigo],
+        mensaje,
+        mensajeTipo: tipo,
+        ...extra,
+      };
+      nuevos[indexBloque] = { ...nuevos[indexBloque], codigos };
+      return nuevos;
+    });
+  };
+
+  // Validar código individualmente (mensajes inline, sin alertas emergentes)
   const validarCodigo = async (indexBloque, indexCodigo) => {
     const bloque = bloques[indexBloque];
     const codigoItem = bloque.codigos[indexCodigo];
-    
+
     if (!bloque.variante_id) {
-      alert("Primero selecciona un producto");
+      setMensajeCodigo(indexBloque, indexCodigo, "Primero selecciona un producto", "error", { validado: false });
       return;
     }
-    
+
     if (!codigoItem.codigo || codigoItem.codigo.trim() === "") {
-      alert("Ingresa un código para validar");
+      setMensajeCodigo(indexBloque, indexCodigo, "Ingresa un código para validar", "error", { validado: false });
       return;
     }
 
     const codigoIngresado = String(codigoItem.codigo).trim();
+    setMensajeCodigo(indexBloque, indexCodigo, "Validando código...", "info");
 
     try {
       const res = await axios.get(
@@ -583,30 +600,34 @@ const ComenzarTratamiento = () => {
       );
 
       if (codigosDisponibles.length === 0) {
-        alert("Este producto no tiene códigos disponibles registrados en inventario.");
+        setMensajeCodigo(indexBloque, indexCodigo, "Este producto no tiene códigos disponibles en inventario", "error", { validado: false });
         return;
       }
 
       const coincide = codigosDisponibles.find(c => c.barcode === codigoIngresado);
 
       if (coincide) {
-        const nuevosBloques = [...bloques];
-        nuevosBloques[indexBloque].codigos[indexCodigo] = {
-          ...nuevosBloques[indexBloque].codigos[indexCodigo],
+        const restantes = coincide.unidades_restantes != null ? coincide.unidades_restantes : null;
+        const totales = coincide.unidades_totales != null ? coincide.unidades_totales : null;
+        const detalle = restantes != null && totales != null
+          ? `Quedan ${restantes} de ${totales} unidades`
+          : "Código validado correctamente";
+        setMensajeCodigo(indexBloque, indexCodigo, detalle, "success", {
           validado: true,
           unidades_restantes: coincide.unidades_restantes,
           unidades_totales: coincide.unidades_totales,
-        };
-        setBloques(nuevosBloques);
-        const unidadesRestantes = coincide.unidades_restantes != null ? coincide.unidades_restantes : "N/A";
-        const unidadesTotales = coincide.unidades_totales != null ? coincide.unidades_totales : "N/A";
-        alert(`✅ Código validado - ${unidadesRestantes} de ${unidadesTotales} unidades disponibles`);
+        });
       } else {
-        alert("Código incorrecto. No coincide con ningún código de este producto.");
+        // Verificar si el código existe pero está agotado
+        const agotado = (data.codes || []).find(c => c.barcode === codigoIngresado);
+        const msg = agotado
+          ? "Este código ya fue agotado (0 unidades). Usa otro código."
+          : "Código incorrecto. No coincide con ningún código de este producto.";
+        setMensajeCodigo(indexBloque, indexCodigo, msg, "error", { validado: false });
       }
     } catch (err) {
       console.error("Error validando código:", err);
-      alert("Error al validar el código");
+      setMensajeCodigo(indexBloque, indexCodigo, "Error al validar el código. Intenta de nuevo.", "error", { validado: false });
     }
   };
 
@@ -620,7 +641,16 @@ const ComenzarTratamiento = () => {
   // Actualizar código
   const actualizarCodigo = (indexBloque, indexCodigo, campo, valor) => {
     const nuevosBloques = [...bloques];
-    nuevosBloques[indexBloque].codigos[indexCodigo][campo] = valor;
+    const codigoActual = { ...nuevosBloques[indexBloque].codigos[indexCodigo], [campo]: valor };
+    // Si cambia el texto del código, invalidar la validación previa
+    if (campo === "codigo") {
+      codigoActual.validado = false;
+      codigoActual.mensaje = "";
+      codigoActual.mensajeTipo = "";
+      codigoActual.unidades_restantes = null;
+      codigoActual.unidades_totales = null;
+    }
+    nuevosBloques[indexBloque].codigos[indexCodigo] = codigoActual;
     setBloques(nuevosBloques);
   };
 
@@ -649,28 +679,45 @@ const ComenzarTratamiento = () => {
       return;
     }
 
-    // Validar que al menos un código esté validado para cada bloque con producto seleccionado
+    // Validar que cada producto seleccionado tenga código(s) validado(s) y unidades
     for (let i = 0; i < bloquesValidos.length; i++) {
       const bloque = bloquesValidos[i];
-      if (bloque.variante_id) {
-        // Si tiene producto seleccionado, DEBE tener al menos un código validado
-        const codigosValidados = (bloque.codigos || []).filter(c => c.validado);
-        if (codigosValidados.length === 0) {
-          showToast({ 
-            severity: "error", 
-            message: `Debes ingresar y validar al menos un código en el tratamiento #${i + 1}` 
-          });
-          return;
-        }
-        // Validar que al menos un código tenga unidades usadas
-        const totalUnidades = calcularTotalUnidades(bloque);
-        if (totalUnidades <= 0) {
-          showToast({ 
-            severity: "error", 
-            message: `Debes especificar las unidades a usar en el tratamiento #${i + 1}` 
-          });
-          return;
-        }
+      if (!bloque.variante_id) continue;
+
+      // Solo consideramos los códigos con texto ingresado
+      const codigosIngresados = (bloque.codigos || []).filter(
+        (c) => c.codigo && String(c.codigo).trim() !== ""
+      );
+
+      // 1) Debe haber al menos un código ingresado
+      if (codigosIngresados.length === 0) {
+        showToast({
+          severity: "error",
+          message: `Debes ingresar y validar al menos un código en el tratamiento #${i + 1}`,
+        });
+        return;
+      }
+
+      // 2) Todos los códigos ingresados deben estar validados
+      const noValidados = codigosIngresados.filter((c) => !c.validado);
+      if (noValidados.length > 0) {
+        showToast({
+          severity: "error",
+          message: `Valida todos los códigos ingresados en el tratamiento #${i + 1}`,
+        });
+        return;
+      }
+
+      // 3) Cada código validado debe tener unidades a usar mayores a 0
+      const sinUnidades = codigosIngresados.filter(
+        (c) => !(parseFloat(c.unidades_usadas) > 0)
+      );
+      if (sinUnidades.length > 0) {
+        showToast({
+          severity: "error",
+          message: `Ingresa las unidades a usar para cada código en el tratamiento #${i + 1}`,
+        });
+        return;
       }
     }
 
@@ -1125,18 +1172,45 @@ const ComenzarTratamiento = () => {
                                 </Button>
                               </Box>
                               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                                {b.codigos && b.codigos.map((codigo, idx) => (
+                                {b.codigos && b.codigos.map((codigo, idx) => {
+                                  const msgColor = codigo.mensajeTipo === "success"
+                                    ? "#2e7d32"
+                                    : codigo.mensajeTipo === "error"
+                                    ? "#d32f2f"
+                                    : "#8a5a1a";
+                                  const msgBg = codigo.mensajeTipo === "success"
+                                    ? "rgba(46,125,50,0.08)"
+                                    : codigo.mensajeTipo === "error"
+                                    ? "rgba(211,47,47,0.08)"
+                                    : "rgba(163,105,32,0.08)";
+                                  return (
                                   <Box
                                     key={idx}
                                     sx={{
                                       display: "flex",
-                                      gap: 1,
-                                      alignItems: "center",
+                                      flexDirection: "column",
+                                      gap: 0.6,
+                                      p: 1.2,
+                                      borderRadius: 2,
+                                      border: codigo.validado
+                                        ? "1px solid rgba(46,125,50,0.35)"
+                                        : "1px solid rgba(163,105,32,0.18)",
+                                      backgroundColor: codigo.validado
+                                        ? "rgba(46,125,50,0.04)"
+                                        : "rgba(255,255,255,0.6)",
                                     }}
                                   >
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        gap: 1,
+                                        alignItems: "flex-start",
+                                        flexWrap: "wrap",
+                                      }}
+                                    >
                                     <TextField
                                       label="Código"
-                                      placeholder="Ingresa el código"
+                                      placeholder="Pistolea o ingresa el código"
                                       size="small"
                                       value={codigo.codigo || ""}
                                       onChange={(e) => actualizarCodigo(index, idx, "codigo", e.target.value)}
@@ -1191,8 +1265,28 @@ const ComenzarTratamiento = () => {
                                         <Close fontSize="small" />
                                       </IconButton>
                                     )}
+                                    </Box>
+                                    {codigo.mensaje && (
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          alignSelf: "flex-start",
+                                          fontWeight: 600,
+                                          color: msgColor,
+                                          backgroundColor: msgBg,
+                                          borderRadius: 1.5,
+                                          px: 1,
+                                          py: 0.3,
+                                        }}
+                                      >
+                                        {codigo.mensaje}
+                                      </Typography>
+                                    )}
                                   </Box>
-                                ))}
+                                  );
+                                })}
                               </Box>
                             </Box>
                           </Grid>
