@@ -1169,10 +1169,16 @@ const ComenzarTratamiento = () => {
                                     <TextField
                                       label="Unidades a usar"
                                       placeholder="0"
-                                      type="number"
+                                      type="text"
+                                      inputMode="decimal"
                                       size="small"
                                       value={codigo.unidades_usadas || ""}
-                                      onChange={(e) => actualizarCodigo(index, idx, "unidades_usadas", e.target.value)}
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        if (v === "" || /^\d*[.,]?\d*$/.test(v)) {
+                                          actualizarCodigo(index, idx, "unidades_usadas", v.replace(",", "."));
+                                        }
+                                      }}
                                       disabled={!codigo.validado}
                                       sx={{ width: 140 }}
                                     />
