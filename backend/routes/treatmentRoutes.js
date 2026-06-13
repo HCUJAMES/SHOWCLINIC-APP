@@ -1568,6 +1568,38 @@ router.get("/productos-aplicados", authMiddleware, requireRole(["master"]), asyn
       params
     );
 
+    // Obtener los códigos de barras usados en estos tratamientos
+    const treatmentIds = tratamientos.map((t) => t.id).filter((id) => id != null);
+    const codigosPorTratamiento = {};
+    if (treatmentIds.length > 0) {
+      const placeholders = treatmentIds.map(() => "?").join(",");
+      const codigosRows = await dbAll(
+        `
+        SELECT
+          bu.treatment_id,
+          bu.barcode,
+          pb.nombre AS producto_base_nombre,
+          v.nombre AS variante_nombre
+        FROM barcode_units bu
+        LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+        LEFT JOIN variantes v ON v.id = sl.variante_id
+        LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+        WHERE bu.treatment_id IN (${placeholders})
+        ORDER BY bu.scanned_at ASC, bu.id ASC
+        `,
+        treatmentIds
+      );
+      for (const row of codigosRows) {
+        if (!codigosPorTratamiento[row.treatment_id]) {
+          codigosPorTratamiento[row.treatment_id] = [];
+        }
+        codigosPorTratamiento[row.treatment_id].push({
+          barcode: row.barcode,
+          producto: `${row.producto_base_nombre || ""} ${row.variante_nombre || ""}`.trim(),
+        });
+      }
+    }
+
     // Parse productos JSON y crear texto legible
     const tratamientosConProductos = tratamientos.map((t) => {
       let productosTexto = "-";
@@ -1589,9 +1621,12 @@ router.get("/productos-aplicados", authMiddleware, requireRole(["master"]), asyn
         console.error("Error parseando productos:", e);
       }
 
+      const codigos = codigosPorTratamiento[t.id] || [];
       return {
         ...t,
         productos_texto: productosTexto,
+        codigos_usados: codigos,
+        codigos_texto: codigos.map((c) => c.barcode).join(", "),
       };
     });
 
@@ -1659,7 +1694,7 @@ router.get("/buscar-por-codigo", authMiddleware, requireRole(["master"]), async 
 });
 
 /* ==============================
-   �📊 CALENDAR LAYOUT (posiciones de nodos y conexiones)
+   �� CALENDAR LAYOUT (posiciones de nodos y conexiones)
 ============================== */
 
 // GET: obtener layout guardado para un presupuesto

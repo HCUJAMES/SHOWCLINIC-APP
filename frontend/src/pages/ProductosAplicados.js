@@ -93,17 +93,36 @@ const ProductosAplicados = () => {
       t.paciente_apellido?.toLowerCase().includes(busqueda) ||
       nombreCompleto.includes(busqueda) ||
       t.tratamiento_nombre?.toLowerCase().includes(busqueda) ||
-      t.productos_texto?.toLowerCase().includes(busqueda)
+      t.productos_texto?.toLowerCase().includes(busqueda) ||
+      t.codigos_texto?.toLowerCase().includes(busqueda)
     );
   });
 
+  const aplicarRangoRapido = (dias) => {
+    const hoy = new Date();
+    const desde = new Date();
+    desde.setDate(hoy.getDate() - (dias - 1));
+    setFechaFin(hoy.toISOString().split("T")[0]);
+    setFechaInicio(desde.toISOString().split("T")[0]);
+  };
+
+  // Métricas para las tarjetas de resumen
+  const totalCodigos = tratamientosFiltrados.reduce(
+    (acc, t) => acc + (Array.isArray(t.codigos_usados) ? t.codigos_usados.length : 0),
+    0
+  );
+  const pacientesUnicos = new Set(
+    tratamientosFiltrados.map((t) => t.paciente_id).filter((id) => id != null)
+  ).size;
+
   const exportarExcel = () => {
-    const headers = ["Fecha", "Paciente", "Tratamiento", "Producto", "Cantidad", "Especialista"];
+    const headers = ["Fecha", "Paciente", "Tratamiento", "Producto", "Código(s)", "Cantidad", "Especialista"];
     const rows = tratamientosFiltrados.map((t) => [
       t.fecha || "-",
       `${t.paciente_nombre || ""} ${t.paciente_apellido || ""}`.trim() || "-",
       t.tratamiento_nombre || "-",
       t.productos_texto || "-",
+      t.codigos_texto || "-",
       t.cantidad_total || "-",
       t.especialista || "-",
     ]);
@@ -167,74 +186,130 @@ const ProductosAplicados = () => {
           </Box>
         </Box>
 
-        {/* Filters */}
-        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
-          <TextField
-            label="Fecha Inicio"
-            type="date"
-            value={fechaInicio}
-            onChange={(e) => setFechaInicio(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            size="small"
-            sx={{ minWidth: 160 }}
-          />
-          <TextField
-            label="Fecha Fin"
-            type="date"
-            value={fechaFin}
-            onChange={(e) => setFechaFin(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            size="small"
-            sx={{ minWidth: 160 }}
-          />
-          <Button
-            variant="contained"
-            startIcon={<Search />}
-            onClick={cargarTratamientos}
-            sx={{
-              backgroundColor: "#B8860B",
-              "&:hover": { backgroundColor: "#8a5a1a" },
-              fontWeight: 600,
-            }}
-          >
-            Buscar
-          </Button>
-          <TextField
-            placeholder="Buscar paciente, tratamiento o producto..."
-            value={filtroNombre}
-            onChange={(e) => setFiltroNombre(e.target.value)}
-            size="small"
-            sx={{ flexGrow: 1, minWidth: 250 }}
-            InputProps={{
-              startAdornment: <Search sx={{ color: "#8B7D6B", mr: 1 }} />,
-            }}
-          />
-          <Button
-            variant="outlined"
-            startIcon={<FileDownload />}
-            onClick={exportarExcel}
-            disabled={tratamientosFiltrados.length === 0}
-            sx={{
-              borderColor: "#B8860B",
-              color: "#B8860B",
-              "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(184,134,11,0.08)" },
-            }}
-          >
-            Exportar CSV
-          </Button>
+        {/* Filtros */}
+        <Box
+          sx={{
+            p: 2.5,
+            borderRadius: 2,
+            backgroundColor: "rgba(255,255,255,0.6)",
+            border: "1px solid #E8DFD0",
+          }}
+        >
+          {/* Rangos rápidos */}
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2, alignItems: "center" }}>
+            <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#8B7D6B", mr: 0.5 }}>
+              RANGO RÁPIDO:
+            </Typography>
+            {[
+              { label: "Hoy", dias: 1 },
+              { label: "7 días", dias: 7 },
+              { label: "15 días", dias: 15 },
+              { label: "30 días", dias: 30 },
+              { label: "90 días", dias: 90 },
+            ].map((r) => (
+              <Chip
+                key={r.label}
+                label={r.label}
+                size="small"
+                onClick={() => aplicarRangoRapido(r.dias)}
+                sx={{
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  backgroundColor: "rgba(163,105,32,0.08)",
+                  color: "#8a5a1a",
+                  border: "1px solid rgba(163,105,32,0.25)",
+                  "&:hover": { backgroundColor: "rgba(163,105,32,0.18)" },
+                }}
+              />
+            ))}
+          </Box>
+
+          {/* Filtros principales */}
+          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
+            <TextField
+              label="Fecha Inicio"
+              type="date"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              size="small"
+              sx={{ minWidth: 160, backgroundColor: "white", borderRadius: 1 }}
+            />
+            <TextField
+              label="Fecha Fin"
+              type="date"
+              value={fechaFin}
+              onChange={(e) => setFechaFin(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              size="small"
+              sx={{ minWidth: 160, backgroundColor: "white", borderRadius: 1 }}
+            />
+            <Button
+              variant="contained"
+              startIcon={<Search />}
+              onClick={cargarTratamientos}
+              sx={{
+                backgroundColor: "#B8860B",
+                "&:hover": { backgroundColor: "#8a5a1a" },
+                fontWeight: 600,
+                boxShadow: "none",
+              }}
+            >
+              Aplicar
+            </Button>
+            <TextField
+              placeholder="Buscar por paciente, tratamiento, producto o código..."
+              value={filtroNombre}
+              onChange={(e) => setFiltroNombre(e.target.value)}
+              size="small"
+              sx={{ flexGrow: 1, minWidth: 260, backgroundColor: "white", borderRadius: 1 }}
+              InputProps={{
+                startAdornment: <Search sx={{ color: "#8B7D6B", mr: 1 }} />,
+              }}
+            />
+            <Button
+              variant="outlined"
+              startIcon={<FileDownload />}
+              onClick={exportarExcel}
+              disabled={tratamientosFiltrados.length === 0}
+              sx={{
+                borderColor: "#B8860B",
+                color: "#B8860B",
+                fontWeight: 600,
+                "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(184,134,11,0.08)" },
+              }}
+            >
+              Exportar CSV
+            </Button>
+          </Box>
         </Box>
 
-        {/* Stats */}
-        <Box sx={{ display: "flex", gap: 2, mt: 2 }}>
-          <Chip
-            label={`${tratamientosFiltrados.length} tratamientos`}
-            sx={{
-              backgroundColor: "rgba(76,175,80,0.15)",
-              color: "#2e7d32",
-              fontWeight: 600,
-              fontSize: "0.85rem",
-            }}
-          />
+        {/* Tarjetas de resumen */}
+        <Box sx={{ display: "flex", gap: 2, mt: 2.5, flexWrap: "wrap" }}>
+          {[
+            { label: "Tratamientos", value: tratamientosFiltrados.length, color: "#2e7d32", bg: "rgba(76,175,80,0.12)" },
+            { label: "Códigos aplicados", value: totalCodigos, color: "#a36920", bg: "rgba(163,105,32,0.12)" },
+            { label: "Pacientes atendidos", value: pacientesUnicos, color: "#1565c0", bg: "rgba(33,150,243,0.12)" },
+          ].map((stat) => (
+            <Box
+              key={stat.label}
+              sx={{
+                flex: "1 1 160px",
+                minWidth: 140,
+                p: 2,
+                borderRadius: 2,
+                backgroundColor: stat.bg,
+                border: `1px solid ${stat.color}33`,
+              }}
+            >
+              <Typography sx={{ fontSize: "1.6rem", fontWeight: 800, color: stat.color, lineHeight: 1 }}>
+                {stat.value}
+              </Typography>
+              <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: "#8B7D6B", mt: 0.5 }}>
+                {stat.label}
+              </Typography>
+            </Box>
+          ))}
         </Box>
       </Paper>
 
@@ -405,7 +480,7 @@ const ProductosAplicados = () => {
           <Table stickyHeader size="small">
             <TableHead>
               <TableRow>
-                {["Fecha", "Paciente", "Tratamiento", "Producto Aplicado", "Cantidad", "Especialista", "Sesión", "Tipo"].map(
+                {["Fecha", "Paciente", "Tratamiento", "Producto Aplicado", "Código(s)", "Cantidad", "Especialista", "Sesión", "Tipo"].map(
                   (header) => (
                     <TableCell
                       key={header}
@@ -429,7 +504,7 @@ const ProductosAplicados = () => {
             <TableBody>
               {tratamientosFiltrados.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                     <Typography sx={{ color: "#8B7D6B", fontSize: "0.9rem" }}>
                       No se encontraron tratamientos en el rango de fechas seleccionado
                     </Typography>
@@ -453,6 +528,32 @@ const ProductosAplicados = () => {
                     <TableCell sx={{ fontSize: "0.8rem", px: 2 }}>{t.tratamiento_nombre || "-"}</TableCell>
                     <TableCell sx={{ fontSize: "0.8rem", px: 2, maxWidth: 300 }}>
                       {t.productos_texto || "-"}
+                    </TableCell>
+                    <TableCell sx={{ fontSize: "0.8rem", px: 2, maxWidth: 220 }}>
+                      {Array.isArray(t.codigos_usados) && t.codigos_usados.length > 0 ? (
+                        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                          {t.codigos_usados.map((c, i) => (
+                            <Chip
+                              key={`${c.barcode}-${i}`}
+                              icon={<QrCodeScanner sx={{ fontSize: "0.9rem !important" }} />}
+                              label={c.barcode}
+                              size="small"
+                              title={c.producto || ""}
+                              sx={{
+                                fontSize: "0.7rem",
+                                height: 22,
+                                fontFamily: "monospace",
+                                backgroundColor: "rgba(163,105,32,0.10)",
+                                color: "#8a5a1a",
+                                border: "1px solid rgba(163,105,32,0.25)",
+                                "& .MuiChip-icon": { color: "#a36920" },
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography sx={{ fontSize: "0.78rem", color: "#B0A48E" }}>Sin código</Typography>
+                      )}
                     </TableCell>
                     <TableCell sx={{ fontSize: "0.8rem", textAlign: "center", px: 2 }}>
                       {t.cantidad_total || "-"}
