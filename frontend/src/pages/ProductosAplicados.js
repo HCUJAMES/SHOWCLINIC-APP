@@ -13,8 +13,9 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Divider,
 } from "@mui/material";
-import { Search, FileDownload, CalendarToday } from "@mui/icons-material";
+import { Search, FileDownload, CalendarToday, QrCodeScanner } from "@mui/icons-material";
 import axios from "axios";
 
 const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
@@ -25,6 +26,30 @@ const ProductosAplicados = () => {
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
   const [filtroNombre, setFiltroNombre] = useState("");
+
+  // Búsqueda por código de producto
+  const [codigoBusqueda, setCodigoBusqueda] = useState("");
+  const [codigoResultados, setCodigoResultados] = useState(null);
+  const [codigoLoading, setCodigoLoading] = useState(false);
+
+  const buscarPorCodigo = async () => {
+    const codigo = codigoBusqueda.trim();
+    if (!codigo) return;
+    setCodigoLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${API_BASE_URL}/api/tratamientos/buscar-por-codigo`, {
+        params: { codigo },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setCodigoResultados(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error("Error al buscar por código:", error);
+      setCodigoResultados([]);
+    } finally {
+      setCodigoLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Set default dates: last 30 days
@@ -211,6 +236,155 @@ const ProductosAplicados = () => {
             }}
           />
         </Box>
+      </Paper>
+
+      {/* Búsqueda por código de producto */}
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 3,
+          p: 3,
+          background: "linear-gradient(135deg, #FFFDF8 0%, #f5f1e4 100%)",
+          border: "2px solid #E8DFD0",
+          borderRadius: 3,
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
+          <QrCodeScanner sx={{ color: "#a36920" }} />
+          <Box>
+            <Typography sx={{ fontWeight: 700, color: "#3B2F1E", fontSize: "1.05rem" }}>
+              Buscar por código de producto
+            </Typography>
+            <Typography sx={{ fontSize: "0.82rem", color: "#8B7D6B" }}>
+              Escanea o escribe un código para ver a qué paciente se le aplicó
+            </Typography>
+          </Box>
+        </Box>
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
+          <TextField
+            placeholder="Ingresa o escanea el código..."
+            value={codigoBusqueda}
+            onChange={(e) => setCodigoBusqueda(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                buscarPorCodigo();
+              }
+            }}
+            size="small"
+            sx={{ flexGrow: 1, minWidth: 250 }}
+            InputProps={{
+              startAdornment: <QrCodeScanner sx={{ color: "#8B7D6B", mr: 1 }} />,
+            }}
+          />
+          <Button
+            variant="contained"
+            startIcon={<Search />}
+            onClick={buscarPorCodigo}
+            disabled={!codigoBusqueda.trim() || codigoLoading}
+            sx={{
+              backgroundColor: "#B8860B",
+              "&:hover": { backgroundColor: "#8a5a1a" },
+              fontWeight: 600,
+            }}
+          >
+            Buscar código
+          </Button>
+          {codigoResultados !== null && (
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setCodigoBusqueda("");
+                setCodigoResultados(null);
+              }}
+              sx={{
+                borderColor: "#B8860B",
+                color: "#B8860B",
+                "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(184,134,11,0.08)" },
+              }}
+            >
+              Limpiar
+            </Button>
+          )}
+        </Box>
+
+        {/* Resultados de la búsqueda por código */}
+        {codigoLoading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+            <CircularProgress size={28} sx={{ color: "#B8860B" }} />
+          </Box>
+        ) : codigoResultados !== null ? (
+          codigoResultados.length === 0 ? (
+            <Typography sx={{ mt: 2, color: "#8B7D6B", fontSize: "0.9rem" }}>
+              No se encontró ningún código que coincida con "{codigoBusqueda}".
+            </Typography>
+          ) : (
+            <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+              {codigoResultados.map((r) => {
+                const aplicado = !!r.treatment_id && !!r.paciente_id;
+                return (
+                  <Paper
+                    key={r.barcode_unit_id}
+                    elevation={0}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: "1px solid #E8DFD0",
+                      backgroundColor: "white",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                      <Typography sx={{ fontWeight: 700, color: "#3B2F1E", fontFamily: "monospace" }}>
+                        {r.barcode}
+                      </Typography>
+                      <Chip
+                        label={aplicado ? "Aplicado" : (r.status === "active" ? "Disponible" : "Sin uso registrado")}
+                        size="small"
+                        sx={{
+                          fontWeight: 600,
+                          backgroundColor: aplicado ? "rgba(76,175,80,0.15)" : "rgba(33,150,243,0.15)",
+                          color: aplicado ? "#2e7d32" : "#1565c0",
+                        }}
+                      />
+                    </Box>
+                    <Typography sx={{ fontSize: "0.85rem", color: "#8B7D6B", mt: 0.5 }}>
+                      {`${r.producto_base_nombre || ""} ${r.variante_nombre || ""}`.trim() || "Producto sin nombre"}
+                      {r.unidades_restantes != null && r.unidades_totales != null
+                        ? ` — Restantes: ${r.unidades_restantes} de ${r.unidades_totales}`
+                        : ""}
+                    </Typography>
+                    <Divider sx={{ my: 1.2 }} />
+                    {aplicado ? (
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, rowGap: 0.5 }}>
+                        <Typography sx={{ fontSize: "0.85rem" }}>
+                          <b>Paciente:</b>{" "}
+                          {`${r.paciente_nombre || ""} ${r.paciente_apellido || ""}`.trim() || "-"}
+                          {r.paciente_dni ? ` (DNI ${r.paciente_dni})` : ""}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.85rem" }}>
+                          <b>Tratamiento:</b> {r.tratamiento_nombre || "-"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.85rem" }}>
+                          <b>Fecha:</b> {r.tratamiento_fecha || r.scanned_at || "-"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.85rem" }}>
+                          <b>Especialista:</b> {r.especialista || "-"}
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.85rem" }}>
+                          <b>Sesión:</b> {r.sesion || "-"}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography sx={{ fontSize: "0.85rem", color: "#8B7D6B" }}>
+                        Este código existe en inventario pero aún no se ha aplicado a ningún paciente.
+                      </Typography>
+                    )}
+                  </Paper>
+                );
+              })}
+            </Box>
+          )
+        ) : null}
       </Paper>
 
       {/* Table */}

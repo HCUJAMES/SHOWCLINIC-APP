@@ -1603,7 +1603,63 @@ router.get("/productos-aplicados", authMiddleware, requireRole(["master"]), asyn
 });
 
 /* ==============================
-   📊 CALENDAR LAYOUT (posiciones de nodos y conexiones)
+   � BUSCAR CÓDIGO DE PRODUCTO Y PACIENTE AL QUE SE APLICÓ
+   Busca un código de barras y devuelve a qué paciente / tratamiento se le aplicó
+============================== */
+router.get("/buscar-por-codigo", authMiddleware, requireRole(["master"]), async (req, res) => {
+  try {
+    const codigo = String(req.query.codigo || "").trim();
+    if (!codigo) {
+      return res.status(400).json({ message: "Debes indicar un código a buscar" });
+    }
+
+    const like = `%${codigo}%`;
+    const filas = await dbAll(
+      `
+      SELECT
+        bu.id AS barcode_unit_id,
+        bu.barcode,
+        bu.status,
+        bu.unidades_totales,
+        bu.unidades_restantes,
+        bu.scanned_at,
+        bu.treatment_id,
+        v.nombre AS variante_nombre,
+        v.unidad_base,
+        pb.nombre AS producto_base_nombre,
+        tr.id AS tratamiento_realizado_id,
+        tr.fecha AS tratamiento_fecha,
+        tr.sesion,
+        tr.tipoAtencion,
+        tr.especialista,
+        tr.paciente_id,
+        t.nombre AS tratamiento_nombre,
+        p.nombre AS paciente_nombre,
+        p.apellido AS paciente_apellido,
+        p.dni AS paciente_dni
+      FROM barcode_units bu
+      LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+      LEFT JOIN variantes v ON v.id = sl.variante_id
+      LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+      LEFT JOIN tratamientos_realizados tr ON tr.id = bu.treatment_id
+      LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
+      LEFT JOIN patients p ON p.id = tr.paciente_id
+      WHERE bu.barcode = ? OR bu.barcode LIKE ?
+      ORDER BY (bu.barcode = ?) DESC, bu.scanned_at DESC, bu.id DESC
+      LIMIT 50
+      `,
+      [codigo, like, codigo]
+    );
+
+    res.json(filas);
+  } catch (error) {
+    console.error("❌ Error al buscar por código:", error);
+    res.status(500).json({ message: "Error al buscar el código del producto" });
+  }
+});
+
+/* ==============================
+   �📊 CALENDAR LAYOUT (posiciones de nodos y conexiones)
 ============================== */
 
 // GET: obtener layout guardado para un presupuesto
