@@ -41,7 +41,7 @@ const GRID_CONFIG = {
 // =============================================
 // COMPONENTE DE CABEZA 3D CON WIREFRAME
 // =============================================
-function HeadModel({ markedPoints, onPointClick, showWireframe }) {
+function HeadModel({ markedPoints, onPointClick, showWireframe, modelScale = 0.55, modelPosition = [0, -0.2, 0] }) {
   const { scene } = useGLTF("/models/male_head.glb");
   const meshRef = useRef();
   const wireframeRef = useRef();
@@ -146,8 +146,8 @@ function HeadModel({ markedPoints, onPointClick, showWireframe }) {
     <>
       <primitive 
         object={scene} 
-        scale={0.55}
-        position={[0, -0.2, 0]}
+        scale={modelScale}
+        position={modelPosition}
         onClick={handleClick}
       />
       
@@ -434,7 +434,7 @@ export default function FacialMap3D({
     return (
       <Box sx={{ width: "100%", height: "100%", position: "relative", backgroundColor: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
         <Canvas
-          camera={{ position: [0, -0.8, 3.2], fov: 45 }}
+          camera={{ position: [0, 0.15, 4.0], fov: 42 }}
           style={{ width: "100%", height: "100%" }}
         >
           <ambientLight intensity={0.7} />
@@ -445,15 +445,17 @@ export default function FacialMap3D({
               markedPoints={markedPoints}
               onPointClick={() => {}}
               showWireframe={showWireframe}
+              modelScale={0.5}
+              modelPosition={[0, -0.55, 0]}
             />
           </Suspense>
           <OrbitControls
             ref={controlsRef}
             enableDamping
             dampingFactor={0.05}
-            minDistance={3.2}
-            maxDistance={3.2}
-            target={[0, 0.75, 0]}
+            minDistance={4.0}
+            maxDistance={4.0}
+            target={[0, 0.35, 0]}
             enableRotate={true}
             enablePan={false}
             enableZoom={false}
