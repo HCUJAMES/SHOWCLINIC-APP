@@ -1593,28 +1593,28 @@ export default function Inventario() {
                     }
                     const maxStock = Math.max(...data.map((p) => p.stock));
                     return (
-                      <Box sx={{ maxHeight: 1200, overflowY: "auto", pr: 2, "&::-webkit-scrollbar": { width: 10 }, "&::-webkit-scrollbar-thumb": { borderRadius: 5, background: colorSecundario } }}>
+                      <Box sx={{ maxHeight: 520, overflowY: "auto", pr: 1.5, "&::-webkit-scrollbar": { width: 8 }, "&::-webkit-scrollbar-thumb": { borderRadius: 4, background: colorSecundario } }}>
                         {data.map((p) => {
                           const percentage = maxStock > 0 ? (p.stock / maxStock) * 100 : 0;
                           const catColor = getCategoriaColor(p.categoria);
                           return (
-                            <Box key={p.variante_id} sx={{ mb: 4 }}>
-                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.2 }}>
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
-                                  <Box sx={{ width: 16, height: 16, borderRadius: "50%", background: catColor.text, flexShrink: 0 }} />
-                                  <Typography sx={{ color: "#2d2d2d", fontWeight: 600, fontSize: 21, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.variante}</Typography>
+                            <Box key={p.variante_id} sx={{ mb: 2 }}>
+                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.6 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+                                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: catColor.text, flexShrink: 0 }} />
+                                  <Typography sx={{ color: "#2d2d2d", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.variante}</Typography>
                                 </Box>
-                                <Typography sx={{ fontWeight: 800, color: colorPrincipal, fontSize: 21, flexShrink: 0, ml: 1 }}>
+                                <Typography sx={{ fontWeight: 800, color: colorPrincipal, fontSize: 14, flexShrink: 0, ml: 1 }}>
                                   {p.stock.toLocaleString()} {p.unidad_base || "u"}
                                 </Typography>
                               </Box>
-                              <Box sx={{ width: "100%", height: 44, background: "#f0ece1", borderRadius: 22, overflow: "hidden" }}>
+                              <Box sx={{ width: "100%", height: 16, background: "#f0ece1", borderRadius: 8, overflow: "hidden" }}>
                                 <Box sx={{
                                   width: `${percentage}%`,
                                   height: "100%",
-                                  minWidth: percentage > 0 ? 18 : 0,
+                                  minWidth: percentage > 0 ? 8 : 0,
                                   background: `linear-gradient(90deg, ${colorPrincipal}, ${colorSecundario})`,
-                                  borderRadius: 22,
+                                  borderRadius: 8,
                                   transition: "width 0.4s ease",
                                 }} />
                               </Box>
