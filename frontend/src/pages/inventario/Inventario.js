@@ -32,10 +32,8 @@ import {
   Visibility,
   Edit,
   Delete,
-  Warning,
   Inventory2,
   Category,
-  Schedule,
   Print,
   ExpandMore,
   ExpandLess,
@@ -238,6 +236,16 @@ export default function Inventario() {
   const [loteAjustando, setLoteAjustando] = useState(null);
   const [formAjusteStock, setFormAjusteStock] = useState({ cantidad_a_reducir: "", motivo: "" });
   const [ajustandoStock, setAjustandoStock] = useState(false);
+
+  // Estado para el gráfico de barras (productos ocultos del gráfico)
+  const [productosOcultos, setProductosOcultos] = useState([]);
+  const [openFiltroGrafico, setOpenFiltroGrafico] = useState(false);
+
+  const toggleProductoGrafico = (varianteId) => {
+    setProductosOcultos((prev) =>
+      prev.includes(varianteId) ? prev.filter((id) => id !== varianteId) : [...prev, varianteId]
+    );
+  };
 
   const obtenerSiguienteCorrelativo = async (nombreProducto, lote) => {
     const prefijo = construirPrefijoCodigo(nombreProducto, lote);
@@ -1285,274 +1293,341 @@ export default function Inventario() {
     <Box sx={{ minHeight: "200vh", backgroundColor: colorFondo, p: { xs: 2, md: 3 } }}>
       <Box sx={{ maxWidth: 10000, margin: "0 auto" }}>
 
-        {/* Header */}
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3, flexWrap: "wrap", gap: 1 }}>
-          <Box sx={{ display: "flex", alignItems: "center" }}>
-            <IconButton onClick={() => navigate("/dashboard")} sx={{ mr: 2, color: colorPrincipal }}><ArrowBack /></IconButton>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d" }}>Inventario clínico</Typography>
-              <Typography variant="body2" sx={{ color: "#888", textTransform: "uppercase", letterSpacing: 1 }}>Gestión de stock · ShowClinic</Typography>
+        {/* Report Header */}
+        <Box sx={{ background: "linear-gradient(135deg,#fffdf7 0%,#f3e9d6 100%)", borderRadius: 4, p: { xs: 2.5, md: 4 }, mb: 4, border: "1px solid #e8dcc3", boxShadow: "0 10px 34px rgba(163,105,32,0.12)" }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <IconButton onClick={() => navigate("/dashboard")} sx={{ mr: 2, color: colorPrincipal, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", "&:hover": { background: colorCream } }}><ArrowBack /></IconButton>
+              <Box>
+                <Typography sx={{ fontWeight: 900, color: "#2d2d2d", fontSize: { xs: 26, md: 40 }, lineHeight: 1.05, textTransform: "uppercase", letterSpacing: 0.5 }}>Reporte de Inventario</Typography>
+                <Typography sx={{ color: colorPrincipal, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", fontSize: 13 }}>Gestión de stock · ShowClinic</Typography>
+              </Box>
             </Box>
-          </Box>
-          <Box sx={{ display: "flex", gap: 1.5 }}>
-            <Button variant="outlined" startIcon={<Download />} sx={{ borderColor: colorSecundario, color: colorPrincipal, fontWeight: 600, borderRadius: 2, "&:hover": { borderColor: colorPrincipal, background: colorCream } }}>
-              Exportar
-            </Button>
-            <Button variant="contained" startIcon={<Add />} onClick={() => setOpenRegistrar(true)} sx={{ background: colorPrincipal, fontWeight: 600, borderRadius: 2, px: 3, "&:hover": { background: "#8a5a1a" } }}>
-              Registrar lote
-            </Button>
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1.5 }}>
+              <Typography sx={{ fontWeight: 900, color: colorPrincipal, fontSize: { xs: 30, md: 46 }, lineHeight: 1 }}>{new Date().getFullYear()}</Typography>
+              <Box sx={{ display: "flex", gap: 1.5 }}>
+                <Button variant="outlined" startIcon={<Download />} sx={{ borderColor: colorSecundario, color: colorPrincipal, fontWeight: 600, borderRadius: 2, background: "#fff", "&:hover": { borderColor: colorPrincipal, background: colorCream } }}>
+                  Exportar
+                </Button>
+                <Button variant="contained" startIcon={<Add />} onClick={() => setOpenRegistrar(true)} sx={{ background: colorPrincipal, fontWeight: 600, borderRadius: 2, px: 3, "&:hover": { background: "#8a5a1a" } }}>
+                  Registrar lote
+                </Button>
+              </Box>
+            </Box>
           </Box>
         </Box>
 
-        {/* Summary Cards */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={6} md={4}>
-            <Card sx={{ borderRadius: 3, border: "1px solid #e8e0d0", boxShadow: "none" }}>
-              <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                  <Inventory2 sx={{ fontSize: 16, color: colorPrincipal }} />
-                  <Typography variant="caption" sx={{ color: "#888", fontWeight: 600, textTransform: "uppercase" }}>Productos</Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d" }}>{productos.length}</Typography>
-                <Typography variant="caption" sx={{ color: "#aaa" }}>{marcasActivas} marcas activas</Typography>
-              </CardContent>
-            </Card>
+        {/* ===== KPIs Resumen (números grandes) ===== */}
+        {(() => {
+          const conStock = productos.filter((p) => p.stock > 0).length;
+          const agotados = productos.filter((p) => p.stock <= 0).length;
+          const kpis = [
+            { label: "Productos", value: productos.length, color: colorPrincipal, sub: `${marcasActivas} marcas` },
+            { label: "Con stock", value: conStock, color: "#2e7d32", sub: "Disponibles" },
+            { label: "Stock bajo", value: stockBajo, color: "#d32f2f", sub: "Reponer" },
+            { label: "Por vencer", value: porVencer, color: "#f57c00", sub: "< 30 días" },
+            { label: "Agotados", value: agotados, color: "#b71c1c", sub: "Sin stock" },
+          ];
+          return (
+            <Box sx={{ position: "relative", mt: 3, mb: 5 }}>
+              <Box sx={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 14, px: 3.5, py: 1, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
+                Resumen del inventario
+              </Box>
+              <Card sx={{ borderRadius: 4, boxShadow: "0 8px 26px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
+                <CardContent sx={{ pt: 4, pb: 3, px: { xs: 1, md: 3 } }}>
+                  <Box sx={{ display: "flex", flexWrap: "wrap" }}>
+                    {kpis.map((k, i) => (
+                      <Box key={k.label} sx={{ flex: { xs: "1 1 33%", md: 1 }, textAlign: "center", py: 1.5, borderRight: { md: i < kpis.length - 1 ? "1px solid #efe6d4" : "none" } }}>
+                        <Typography sx={{ color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 12, mb: 0.5 }}>{k.label}</Typography>
+                        <Typography sx={{ fontWeight: 900, color: k.color, fontSize: { xs: 30, md: 42 }, lineHeight: 1 }}>{k.value}</Typography>
+                        <Typography sx={{ color: "#aaa", fontSize: 11, mt: 0.5 }}>{k.sub}</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Box>
+          );
+        })()}
+
+        {/* ===== Fila de gráficos (3 paneles) ===== */}
+        <Grid container spacing={4} sx={{ mt: 1, mb: 5 }}>
+          {/* Panel: Distribución por categoría (dona) */}
+          <Grid item xs={12} md={12}>
+            <Box sx={{ position: "relative", height: "100%" }}>
+              <Box sx={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 14, px: 3.5, py: 1, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
+                Distribución por categoría
+              </Box>
+              <Card sx={{ borderRadius: 4, height: "100%", boxShadow: "0 6px 22px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
+                <CardContent sx={{ pt: 5, px: { xs: 3, md: 6 }, pb: 4 }}>
+                  {(() => {
+                    const pal = ["#a36920", "#ba9a63", "#8a5a1a", "#cdb079", "#6e4715", "#d8c39a"];
+                    const total = productos.length || 1;
+                    let currentAngle = -90;
+                    return (
+                      <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, alignItems: "center", gap: { xs: 3, md: 8 }, justifyContent: "center" }}>
+                        <Box sx={{ position: "relative", width: 320, height: 320, flexShrink: 0 }}>
+                          <svg width="320" height="320" viewBox="0 0 320 320">
+                            <circle cx="160" cy="160" r="120" fill="none" stroke="#f5f1e4" strokeWidth="72" />
+                            {categorias.map((cat, idx) => {
+                              const percentage = (cat.count / total) * 100;
+                              const angle = (percentage / 100) * 360;
+                              const startAngle = currentAngle;
+                              const endAngle = currentAngle + angle;
+                              currentAngle = endAngle;
+                              const startRad = (startAngle * Math.PI) / 180;
+                              const endRad = (endAngle * Math.PI) / 180;
+                              const x1 = 160 + 120 * Math.cos(startRad);
+                              const y1 = 160 + 120 * Math.sin(startRad);
+                              const x2 = 160 + 120 * Math.cos(endRad);
+                              const y2 = 160 + 120 * Math.sin(endRad);
+                              const largeArc = angle > 180 ? 1 : 0;
+                              return (
+                                <path key={cat.label} d={`M 160 160 L ${x1} ${y1} A 120 120 0 ${largeArc} 1 ${x2} ${y2} Z`} fill={pal[idx % pal.length]} />
+                              );
+                            })}
+                            <circle cx="160" cy="160" r="84" fill="#fff" />
+                          </svg>
+                          <Box sx={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
+                            <Typography sx={{ fontWeight: 900, color: "#2d2d2d", lineHeight: 1, fontSize: 54 }}>{productos.length}</Typography>
+                            <Typography sx={{ color: "#999", fontSize: 16 }}>productos</Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ flex: 1, width: "100%", maxWidth: 560 }}>
+                          {categorias.map((cat, idx) => (
+                            <Box key={cat.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.4, pb: 1.4, borderBottom: "1px solid #f0e8d8" }}>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                                <Box sx={{ width: 16, height: 16, borderRadius: "4px", background: pal[idx % pal.length] }} />
+                                <Typography sx={{ color: "#2d2d2d", fontWeight: 500, fontSize: 18 }}>{cat.label}</Typography>
+                              </Box>
+                              <Typography sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 18 }}>
+                                {cat.count} · {Math.round((cat.count / total) * 100)}%
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </Box>
           </Grid>
-          <Grid item xs={6} md={4}>
-            <Card sx={{ borderRadius: 3, border: "1px solid #ffcdd2", boxShadow: "none", background: "#fff5f5" }}>
-              <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                  <Warning sx={{ fontSize: 16, color: "#d32f2f" }} />
-                  <Typography variant="caption" sx={{ color: "#d32f2f", fontWeight: 600, textTransform: "uppercase" }}>Stock Bajo</Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: "#d32f2f" }}>{stockBajo}</Typography>
-                <Typography variant="caption" sx={{ color: "#aaa" }}>Requiere reposición</Typography>
-              </CardContent>
-            </Card>
+
+          {/* Panel: Unidades por categoría (barras verticales) */}
+          <Grid item xs={12} md={6}>
+            <Box sx={{ position: "relative", height: "100%" }}>
+              <Box sx={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 13.5, px: 3, py: 0.9, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
+                Unidades por categoría
+              </Box>
+              <Card sx={{ borderRadius: 4, height: "100%", boxShadow: "0 6px 22px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
+                <CardContent sx={{ pt: 4, px: 3, pb: 2.5 }}>
+                  {(() => {
+                    const map = {};
+                    productos.forEach((p) => { map[p.categoria] = (map[p.categoria] || 0) + p.stock; });
+                    const arr = Object.entries(map).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+                    const max = Math.max(...arr.map((a) => a.value), 1);
+                    const pal = ["#a36920", "#ba9a63", "#8a5a1a", "#cdb079", "#6e4715", "#d8c39a"];
+                    if (arr.length === 0) return <Typography sx={{ textAlign: "center", color: "#aaa", py: 6 }}>Sin datos</Typography>;
+                    return (
+                      <>
+                        <Box sx={{ display: "flex", alignItems: "flex-end", height: 190, gap: 1.5, mt: 1 }}>
+                          {arr.map((a, i) => (
+                            <Box key={a.label} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                              <Typography sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 12, mb: 0.5 }}>{a.value.toLocaleString()}</Typography>
+                              <Box sx={{ width: "70%", maxWidth: 46, height: `${(a.value / max) * 100}%`, minHeight: a.value > 0 ? 8 : 2, background: `linear-gradient(180deg, ${pal[i % pal.length]}, ${pal[i % pal.length]}bb)`, borderRadius: "8px 8px 0 0", transition: "height .4s ease" }} />
+                            </Box>
+                          ))}
+                        </Box>
+                        <Box sx={{ display: "flex", gap: 1.5, mt: 1, pt: 1, borderTop: "1px solid #efe6d4" }}>
+                          {arr.map((a) => (
+                            <Typography key={a.label} sx={{ flex: 1, textAlign: "center", color: "#777", fontWeight: 600, fontSize: 11 }}>{a.label}</Typography>
+                          ))}
+                        </Box>
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </Box>
           </Grid>
-          <Grid item xs={6} md={4}>
-            <Card sx={{ borderRadius: 3, border: "1px solid #ffe0b2", boxShadow: "none", background: "#fff8e1" }}>
-              <CardContent sx={{ p: 2 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                  <Schedule sx={{ fontSize: 16, color: "#f57c00" }} />
-                  <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: 600, textTransform: "uppercase" }}>Por Vencer</Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: "#f57c00" }}>{porVencer}</Typography>
-                <Typography variant="caption" sx={{ color: "#aaa" }}>En menos de 30 días</Typography>
-              </CardContent>
-            </Card>
+
+          {/* Panel: Top productos en stock (barras verticales) */}
+          <Grid item xs={12} md={6}>
+            <Box sx={{ position: "relative", height: "100%" }}>
+              <Box sx={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 13.5, px: 3, py: 0.9, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
+                Top productos en stock
+              </Box>
+              <Card sx={{ borderRadius: 4, height: "100%", boxShadow: "0 6px 22px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
+                <CardContent sx={{ pt: 4, px: 3, pb: 2.5 }}>
+                  {(() => {
+                    const data = productos.filter((p) => p.stock > 0).sort((a, b) => b.stock - a.stock).slice(0, 5);
+                    const max = Math.max(...data.map((p) => p.stock), 1);
+                    const pal = ["#a36920", "#ba9a63", "#8a5a1a", "#cdb079", "#6e4715"];
+                    if (data.length === 0) return <Typography sx={{ textAlign: "center", color: "#aaa", py: 6 }}>Sin productos con stock</Typography>;
+                    return (
+                      <>
+                        <Box sx={{ display: "flex", alignItems: "flex-end", height: 190, gap: 1.5, mt: 1 }}>
+                          {data.map((p, i) => (
+                            <Box key={p.variante_id} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                              <Typography sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 12, mb: 0.5 }}>{p.stock.toLocaleString()}</Typography>
+                              <Box sx={{ width: "70%", maxWidth: 46, height: `${(p.stock / max) * 100}%`, minHeight: 8, background: `linear-gradient(180deg, ${pal[i % pal.length]}, ${pal[i % pal.length]}bb)`, borderRadius: "8px 8px 0 0", transition: "height .4s ease" }} />
+                            </Box>
+                          ))}
+                        </Box>
+                        <Box sx={{ display: "flex", gap: 1.5, mt: 1, pt: 1, borderTop: "1px solid #efe6d4" }}>
+                          {data.map((p) => (
+                            <Typography key={p.variante_id} title={p.variante} sx={{ flex: 1, textAlign: "center", color: "#777", fontWeight: 600, fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.variante}</Typography>
+                          ))}
+                        </Box>
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </Box>
           </Grid>
         </Grid>
 
-        {/* Gráficos Section */}
-        <Grid container spacing={4} sx={{ mb: 3 }}>
-          {/* Distribución por categoría */}
-          <Grid item xs={12} md={4}>
-            <Card sx={{ borderRadius: 3, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", height: "100%" }}>
-              <CardContent sx={{ p: 2.5, px: 5, pb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#2d2d2d", mb: 0.5 }}>Distribución por categoría</Typography>
-                <Typography variant="caption" sx={{ color: "#888", mb: 2, display: "block" }}>
-                  {productos.length} productos · {categorias.length} categorías
-                </Typography>
-                
-                <Box sx={{ display: "flex", alignItems: "center", gap: 3, mt: 1.5, justifyContent: "space-between" }}>
-                  {/* Gráfico de dona */}
-                  <Box sx={{ position: "relative", width: 180, height: 180, flexShrink: 0 }}>
-                    <svg width="180" height="180" viewBox="0 0 180 180">
-                      <circle cx="90" cy="90" r="68" fill="none" stroke="#f5f1e4" strokeWidth="40" />
-                      {(() => {
-                        const total = productos.length;
-                        let currentAngle = -90;
-                        const colors = {
-                          "Otro": "#8b6f47",
-                          "Filler": "#ba9a63",
-                          "Bioestim.": "#5b9bd5",
-                          "Skincare": "#c5a3d9",
-                          "Enzima": "#e89b9b",
-                          "Toxina": "#a8c5a8"
-                        };
-                        return categorias.map((cat, idx) => {
-                          const percentage = (cat.count / total) * 100;
-                          const angle = (percentage / 100) * 360;
-                          const startAngle = currentAngle;
-                          const endAngle = currentAngle + angle;
-                          currentAngle = endAngle;
-                          
-                          const startRad = (startAngle * Math.PI) / 180;
-                          const endRad = (endAngle * Math.PI) / 180;
-                          const x1 = 90 + 68 * Math.cos(startRad);
-                          const y1 = 90 + 68 * Math.sin(startRad);
-                          const x2 = 90 + 68 * Math.cos(endRad);
-                          const y2 = 90 + 68 * Math.sin(endRad);
-                          const largeArc = angle > 180 ? 1 : 0;
-                          
-                          return (
-                            <path
-                              key={cat.label}
-                              d={`M 90 90 L ${x1} ${y1} A 68 68 0 ${largeArc} 1 ${x2} ${y2} Z`}
-                              fill={colors[cat.label] || "#999"}
-                              opacity="0.9"
+        {/* ===== Participación por categoría (medidores semicirculares) ===== */}
+        <Box sx={{ position: "relative", mb: 5 }}>
+          <Box sx={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 14, px: 3.5, py: 1, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
+            Participación por categoría
+          </Box>
+          <Card sx={{ borderRadius: 4, boxShadow: "0 8px 26px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
+            <CardContent sx={{ pt: 4.5, pb: 3, px: { xs: 1, md: 3 } }}>
+              {(() => {
+                const total = productos.length || 1;
+                const pal = ["#a36920", "#8a5a1a", "#ba9a63", "#cdb079", "#6e4715", "#d8c39a"];
+                const data = [...categorias].sort((a, b) => b.count - a.count).slice(0, 6);
+                const len = Math.PI * 48;
+                if (data.length === 0) return <Typography sx={{ textAlign: "center", color: "#aaa", py: 4 }}>Sin datos</Typography>;
+                return (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", gap: 2 }}>
+                    {data.map((cat, idx) => {
+                      const pct = Math.round((cat.count / total) * 100);
+                      const dash = ((pct / 100) * len).toFixed(1);
+                      const color = pal[idx % pal.length];
+                      return (
+                        <Box key={cat.label} sx={{ flex: "1 1 130px", maxWidth: 200, textAlign: "center" }}>
+                          <Box sx={{ position: "relative", display: "inline-block" }}>
+                            <svg width="140" height="84" viewBox="0 0 120 72">
+                              <path d="M 12 60 A 48 48 0 0 1 108 60" fill="none" stroke="#ece2cd" strokeWidth="12" strokeLinecap="round" />
+                              <path d="M 12 60 A 48 48 0 0 1 108 60" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${dash} 1000`} />
+                              <text x="60" y="54" textAnchor="middle" fontSize="22" fontWeight="800" fill="#2d2d2d">{pct}%</text>
+                            </svg>
+                          </Box>
+                          <Typography sx={{ color: "#555", fontWeight: 600, fontSize: 13, mt: -0.5 }}>{cat.label}</Typography>
+                          <Typography sx={{ color: "#aaa", fontSize: 11 }}>{cat.count} producto{cat.count !== 1 ? "s" : ""}</Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </Box>
+
+        {/* ===== Unidades por producto (barras filtrables, ancho completo) ===== */}
+        <Box sx={{ position: "relative", mb: 5 }}>
+          <Box sx={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 14, px: 3.5, py: 1, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
+            Unidades por producto
+          </Box>
+          <Card sx={{ borderRadius: 4, boxShadow: "0 8px 26px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
+              <CardContent sx={{ pt: 4, px: { xs: 2, md: 4 }, pb: 2.5 }}>
+                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 0.5, gap: 1 }}>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
+                      Ordenado de mayor a menor stock disponible
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setOpenFiltroGrafico((v) => !v)}
+                    endIcon={openFiltroGrafico ? <ExpandLess /> : <ExpandMore />}
+                    sx={{ borderColor: colorSecundario, color: colorPrincipal, fontWeight: 600, borderRadius: 2, textTransform: "none", whiteSpace: "nowrap", "&:hover": { borderColor: colorPrincipal, background: colorCream } }}
+                  >
+                    Filtrar {productosOcultos.length > 0 ? `(${productosOcultos.length} oculto${productosOcultos.length > 1 ? "s" : ""})` : ""}
+                  </Button>
+                </Box>
+
+                {/* Panel de selección de productos a mostrar */}
+                <Collapse in={openFiltroGrafico}>
+                  <Box sx={{ p: 1.5, mt: 1, mb: 1.5, borderRadius: 2, background: colorFondo, border: "1px solid #e8e0d0" }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: "#777", fontWeight: 600 }}>Selecciona los productos a incluir en el gráfico</Typography>
+                      {productosOcultos.length > 0 && (
+                        <Button size="small" onClick={() => setProductosOcultos([])} sx={{ textTransform: "none", color: colorPrincipal, fontSize: 12, minWidth: 0 }}>Mostrar todos</Button>
+                      )}
+                    </Box>
+                    <Box sx={{ maxHeight: 140, overflowY: "auto", display: "flex", flexWrap: "wrap" }}>
+                      {productos.filter((p) => p.stock > 0).sort((a, b) => b.stock - a.stock).map((p) => (
+                        <FormControlLabel
+                          key={p.variante_id}
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={!productosOcultos.includes(p.variante_id)}
+                              onChange={() => toggleProductoGrafico(p.variante_id)}
+                              sx={{ color: colorSecundario, "&.Mui-checked": { color: colorPrincipal }, py: 0.25 }}
                             />
-                          );
-                        });
-                      })()}
-                      <circle cx="90" cy="90" r="48" fill="white" />
-                    </svg>
-                    <Box sx={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
-                      <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d", lineHeight: 1 }}>{productos.length}</Typography>
-                      <Typography variant="caption" sx={{ color: "#888", fontSize: 10 }}>productos</Typography>
+                          }
+                          label={<Typography variant="caption" sx={{ color: "#444" }}>{p.variante}</Typography>}
+                          sx={{ width: { xs: "100%", sm: "50%" }, m: 0 }}
+                        />
+                      ))}
                     </Box>
                   </Box>
-                  
-                  {/* Leyenda */}
-                  <Box sx={{ flex: 1 }}>
-                    {categorias.map((cat) => {
-                      const colors = {
-                        "Otro": "#8b6f47",
-                        "Filler": "#ba9a63",
-                        "Bioestim.": "#5b9bd5",
-                        "Skincare": "#c5a3d9",
-                        "Enzima": "#e89b9b",
-                        "Toxina": "#a8c5a8"
-                      };
-                      return (
-                        <Box key={cat.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.8 }}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Box sx={{ width: 10, height: 10, borderRadius: 1, background: colors[cat.label] || "#999" }} />
-                            <Typography variant="body2" sx={{ color: "#2d2d2d", fontWeight: 500, fontSize: 13 }}>{cat.label}</Typography>
-                          </Box>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 13 }}>{cat.count}</Typography>
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
+                </Collapse>
 
-          {/* Ranking de stock */}
-          <Grid item xs={12} md={4}>
-            <Card sx={{ borderRadius: 3, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", height: "100%" }}>
-              <CardContent sx={{ p: 2.5, px: 5, pb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#2d2d2d", mb: 0.5 }}>Ranking de stock</Typography>
-                <Typography variant="caption" sx={{ color: "#888", mb: 1.5, display: "block" }}>Cantidad disponible por producto</Typography>
-                
-                <Box sx={{ mt: 1.5 }}>
-                  {productos
-                    .filter(p => p.stock > 0)
-                    .sort((a, b) => b.stock - a.stock)
-                    .slice(0, 5)
-                    .map((p, idx) => {
-                      const maxStock = Math.max(...productos.map(pr => pr.stock));
-                      const percentage = maxStock > 0 ? (p.stock / maxStock) * 100 : 0;
-                      return (
-                        <Box key={p.variante_id} sx={{ mb: 2 }}>
-                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                              <Typography variant="body2" sx={{ color: "#888", fontWeight: 600, minWidth: 16, fontSize: 13 }}>{idx + 1}</Typography>
-                              <Typography variant="body2" sx={{ color: "#2d2d2d", fontWeight: 600, fontSize: 13 }}>{p.variante}</Typography>
-                            </Box>
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: colorPrincipal, fontSize: 13 }}>
-                              {p.stock.toLocaleString()} {p.unidad_base || "u"}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ 
-                            width: "100%", 
-                            height: 8, 
-                            background: "#f0f0f0", 
-                            borderRadius: 1,
-                            overflow: "hidden"
-                          }}>
-                            <Box sx={{ 
-                              width: `${percentage}%`, 
-                              height: "100%", 
-                              background: `linear-gradient(90deg, ${colorPrincipal}, ${colorSecundario})`,
-                              borderRadius: 1,
-                              transition: "width 0.3s ease"
-                            }} />
-                          </Box>
-                        </Box>
-                      );
-                    })}
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Gráfico de Laboratorios */}
-          <Grid item xs={12} md={4}>
-            <Card sx={{ borderRadius: 3, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", height: "100%" }}>
-              <CardContent sx={{ p: 2.5, px: 5, pb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#2d2d2d", mb: 0.5 }}>Lotes por laboratorio</Typography>
-                <Typography variant="caption" sx={{ color: "#888", mb: 1.5, display: "block" }}>
-                  Total de lotes en circulación
-                </Typography>
-                
-                <Box sx={{ mt: 1.5 }}>
+                {/* Barras */}
+                <Box sx={{ mt: 2 }}>
                   {(() => {
-                    // Agrupar por marca (laboratorio)
-                    const laboratorios = {};
-                    stockLotes.forEach((lote) => {
-                      const lab = lote.producto_base_nombre || "Sin marca";
-                      if (!laboratorios[lab]) {
-                        laboratorios[lab] = 0;
-                      }
-                      laboratorios[lab] += 1;
-                    });
-                    
-                    // Convertir a array y ordenar
-                    const labArray = Object.entries(laboratorios)
-                      .map(([nombre, count]) => ({ nombre, count }))
-                      .sort((a, b) => b.count - a.count)
-                      .slice(0, 5);
-                    
-                    const maxCount = Math.max(...labArray.map(l => l.count));
-                    
-                    const barColors = [
-                      "#5b9bd5",
-                      "#ba9a63", 
-                      "#a8c5a8",
-                      "#c5a3d9",
-                      "#e89b9b"
-                    ];
-                    
-                    return labArray.map((lab, idx) => {
-                      const percentage = maxCount > 0 ? (lab.count / maxCount) * 100 : 0;
-                      return (
-                        <Box key={lab.nombre} sx={{ mb: 2 }}>
-                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-                            <Typography variant="body2" sx={{ color: "#2d2d2d", fontWeight: 600, fontSize: 13 }}>
-                              {lab.nombre}
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: colorPrincipal, fontSize: 13 }}>
-                              {lab.count}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ 
-                            width: "100%", 
-                            height: 8, 
-                            background: "#f0f0f0", 
-                            borderRadius: 1,
-                            overflow: "hidden"
-                          }}>
-                            <Box sx={{ 
-                              width: `${percentage}%`, 
-                              height: "100%", 
-                              background: barColors[idx % barColors.length],
-                              borderRadius: 1,
-                              transition: "width 0.3s ease"
-                            }} />
-                          </Box>
-                        </Box>
-                      );
-                    });
+                    const data = productos
+                      .filter((p) => p.stock > 0 && !productosOcultos.includes(p.variante_id))
+                      .sort((a, b) => b.stock - a.stock);
+                    if (data.length === 0) {
+                      return <Typography variant="body2" sx={{ color: "#aaa", textAlign: "center", py: 4 }}>No hay productos para mostrar</Typography>;
+                    }
+                    const maxStock = Math.max(...data.map((p) => p.stock));
+                    return (
+                      <Box sx={{ maxHeight: 1200, overflowY: "auto", pr: 2, "&::-webkit-scrollbar": { width: 10 }, "&::-webkit-scrollbar-thumb": { borderRadius: 5, background: colorSecundario } }}>
+                        {data.map((p) => {
+                          const percentage = maxStock > 0 ? (p.stock / maxStock) * 100 : 0;
+                          const catColor = getCategoriaColor(p.categoria);
+                          return (
+                            <Box key={p.variante_id} sx={{ mb: 4 }}>
+                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.2 }}>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+                                  <Box sx={{ width: 16, height: 16, borderRadius: "50%", background: catColor.text, flexShrink: 0 }} />
+                                  <Typography sx={{ color: "#2d2d2d", fontWeight: 600, fontSize: 21, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.variante}</Typography>
+                                </Box>
+                                <Typography sx={{ fontWeight: 800, color: colorPrincipal, fontSize: 21, flexShrink: 0, ml: 1 }}>
+                                  {p.stock.toLocaleString()} {p.unidad_base || "u"}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ width: "100%", height: 44, background: "#f0ece1", borderRadius: 22, overflow: "hidden" }}>
+                                <Box sx={{
+                                  width: `${percentage}%`,
+                                  height: "100%",
+                                  minWidth: percentage > 0 ? 18 : 0,
+                                  background: `linear-gradient(90deg, ${colorPrincipal}, ${colorSecundario})`,
+                                  borderRadius: 22,
+                                  transition: "width 0.4s ease",
+                                }} />
+                              </Box>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    );
                   })()}
                 </Box>
               </CardContent>
             </Card>
-          </Grid>
-        </Grid>
+        </Box>
 
         {/* Products Section */}
         <Card sx={{ borderRadius: 3, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", overflow: "visible" }}>
@@ -1583,24 +1658,19 @@ export default function Inventario() {
               ))}
             </Box>
 
-            {/* Table Header */}
-            <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr 1.2fr 0.8fr", px: 2, py: 1, borderBottom: "1px solid #eee", mb: 1 }}>
-              {["PRODUCTO", "CATEGORÍA", "STOCK", "LOTES", "VENCE", "ESTADO", "ACCIONES"].map((h) => (
-                <Typography key={h} variant="caption" sx={{ fontWeight: 700, color: "#999", letterSpacing: 0.5 }}>{h}</Typography>
-              ))}
-            </Box>
+            {(() => {
+              const conStock = productosFiltrados.filter((p) => p.stock > 0);
+              const sinStock = productosFiltrados.filter((p) => p.stock <= 0);
 
-            {/* ALL Product Rows - scrollable */}
-            <Box sx={{ maxHeight: "60vh", overflowY: "auto", "&::-webkit-scrollbar": { width: 6 }, "&::-webkit-scrollbar-thumb": { borderRadius: 3, background: colorSecundario } }}>
-              {productosFiltrados.map((p, idx) => {
+              const renderFila = (p, idx, agotado) => {
                 const catColor = getCategoriaColor(p.categoria);
-                const rowBg = p.stock === 0 ? "#fff5f5" : idx % 2 === 0 ? "#fff" : "#fafafa";
+                const rowBg = agotado ? "#fff5f5" : idx % 2 === 0 ? "#fff" : "#fafafa";
                 return (
                   <Box key={p.variante_id} sx={{
                     display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr 1.2fr 0.8fr",
                     px: 2, py: 1.5, alignItems: "center", borderBottom: "1px solid #f5f5f5", background: rowBg, borderRadius: 1,
                     transition: "background 0.15s", "&:hover": { background: "#fdf6ec" },
-                    borderLeft: p.stock === 0 ? "3px solid #d32f2f" : "3px solid transparent", cursor: "pointer",
+                    borderLeft: agotado ? "3px solid #d32f2f" : "3px solid transparent", cursor: "pointer",
                   }}
                     onClick={() => { setProductoDetalle(p); setVista("detalle"); }}
                   >
@@ -1611,7 +1681,7 @@ export default function Inventario() {
                     <Box>
                       <Chip label={p.categoria} size="small" sx={{ background: catColor.bg, color: catColor.text, fontWeight: 600, fontSize: 11, height: 24 }} />
                     </Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: p.stock === 0 ? "#d32f2f" : "#2d2d2d" }}>{formatStock(p.stock, p.unidad_base)}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: agotado ? "#d32f2f" : "#2d2d2d" }}>{formatStock(p.stock, p.unidad_base)}</Typography>
                     <Typography variant="body2" sx={{ color: "#666" }}>{p.lotes_count}</Typography>
                     <Typography variant="body2" sx={{ color: "#666" }}>{formatVencimiento(p.vencimiento_proximo)}</Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -1631,19 +1701,56 @@ export default function Inventario() {
                     </Box>
                   </Box>
                 );
-              })}
-            </Box>
+              };
 
-            {productosFiltrados.length === 0 && (
-              <Typography sx={{ textAlign: "center", py: 4, color: "#999" }}>No se encontraron productos</Typography>
-            )}
+              const TableHeader = () => (
+                <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr 1.2fr 0.8fr", px: 2, py: 1, borderBottom: "1px solid #eee", mb: 1 }}>
+                  {["PRODUCTO", "CATEGORÍA", "STOCK", "LOTES", "VENCE", "ESTADO", "ACCIONES"].map((h) => (
+                    <Typography key={h} variant="caption" sx={{ fontWeight: 700, color: "#999", letterSpacing: 0.5 }}>{h}</Typography>
+                  ))}
+                </Box>
+              );
 
-            {/* Footer count */}
-            <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #eee" }}>
-              <Typography variant="caption" sx={{ color: "#999" }}>
-                Mostrando {productosFiltrados.length} de {productos.length} productos
-              </Typography>
-            </Box>
+              return (
+                <>
+                  {/* ===== Productos con stock ===== */}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#2e7d32" }} />
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#2d2d2d" }}>Disponibles</Typography>
+                    <Chip label={conStock.length} size="small" sx={{ background: "#e8f5e9", color: "#2e7d32", fontWeight: 700, height: 22 }} />
+                  </Box>
+                  <TableHeader />
+                  <Box sx={{ maxHeight: "50vh", overflowY: "auto", "&::-webkit-scrollbar": { width: 6 }, "&::-webkit-scrollbar-thumb": { borderRadius: 3, background: colorSecundario } }}>
+                    {conStock.map((p, idx) => renderFila(p, idx, false))}
+                    {conStock.length === 0 && (
+                      <Typography sx={{ textAlign: "center", py: 3, color: "#999" }}>No hay productos con stock</Typography>
+                    )}
+                  </Box>
+
+                  {/* ===== Productos sin stock ===== */}
+                  <Divider sx={{ my: 3 }} />
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#d32f2f" }} />
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: "#2d2d2d" }}>Sin stock</Typography>
+                    <Chip label={sinStock.length} size="small" sx={{ background: "#ffebee", color: "#d32f2f", fontWeight: 700, height: 22 }} />
+                  </Box>
+                  {sinStock.length > 0 && <TableHeader />}
+                  <Box sx={{ maxHeight: "40vh", overflowY: "auto", "&::-webkit-scrollbar": { width: 6 }, "&::-webkit-scrollbar-thumb": { borderRadius: 3, background: colorSecundario } }}>
+                    {sinStock.map((p, idx) => renderFila(p, idx, true))}
+                    {sinStock.length === 0 && (
+                      <Typography sx={{ textAlign: "center", py: 3, color: "#999" }}>Todos los productos tienen stock</Typography>
+                    )}
+                  </Box>
+
+                  {/* Footer count */}
+                  <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #eee" }}>
+                    <Typography variant="caption" sx={{ color: "#999" }}>
+                      {conStock.length} disponibles · {sinStock.length} sin stock · {productosFiltrados.length} de {productos.length} productos
+                    </Typography>
+                  </Box>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       </Box>
