@@ -1415,7 +1415,7 @@ export default function Inventario() {
           </Grid>
 
           {/* Panel: Unidades por categoría (barras verticales) */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={12}>
             <Box sx={{ position: "relative", height: "100%" }}>
               <Box sx={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 13.5, px: 3, py: 0.9, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
                 Unidades por categoría
@@ -1431,17 +1431,17 @@ export default function Inventario() {
                     if (arr.length === 0) return <Typography sx={{ textAlign: "center", color: "#aaa", py: 6 }}>Sin datos</Typography>;
                     return (
                       <>
-                        <Box sx={{ display: "flex", alignItems: "flex-end", height: 190, gap: 1.5, mt: 1 }}>
+                        <Box sx={{ display: "flex", alignItems: "flex-end", height: 260, gap: 3, mt: 1, px: { xs: 0, md: 4 } }}>
                           {arr.map((a, i) => (
                             <Box key={a.label} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                              <Typography sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 12, mb: 0.5 }}>{a.value.toLocaleString()}</Typography>
-                              <Box sx={{ width: "70%", maxWidth: 46, height: `${(a.value / max) * 100}%`, minHeight: a.value > 0 ? 8 : 2, background: `linear-gradient(180deg, ${pal[i % pal.length]}, ${pal[i % pal.length]}bb)`, borderRadius: "8px 8px 0 0", transition: "height .4s ease" }} />
+                              <Typography sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 16, mb: 0.8 }}>{a.value.toLocaleString()}</Typography>
+                              <Box sx={{ width: "75%", maxWidth: 110, height: `${(a.value / max) * 100}%`, minHeight: a.value > 0 ? 10 : 2, background: `linear-gradient(180deg, ${pal[i % pal.length]}, ${pal[i % pal.length]}bb)`, borderRadius: "10px 10px 0 0", transition: "height .4s ease" }} />
                             </Box>
                           ))}
                         </Box>
-                        <Box sx={{ display: "flex", gap: 1.5, mt: 1, pt: 1, borderTop: "1px solid #efe6d4" }}>
+                        <Box sx={{ display: "flex", gap: 3, mt: 1, pt: 1.5, borderTop: "1px solid #efe6d4", px: { xs: 0, md: 4 } }}>
                           {arr.map((a) => (
-                            <Typography key={a.label} sx={{ flex: 1, textAlign: "center", color: "#777", fontWeight: 600, fontSize: 11 }}>{a.label}</Typography>
+                            <Typography key={a.label} sx={{ flex: 1, textAlign: "center", color: "#777", fontWeight: 600, fontSize: 14 }}>{a.label}</Typography>
                           ))}
                         </Box>
                       </>
@@ -1453,7 +1453,7 @@ export default function Inventario() {
           </Grid>
 
           {/* Panel: Top productos en stock (barras verticales) */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={12}>
             <Box sx={{ position: "relative", height: "100%" }}>
               <Box sx={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 13.5, px: 3, py: 0.9, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
                 Top productos en stock
