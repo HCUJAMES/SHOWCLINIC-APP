@@ -21,8 +21,8 @@ import {
   LinearProgress,
   Checkbox,
   FormControlLabel,
-  Collapse,
   Divider,
+  Popover,
 } from "@mui/material";
 import {
   ArrowBack,
@@ -35,10 +35,13 @@ import {
   Inventory2,
   Category,
   Print,
-  ExpandMore,
-  ExpandLess,
   Close,
   QrCodeScanner,
+  CheckCircleOutline,
+  WarningAmberOutlined,
+  AccessTime,
+  HighlightOff,
+  Tune,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import bwipjs from "bwip-js";
@@ -48,6 +51,53 @@ const colorPrincipal = "#a36920";
 const colorSecundario = "#ba9a63";
 const colorFondo = "#f5f1e4";
 const colorCream = "#fffdf7";
+
+// Paleta diferenciada para gráficos (cálida + complementarios, acorde a la marca)
+const chartPalette = [
+  "#a36920", // dorado marca
+  "#5b9bd5", // azul
+  "#2e9e7d", // verde esmeralda
+  "#c0577a", // rosa vino
+  "#e0a458", // ámbar
+  "#7e6bbf", // violeta
+  "#d1495b", // rojo coral
+  "#3c91a6", // turquesa
+  "#8a9a3e", // verde oliva
+  "#b5651d", // terracota
+  "#5c7aaf", // azul acero
+  "#cc8b3c", // mostaza
+];
+
+// ===== Sistema de diseño clínico (solo presentación) =====
+const T = {
+  pageBg: "#F4F6F9",
+  surface: "#FFFFFF",
+  surface2: "#F1F4F8",
+  text1: "#1A2230",
+  text2: "#5B6675",
+  text3: "#9099A6",
+  border: "rgba(26,34,48,0.08)",
+  borderHover: "rgba(26,34,48,0.14)",
+  blue: "#185FA5",
+  blueMid: "#378ADD",
+  blueLight: "#E6F1FB",
+  font: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+};
+const semantic = {
+  green: { bg: "#EAF3DE", text: "#3B6D11", num: "#27500A" },
+  amber: { bg: "#FAEEDA", text: "#854F0B", num: "#633806" },
+  red: { bg: "#FCEBEB", text: "#A32D2D", num: "#791F1F" },
+  neutral: { bg: "#F1F4F8", text: "#5B6675", num: "#1A2230" },
+};
+const categoriaColorMap = {
+  Otro: "#185FA5",
+  Filler: "#378ADD",
+  "Bioestim.": "#1D9E75",
+  Skincare: "#5DCAA5",
+  Toxina: "#BA7517",
+  Enzima: "#EF9F27",
+};
+const catColor = (label, idx = 0) => categoriaColorMap[label] || chartPalette[idx % chartPalette.length];
 
 const inferirCategoria = (marca, variante) => {
   const texto = `${marca || ""} ${variante || ""}`.toLowerCase();
@@ -237,13 +287,21 @@ export default function Inventario() {
   const [formAjusteStock, setFormAjusteStock] = useState({ cantidad_a_reducir: "", motivo: "" });
   const [ajustandoStock, setAjustandoStock] = useState(false);
 
-  // Estado para el gráfico de barras (productos ocultos del gráfico)
+  // Estado de presentación de los gráficos (NO toca la data subyacente)
   const [productosOcultos, setProductosOcultos] = useState([]);
-  const [openFiltroGrafico, setOpenFiltroGrafico] = useState(false);
+  const [catsOcultas, setCatsOcultas] = useState([]);
+  const [topN, setTopN] = useState(5);
+  const [anchorCatMenu, setAnchorCatMenu] = useState(null);
+  const [anchorTopMenu, setAnchorTopMenu] = useState(null);
 
   const toggleProductoGrafico = (varianteId) => {
     setProductosOcultos((prev) =>
       prev.includes(varianteId) ? prev.filter((id) => id !== varianteId) : [...prev, varianteId]
+    );
+  };
+  const toggleCat = (label) => {
+    setCatsOcultas((prev) =>
+      prev.includes(label) ? prev.filter((c) => c !== label) : [...prev, label]
     );
   };
 
@@ -1290,344 +1348,273 @@ export default function Inventario() {
 
   /* ===== LIST VIEW ===== */
   return (
-    <Box sx={{ minHeight: "200vh", backgroundColor: colorFondo, p: { xs: 2, md: 3 } }}>
-      <Box sx={{ maxWidth: 10000, margin: "0 auto" }}>
+    <Box sx={{ minHeight: "100vh", backgroundColor: T.pageBg, fontFamily: T.font, p: { xs: 2, md: 3 } }}>
+      <Box sx={{ maxWidth: 1320, margin: "0 auto", fontFamily: T.font }}>
 
-        {/* Report Header */}
-        <Box sx={{ background: "linear-gradient(135deg,#fffdf7 0%,#f3e9d6 100%)", borderRadius: 4, p: { xs: 2.5, md: 4 }, mb: 4, border: "1px solid #e8dcc3", boxShadow: "0 10px 34px rgba(163,105,32,0.12)" }}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "center" }}>
-              <IconButton onClick={() => navigate("/dashboard")} sx={{ mr: 2, color: colorPrincipal, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", "&:hover": { background: colorCream } }}><ArrowBack /></IconButton>
-              <Box>
-                <Typography sx={{ fontWeight: 900, color: "#2d2d2d", fontSize: { xs: 26, md: 40 }, lineHeight: 1.05, textTransform: "uppercase", letterSpacing: 0.5 }}>Reporte de Inventario</Typography>
-                <Typography sx={{ color: colorPrincipal, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", fontSize: 13 }}>Gestión de stock · ShowClinic</Typography>
-              </Box>
+        {/* Header */}
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2, mb: 3 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <IconButton onClick={() => navigate("/dashboard")} sx={{ color: T.text2, background: T.surface, border: `1px solid ${T.border}`, borderRadius: "10px", "&:hover": { background: T.surface2, borderColor: T.borderHover } }}><ArrowBack /></IconButton>
+            <Box sx={{ width: 44, height: 44, borderRadius: "10px", background: T.blueLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Inventory2 sx={{ color: T.blue }} />
             </Box>
-            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1.5 }}>
-              <Typography sx={{ fontWeight: 900, color: colorPrincipal, fontSize: { xs: 30, md: 46 }, lineHeight: 1 }}>{new Date().getFullYear()}</Typography>
-              <Box sx={{ display: "flex", gap: 1.5 }}>
-                <Button variant="outlined" startIcon={<Download />} sx={{ borderColor: colorSecundario, color: colorPrincipal, fontWeight: 600, borderRadius: 2, background: "#fff", "&:hover": { borderColor: colorPrincipal, background: colorCream } }}>
-                  Exportar
-                </Button>
-                <Button variant="contained" startIcon={<Add />} onClick={() => setOpenRegistrar(true)} sx={{ background: colorPrincipal, fontWeight: 600, borderRadius: 2, px: 3, "&:hover": { background: "#8a5a1a" } }}>
-                  Registrar lote
-                </Button>
-              </Box>
+            <Box>
+              <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text1, fontSize: 24, lineHeight: 1.2 }}>Reporte de inventario</Typography>
+              <Typography sx={{ fontFamily: T.font, color: T.text2, fontSize: 13 }}>Gestión de stock · ShowClinic · {new Date().getFullYear()}</Typography>
             </Box>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1.5 }}>
+            <Button variant="outlined" startIcon={<Download />} sx={{ fontFamily: T.font, textTransform: "none", fontWeight: 500, borderRadius: "10px", borderColor: T.border, color: T.text1, "&:hover": { borderColor: T.borderHover, background: T.surface2 } }}>
+              Exportar
+            </Button>
+            <Button variant="contained" startIcon={<Add />} onClick={() => setOpenRegistrar(true)} sx={{ fontFamily: T.font, textTransform: "none", fontWeight: 600, borderRadius: "10px", background: T.blue, boxShadow: "none", px: 2.5, "&:hover": { background: "#13507f", boxShadow: "none" } }}>
+              Registrar lote
+            </Button>
           </Box>
         </Box>
 
-        {/* ===== KPIs Resumen (números grandes) ===== */}
+        {/* ===== KPIs ===== */}
         {(() => {
           const conStock = productos.filter((p) => p.stock > 0).length;
           const agotados = productos.filter((p) => p.stock <= 0).length;
           const kpis = [
-            { label: "Productos", value: productos.length, color: colorPrincipal, sub: `${marcasActivas} marcas` },
-            { label: "Con stock", value: conStock, color: "#2e7d32", sub: "Disponibles" },
-            { label: "Stock bajo", value: stockBajo, color: "#d32f2f", sub: "Reponer" },
-            { label: "Por vencer", value: porVencer, color: "#f57c00", sub: "< 30 días" },
-            { label: "Agotados", value: agotados, color: "#b71c1c", sub: "Sin stock" },
+            { key: "prod", label: "Productos", value: productos.length, sub: `${marcasActivas} marcas`, tone: semantic.neutral, Icon: Inventory2 },
+            { key: "con", label: "Con stock", value: conStock, sub: "Disponibles", tone: semantic.green, Icon: CheckCircleOutline },
+            { key: "bajo", label: "Stock bajo", value: stockBajo, sub: "Reponer", tone: semantic.amber, Icon: WarningAmberOutlined },
+            { key: "vence", label: "Por vencer", value: porVencer, sub: "Menos de 30 días", tone: semantic.neutral, Icon: AccessTime },
+            { key: "agot", label: "Agotados", value: agotados, sub: "Sin stock", tone: semantic.red, Icon: HighlightOff },
           ];
           return (
-            <Box sx={{ position: "relative", mt: 3, mb: 5 }}>
-              <Box sx={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 14, px: 3.5, py: 1, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
-                Resumen del inventario
-              </Box>
-              <Card sx={{ borderRadius: 4, boxShadow: "0 8px 26px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
-                <CardContent sx={{ pt: 4, pb: 3, px: { xs: 1, md: 3 } }}>
-                  <Box sx={{ display: "flex", flexWrap: "wrap" }}>
-                    {kpis.map((k, i) => (
-                      <Box key={k.label} sx={{ flex: { xs: "1 1 33%", md: 1 }, textAlign: "center", py: 1.5, borderRight: { md: i < kpis.length - 1 ? "1px solid #efe6d4" : "none" } }}>
-                        <Typography sx={{ color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, fontSize: 12, mb: 0.5 }}>{k.label}</Typography>
-                        <Typography sx={{ fontWeight: 900, color: k.color, fontSize: { xs: 30, md: 42 }, lineHeight: 1 }}>{k.value}</Typography>
-                        <Typography sx={{ color: "#aaa", fontSize: 11, mt: 0.5 }}>{k.sub}</Typography>
-                      </Box>
-                    ))}
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(5, 1fr)" }, gap: 2, mb: 3 }}>
+              {kpis.map((k) => (
+                <Box key={k.key} sx={{ background: k.tone.bg, border: `1px solid ${T.border}`, borderRadius: "14px", p: 2.2 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mb: 1 }}>
+                    <k.Icon sx={{ fontSize: 18, color: k.tone.text }} />
+                    <Typography sx={{ fontFamily: T.font, color: k.tone.text, fontWeight: 500, fontSize: 12 }}>{k.label}</Typography>
                   </Box>
-                </CardContent>
-              </Card>
+                  <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: k.tone.num, fontSize: 26, lineHeight: 1 }}>{Math.round(k.value).toLocaleString()}</Typography>
+                  <Typography sx={{ fontFamily: T.font, color: T.text3, fontSize: 11, mt: 0.6 }}>{k.sub}</Typography>
+                </Box>
+              ))}
             </Box>
           );
         })()}
 
-        {/* ===== Fila de gráficos (3 paneles) ===== */}
-        <Grid container spacing={4} sx={{ mt: 1, mb: 5 }}>
-          {/* Panel: Distribución por categoría (dona) */}
-          <Grid item xs={12} md={12}>
-            <Box sx={{ position: "relative", height: "100%" }}>
-              <Box sx={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 14, px: 3.5, py: 1, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
-                Distribución por categoría
+        {/* ===== Gráficos: distribución + unidades por categoría ===== */}
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2, mb: 3 }}>
+          {/* Dona: distribución por categoría */}
+          <Card sx={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: "14px", boxShadow: "none" }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
+                <Box>
+                  <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text1, fontSize: 16 }}>Distribución por categoría</Typography>
+                  <Typography sx={{ fontFamily: T.font, color: T.text3, fontSize: 12 }}>Productos por categoría</Typography>
+                </Box>
+                <IconButton size="small" onClick={(e) => setAnchorCatMenu(e.currentTarget)} sx={{ color: T.text2, border: `1px solid ${T.border}`, borderRadius: "10px", "&:hover": { background: T.surface2, borderColor: T.borderHover } }}>
+                  <Tune sx={{ fontSize: 18 }} />
+                </IconButton>
               </Box>
-              <Card sx={{ borderRadius: 4, height: "100%", boxShadow: "0 6px 22px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
-                <CardContent sx={{ pt: 5, px: { xs: 3, md: 6 }, pb: 4 }}>
-                  {(() => {
-                    const pal = ["#a36920", "#ba9a63", "#8a5a1a", "#cdb079", "#6e4715", "#d8c39a"];
-                    const total = productos.length || 1;
-                    let currentAngle = -90;
-                    return (
-                      <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, alignItems: "center", gap: { xs: 3, md: 8 }, justifyContent: "center" }}>
-                        <Box sx={{ position: "relative", width: 320, height: 320, flexShrink: 0 }}>
-                          <svg width="320" height="320" viewBox="0 0 320 320">
-                            <circle cx="160" cy="160" r="120" fill="none" stroke="#f5f1e4" strokeWidth="72" />
-                            {categorias.map((cat, idx) => {
-                              const percentage = (cat.count / total) * 100;
-                              const angle = (percentage / 100) * 360;
-                              const startAngle = currentAngle;
-                              const endAngle = currentAngle + angle;
-                              currentAngle = endAngle;
-                              const startRad = (startAngle * Math.PI) / 180;
-                              const endRad = (endAngle * Math.PI) / 180;
-                              const x1 = 160 + 120 * Math.cos(startRad);
-                              const y1 = 160 + 120 * Math.sin(startRad);
-                              const x2 = 160 + 120 * Math.cos(endRad);
-                              const y2 = 160 + 120 * Math.sin(endRad);
-                              const largeArc = angle > 180 ? 1 : 0;
-                              return (
-                                <path key={cat.label} d={`M 160 160 L ${x1} ${y1} A 120 120 0 ${largeArc} 1 ${x2} ${y2} Z`} fill={pal[idx % pal.length]} />
-                              );
-                            })}
-                            <circle cx="160" cy="160" r="84" fill="#fff" />
-                          </svg>
-                          <Box sx={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
-                            <Typography sx={{ fontWeight: 900, color: "#2d2d2d", lineHeight: 1, fontSize: 54 }}>{productos.length}</Typography>
-                            <Typography sx={{ color: "#999", fontSize: 16 }}>productos</Typography>
-                          </Box>
-                        </Box>
-                        <Box sx={{ flex: 1, width: "100%", maxWidth: 560 }}>
-                          {categorias.map((cat, idx) => (
-                            <Box key={cat.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.4, pb: 1.4, borderBottom: "1px solid #f0e8d8" }}>
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                                <Box sx={{ width: 16, height: 16, borderRadius: "4px", background: pal[idx % pal.length] }} />
-                                <Typography sx={{ color: "#2d2d2d", fontWeight: 500, fontSize: 18 }}>{cat.label}</Typography>
-                              </Box>
-                              <Typography sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 18 }}>
-                                {cat.count} · {Math.round((cat.count / total) * 100)}%
-                              </Typography>
-                            </Box>
-                          ))}
-                        </Box>
-                      </Box>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            </Box>
-          </Grid>
-
-          {/* Panel: Unidades por categoría (barras verticales) */}
-          <Grid item xs={12} md={12}>
-            <Box sx={{ position: "relative", height: "100%" }}>
-              <Box sx={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 13.5, px: 3, py: 0.9, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
-                Unidades por categoría
-              </Box>
-              <Card sx={{ borderRadius: 4, height: "100%", boxShadow: "0 6px 22px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
-                <CardContent sx={{ pt: 4, px: 3, pb: 2.5 }}>
-                  {(() => {
-                    const map = {};
-                    productos.forEach((p) => { map[p.categoria] = (map[p.categoria] || 0) + p.stock; });
-                    const arr = Object.entries(map).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
-                    const max = Math.max(...arr.map((a) => a.value), 1);
-                    const pal = ["#a36920", "#ba9a63", "#8a5a1a", "#cdb079", "#6e4715", "#d8c39a"];
-                    if (arr.length === 0) return <Typography sx={{ textAlign: "center", color: "#aaa", py: 6 }}>Sin datos</Typography>;
-                    return (
-                      <>
-                        <Box sx={{ display: "flex", alignItems: "flex-end", height: 260, gap: 3, mt: 1, px: { xs: 0, md: 4 } }}>
-                          {arr.map((a, i) => (
-                            <Box key={a.label} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                              <Typography sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 16, mb: 0.8 }}>{a.value.toLocaleString()}</Typography>
-                              <Box sx={{ width: "75%", maxWidth: 110, height: `${(a.value / max) * 100}%`, minHeight: a.value > 0 ? 10 : 2, background: `linear-gradient(180deg, ${pal[i % pal.length]}, ${pal[i % pal.length]}bb)`, borderRadius: "10px 10px 0 0", transition: "height .4s ease" }} />
-                            </Box>
-                          ))}
-                        </Box>
-                        <Box sx={{ display: "flex", gap: 3, mt: 1, pt: 1.5, borderTop: "1px solid #efe6d4", px: { xs: 0, md: 4 } }}>
-                          {arr.map((a) => (
-                            <Typography key={a.label} sx={{ flex: 1, textAlign: "center", color: "#777", fontWeight: 600, fontSize: 14 }}>{a.label}</Typography>
-                          ))}
-                        </Box>
-                      </>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            </Box>
-          </Grid>
-
-          {/* Panel: Top productos en stock (barras verticales) */}
-          <Grid item xs={12} md={12}>
-            <Box sx={{ position: "relative", height: "100%" }}>
-              <Box sx={{ position: "absolute", top: -13, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 13.5, px: 3, py: 0.9, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
-                Top productos en stock
-              </Box>
-              <Card sx={{ borderRadius: 4, height: "100%", boxShadow: "0 6px 22px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
-                <CardContent sx={{ pt: 4, px: 3, pb: 2.5 }}>
-                  {(() => {
-                    const data = productos.filter((p) => p.stock > 0).sort((a, b) => b.stock - a.stock).slice(0, 5);
-                    const max = Math.max(...data.map((p) => p.stock), 1);
-                    const pal = ["#a36920", "#ba9a63", "#8a5a1a", "#cdb079", "#6e4715"];
-                    if (data.length === 0) return <Typography sx={{ textAlign: "center", color: "#aaa", py: 6 }}>Sin productos con stock</Typography>;
-                    return (
-                      <>
-                        <Box sx={{ display: "flex", alignItems: "flex-end", height: 190, gap: 1.5, mt: 1 }}>
-                          {data.map((p, i) => (
-                            <Box key={p.variante_id} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                              <Typography sx={{ fontWeight: 700, color: "#2d2d2d", fontSize: 12, mb: 0.5 }}>{p.stock.toLocaleString()}</Typography>
-                              <Box sx={{ width: "70%", maxWidth: 46, height: `${(p.stock / max) * 100}%`, minHeight: 8, background: `linear-gradient(180deg, ${pal[i % pal.length]}, ${pal[i % pal.length]}bb)`, borderRadius: "8px 8px 0 0", transition: "height .4s ease" }} />
-                            </Box>
-                          ))}
-                        </Box>
-                        <Box sx={{ display: "flex", gap: 1.5, mt: 1, pt: 1, borderTop: "1px solid #efe6d4" }}>
-                          {data.map((p) => (
-                            <Typography key={p.variante_id} title={p.variante} sx={{ flex: 1, textAlign: "center", color: "#777", fontWeight: 600, fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.variante}</Typography>
-                          ))}
-                        </Box>
-                      </>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            </Box>
-          </Grid>
-        </Grid>
-
-        {/* ===== Participación por categoría (medidores semicirculares) ===== */}
-        <Box sx={{ position: "relative", mb: 5 }}>
-          <Box sx={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 14, px: 3.5, py: 1, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
-            Participación por categoría
-          </Box>
-          <Card sx={{ borderRadius: 4, boxShadow: "0 8px 26px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
-            <CardContent sx={{ pt: 4.5, pb: 3, px: { xs: 1, md: 3 } }}>
               {(() => {
-                const total = productos.length || 1;
-                const pal = ["#a36920", "#8a5a1a", "#ba9a63", "#cdb079", "#6e4715", "#d8c39a"];
-                const data = [...categorias].sort((a, b) => b.count - a.count).slice(0, 6);
-                const len = Math.PI * 48;
-                if (data.length === 0) return <Typography sx={{ textAlign: "center", color: "#aaa", py: 4 }}>Sin datos</Typography>;
+                const visCats = categorias.filter((c) => !catsOcultas.includes(c.label));
+                const donaTotal = visCats.reduce((s, c) => s + c.count, 0) || 1;
+                if (visCats.length === 0) return <Typography sx={{ fontFamily: T.font, textAlign: "center", color: T.text3, py: 6 }}>Sin categorías seleccionadas</Typography>;
+                let ang = -90;
                 return (
-                  <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-around", gap: 2 }}>
-                    {data.map((cat, idx) => {
-                      const pct = Math.round((cat.count / total) * 100);
-                      const dash = ((pct / 100) * len).toFixed(1);
-                      const color = pal[idx % pal.length];
-                      return (
-                        <Box key={cat.label} sx={{ flex: "1 1 130px", maxWidth: 200, textAlign: "center" }}>
-                          <Box sx={{ position: "relative", display: "inline-block" }}>
-                            <svg width="140" height="84" viewBox="0 0 120 72">
-                              <path d="M 12 60 A 48 48 0 0 1 108 60" fill="none" stroke="#ece2cd" strokeWidth="12" strokeLinecap="round" />
-                              <path d="M 12 60 A 48 48 0 0 1 108 60" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={`${dash} 1000`} />
-                              <text x="60" y="54" textAnchor="middle" fontSize="22" fontWeight="800" fill="#2d2d2d">{pct}%</text>
-                            </svg>
-                          </Box>
-                          <Typography sx={{ color: "#555", fontWeight: 600, fontSize: 13, mt: -0.5 }}>{cat.label}</Typography>
-                          <Typography sx={{ color: "#aaa", fontSize: 11 }}>{cat.count} producto{cat.count !== 1 ? "s" : ""}</Typography>
+                  <>
+                    <Box sx={{ position: "relative", height: 220, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                      <svg width="220" height="220" viewBox="0 0 220 220">
+                        {visCats.map((cat, idx) => {
+                          const frac = cat.count / donaTotal;
+                          const start = ang;
+                          const end = ang + frac * 360;
+                          ang = end;
+                          const sr = (start * Math.PI) / 180;
+                          const er = (end * Math.PI) / 180;
+                          const x1 = 110 + 92 * Math.cos(sr);
+                          const y1 = 110 + 92 * Math.sin(sr);
+                          const x2 = 110 + 92 * Math.cos(er);
+                          const y2 = 110 + 92 * Math.sin(er);
+                          const largeArc = frac > 0.5 ? 1 : 0;
+                          return (
+                            <path key={cat.label} d={`M 110 110 L ${x1} ${y1} A 92 92 0 ${largeArc} 1 ${x2} ${y2} Z`} fill={catColor(cat.label, idx)} stroke="#fff" strokeWidth="2" />
+                          );
+                        })}
+                        <circle cx="110" cy="110" r="59" fill="#fff" />
+                      </svg>
+                      <Box sx={{ position: "absolute", textAlign: "center" }}>
+                        <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text1, fontSize: 30, lineHeight: 1 }}>{Math.round(donaTotal).toLocaleString()}</Typography>
+                        <Typography sx={{ fontFamily: T.font, color: T.text3, fontSize: 12 }}>productos</Typography>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mt: 2 }}>
+                      {visCats.map((cat, idx) => (
+                        <Box key={cat.label} sx={{ display: "flex", alignItems: "center", gap: 0.8, width: { xs: "100%", sm: "50%" }, pr: 1 }}>
+                          <Box sx={{ width: 10, height: 10, borderRadius: "3px", background: catColor(cat.label, idx), flexShrink: 0 }} />
+                          <Typography sx={{ fontFamily: T.font, fontSize: 12.5, color: T.text2 }}>
+                            {cat.label} · {cat.count} · {Math.round((cat.count / donaTotal) * 100)}%
+                          </Typography>
                         </Box>
-                      );
-                    })}
-                  </Box>
+                      ))}
+                    </Box>
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+
+          {/* Barras: unidades por categoría (escala logarítmica) */}
+          <Card sx={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: "14px", boxShadow: "none" }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
+                <Box>
+                  <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text1, fontSize: 16 }}>Unidades por categoría</Typography>
+                  <Typography sx={{ fontFamily: T.font, color: T.text3, fontSize: 12 }}>Escala logarítmica</Typography>
+                </Box>
+                <IconButton size="small" onClick={(e) => setAnchorCatMenu(e.currentTarget)} sx={{ color: T.text2, border: `1px solid ${T.border}`, borderRadius: "10px", "&:hover": { background: T.surface2, borderColor: T.borderHover } }}>
+                  <Tune sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Box>
+              {(() => {
+                const map = {};
+                productos.forEach((p) => { map[p.categoria] = (map[p.categoria] || 0) + p.stock; });
+                const arr = Object.entries(map)
+                  .map(([label, value]) => ({ label, value }))
+                  .filter((a) => !catsOcultas.includes(a.label))
+                  .sort((a, b) => b.value - a.value);
+                if (arr.length === 0) return <Typography sx={{ fontFamily: T.font, textAlign: "center", color: T.text3, py: 6 }}>Sin categorías seleccionadas</Typography>;
+                const maxV = Math.max(...arr.map((a) => a.value), 1);
+                const logMax = Math.log10(maxV + 1) || 1;
+                const barH = (v) => (v > 0 ? Math.max((Math.log10(v + 1) / logMax) * 100, 4) : 0);
+                return (
+                  <>
+                    <Box sx={{ display: "flex", alignItems: "flex-end", height: 220, gap: 1.5, mt: 1 }}>
+                      {arr.map((a) => (
+                        <Box key={a.label} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
+                          <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text2, fontSize: 11, mb: 0.5 }}>{Math.round(a.value).toLocaleString()}</Typography>
+                          <Box sx={{ width: "62%", maxWidth: 54, height: `${barH(a.value)}%`, background: T.blueMid, borderRadius: "4px 4px 0 0", transition: "height .4s ease" }} />
+                        </Box>
+                      ))}
+                    </Box>
+                    <Box sx={{ display: "flex", gap: 1.5, mt: 1, pt: 1, borderTop: `1px solid ${T.border}` }}>
+                      {arr.map((a) => (
+                        <Typography key={a.label} sx={{ fontFamily: T.font, flex: 1, textAlign: "center", color: T.text3, fontWeight: 500, fontSize: 11 }}>{a.label}</Typography>
+                      ))}
+                    </Box>
+                  </>
                 );
               })()}
             </CardContent>
           </Card>
         </Box>
 
-        {/* ===== Unidades por producto (barras filtrables, ancho completo) ===== */}
-        <Box sx={{ position: "relative", mb: 5 }}>
-          <Box sx={{ position: "absolute", top: -16, left: "50%", transform: "translateX(-50%)", zIndex: 3, background: `linear-gradient(135deg, ${colorPrincipal}, ${colorSecundario})`, color: "#fff", fontWeight: 700, fontSize: 14, px: 3.5, py: 1, borderRadius: 3, boxShadow: "0 6px 16px rgba(163,105,32,0.35)", whiteSpace: "nowrap" }}>
-            Unidades por producto
+        {/* Popover: filtro de categorías (solo presentación) */}
+        <Popover
+          open={Boolean(anchorCatMenu)}
+          anchorEl={anchorCatMenu}
+          onClose={() => setAnchorCatMenu(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          PaperProps={{ sx: { borderRadius: "12px", border: `1px solid ${T.border}`, boxShadow: "0 12px 32px rgba(26,34,48,0.12)", mt: 1, minWidth: 230 } }}
+        >
+          <Box sx={{ p: 1.5 }}>
+            <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text1, fontSize: 13, mb: 0.5 }}>Categorías visibles</Typography>
+            <Box sx={{ display: "flex", gap: 1, mb: 0.5 }}>
+              <Button size="small" onClick={() => setCatsOcultas([])} sx={{ textTransform: "none", fontSize: 12, color: T.blue, minWidth: 0 }}>Seleccionar todo</Button>
+              <Button size="small" onClick={() => setCatsOcultas(categorias.map((c) => c.label))} sx={{ textTransform: "none", fontSize: 12, color: T.text2, minWidth: 0 }}>Limpiar</Button>
+            </Box>
+            <Divider sx={{ mb: 0.5 }} />
+            {categorias.map((c) => (
+              <FormControlLabel
+                key={c.label}
+                sx={{ display: "flex", m: 0 }}
+                control={<Checkbox size="small" checked={!catsOcultas.includes(c.label)} onChange={() => toggleCat(c.label)} sx={{ color: T.text3, "&.Mui-checked": { color: T.blue } }} />}
+                label={<Typography sx={{ fontFamily: T.font, fontSize: 13, color: T.text1 }}>{c.label} <span style={{ color: T.text3 }}>· {c.count}</span></Typography>}
+              />
+            ))}
           </Box>
-          <Card sx={{ borderRadius: 4, boxShadow: "0 8px 26px rgba(163,105,32,0.10)", border: "1px solid #efe6d4" }}>
-              <CardContent sx={{ pt: 4, px: { xs: 2, md: 4 }, pb: 2.5 }}>
-                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 0.5, gap: 1 }}>
-                  <Box>
-                    <Typography variant="caption" sx={{ color: "#888", display: "block" }}>
-                      Ordenado de mayor a menor stock disponible
-                    </Typography>
-                  </Box>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={() => setOpenFiltroGrafico((v) => !v)}
-                    endIcon={openFiltroGrafico ? <ExpandLess /> : <ExpandMore />}
-                    sx={{ borderColor: colorSecundario, color: colorPrincipal, fontWeight: 600, borderRadius: 2, textTransform: "none", whiteSpace: "nowrap", "&:hover": { borderColor: colorPrincipal, background: colorCream } }}
-                  >
-                    Filtrar {productosOcultos.length > 0 ? `(${productosOcultos.length} oculto${productosOcultos.length > 1 ? "s" : ""})` : ""}
-                  </Button>
-                </Box>
+        </Popover>
 
-                {/* Panel de selección de productos a mostrar */}
-                <Collapse in={openFiltroGrafico}>
-                  <Box sx={{ p: 1.5, mt: 1, mb: 1.5, borderRadius: 2, background: colorFondo, border: "1px solid #e8e0d0" }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-                      <Typography variant="caption" sx={{ color: "#777", fontWeight: 600 }}>Selecciona los productos a incluir en el gráfico</Typography>
-                      {productosOcultos.length > 0 && (
-                        <Button size="small" onClick={() => setProductosOcultos([])} sx={{ textTransform: "none", color: colorPrincipal, fontSize: 12, minWidth: 0 }}>Mostrar todos</Button>
-                      )}
-                    </Box>
-                    <Box sx={{ maxHeight: 140, overflowY: "auto", display: "flex", flexWrap: "wrap" }}>
-                      {productos.filter((p) => p.stock > 0).sort((a, b) => b.stock - a.stock).map((p) => (
-                        <FormControlLabel
-                          key={p.variante_id}
-                          control={
-                            <Checkbox
-                              size="small"
-                              checked={!productosOcultos.includes(p.variante_id)}
-                              onChange={() => toggleProductoGrafico(p.variante_id)}
-                              sx={{ color: colorSecundario, "&.Mui-checked": { color: colorPrincipal }, py: 0.25 }}
-                            />
-                          }
-                          label={<Typography variant="caption" sx={{ color: "#444" }}>{p.variante}</Typography>}
-                          sx={{ width: { xs: "100%", sm: "50%" }, m: 0 }}
-                        />
-                      ))}
-                    </Box>
-                  </Box>
-                </Collapse>
-
-                {/* Barras */}
-                <Box sx={{ mt: 2 }}>
-                  {(() => {
-                    const data = productos
-                      .filter((p) => p.stock > 0 && !productosOcultos.includes(p.variante_id))
-                      .sort((a, b) => b.stock - a.stock);
-                    if (data.length === 0) {
-                      return <Typography variant="body2" sx={{ color: "#aaa", textAlign: "center", py: 4 }}>No hay productos para mostrar</Typography>;
-                    }
-                    const maxStock = Math.max(...data.map((p) => p.stock));
+        {/* ===== Top productos en stock (barras horizontales) ===== */}
+        <Card sx={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: "14px", boxShadow: "none", mb: 3 }}>
+          <CardContent sx={{ p: 2.5 }}>
+            <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5, gap: 1 }}>
+              <Box>
+                <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text1, fontSize: 16 }}>Top productos en stock</Typography>
+                <Typography sx={{ fontFamily: T.font, color: T.text3, fontSize: 12 }}>Mayor stock disponible</Typography>
+              </Box>
+              <IconButton size="small" onClick={(e) => setAnchorTopMenu(e.currentTarget)} sx={{ color: T.text2, border: `1px solid ${T.border}`, borderRadius: "10px", "&:hover": { background: T.surface2, borderColor: T.borderHover } }}>
+                <Tune sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Box>
+            {(() => {
+              const data = productos
+                .filter((p) => p.stock > 0 && !productosOcultos.includes(p.variante_id))
+                .sort((a, b) => b.stock - a.stock)
+                .slice(0, topN);
+              if (data.length === 0) {
+                return <Typography sx={{ fontFamily: T.font, color: T.text3, textAlign: "center", py: 4 }}>No hay productos para mostrar</Typography>;
+              }
+              const maxStock = Math.max(...data.map((p) => p.stock), 1);
+              return (
+                <Box>
+                  {data.map((p) => {
+                    const pct = (p.stock / maxStock) * 100;
                     return (
-                      <Box sx={{ maxHeight: 520, overflowY: "auto", pr: 1.5, "&::-webkit-scrollbar": { width: 8 }, "&::-webkit-scrollbar-thumb": { borderRadius: 4, background: colorSecundario } }}>
-                        {data.map((p) => {
-                          const percentage = maxStock > 0 ? (p.stock / maxStock) * 100 : 0;
-                          const catColor = getCategoriaColor(p.categoria);
-                          return (
-                            <Box key={p.variante_id} sx={{ mb: 2 }}>
-                              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.6 }}>
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
-                                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", background: catColor.text, flexShrink: 0 }} />
-                                  <Typography sx={{ color: "#2d2d2d", fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.variante}</Typography>
-                                </Box>
-                                <Typography sx={{ fontWeight: 800, color: colorPrincipal, fontSize: 14, flexShrink: 0, ml: 1 }}>
-                                  {p.stock.toLocaleString()} {p.unidad_base || "u"}
-                                </Typography>
-                              </Box>
-                              <Box sx={{ width: "100%", height: 16, background: "#f0ece1", borderRadius: 8, overflow: "hidden" }}>
-                                <Box sx={{
-                                  width: `${percentage}%`,
-                                  height: "100%",
-                                  minWidth: percentage > 0 ? 8 : 0,
-                                  background: `linear-gradient(90deg, ${colorPrincipal}, ${colorSecundario})`,
-                                  borderRadius: 8,
-                                  transition: "width 0.4s ease",
-                                }} />
-                              </Box>
-                            </Box>
-                          );
-                        })}
+                      <Box key={p.variante_id} sx={{ mb: 1.6 }}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5, gap: 1 }}>
+                          <Typography sx={{ fontFamily: T.font, color: T.text1, fontWeight: 500, fontSize: 13.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.variante}</Typography>
+                          <Typography sx={{ fontFamily: T.font, color: T.blue, fontWeight: 600, fontSize: 13.5, flexShrink: 0 }}>{Math.round(p.stock).toLocaleString()} {p.unidad_base || "u"}</Typography>
+                        </Box>
+                        <Box sx={{ width: "100%", height: 10, background: T.surface2, borderRadius: "10px", overflow: "hidden" }}>
+                          <Box sx={{ width: `${pct}%`, height: "100%", minWidth: pct > 0 ? 6 : 0, background: T.blue, borderRadius: "10px", transition: "width .4s ease" }} />
+                        </Box>
                       </Box>
                     );
-                  })()}
+                  })}
                 </Box>
-              </CardContent>
-            </Card>
-        </Box>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
+        {/* Popover: filtro de productos del Top (solo presentación) */}
+        <Popover
+          open={Boolean(anchorTopMenu)}
+          anchorEl={anchorTopMenu}
+          onClose={() => setAnchorTopMenu(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          PaperProps={{ sx: { borderRadius: "12px", border: `1px solid ${T.border}`, boxShadow: "0 12px 32px rgba(26,34,48,0.12)", mt: 1, minWidth: 280 } }}
+        >
+          <Box sx={{ p: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
+              <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text1, fontSize: 13 }}>Mostrar top</Typography>
+              <TextField
+                type="number"
+                size="small"
+                value={topN}
+                onChange={(e) => setTopN(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                inputProps={{ min: 1, style: { padding: "6px 8px", width: 60 } }}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px" } }}
+              />
+            </Box>
+            <Box sx={{ display: "flex", gap: 1, mb: 0.5 }}>
+              <Button size="small" onClick={() => setProductosOcultos([])} sx={{ textTransform: "none", fontSize: 12, color: T.blue, minWidth: 0 }}>Seleccionar todo</Button>
+              <Button size="small" onClick={() => setProductosOcultos(productos.filter((p) => p.stock > 0).map((p) => p.variante_id))} sx={{ textTransform: "none", fontSize: 12, color: T.text2, minWidth: 0 }}>Limpiar</Button>
+            </Box>
+            <Divider sx={{ mb: 0.5 }} />
+            <Box sx={{ maxHeight: 240, overflowY: "auto" }}>
+              {productos.filter((p) => p.stock > 0).sort((a, b) => b.stock - a.stock).map((p) => (
+                <FormControlLabel
+                  key={p.variante_id}
+                  sx={{ display: "flex", m: 0 }}
+                  control={<Checkbox size="small" checked={!productosOcultos.includes(p.variante_id)} onChange={() => toggleProductoGrafico(p.variante_id)} sx={{ color: T.text3, "&.Mui-checked": { color: T.blue } }} />}
+                  label={<Typography sx={{ fontFamily: T.font, fontSize: 13, color: T.text1 }}>{p.variante}</Typography>}
+                />
+              ))}
+            </Box>
+          </Box>
+        </Popover>
 
         {/* Products Section */}
         <Card sx={{ borderRadius: 3, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", overflow: "visible" }}>
