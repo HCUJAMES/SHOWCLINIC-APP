@@ -3591,18 +3591,76 @@ const HistorialClinico = () => {
                     {(pacienteSeleccionado.nombre || "P").charAt(0).toUpperCase()}
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <Typography
-                      sx={{
-                        fontFamily: "'Cormorant Garamond', serif",
-                        fontSize: "2rem",
-                        fontWeight: 700,
-                        color: "#5D4037",
-                        lineHeight: 1.2,
-                        mb: 1
-                      }}
-                    >
-                      {`${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim() || "Paciente"}
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                      <Typography
+                        sx={{
+                          fontFamily: "'Cormorant Garamond', serif",
+                          fontSize: "2rem",
+                          fontWeight: 700,
+                          color: "#5D4037",
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {`${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim() || "Paciente"}
+                      </Typography>
+                      <Tooltip title={pacienteSeleccionado.especial ? "Cliente especial" : "Marcar como cliente especial"} arrow>
+                        <IconButton
+                          onClick={async () => {
+                            const nuevoValor = !pacienteSeleccionado.especial;
+                            try {
+                              await axios.patch(
+                                `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/especial`,
+                                { especial: nuevoValor },
+                                { headers: authHeaders }
+                              );
+                              setPacienteSeleccionado(prev => ({ ...prev, especial: nuevoValor ? 1 : 0 }));
+                              showToast({ severity: "success", message: nuevoValor ? "Marcado como cliente especial" : "Cliente normal" });
+                            } catch (err) {
+                              console.error("Error actualizando especial:", err);
+                              showToast({ severity: "error", message: "Error al actualizar" });
+                            }
+                          }}
+                          sx={{
+                            position: "relative",
+                            color: pacienteSeleccionado.especial ? "#ff1744" : "#c4b9aa",
+                            transition: "color 0.25s ease, transform 0.25s ease",
+                            "&:hover": { color: "#ff1744", backgroundColor: "rgba(255,23,68,0.08)", transform: "scale(1.1)" },
+                            ...(pacienteSeleccionado.especial && {
+                              "&::before": {
+                                content: '""',
+                                position: "absolute",
+                                top: "50%",
+                                left: "50%",
+                                width: 46,
+                                height: 46,
+                                transform: "translate(-50%, -50%)",
+                                borderRadius: "50%",
+                                background: "radial-gradient(circle, rgba(255,23,68,0.45) 0%, rgba(255,82,82,0.15) 55%, transparent 75%)",
+                                animation: "starPulse 1.8s ease-in-out infinite",
+                                zIndex: 0,
+                                pointerEvents: "none",
+                              },
+                              "& svg": {
+                                position: "relative",
+                                zIndex: 1,
+                                filter: "drop-shadow(0 0 6px rgba(255,23,68,0.85))",
+                                animation: "starGlow 1.8s ease-in-out infinite",
+                              },
+                              "@keyframes starPulse": {
+                                "0%, 100%": { opacity: 0.55, transform: "translate(-50%, -50%) scale(0.85)" },
+                                "50%": { opacity: 1, transform: "translate(-50%, -50%) scale(1.15)" },
+                              },
+                              "@keyframes starGlow": {
+                                "0%, 100%": { filter: "drop-shadow(0 0 4px rgba(255,23,68,0.6))" },
+                                "50%": { filter: "drop-shadow(0 0 12px rgba(255,23,68,1))" },
+                              },
+                            }),
+                          }}
+                        >
+                          <Star sx={{ fontSize: 30 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                     <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
                       <Chip
                         label={`${calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"} años`}
@@ -3640,32 +3698,6 @@ const HistorialClinico = () => {
                       />
                     </Box>
                   </Box>
-                  <Tooltip title={pacienteSeleccionado.especial ? "Cliente especial" : "Marcar como cliente especial"} arrow>
-                    <IconButton
-                      onClick={async () => {
-                        const nuevoValor = !pacienteSeleccionado.especial;
-                        try {
-                          await axios.patch(
-                            `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/especial`,
-                            { especial: nuevoValor },
-                            { headers: authHeaders }
-                          );
-                          setPacienteSeleccionado(prev => ({ ...prev, especial: nuevoValor ? 1 : 0 }));
-                          showToast({ severity: "success", message: nuevoValor ? "Marcado como cliente especial" : "Cliente normal" });
-                        } catch (err) {
-                          console.error("Error actualizando especial:", err);
-                          showToast({ severity: "error", message: "Error al actualizar" });
-                        }
-                      }}
-                      sx={{
-                        color: pacienteSeleccionado.especial ? "#d32f2f" : "#bbb",
-                        transition: "all 0.2s ease",
-                        "&:hover": { color: "#d32f2f", backgroundColor: "rgba(211,47,47,0.08)" },
-                      }}
-                    >
-                      <Star sx={{ fontSize: 30 }} />
-                    </IconButton>
-                  </Tooltip>
                 </Box>
 
                 {/* Tarjetas horizontales de información */}
