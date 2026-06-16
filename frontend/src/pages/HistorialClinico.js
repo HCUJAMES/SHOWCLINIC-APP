@@ -34,7 +34,7 @@ import {
   Tooltip,
   Menu,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen } from "@mui/icons-material";
+import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -3638,52 +3638,34 @@ const HistorialClinico = () => {
                           height: "28px"
                         }}
                       />
-                      {pacienteSeleccionado.especial && (
-                        <Chip
-                          label="⭐ Cliente Especial"
-                          sx={{
-                            backgroundColor: "#d32f2f",
-                            color: "#fff",
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontWeight: 700,
-                            fontSize: "0.8rem",
-                            height: "28px"
-                          }}
-                        />
-                      )}
                     </Box>
                   </Box>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={Boolean(pacienteSeleccionado.especial)}
-                        onChange={async (e) => {
-                          const nuevoValor = e.target.checked;
-                          try {
-                            await axios.patch(
-                              `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/especial`,
-                              { especial: nuevoValor },
-                              { headers: authHeaders }
-                            );
-                            setPacienteSeleccionado(prev => ({ ...prev, especial: nuevoValor ? 1 : 0 }));
-                            showToast({ severity: "success", message: nuevoValor ? "⭐ Marcado como cliente especial" : "Cliente normal" });
-                          } catch (err) {
-                            console.error("Error actualizando especial:", err);
-                            showToast({ severity: "error", message: "Error al actualizar" });
-                          }
-                        }}
-                        sx={{
-                          "& .MuiSwitch-switchBase.Mui-checked": { color: "#d32f2f" },
-                          "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#d32f2f" },
-                        }}
-                      />
-                    }
-                    label={
-                      <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.especial ? "#d32f2f" : "#888", fontSize: "0.85rem" }}>
-                        {pacienteSeleccionado.especial ? "Especial" : "Normal"}
-                      </Typography>
-                    }
-                  />
+                  <Tooltip title={pacienteSeleccionado.especial ? "Cliente especial" : "Marcar como cliente especial"} arrow>
+                    <IconButton
+                      onClick={async () => {
+                        const nuevoValor = !pacienteSeleccionado.especial;
+                        try {
+                          await axios.patch(
+                            `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/especial`,
+                            { especial: nuevoValor },
+                            { headers: authHeaders }
+                          );
+                          setPacienteSeleccionado(prev => ({ ...prev, especial: nuevoValor ? 1 : 0 }));
+                          showToast({ severity: "success", message: nuevoValor ? "Marcado como cliente especial" : "Cliente normal" });
+                        } catch (err) {
+                          console.error("Error actualizando especial:", err);
+                          showToast({ severity: "error", message: "Error al actualizar" });
+                        }
+                      }}
+                      sx={{
+                        color: pacienteSeleccionado.especial ? "#d32f2f" : "#bbb",
+                        transition: "all 0.2s ease",
+                        "&:hover": { color: "#d32f2f", backgroundColor: "rgba(211,47,47,0.08)" },
+                      }}
+                    >
+                      <Star sx={{ fontSize: 30 }} />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
 
                 {/* Tarjetas horizontales de información */}

@@ -154,6 +154,19 @@ const TreatmentTimelineMatrix = ({
     });
   }, [categories, milestones, totalWeeks, contentWidth, nodePositions]);
 
+  // ─── Discharge line (Alta): posición X al final del último tratamiento ───
+  const dischargeX = useMemo(() => {
+    let maxX = -Infinity;
+    lanes.forEach((lane) => {
+      lane.nodes.forEach((n) => {
+        if (n.x > maxX) maxX = n.x;
+      });
+    });
+    if (maxX === -Infinity) return null;
+    // Ubicar la línea un poco después del último nodo, sin salir del lienzo
+    return Math.min(contentWidth - 6, maxX + 70);
+  }, [lanes, contentWidth]);
+
   // ─── Category counts ───
   const categoryCounts = useMemo(() => {
     const counts = {};
@@ -449,6 +462,63 @@ const TreatmentTimelineMatrix = ({
               );
             })}
 
+            {/* ─── Discharge line (ALTA) al final del último tratamiento ─── */}
+            {dischargeX !== null && milestones.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scaleY: 0 }}
+                animate={{ opacity: 1, scaleY: 1 }}
+                transition={{ duration: 0.6, delay: 0.5, ease: "easeOut" }}
+                style={{
+                  position: "absolute",
+                  left: dischargeX,
+                  top: HEADER_HEIGHT - 8,
+                  height: lanesHeight + 8,
+                  width: 0,
+                  borderLeft: "3px solid #4CAF50",
+                  transformOrigin: "top center",
+                  zIndex: 5,
+                  pointerEvents: "none",
+                }}
+              >
+                {/* Etiqueta ALTA */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: -14,
+                    transform: "translateX(-50%)",
+                    background: "#4CAF50",
+                    color: "#FFFFFF",
+                    fontFamily: FONTS.sans,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "1.5px",
+                    textTransform: "uppercase",
+                    padding: "3px 12px",
+                    borderRadius: 12,
+                    boxShadow: "0 2px 8px rgba(76,175,80,0.35)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Alta
+                </div>
+                {/* Punto inferior decorativo */}
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    bottom: -5,
+                    transform: "translateX(-50%)",
+                    width: 9,
+                    height: 9,
+                    borderRadius: "50%",
+                    background: "#4CAF50",
+                    boxShadow: "0 0 0 3px rgba(76,175,80,0.18)",
+                  }}
+                />
+              </motion.div>
+            )}
+
             {/* ─── Connector Lines between nodes in each lane ─── */}
             {lanes.map((lane) => {
               const color = lane.color;
@@ -649,6 +719,10 @@ const TreatmentTimelineMatrix = ({
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ width: 12, height: 12, borderRadius: "50%", background: COLORS.creamMain, border: `2px dashed ${COLORS.brownLight}`, boxSizing: "border-box" }} />
           <span style={{ fontFamily: FONTS.sans, fontSize: 11, letterSpacing: "0.8px", color: COLORS.brownMain, opacity: 0.85 }}>Pendiente</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ width: 4, height: 14, borderRadius: 2, background: "#4CAF50" }} />
+          <span style={{ fontFamily: FONTS.sans, fontSize: 11, letterSpacing: "0.8px", color: COLORS.brownMain, opacity: 0.85 }}>Alta</span>
         </div>
       </div>
 
