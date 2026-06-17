@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import useSocket from "../hooks/useSocket";
 import {
   Container,
@@ -46,11 +46,19 @@ import { useToast } from "../components/ToastProvider";
 import ReciboTicket from "../components/ReciboTicket";
 import ReciboConsolidado from "../components/ReciboConsolidado";
 import FacialMap3D from "../components/FacialMap3D";
+import FacialMapMini from "../components/FacialMapMini";
 import PatientJourneyChart from "../components/PatientJourneyChart";
 import TreatmentCalendar from "../components/TreatmentCalendar";
 import TreatmentTimelineMatrix from "../components/TreatmentTimelineMatrix";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
+
+// Paleta para colorear los puntos de cada tratamiento en el mapa facial del presupuesto
+const FACIAL_COLOR_PALETTE = [
+  "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
+  "#F7DC6F", "#BB8FCE", "#85C1E2", "#F8B88B", "#ABEBC6",
+  "#F1948A", "#85929E", "#D7BDE2", "#A9DFBF", "#FAD7A0",
+];
 
 const loadImage = (src) =>
   new Promise((resolve) => {
@@ -2039,6 +2047,67 @@ const HistorialClinico = () => {
     const n = Number(it.precio);
     return sum + (Number.isFinite(n) ? n : 0);
   }, 0);
+
+  // Puntos predeterminados del mapa facial 3D, combinados según los tratamientos del presupuesto.
+  // Cada tratamiento recibe un color distinto de la paleta.
+  const ofertaTratamientoIds = useMemo(
+    () => [...new Set(ofertaItems.map((it) => it.tratamientoId).filter(Boolean))],
+    [ofertaItems]
+  );
+
+  const ofertaFacialPoints = useMemo(() => {
+    const merged = {};
+    ofertaTratamientoIds.forEach((tratamientoId, index) => {
+      const t = tratamientosBase.find((x) => x.id === tratamientoId);
+      if (!t || !t.zonas_default_json) return;
+      let zonas = {};
+      try {
+        zonas =
+          typeof t.zonas_default_json === "string"
+            ? JSON.parse(t.zonas_default_json)
+            : t.zonas_default_json || {};
+      } catch (_) {
+        zonas = {};
+      }
+      const color = FACIAL_COLOR_PALETTE[index % FACIAL_COLOR_PALETTE.length];
+      Object.entries(zonas).forEach(([pointId, data]) => {
+        if (!data?.position) return;
+        merged[`${tratamientoId}__${pointId}`] = {
+          color,
+          position: data.position,
+          treatmentId: tratamientoId,
+        };
+      });
+    });
+    return merged;
+  }, [ofertaTratamientoIds, tratamientosBase]);
+
+  const ofertaFacialLeyenda = useMemo(
+    () =>
+      ofertaTratamientoIds
+        .map((tratamientoId, index) => {
+          const t = tratamientosBase.find((x) => x.id === tratamientoId);
+          if (!t) return null;
+          let count = 0;
+          try {
+            const zonas =
+              typeof t.zonas_default_json === "string"
+                ? JSON.parse(t.zonas_default_json || "{}")
+                : t.zonas_default_json || {};
+            count = Object.keys(zonas || {}).length;
+          } catch (_) {
+            count = 0;
+          }
+          return {
+            id: tratamientoId,
+            nombre: t.nombre,
+            color: FACIAL_COLOR_PALETTE[index % FACIAL_COLOR_PALETTE.length],
+            count,
+          };
+        })
+        .filter(Boolean),
+    [ofertaTratamientoIds, tratamientosBase]
+  );
 
   const guardarOferta = async () => {
     if (!pacienteSeleccionado?.id) return;
@@ -4602,26 +4671,46 @@ const HistorialClinico = () => {
                           </Typography>
                         </Box>
 
-                        {/* Visor 3D */}
+                        {/* Visor 3D con los puntos predeterminados de los tratamientos seleccionados */}
                         <Box 
                           className="stage"
                           sx={{ 
-                            height: "500px",
                             position: "relative",
                             backgroundColor: "#1a1a1a",
                             backgroundImage: "radial-gradient(circle at center, rgba(200, 169, 110, 0.03) 1px, transparent 1px)",
                             backgroundSize: "20px 20px"
                           }}
                         >
-                          <FacialMap3D
-                            paciente={pacienteSeleccionado}
-                            registros={facialRegistros}
-                            onGuardar={null}
-                            onActualizar={null}
-                            onEliminar={null}
-                            viewOnly={true}
+                          <FacialMapMini
+                            points={ofertaFacialPoints}
+                            editable={false}
+                            height={420}
                           />
                         </Box>
+
+                        {/* Leyenda: color por tratamiento + nº de puntos */}
+                        {ofertaFacialLeyenda.length > 0 && (
+                          <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 0.6 }}>
+                            {ofertaFacialLeyenda.map((l) => (
+                              <Box key={l.id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <Box sx={{ width: 11, height: 11, borderRadius: "50%", backgroundColor: l.color, boxShadow: `0 0 6px ${l.color}`, flexShrink: 0 }} />
+                                <Typography sx={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.85)", flex: 1, lineHeight: 1.2 }}>
+                                  {l.nombre}
+                                </Typography>
+                                <Typography sx={{ fontSize: "0.68rem", color: l.count > 0 ? "#C8A96E" : "rgba(255,255,255,0.35)", fontWeight: 700 }}>
+                                  {l.count > 0 ? `${l.count} pts` : "sin puntos"}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        )}
+                        {ofertaFacialLeyenda.length === 0 && (
+                          <Box sx={{ p: 1.5 }}>
+                            <Typography sx={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
+                              Selecciona tratamientos para ver sus puntos en el mapa
+                            </Typography>
+                          </Box>
+                        )}
                       </Box>
 
                       <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#1a1a1a", mb: 1.5 }}>

@@ -364,6 +364,18 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
             }
           });
         }
+
+        // Puntos por defecto del mapa facial 3D para cada tratamiento
+        const tieneZonasDefault = rows.some((col) => col.name === "zonas_default_json");
+        if (!tieneZonasDefault) {
+          db.run("ALTER TABLE tratamientos ADD COLUMN zonas_default_json TEXT DEFAULT '{}'", (alterErr) => {
+            if (alterErr) {
+              console.error("❌ Error agregando columna zonas_default_json en tratamientos:", alterErr.message);
+            } else {
+              console.log("✅ Columna zonas_default_json agregada a tratamientos");
+            }
+          });
+        }
       }
     });
 

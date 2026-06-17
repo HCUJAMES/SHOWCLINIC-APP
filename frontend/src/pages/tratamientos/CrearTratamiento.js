@@ -18,9 +18,10 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check } from "@mui/icons-material";
+import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check, Face } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/ToastProvider";
+import FacialMapMini from "../../components/FacialMapMini";
 import { useAuth } from "../../hooks/useAuth";
 import { canCreateTreatments, isDoctor as checkIsDoctor } from "../../utils/permissions";
 import { COLORS, API_BASE_URL } from "../../constants";
@@ -48,6 +49,11 @@ export default function CrearTratamiento() {
   // Estados para imágenes de tratamientos
   const [imagenesTratamiento, setImagenesTratamiento] = useState([]);
   const [subiendoImagen, setSubiendoImagen] = useState(false);
+
+  // Estados para el mapa facial 3D por defecto del tratamiento
+  const [modalMapa, setModalMapa] = useState(false);
+  const [puntosMapa, setPuntosMapa] = useState({});
+  const [guardandoMapa, setGuardandoMapa] = useState(false);
 
   const cargarTratamientos = async () => {
     const res = await fetch(`${API_BASE_URL}/api/tratamientos/listar`, {
@@ -158,6 +164,54 @@ export default function CrearTratamiento() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const abrirMapaFacial = async (tratamiento) => {
+    if (!tratamiento) return;
+    setTratamientoSeleccionado(tratamiento);
+    setPuntosMapa({});
+    setModalMapa(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tratamientos/${tratamiento.id}/mapa-facial`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      setPuntosMapa(data?.zonas_default_json || {});
+    } catch (err) {
+      console.error("Error al cargar mapa facial del tratamiento:", err);
+      setPuntosMapa({});
+    }
+  };
+
+  const guardarMapaFacial = async () => {
+    if (!isDoctor) {
+      showToast({ severity: "warning", message: "Solo el rol doctor puede modificar el mapa facial" });
+      return;
+    }
+    if (!tratamientoSeleccionado) return;
+    setGuardandoMapa(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tratamientos/${tratamientoSeleccionado.id}/mapa-facial`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ zonas_default_json: puntosMapa }),
+      });
+      if (res.ok) {
+        showToast({ severity: "success", message: "Mapa facial guardado" });
+        setModalMapa(false);
+        cargarTratamientos();
+      } else {
+        const err = await res.json();
+        showToast({ severity: "error", message: err.message || "Error al guardar mapa facial" });
+      }
+    } catch (err) {
+      console.error(err);
+      showToast({ severity: "error", message: "Error al guardar mapa facial" });
+    }
+    setGuardandoMapa(false);
   };
 
   const agregarProductoATratamiento = async () => {
@@ -840,6 +894,24 @@ export default function CrearTratamiento() {
             </Button>
           )}
 
+          {/* Mapa facial 3D por defecto */}
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1, color: colorPrincipal }}>
+            🎭 Mapa facial 3D del tratamiento:
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            Marca los puntos que se aplican en este tratamiento. Aparecerán de forma
+            predeterminada en el mapa facial 3D al crear un presupuesto.
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<Face />}
+            onClick={() => abrirMapaFacial(tratamientoSeleccionado)}
+            sx={{ borderColor: colorPrincipal, color: colorPrincipal, mb: 1 }}
+          >
+            {isDoctor ? "Configurar puntos del mapa facial" : "Ver puntos del mapa facial"}
+          </Button>
+
           {isDoctor && (
             <>
               <Divider sx={{ my: 2 }} />
@@ -881,6 +953,53 @@ export default function CrearTratamiento() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setModalProductos(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal del mapa facial 3D por defecto del tratamiento */}
+      <Dialog
+        open={modalMapa}
+        onClose={() => setModalMapa(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ backgroundColor: colorPrincipal, color: "white" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Face />
+            <span>Mapa facial 3D - {tratamientoSeleccionado?.nombre}</span>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            {isDoctor
+              ? "Haz clic sobre el rostro para marcar los puntos del tratamiento. Usa la herramienta de borrar para quitarlos."
+              : "Visualización de los puntos predeterminados de este tratamiento."}
+          </Typography>
+          <FacialMapMini
+            points={puntosMapa}
+            onChange={setPuntosMapa}
+            editable={isDoctor}
+            color={colorPrincipal}
+            height={420}
+          />
+          <Typography variant="caption" sx={{ display: "block", mt: 1, color: "#888" }}>
+            {Object.keys(puntosMapa || {}).length} punto(s) marcado(s)
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setModalMapa(false)} sx={{ color: "#666" }}>
+            Cerrar
+          </Button>
+          {isDoctor && (
+            <Button
+              variant="contained"
+              onClick={guardarMapaFacial}
+              disabled={guardandoMapa}
+              sx={{ backgroundColor: colorPrincipal, "&:hover": { backgroundColor: "#8a5a1a" }, fontWeight: 700 }}
+            >
+              {guardandoMapa ? "Guardando..." : "Guardar mapa"}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>

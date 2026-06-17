@@ -41,7 +41,7 @@ const GRID_CONFIG = {
 // =============================================
 // COMPONENTE DE CABEZA 3D CON WIREFRAME
 // =============================================
-function HeadModel({ markedPoints, onPointClick, showWireframe, modelScale = 0.55, modelPosition = [0, -0.2, 0] }) {
+export function HeadModel({ markedPoints, onPointClick, showWireframe, modelScale = 0.55, modelPosition = [0, -0.2, 0] }) {
   const { scene } = useGLTF("/models/male_head.glb");
   const meshRef = useRef();
   const wireframeRef = useRef();

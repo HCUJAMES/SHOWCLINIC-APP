@@ -246,6 +246,58 @@ router.put("/recetas/:tratamiento_id/:variante_id", requireRole("doctor", "maste
 
 // ========== FIN RUTAS DE RECETAS ==========
 
+// ========== MAPA FACIAL 3D POR DEFECTO (puntos predeterminados del tratamiento) ==========
+
+// Obtener puntos por defecto del mapa facial de un tratamiento
+router.get("/:id/mapa-facial", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: "ID inválido" });
+    }
+    const row = await dbGet(`SELECT zonas_default_json FROM tratamientos WHERE id = ?`, [id]);
+    if (!row) {
+      return res.status(404).json({ message: "Tratamiento no encontrado" });
+    }
+    let zonas = {};
+    try {
+      zonas = row.zonas_default_json ? JSON.parse(row.zonas_default_json) : {};
+    } catch (_) {
+      zonas = {};
+    }
+    res.json({ zonas_default_json: zonas });
+  } catch (err) {
+    console.error("❌ Error al obtener mapa facial del tratamiento:", err.message);
+    res.status(500).json({ message: "Error al obtener mapa facial del tratamiento" });
+  }
+});
+
+// Guardar puntos por defecto del mapa facial de un tratamiento
+router.put("/:id/mapa-facial", requireDoctor, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return res.status(400).json({ message: "ID inválido" });
+    }
+    const { zonas_default_json } = req.body || {};
+    const zonasStr = JSON.stringify(zonas_default_json || {});
+
+    const result = await dbRun(
+      `UPDATE tratamientos SET zonas_default_json = ? WHERE id = ?`,
+      [zonasStr, id]
+    );
+    if ((result?.changes || 0) === 0) {
+      return res.status(404).json({ message: "Tratamiento no encontrado" });
+    }
+    res.json({ message: "Mapa facial del tratamiento guardado" });
+  } catch (err) {
+    console.error("❌ Error al guardar mapa facial del tratamiento:", err.message);
+    res.status(500).json({ message: "Error al guardar mapa facial del tratamiento" });
+  }
+});
+
+// ========== FIN MAPA FACIAL 3D POR DEFECTO ==========
+
 router.put("/:id", requireDoctor, async (req, res) => {
   const { id } = req.params;
   const idNum = Number(id);
