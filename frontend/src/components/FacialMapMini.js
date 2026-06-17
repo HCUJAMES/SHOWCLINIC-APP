@@ -84,7 +84,7 @@ export default function FacialMapMini({
 
   return (
     <Box sx={{ position: "relative", width: "100%", height, backgroundColor: "#1a1a1a", borderRadius: 2, overflow: "hidden" }}>
-      <Canvas camera={{ position: editable ? [0, 0.15, 4.0] : [0, 0.0, 3.3], fov: 42 }} style={{ width: "100%", height: "100%" }} gl={{ antialias: true }}>
+      <Canvas camera={{ position: editable ? [0, 0.15, 4.0] : [0, 0.23, 3.3], fov: 42 }} style={{ width: "100%", height: "100%" }} gl={{ antialias: true }}>
         <ambientLight intensity={0.7} />
         <directionalLight position={[0, 5, 5]} intensity={0.9} />
         <directionalLight position={[0, 3, -5]} intensity={0.5} />
@@ -102,7 +102,7 @@ export default function FacialMapMini({
             onPointClick={handlePointClick}
             showWireframe={false}
             modelScale={0.5}
-            modelPosition={editable ? [0, -0.55, 0] : [0, -0.78, 0]}
+            modelPosition={[0, -0.55, 0]}
           />
         </Suspense>
         <OrbitControls
@@ -112,7 +112,7 @@ export default function FacialMapMini({
           enableZoom={editable}
           minDistance={editable ? 2.5 : 3.3}
           maxDistance={editable ? 6 : 3.3}
-          target={editable ? [0, 0.35, 0] : [0, 0.22, 0]}
+          target={editable ? [0, 0.35, 0] : [0, 0.45, 0]}
           dampingFactor={0.05}
           enableDamping
         />
