@@ -1491,7 +1491,7 @@ export default function Inventario() {
                       {arr.map((a) => (
                         <Box key={a.label} sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
                           <Typography sx={{ fontFamily: T.font, fontWeight: 600, color: T.text2, fontSize: 11, mb: 0.5 }}>{Math.round(a.value).toLocaleString()}</Typography>
-                          <Box sx={{ width: "62%", maxWidth: 54, height: `${barH(a.value)}%`, background: T.blueMid, borderRadius: "4px 4px 0 0", transition: "height .4s ease" }} />
+                          <Box sx={{ width: "62%", maxWidth: 54, height: `${barH(a.value)}%`, background: catColor(a.label), borderRadius: "4px 4px 0 0", transition: "height .4s ease" }} />
                         </Box>
                       ))}
                     </Box>
