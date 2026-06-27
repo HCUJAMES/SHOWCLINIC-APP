@@ -553,6 +553,52 @@ router.patch("/:id/ofertas/:ofertaId/descuento", requirePatientWrite, (req, res)
   });
 });
 
+// ✅ Actualizar fecha de creación de una oferta/presupuesto
+router.patch("/:id/ofertas/:ofertaId/fecha", requirePatientWrite, (req, res) => {
+  const { id, ofertaId } = req.params;
+  const { creado_en } = req.body;
+
+  if (!creado_en) {
+    return res.status(400).json({ message: "Fecha inválida" });
+  }
+
+  // Obtener la fecha actual para conservar la hora original si existía
+  db.get(
+    `SELECT creado_en FROM patient_ofertas WHERE id = ? AND paciente_id = ?`,
+    [ofertaId, id],
+    (errGet, row) => {
+      if (errGet) {
+        console.error("❌ Error al obtener oferta:", errGet.message);
+        return res.status(500).json({ message: "Error al actualizar fecha" });
+      }
+      if (!row) {
+        return res.status(404).json({ message: "Oferta no encontrada" });
+      }
+
+      const horaOriginal = (row.creado_en && row.creado_en.includes(' '))
+        ? row.creado_en.split(' ')[1]
+        : '00:00:00';
+      const soloFecha = String(creado_en).split(' ')[0];
+      const nuevaFecha = `${soloFecha} ${horaOriginal}`;
+
+      db.run(
+        `UPDATE patient_ofertas SET creado_en = ? WHERE id = ? AND paciente_id = ?`,
+        [nuevaFecha, ofertaId, id],
+        function (err) {
+          if (err) {
+            console.error("❌ Error al actualizar fecha:", err.message);
+            return res.status(500).json({ message: "Error al actualizar fecha" });
+          }
+          if (this.changes === 0) {
+            return res.status(404).json({ message: "Oferta no encontrada" });
+          }
+          res.json({ message: "Fecha actualizada correctamente", creado_en: nuevaFecha });
+        }
+      );
+    }
+  );
+});
+
 // ✅ Eliminar una oferta/presupuesto
 router.delete("/:id/ofertas/:ofertaId", requirePatientWrite, (req, res) => {
   const { id, ofertaId } = req.params;
