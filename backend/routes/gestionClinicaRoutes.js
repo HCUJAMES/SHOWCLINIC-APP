@@ -678,4 +678,81 @@ router.get("/historial-pagos/:especialista_id", authMiddleware, async (req, res)
   }
 });
 
+// ✅ Registrar un cargo/pago manual adicional que se le debe al especialista
+//    (título, descripción y monto). Suma al "Total a pagar" del doctor.
+router.post("/cargos-extra", authMiddleware, async (req, res) => {
+  try {
+    const { especialista_id, titulo, descripcion, monto, fecha, mes, anio } = req.body;
+
+    if (!especialista_id || !titulo || monto == null) {
+      return res.status(400).json({ message: "Faltan datos requeridos (especialista_id, titulo, monto)" });
+    }
+    const montoNum = parseFloat(monto);
+    if (isNaN(montoNum) || montoNum <= 0) {
+      return res.status(400).json({ message: "El monto debe ser mayor a 0" });
+    }
+
+    const fechaFinal = fecha || new Date().toISOString().split("T")[0];
+    const mesFinal = mes || (new Date(fechaFinal).getMonth() + 1);
+    const anioFinal = anio || new Date(fechaFinal).getFullYear();
+
+    const result = await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO cargos_personal (especialista_id, titulo, descripcion, monto, fecha, mes, anio)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [especialista_id, titulo, descripcion || null, montoNum, fechaFinal, mesFinal, anioFinal],
+        function (err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+
+    res.json({ message: "Cargo registrado exitosamente", id: result.id });
+  } catch (err) {
+    console.error("❌ Error al registrar cargo:", err.message);
+    res.status(500).json({ message: "Error al registrar cargo", error: err.message });
+  }
+});
+
+// ✅ Obtener cargos/pagos manuales de un especialista (opcionalmente filtrado por periodo)
+router.get("/cargos-extra/:especialista_id", authMiddleware, async (req, res) => {
+  try {
+    const { especialista_id } = req.params;
+    const { fecha_inicio, fecha_fin } = req.query;
+
+    let cond = ["especialista_id = ?"];
+    let params = [especialista_id];
+    if (fecha_inicio) { cond.push("DATE(fecha) >= ?"); params.push(fecha_inicio); }
+    if (fecha_fin) { cond.push("DATE(fecha) <= ?"); params.push(fecha_fin); }
+
+    const cargos = await dbAll(
+      `SELECT * FROM cargos_personal WHERE ${cond.join(" AND ")} ORDER BY fecha DESC, id DESC`,
+      params
+    );
+
+    res.json(cargos);
+  } catch (err) {
+    console.error("❌ Error al obtener cargos:", err.message);
+    res.status(500).json({ message: "Error al obtener cargos", error: err.message });
+  }
+});
+
+// ✅ Eliminar un cargo/pago manual
+router.delete("/cargos-extra/:id", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await new Promise((resolve, reject) => {
+      db.run(`DELETE FROM cargos_personal WHERE id = ?`, [id], function (err) {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    res.json({ message: "Cargo eliminado correctamente" });
+  } catch (err) {
+    console.error("❌ Error al eliminar cargo:", err.message);
+    res.status(500).json({ message: "Error al eliminar cargo", error: err.message });
+  }
+});
+
 export default router;

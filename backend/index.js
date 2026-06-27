@@ -1225,7 +1225,26 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE INDEX IF NOT EXISTS idx_pagos_personal_esp ON pagos_personal(especialista_id)");
     console.log("✅ Tabla pagos_personal creada");
 
-    // 📊 Tabla de layout del calendario de tratamientos (posiciones de nodos, orden de conexión, semanas)
+    // � Tabla de cargos/pagos manuales adicionales que se le deben pagar al especialista
+    // (bonos, deudas, conceptos extra). Suman al "Total a pagar" del doctor.
+    db.run(`
+      CREATE TABLE IF NOT EXISTS cargos_personal (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        especialista_id INTEGER NOT NULL,
+        titulo TEXT NOT NULL,
+        descripcion TEXT,
+        monto REAL NOT NULL DEFAULT 0,
+        fecha TEXT NOT NULL,
+        mes INTEGER,
+        anio INTEGER,
+        creado_en TEXT DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY(especialista_id) REFERENCES especialistas(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_cargos_personal_esp ON cargos_personal(especialista_id)");
+    console.log("✅ Tabla cargos_personal creada");
+
+    // �📊 Tabla de layout del calendario de tratamientos (posiciones de nodos, orden de conexión, semanas)
     db.run(`
       CREATE TABLE IF NOT EXISTS calendar_layout (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -39,7 +39,9 @@ import {
   History,
   FileDownload,
   Edit,
-  PictureAsPdf
+  PictureAsPdf,
+  Add,
+  Delete
 } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -88,6 +90,17 @@ const GestionPersonalCards = () => {
     metodo: 'transferencia',
     referencia: ''
   });
+
+  // Cargos/pagos manuales adicionales que se le deben al especialista
+  const [cargosExtra, setCargosExtra] = useState([]);
+  const [modalCargo, setModalCargo] = useState({ abierto: false, trabajador: null });
+  const [datoCargo, setDatoCargo] = useState({
+    titulo: '',
+    descripcion: '',
+    monto: '',
+    fecha: new Date().toISOString().split('T')[0]
+  });
+  const [guardandoCargo, setGuardandoCargo] = useState(false);
 
   // Modal edición rápida desde card
   const [modalEditarCard, setModalEditarCard] = useState({ abierto: false, trabajador: null });
@@ -152,27 +165,99 @@ const GestionPersonalCards = () => {
     setDetalleData(null);
     setPresupuestosEsp([]);
     setHistorialPagos([]);
+    setCargosExtra([]);
 
     try {
       const { fechaInicio, fechaFin } = getFechasRango();
       const qs = `?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`;
 
-      const [detalleRes, presupuestosRes, historialRes] = await Promise.all([
+      const [detalleRes, presupuestosRes, historialRes, cargosRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/api/gestion-clinica/especialista/${trabajador.especialista_id}/detalle${qs}`, { headers: authHeaders }),
         axios.get(`${API_BASE_URL}/api/gestion-clinica/especialista/${trabajador.especialista_id}/presupuestos${qs}`, { headers: authHeaders }),
-        axios.get(`${API_BASE_URL}/api/gestion-clinica/historial-pagos/${trabajador.especialista_id}`, { headers: authHeaders })
+        axios.get(`${API_BASE_URL}/api/gestion-clinica/historial-pagos/${trabajador.especialista_id}`, { headers: authHeaders }),
+        axios.get(`${API_BASE_URL}/api/gestion-clinica/cargos-extra/${trabajador.especialista_id}${qs}`, { headers: authHeaders })
       ]);
 
       setDetalleData(detalleRes.data);
       setPresupuestosEsp(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
       setHistorialPagos(Array.isArray(historialRes.data) ? historialRes.data : []);
+      setCargosExtra(Array.isArray(cargosRes.data) ? cargosRes.data : []);
     } catch (error) {
       console.error("Error al cargar detalle:", error);
       setDetalleData(null);
       setPresupuestosEsp([]);
       setHistorialPagos([]);
+      setCargosExtra([]);
     } finally {
       setLoadingDetalle(false);
+    }
+  };
+
+  const recargarCargos = async (espId) => {
+    try {
+      const { fechaInicio, fechaFin } = getFechasRango();
+      const qs = `?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`;
+      const res = await axios.get(`${API_BASE_URL}/api/gestion-clinica/cargos-extra/${espId}${qs}`, { headers: authHeaders });
+      setCargosExtra(Array.isArray(res.data) ? res.data : []);
+    } catch (error) {
+      console.error("Error al recargar cargos:", error);
+    }
+  };
+
+  const abrirModalCargo = (trabajador) => {
+    setDatoCargo({
+      titulo: '',
+      descripcion: '',
+      monto: '',
+      fecha: new Date().toISOString().split('T')[0]
+    });
+    setModalCargo({ abierto: true, trabajador });
+  };
+
+  const registrarCargo = async () => {
+    const trabajador = modalCargo.trabajador;
+    if (!trabajador) return;
+    if (!datoCargo.titulo.trim()) {
+      showToast({ severity: "warning", message: "Ingresa un título" });
+      return;
+    }
+    const montoNum = parseFloat(datoCargo.monto);
+    if (isNaN(montoNum) || montoNum <= 0) {
+      showToast({ severity: "warning", message: "Ingresa un monto válido mayor a 0" });
+      return;
+    }
+    try {
+      setGuardandoCargo(true);
+      await axios.post(
+        `${API_BASE_URL}/api/gestion-clinica/cargos-extra`,
+        {
+          especialista_id: trabajador.especialista_id,
+          titulo: datoCargo.titulo.trim(),
+          descripcion: datoCargo.descripcion.trim(),
+          monto: montoNum,
+          fecha: datoCargo.fecha,
+          mes: mesSeleccionado,
+          anio: anioSeleccionado
+        },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Pago registrado correctamente" });
+      setModalCargo({ abierto: false, trabajador: null });
+      if (personalExpandido) await recargarCargos(personalExpandido);
+    } catch (error) {
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al registrar pago" });
+    } finally {
+      setGuardandoCargo(false);
+    }
+  };
+
+  const eliminarCargo = async (cargoId) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/api/gestion-clinica/cargos-extra/${cargoId}`, { headers: authHeaders });
+      showToast({ severity: "success", message: "Pago eliminado" });
+      if (personalExpandido) await recargarCargos(personalExpandido);
+    } catch (error) {
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al eliminar pago" });
     }
   };
 
@@ -591,33 +676,61 @@ const GestionPersonalCards = () => {
                 </Box>
               </Box>
               
-              {/* Resumen Financiero - 2 cards: Sueldo fijo + Comisión calculada sobre pagado */}
+              {/* Resumen Financiero: Sueldo fijo + Comisión + Pagos extra = Total a pagar */}
               {(() => {
                 const totalPagado = presupuestosEsp.reduce((sum, p) => sum + Number(p.monto_pagado || 0), 0);
                 const comisionPct = Number(trabajadorActual.comision_porcentaje || 0);
                 const comisionCalculada = totalPagado * (comisionPct / 100);
+                const sueldoFijo = Number(trabajadorActual.pago_fijo || 0);
+                const totalCargos = cargosExtra.reduce((sum, c) => sum + Number(c.monto || 0), 0);
+                const totalAPagar = sueldoFijo + comisionCalculada + totalCargos;
                 return (
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={6}>
+                  <>
+                  <Grid container spacing={2} sx={{ mb: 2 }}>
+                    <Grid item xs={4}>
                       <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
                         <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Sueldo fijo</Typography>
-                        <Typography variant="h6" sx={{ color: '#333', fontWeight: 600, fontSize: '1.1rem' }}>
-                          S/ {Number(trabajadorActual.pago_fijo || 0).toFixed(2)}
+                        <Typography variant="h6" sx={{ color: '#333', fontWeight: 600, fontSize: '1.05rem' }}>
+                          S/ {sueldoFijo.toFixed(2)}
                         </Typography>
                       </Paper>
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid item xs={4}>
                       <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
-                        <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Comisión ({comisionPct.toFixed(0)}% sobre pagado)</Typography>
-                        <Typography variant="h6" sx={{ color: '#854F0B', fontWeight: 600, fontSize: '1.1rem' }}>
+                        <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Comisión ({comisionPct.toFixed(0)}%)</Typography>
+                        <Typography variant="h6" sx={{ color: '#854F0B', fontWeight: 600, fontSize: '1.05rem' }}>
                           S/ {comisionCalculada.toFixed(2)}
                         </Typography>
                         <Typography variant="caption" sx={{ color: '#999', fontSize: '0.6rem' }}>
-                          Total pagado: S/ {totalPagado.toFixed(2)}
+                          Pagado: S/ {totalPagado.toFixed(2)}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
+                        <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Pagos extra</Typography>
+                        <Typography variant="h6" sx={{ color: '#9B7EBD', fontWeight: 600, fontSize: '1.05rem' }}>
+                          S/ {totalCargos.toFixed(2)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#999', fontSize: '0.6rem' }}>
+                          {cargosExtra.length} concepto{cargosExtra.length !== 1 ? 's' : ''}
                         </Typography>
                       </Paper>
                     </Grid>
                   </Grid>
+                  {/* Cuadro informativo: Total a pagar */}
+                  <Paper sx={{ p: 2, mb: 3, background: 'linear-gradient(135deg, #854F0B 0%, #6B3F08 100%)', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#FAEEDA', fontSize: '0.75rem' }}>Total a pagar</Typography>
+                      <Typography variant="caption" sx={{ color: '#FAEEDA', fontSize: '0.65rem', display: 'block' }}>
+                        Fijo + Comisión + Pagos extra
+                      </Typography>
+                    </Box>
+                    <Typography variant="h4" sx={{ color: 'white', fontWeight: 700, fontSize: '1.8rem' }}>
+                      S/ {totalAPagar.toFixed(2)}
+                    </Typography>
+                  </Paper>
+                  </>
                 );
               })()}
               
@@ -639,6 +752,15 @@ const GestionPersonalCards = () => {
                   sx={{ backgroundColor: '#854F0B', '&:hover': { backgroundColor: '#6B3F08' } }}
                 >
                   Registrar pago
+                </Button>
+                <Button 
+                  variant="contained" 
+                  fullWidth
+                  startIcon={<Add />}
+                  onClick={() => abrirModalCargo(trabajadorActual)}
+                  sx={{ backgroundColor: '#9B7EBD', '&:hover': { backgroundColor: '#7E5CA3' } }}
+                >
+                  Agregar pago extra
                 </Button>
                 <Button 
                   variant="outlined" 
