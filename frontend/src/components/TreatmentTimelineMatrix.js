@@ -154,6 +154,27 @@ const TreatmentTimelineMatrix = ({
     });
   }, [categories, milestones, totalWeeks, contentWidth, nodePositions]);
 
+  // ─── Cross-category connectors ───
+  // Enlaza cada nodo con el más cercano (cronológicamente) que pertenece a OTRA
+  // categoría, formando el recorrido completo del paciente (p.ej. armonización →
+  // cosmeatría/corporal). Los enlaces dentro de la misma categoría ya se dibujan
+  // como conectores de carril, así que aquí solo se añaden los saltos entre carriles.
+  const crossLinks = useMemo(() => {
+    const allNodes = lanes.flatMap((lane) =>
+      lane.nodes.map((n) => ({ id: n.id, x: n.x, y: n.y, categoryKey: n.categoryKey, status: n.status }))
+    );
+    if (allNodes.length < 2) return [];
+    const sorted = allNodes.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
+    const links = [];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      if (a.categoryKey === b.categoryKey) continue; // mismo carril → ya conectado
+      links.push({ a, b, key: `cross-${a.id}-${b.id}` });
+    }
+    return links;
+  }, [lanes]);
+
   // ─── Discharge line (Alta): posición X al final del último tratamiento ───
   const dischargeX = useMemo(() => {
     let maxX = -Infinity;
@@ -564,6 +585,96 @@ const TreatmentTimelineMatrix = ({
               });
             })}
 
+            {/* ─── Cross-category connectors (recorrido del paciente) ─── */}
+            {crossLinks.length > 0 && (
+              <svg
+                width={contentWidth}
+                height={contentHeight + 28}
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  zIndex: 2,
+                  pointerEvents: "none",
+                  overflow: "visible",
+                }}
+              >
+                <defs>
+                  <linearGradient id="crossLinkGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#B07BD9" />
+                    <stop offset="45%" stopColor="#8E44C4" />
+                    <stop offset="100%" stopColor="#6A2C9A" />
+                  </linearGradient>
+                  <radialGradient id="crossLinkDot" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#F3E4FB" />
+                    <stop offset="55%" stopColor="#B07BD9" />
+                    <stop offset="100%" stopColor="rgba(142,68,196,0)" />
+                  </radialGradient>
+                </defs>
+                {crossLinks.map((link, idx) => {
+                  const { a, b } = link;
+                  const dx = b.x - a.x;
+                  const cx1 = a.x + dx * 0.45;
+                  const cx2 = b.x - dx * 0.45;
+                  const d = `M ${a.x} ${a.y} C ${cx1} ${a.y}, ${cx2} ${b.y}, ${b.x} ${b.y}`;
+                  const pathId = `crosspath-${a.id}-${b.id}`;
+                  return (
+                    <g key={link.key}>
+                      {/* halo suave para profundidad */}
+                      <path
+                        id={pathId}
+                        d={d}
+                        fill="none"
+                        stroke="rgba(142,68,196,0.16)"
+                        strokeWidth={7}
+                        strokeLinecap="round"
+                      />
+                      {/* trazo base que se dibuja al aparecer */}
+                      <motion.path
+                        d={d}
+                        fill="none"
+                        stroke="url(#crossLinkGrad)"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 0.9 }}
+                        transition={{ duration: 0.7, delay: 0.3 + idx * 0.08, ease: "easeInOut" }}
+                      />
+                      {/* flujo animado (marcha continua) sobre el trazo */}
+                      <motion.path
+                        d={d}
+                        fill="none"
+                        stroke="#EBD3FA"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                        strokeDasharray="3 17"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 0.9, strokeDashoffset: [0, -40] }}
+                        transition={{
+                          opacity: { duration: 0.6, delay: 0.6 + idx * 0.08 },
+                          strokeDashoffset: { duration: 1.6, repeat: Infinity, ease: "linear" },
+                        }}
+                      />
+                      {/* punto luminoso que viaja por la curva */}
+                      <circle r={4} fill="url(#crossLinkDot)">
+                        <animateMotion
+                          dur="2.4s"
+                          repeatCount="indefinite"
+                          keyPoints="0;1"
+                          keyTimes="0;1"
+                          calcMode="linear"
+                        >
+                          <mpath href={`#${pathId}`} />
+                        </animateMotion>
+                      </circle>
+                      {/* punto de salida en la categoría origen */}
+                      <circle cx={a.x} cy={a.y} r={3.2} fill="rgba(142,68,196,0.95)" />
+                    </g>
+                  );
+                })}
+              </svg>
+            )}
+
             {/* ─── All Nodes (positioned absolutely) ─── */}
             {lanes.flatMap((lane) => {
               const color = lane.color;
@@ -590,8 +701,8 @@ const TreatmentTimelineMatrix = ({
                     onMouseDown={(e) => handleMouseDown(e, n)}
                   >
                         {/* Order badge */}
-                        <div style={{ position: "absolute", top: -(NODE_R + 18), left: "50%", transform: "translateX(-50%)", width: 16, height: 16, borderRadius: "50%", background: n.status === "completed" ? color : COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${color}`, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
-                          <span style={{ fontFamily: FONTS.serif, fontSize: 9, fontWeight: 600, color: n.status === "completed" ? COLORS.creamMain : COLORS.brownDark }}>
+                        <div style={{ position: "absolute", top: -(NODE_R + 20), left: "50%", transform: "translateX(-50%)", width: 19, height: 19, borderRadius: "50%", background: n.status === "completed" ? color : COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${color}`, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
+                          <span style={{ fontFamily: FONTS.serif, fontSize: 11, fontWeight: 600, color: n.status === "completed" ? COLORS.creamMain : COLORS.brownDark }}>
                             {String(n.order).padStart(2, "0")}
                           </span>
                         </div>
@@ -627,12 +738,12 @@ const TreatmentTimelineMatrix = ({
                             left: "50%",
                             transform: "translateX(-50%)",
                             ...(labelAbove ? { bottom: NODE_R * 2 + 16 } : { top: NODE_R * 2 + 16 }),
-                            width: 132,
+                            width: 154,
                           }}
                         >
-                          <div style={{ width: "100%", minHeight: 38, borderRadius: 8, background: COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${hexToRgba(color, 0.55)}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "5px 6px", boxShadow: "0 2px 8px rgba(93,64,55,0.08)" }}>
+                          <div style={{ width: "100%", minHeight: 44, borderRadius: 8, background: COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${hexToRgba(color, 0.55)}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "6px 7px", boxShadow: "0 2px 8px rgba(93,64,55,0.08)" }}>
                             {/* Treatment name */}
-                            <div style={{ fontFamily: FONTS.serif, fontSize: 11.5, fontWeight: 500, color: COLORS.brownDark, textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
+                            <div style={{ fontFamily: FONTS.serif, fontSize: 13.5, fontWeight: 600, color: COLORS.brownDark, textAlign: "center", lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
                               {n.name}
                             </div>
                             {/* Specialist - click to edit */}
@@ -644,9 +755,9 @@ const TreatmentTimelineMatrix = ({
                                   onChange={(e) => selectSpecialist(n.id, e.target.value)}
                                   onBlur={() => setEditingSpecialist(null)}
                                   style={{
-                                    width: "100%", fontSize: 9, fontFamily: FONTS.sans,
+                                    width: "100%", fontSize: 11, fontFamily: FONTS.sans,
                                     border: `1px solid ${color}`, borderRadius: 4,
-                                    padding: "2px 3px", outline: "none", background: COLORS.creamSoft,
+                                    padding: "3px 4px", outline: "none", background: COLORS.creamSoft,
                                     color: COLORS.brownDark, cursor: "pointer", appearance: "auto", fontWeight: 500,
                                   }}
                                 >
@@ -659,9 +770,9 @@ const TreatmentTimelineMatrix = ({
                                 <div
                                   onClick={() => startEditSpecialist(n.id)}
                                   style={{
-                                    width: "100%", fontSize: 9, fontFamily: FONTS.sans,
+                                    width: "100%", fontSize: 11, fontFamily: FONTS.sans,
                                     border: `1px solid ${hexToRgba(color, 0.6)}`, borderRadius: 4,
-                                    padding: "3px 4px", background: specialistNames[n.id] ? hexToRgba(color, 0.1) : COLORS.creamSoft,
+                                    padding: "4px 5px", background: specialistNames[n.id] ? hexToRgba(color, 0.1) : COLORS.creamSoft,
                                     color: specialistNames[n.id] ? COLORS.brownDark : COLORS.brownLight,
                                     cursor: "pointer", fontWeight: 500, textAlign: "center",
                                     transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 3,
@@ -671,13 +782,13 @@ const TreatmentTimelineMatrix = ({
                                 >
                                   {specialistNames[n.id] ? (
                                     <>
-                                      <div style={{ width: 12, height: 12, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                        <span style={{ fontSize: 6, fontWeight: 700, color: COLORS.creamMain }}>{specialistInitials}</span>
+                                      <div style={{ width: 15, height: 15, borderRadius: "50%", background: color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                        <span style={{ fontSize: 7.5, fontWeight: 700, color: COLORS.creamMain }}>{specialistInitials}</span>
                                       </div>
-                                      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: 9 }}>{specialistNames[n.id]}</span>
+                                      <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: 11 }}>{specialistNames[n.id]}</span>
                                     </>
                                   ) : (
-                                    <span style={{ fontStyle: "italic", fontSize: 8 }}>Seleccionar</span>
+                                    <span style={{ fontStyle: "italic", fontSize: 10 }}>Seleccionar</span>
                                   )}
                                 </div>
                               )}

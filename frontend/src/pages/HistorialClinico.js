@@ -316,6 +316,12 @@ const HistorialClinico = () => {
   const [nuevoMontoPagadoPaquete, setNuevoMontoPagadoPaquete] = useState("");
   const [guardandoEditPagoPaquete, setGuardandoEditPagoPaquete] = useState(false);
 
+  // Estados para editar fecha de presupuesto asignado
+  const [modalEditarFechaPresupuesto, setModalEditarFechaPresupuesto] = useState(false);
+  const [presupuestoEditarFecha, setPresupuestoEditarFecha] = useState(null);
+  const [nuevaFechaPresupuesto, setNuevaFechaPresupuesto] = useState("");
+  const [guardandoEditFecha, setGuardandoEditFecha] = useState(false);
+
   // Estados para especialistas
   const [especialistas, setEspecialistas] = useState([]);
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
@@ -1341,6 +1347,35 @@ const HistorialClinico = () => {
       showToast({ severity: "error", message: error.response?.data?.message || "Error al editar pago" });
     } finally {
       setGuardandoEditPagoPaquete(false);
+    }
+  };
+
+  // Editar fecha de presupuesto asignado
+  const guardarEditarFechaPresupuesto = async () => {
+    if (!presupuestoEditarFecha || !pacienteSeleccionado) return;
+    if (!nuevaFechaPresupuesto) {
+      showToast({ severity: "warning", message: "Selecciona una fecha válida" });
+      return;
+    }
+    try {
+      setGuardandoEditFecha(true);
+      await axios.put(
+        `${API_BASE_URL}/api/paquetes/presupuesto/${presupuestoEditarFecha.id}/fecha`,
+        { fecha_inicio: nuevaFechaPresupuesto },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: "Fecha del presupuesto actualizada correctamente" });
+      setModalEditarFechaPresupuesto(false);
+      // Recargar presupuestos asignados
+      const presupuestosRes = await axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, {
+        headers: authHeaders,
+      });
+      setPresupuestosAsignados(Array.isArray(presupuestosRes.data) ? presupuestosRes.data : []);
+    } catch (error) {
+      console.error("Error al editar fecha de presupuesto:", error);
+      showToast({ severity: "error", message: error.response?.data?.message || "Error al editar fecha" });
+    } finally {
+      setGuardandoEditFecha(false);
     }
   };
 
@@ -5995,9 +6030,23 @@ const HistorialClinico = () => {
                               <Typography sx={{ fontWeight: "bold", color: "#333" }}>
                                 Presupuesto #{presupuesto.oferta_id}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Asignado: {presupuesto.fecha_inicio?.split(' ')[0]}
-                              </Typography>
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                <Typography variant="caption" color="text.secondary">
+                                  Asignado: {presupuesto.fecha_inicio?.split(' ')[0]}
+                                </Typography>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => {
+                                    setPresupuestoEditarFecha(presupuesto);
+                                    setNuevaFechaPresupuesto(presupuesto.fecha_inicio?.split(' ')[0] || "");
+                                    setModalEditarFechaPresupuesto(true);
+                                  }}
+                                  title="Editar fecha del presupuesto"
+                                  sx={{ p: 0.25, color: "#a36920", "&:hover": { backgroundColor: "rgba(163,105,32,0.1)" } }}
+                                >
+                                  <Edit sx={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Box>
                             </Box>
                             <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                               <Box sx={{ 
@@ -8719,6 +8768,41 @@ const HistorialClinico = () => {
             sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
           >
             {guardandoEditPago ? "Guardando..." : "Guardar Cambio"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal para Editar Fecha de Presupuesto */}
+      <Dialog open={modalEditarFechaPresupuesto} onClose={() => setModalEditarFechaPresupuesto(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ color: "#a36920", fontWeight: "bold" }}>
+          📅 Editar Fecha del Presupuesto
+        </DialogTitle>
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
+          {presupuestoEditarFecha && (
+            <Typography variant="body2" sx={{ color: "#555" }}>
+              <strong>Presupuesto #{presupuestoEditarFecha.oferta_id}</strong>
+              <br />
+              Fecha actual: {presupuestoEditarFecha.fecha_inicio?.split(' ')[0]}
+            </Typography>
+          )}
+          <TextField
+            label="Nueva fecha"
+            type="date"
+            fullWidth
+            value={nuevaFechaPresupuesto}
+            onChange={(e) => setNuevaFechaPresupuesto(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setModalEditarFechaPresupuesto(false)} sx={{ color: "#666" }}>Cancelar</Button>
+          <Button
+            variant="contained"
+            onClick={guardarEditarFechaPresupuesto}
+            disabled={guardandoEditFecha}
+            sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a541a" } }}
+          >
+            {guardandoEditFecha ? "Guardando..." : "Guardar Cambio"}
           </Button>
         </DialogActions>
       </Dialog>

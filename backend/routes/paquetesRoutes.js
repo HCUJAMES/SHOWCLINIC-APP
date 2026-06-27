@@ -1546,6 +1546,49 @@ router.put("/presupuesto/:presupuesto_asignado_id/editar-pago", authMiddleware, 
 });
 
 /* ==============================
+   📅 EDITAR FECHA DE PRESUPUESTO ASIGNADO
+============================== */
+router.put("/presupuesto/:presupuesto_asignado_id/fecha", requirePaquetesAsignar, async (req, res) => {
+  const { presupuesto_asignado_id } = req.params;
+  const { fecha_inicio } = req.body;
+
+  if (!fecha_inicio) {
+    return res.status(400).json({ message: "Fecha inválida" });
+  }
+
+  try {
+    const presupuesto = await dbGet(
+      `SELECT * FROM presupuestos_asignados WHERE id = ?`,
+      [presupuesto_asignado_id]
+    );
+
+    if (!presupuesto) {
+      return res.status(404).json({ message: "Presupuesto asignado no encontrado" });
+    }
+
+    // Normalizar a formato 'YYYY-MM-DD HH:MM:SS' conservando la hora original si existía
+    const horaOriginal = (presupuesto.fecha_inicio && presupuesto.fecha_inicio.includes(' '))
+      ? presupuesto.fecha_inicio.split(' ')[1]
+      : '00:00:00';
+    const soloFecha = String(fecha_inicio).split(' ')[0];
+    const nuevaFecha = `${soloFecha} ${horaOriginal}`;
+
+    await dbRun(
+      `UPDATE presupuestos_asignados SET fecha_inicio = ? WHERE id = ?`,
+      [nuevaFecha, presupuesto_asignado_id]
+    );
+
+    res.json({
+      message: "✅ Fecha del presupuesto actualizada correctamente",
+      fecha_inicio: nuevaFecha
+    });
+  } catch (err) {
+    console.error("❌ Error al editar fecha de presupuesto:", err.message);
+    res.status(500).json({ message: "Error al editar fecha de presupuesto" });
+  }
+});
+
+/* ==============================
    ✏️ EDITAR PAGO DE PAQUETE (Solo Master)
 ============================== */
 router.put("/paquete-paciente/:paquete_id/editar-pago", authMiddleware, requireRole("master"), async (req, res) => {
