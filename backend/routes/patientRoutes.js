@@ -554,7 +554,9 @@ router.patch("/:id/ofertas/:ofertaId/descuento", requirePatientWrite, (req, res)
 });
 
 // ✅ Actualizar fecha de creación de una oferta/presupuesto
-router.patch("/:id/ofertas/:ofertaId/fecha", requirePatientWrite, (req, res) => {
+//    Sincroniza también los presupuestos_asignados ligados (oferta_id) para que
+//    el cambio se refleje en Gestión Clínica (que lee presupuestos_asignados).
+router.patch("/:id/ofertas/:ofertaId/fecha", requirePatientWrite, async (req, res) => {
   const { id, ofertaId } = req.params;
   const { creado_en } = req.body;
 
@@ -562,41 +564,51 @@ router.patch("/:id/ofertas/:ofertaId/fecha", requirePatientWrite, (req, res) => 
     return res.status(400).json({ message: "Fecha inválida" });
   }
 
-  // Obtener la fecha actual para conservar la hora original si existía
-  db.get(
-    `SELECT creado_en FROM patient_ofertas WHERE id = ? AND paciente_id = ?`,
-    [ofertaId, id],
-    (errGet, row) => {
-      if (errGet) {
-        console.error("❌ Error al obtener oferta:", errGet.message);
-        return res.status(500).json({ message: "Error al actualizar fecha" });
-      }
-      if (!row) {
-        return res.status(404).json({ message: "Oferta no encontrada" });
-      }
+  try {
+    const oferta = await dbGet(
+      `SELECT creado_en FROM patient_ofertas WHERE id = ? AND paciente_id = ?`,
+      [ofertaId, id]
+    );
+    if (!oferta) {
+      return res.status(404).json({ message: "Oferta no encontrada" });
+    }
 
-      const horaOriginal = (row.creado_en && row.creado_en.includes(' '))
-        ? row.creado_en.split(' ')[1]
-        : '00:00:00';
-      const soloFecha = String(creado_en).split(' ')[0];
-      const nuevaFecha = `${soloFecha} ${horaOriginal}`;
+    const horaOriginal = (oferta.creado_en && oferta.creado_en.includes(' '))
+      ? oferta.creado_en.split(' ')[1]
+      : '00:00:00';
+    const soloFecha = String(creado_en).split(' ')[0];
+    const nuevaFecha = `${soloFecha} ${horaOriginal}`;
 
-      db.run(
-        `UPDATE patient_ofertas SET creado_en = ? WHERE id = ? AND paciente_id = ?`,
-        [nuevaFecha, ofertaId, id],
-        function (err) {
-          if (err) {
-            console.error("❌ Error al actualizar fecha:", err.message);
-            return res.status(500).json({ message: "Error al actualizar fecha" });
-          }
-          if (this.changes === 0) {
-            return res.status(404).json({ message: "Oferta no encontrada" });
-          }
-          res.json({ message: "Fecha actualizada correctamente", creado_en: nuevaFecha });
-        }
+    // 1) Actualizar la oferta (Presupuestos del Paciente)
+    await dbRun(
+      `UPDATE patient_ofertas SET creado_en = ? WHERE id = ? AND paciente_id = ?`,
+      [nuevaFecha, ofertaId, id]
+    );
+
+    // 2) Sincronizar presupuestos_asignados ligados (lo que ve Gestión Clínica).
+    //    Conserva la hora original de cada presupuesto asignado, solo cambia la fecha.
+    const asignados = await dbAll(
+      `SELECT id, fecha_inicio, creado_en FROM presupuestos_asignados WHERE oferta_id = ? AND paciente_id = ?`,
+      [ofertaId, id]
+    );
+    for (const pa of asignados) {
+      const horaInicio = (pa.fecha_inicio && pa.fecha_inicio.includes(' ')) ? pa.fecha_inicio.split(' ')[1] : horaOriginal;
+      const horaCreado = (pa.creado_en && pa.creado_en.includes(' ')) ? pa.creado_en.split(' ')[1] : horaOriginal;
+      await dbRun(
+        `UPDATE presupuestos_asignados SET fecha_inicio = ?, creado_en = ? WHERE id = ?`,
+        [`${soloFecha} ${horaInicio}`, `${soloFecha} ${horaCreado}`, pa.id]
       );
     }
-  );
+
+    res.json({
+      message: "Fecha actualizada correctamente",
+      creado_en: nuevaFecha,
+      presupuestos_sincronizados: asignados.length
+    });
+  } catch (err) {
+    console.error("❌ Error al actualizar fecha:", err.message);
+    res.status(500).json({ message: "Error al actualizar fecha" });
+  }
 });
 
 // ✅ Eliminar una oferta/presupuesto

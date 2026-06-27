@@ -1567,15 +1567,20 @@ router.put("/presupuesto/:presupuesto_asignado_id/fecha", requirePaquetesAsignar
     }
 
     // Normalizar a formato 'YYYY-MM-DD HH:MM:SS' conservando la hora original si existía
-    const horaOriginal = (presupuesto.fecha_inicio && presupuesto.fecha_inicio.includes(' '))
+    const horaInicio = (presupuesto.fecha_inicio && presupuesto.fecha_inicio.includes(' '))
       ? presupuesto.fecha_inicio.split(' ')[1]
       : '00:00:00';
+    const horaCreado = (presupuesto.creado_en && presupuesto.creado_en.includes(' '))
+      ? presupuesto.creado_en.split(' ')[1]
+      : horaInicio;
     const soloFecha = String(fecha_inicio).split(' ')[0];
-    const nuevaFecha = `${soloFecha} ${horaOriginal}`;
+    const nuevaFecha = `${soloFecha} ${horaInicio}`;
+    const nuevoCreado = `${soloFecha} ${horaCreado}`;
 
+    // Actualizar fecha_inicio y creado_en (Gestión Clínica filtra/muestra por creado_en)
     await dbRun(
-      `UPDATE presupuestos_asignados SET fecha_inicio = ? WHERE id = ?`,
-      [nuevaFecha, presupuesto_asignado_id]
+      `UPDATE presupuestos_asignados SET fecha_inicio = ?, creado_en = ? WHERE id = ?`,
+      [nuevaFecha, nuevoCreado, presupuesto_asignado_id]
     );
 
     res.json({
