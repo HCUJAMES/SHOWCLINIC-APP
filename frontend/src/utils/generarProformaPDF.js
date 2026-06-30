@@ -32,8 +32,9 @@ const loadImageAsBase64 = (url) => {
  * @param {Object} presupuesto - Datos del presupuesto
  * @param {Object} paciente - Datos del paciente
  * @param {string} tipo - Tipo de documento
+ * @param {string|null} seguimientoImageBase64 - Captura del gráfico de seguimiento (si existe)
  */
-export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupuesto") => {
+export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupuesto", seguimientoImageBase64 = null) => {
   try {
     console.log("Generando proforma PDF con cronograma...", { presupuesto, paciente, tipo });
     
@@ -473,7 +474,13 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     // SEGUNDA PÁGINA: CRONOGRAMA DEL TRATAMIENTO
     // ============================================
     {
-      doc.addPage();
+      // Página horizontal para mejor visualización del cronograma
+      doc.addPage('l'); // landscape
+      const pgW = doc.internal.pageSize.getWidth();   // ~297mm
+      const pgH = doc.internal.pageSize.getHeight();  // ~210mm
+      const hdrH = 32;
+      const ftrH = 18;
+      const ftrY = pgH - ftrH;
       
       // Header con gradiente
       for (let i = 0; i < stripes; i++) {
@@ -482,7 +489,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
         const g = marron[1] + (bronce[1] - marron[1]) * ratio;
         const b = marron[2] + (bronce[2] - marron[2]) * ratio;
         doc.setFillColor(r, g, b);
-        doc.rect(0, (headerHeight / stripes) * i, pageWidth, headerHeight / stripes, "F");
+        doc.rect(0, (hdrH / stripes) * i, pgW, hdrH / stripes, "F");
       }
 
       // Logo
@@ -500,30 +507,43 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       doc.setFontSize(18);
       doc.setFont("times", "bold");
       doc.setTextColor(blanco[0], blanco[1], blanco[2]);
-      doc.text("CRONOGRAMA DE TRATAMIENTO", pageWidth / 2, 20, { align: "center" });
+      doc.text("CRONOGRAMA DE TRATAMIENTO", pgW / 2, 20, { align: "center" });
       
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
-      doc.text("Plan de sesiones personalizado", pageWidth / 2, 28, { align: "center" });
+      doc.text("Plan de sesiones personalizado", pgW / 2, 28, { align: "center" });
 
       // Línea de acento dorado
       doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
       doc.setLineWidth(1);
-      doc.line(0, headerHeight, pageWidth, headerHeight);
+      doc.line(0, hdrH, pgW, hdrH);
 
       // Información del paciente
-      yPos = headerHeight + 8;
+      yPos = hdrH + 8;
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(bronce[0], bronce[1], bronce[2]);
       doc.text(`Paciente: ${nombreCompleto}`, 15, yPos);
       
       const totalSesiones = items.reduce((sum, item) => sum + (Number(item.sesiones) || 1), 0);
-      doc.text(`Total de sesiones: ${totalSesiones}`, pageWidth - 15, yPos, { align: "right" });
+      doc.text(`Total de sesiones: ${totalSesiones}`, pgW - 15, yPos, { align: "right" });
 
       yPos += 8;
 
-      // ─── DIBUJAR CRONOGRAMA VISUAL ───
+      // Si tenemos la captura real del gráfico, usarla directamente
+      if (seguimientoImageBase64) {
+        try {
+          const imgWidth = pgW - 20;
+          const imgHeight = pgH - yPos - ftrH - 5;
+          doc.addImage(seguimientoImageBase64, "PNG", 10, yPos, imgWidth, imgHeight);
+        } catch (e) {
+          console.error("Error agregando imagen de seguimiento:", e);
+          doc.setFontSize(10);
+          doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+          doc.text("No se pudo cargar la imagen del seguimiento", pgW / 2, yPos + 20, { align: "center" });
+        }
+      } else {
+      // ─── DIBUJAR CRONOGRAMA VISUAL (fallback) ───
       // Categorizar tratamientos
       const categorizeTreatment = (nombre) => {
         const n = (nombre || '').toLowerCase();
@@ -569,7 +589,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       // ─── Dibujar el gráfico tipo timeline ───
       const graphX = 15;
       const graphY = yPos;
-      const graphWidth = pageWidth - 30;
+      const graphWidth = pgW - 30;
       const laneHeight = 38;
       const catKeys = Object.keys(sessionsByCategory);
       const activeCats = catKeys.length > 0 ? catKeys : ['armonizacion'];
@@ -718,7 +738,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       // Nota del cronograma
       yPos += 4;
       doc.setFillColor(crema[0], crema[1], crema[2]);
-      doc.roundedRect(15, yPos, pageWidth - 30, 18, 3, 3, "F");
+      doc.roundedRect(15, yPos, pgW - 30, 18, 3, 3, "F");
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
@@ -727,32 +747,33 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       doc.setFont("helvetica", "bold");
       doc.setTextColor(bronce[0], bronce[1], bronce[2]);
       doc.text("Frecuencia recomendada: 1 sesión por semana.", 20, yPos + 16);
+      } // fin else (cronograma generado)
 
-      // Footer en la segunda página
+      // Footer en la segunda página (landscape)
       for (let i = 0; i < footerStripes; i++) {
         const ratio = i / footerStripes;
         const r = marron[0] + (bronce[0] - marron[0]) * ratio;
         const g = marron[1] + (bronce[1] - marron[1]) * ratio;
         const b = marron[2] + (bronce[2] - marron[2]) * ratio;
         doc.setFillColor(r, g, b);
-        doc.rect(0, footerY + (footerHeight / footerStripes) * i, pageWidth, footerHeight / footerStripes, "F");
+        doc.rect(0, ftrY + (ftrH / footerStripes) * i, pgW, ftrH / footerStripes, "F");
       }
 
       doc.setFontSize(8);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(blanco[0], blanco[1], blanco[2]);
-      doc.text("ShowClinic", 15, footerY + 7);
+      doc.text("ShowClinic", 15, ftrY + 7);
       
       doc.setFontSize(7);
       doc.setFont("helvetica", "normal");
-      doc.text("Tel: +51 974 212 114  |  Av. Ejército 616, Centro de Negocios, Yanahuara, Perú", 15, footerY + 12);
+      doc.text("Tel: +51 974 212 114  |  Av. Ejército 616, Centro de Negocios, Yanahuara, Perú", 15, ftrY + 12);
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
       doc.setFillColor(dorado[0], dorado[1], dorado[2]);
-      doc.roundedRect(pageWidth - 45, footerY + 5, 30, 7, 2, 2, "F");
+      doc.roundedRect(pgW - 45, ftrY + 5, 30, 7, 2, 2, "F");
       doc.setTextColor(blanco[0], blanco[1], blanco[2]);
-      doc.text("@showclinic", pageWidth - 30, footerY + 9.5, { align: "center" });
+      doc.text("@showclinic", pgW - 30, ftrY + 9.5, { align: "center" });
     }
 
     // ============================================

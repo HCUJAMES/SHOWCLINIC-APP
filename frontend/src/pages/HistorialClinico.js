@@ -42,6 +42,7 @@ import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProf
 import generarConsentimientoPDF from "../utils/generarConsentimientoPDF";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import { useToast } from "../components/ToastProvider";
 import ReciboTicket from "../components/ReciboTicket";
 import ReciboConsolidado from "../components/ReciboConsolidado";
@@ -282,6 +283,7 @@ const HistorialClinico = () => {
   // Control para la regla automática de exosomas en el editor de presupuesto:
   // si el doctor lo elimina manualmente, no se vuelve a agregar en esa sesión de edición.
   const exosomasRemovedRef = useRef(false);
+  const timelineRefs = useRef({});
 
   // Wrapper que persiste marcas en la base de datos (sincroniza entre dispositivos)
   const setTratamientosMarcados = (valOrFn) => {
@@ -5831,7 +5833,7 @@ const HistorialClinico = () => {
                 if (hiddenTimelines[presupuesto.id]) return null;
 
                 return (
-                  <div key={`timeline-${presupuesto.id}`} style={{ marginBottom: 24 }}>
+                  <div key={`timeline-${presupuesto.id}`} ref={(el) => { timelineRefs.current[presupuesto.id] = el; }} style={{ marginBottom: 24 }}>
                     <TreatmentTimelineMatrix
                       presupuestoId={presupuesto.id}
                       especialistas={especialistas}
@@ -8036,6 +8038,29 @@ const HistorialClinico = () => {
             onClick={async () => {
               if (presupuestoParaProforma && pacienteSeleccionado) {
                 try {
+                  // Capturar el gráfico del seguimiento si existe un presupuesto asignado
+                  let seguimientoImageBase64 = null;
+                  const presAsignado = presupuestosAsignados.find(p => p.oferta_id === presupuestoParaProforma.id);
+                  
+                  if (presAsignado) {
+                    const timelineElement = timelineRefs.current[presAsignado.id];
+                    if (timelineElement) {
+                      try {
+                        showToast({ severity: "info", message: "Capturando seguimiento..." });
+                        const canvas = await html2canvas(timelineElement, {
+                          scale: 2,
+                          backgroundColor: '#FFF8F0',
+                          logging: false,
+                          useCORS: true,
+                          allowTaint: true,
+                        });
+                        seguimientoImageBase64 = canvas.toDataURL('image/png');
+                      } catch (captureError) {
+                        console.error("Error capturando seguimiento:", captureError);
+                      }
+                    }
+                  }
+
                   const allItems = presupuestoParaProforma.items || [];
                   const ofertaId = presupuestoParaProforma.id;
                   const filtrados = allItems.filter((_, idx) => {
@@ -8046,7 +8071,9 @@ const HistorialClinico = () => {
                   
                   await generarProformaPDF(
                     { ...presupuestoParaProforma, items: itemsParaPDF, descuento: Number(descuentoProforma) || 0 },
-                    pacienteSeleccionado
+                    pacienteSeleccionado,
+                    "presupuesto",
+                    seguimientoImageBase64
                   );
                   
                   setModalDescuento(false);
