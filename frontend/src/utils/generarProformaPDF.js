@@ -28,10 +28,14 @@ const loadImageAsBase64 = (url) => {
 /**
  * Generar proforma en PDF con diseño profesional VERTICAL (A4 Portrait)
  * Diseño elegante con colores de ShowClinic según especificaciones
+ * Incluye segunda página con cronograma visual del tratamiento
+ * @param {Object} presupuesto - Datos del presupuesto
+ * @param {Object} paciente - Datos del paciente
+ * @param {string} tipo - Tipo de documento
  */
 export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupuesto") => {
   try {
-    console.log("Generando proforma PDF...", { presupuesto, paciente, tipo });
+    console.log("Generando proforma PDF con cronograma...", { presupuesto, paciente, tipo });
     
     // Cargar logo
     const logoBase64 = await loadImageAsBase64(LOGO_URL);
@@ -464,6 +468,292 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       baseline: "middle"
     });
     doc.setGState(new doc.GState({ opacity: 1 })); // Restaurar opacidad
+
+    // ============================================
+    // SEGUNDA PÁGINA: CRONOGRAMA DEL TRATAMIENTO
+    // ============================================
+    {
+      doc.addPage();
+      
+      // Header con gradiente
+      for (let i = 0; i < stripes; i++) {
+        const ratio = i / stripes;
+        const r = marron[0] + (bronce[0] - marron[0]) * ratio;
+        const g = marron[1] + (bronce[1] - marron[1]) * ratio;
+        const b = marron[2] + (bronce[2] - marron[2]) * ratio;
+        doc.setFillColor(r, g, b);
+        doc.rect(0, (headerHeight / stripes) * i, pageWidth, headerHeight / stripes, "F");
+      }
+
+      // Logo
+      doc.setFillColor(blanco[0], blanco[1], blanco[2]);
+      doc.roundedRect(logoX, logoY, logoSize, logoSize, 3, 3, "F");
+      if (logoBase64) {
+        try {
+          doc.addImage(logoBase64, "PNG", logoX + 2, logoY + 2, logoSize - 4, logoSize - 4);
+        } catch (e) {
+          console.log("No se pudo agregar el logo");
+        }
+      }
+
+      // Título de la sección
+      doc.setFontSize(18);
+      doc.setFont("times", "bold");
+      doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+      doc.text("CRONOGRAMA DE TRATAMIENTO", pageWidth / 2, 20, { align: "center" });
+      
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text("Plan de sesiones personalizado", pageWidth / 2, 28, { align: "center" });
+
+      // Línea de acento dorado
+      doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+      doc.setLineWidth(1);
+      doc.line(0, headerHeight, pageWidth, headerHeight);
+
+      // Información del paciente
+      yPos = headerHeight + 8;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(bronce[0], bronce[1], bronce[2]);
+      doc.text(`Paciente: ${nombreCompleto}`, 15, yPos);
+      
+      const totalSesiones = items.reduce((sum, item) => sum + (Number(item.sesiones) || 1), 0);
+      doc.text(`Total de sesiones: ${totalSesiones}`, pageWidth - 15, yPos, { align: "right" });
+
+      yPos += 8;
+
+      // ─── DIBUJAR CRONOGRAMA VISUAL ───
+      // Categorizar tratamientos
+      const categorizeTreatment = (nombre) => {
+        const n = (nombre || '').toLowerCase();
+        if (n.includes('corporal') || n.includes('reducti') || n.includes('lipopapada') || n.includes('lipo') || 
+            n.includes('masaje') || n.includes('modelado') || n.includes('criolipo') || n.includes('cavita') ||
+            n.includes('drenaje') || n.includes('reafirm') || n.includes('gluteo') || n.includes('abdomen')) {
+          return 'corporal';
+        }
+        if (n.includes('facial') || n.includes('hifu') || n.includes('radiofrecuencia') || n.includes('limpieza') || 
+            n.includes('peeling') || n.includes('microneeld') || n.includes('dermapen') || n.includes('led') ||
+            n.includes('cosm') || n.includes('rejuvenec') || n.includes('mancha') || n.includes('acne') ||
+            n.includes('carboxi')) {
+          return 'facial';
+        }
+        return 'armonizacion';
+      };
+
+      const categoryConfig = {
+        corporal: { label: "Cosmiatría Corporal", color: [95, 147, 138], initial: "C" },
+        facial: { label: "Cosmiatría Facial", color: [192, 132, 109], initial: "F" },
+        armonizacion: { label: "Armonización", color: [200, 169, 110], initial: "A" },
+      };
+
+      // Organizar items por categoría con sesiones
+      const sessionsByCategory = {};
+      items.forEach((item) => {
+        const cat = categorizeTreatment(item.nombre || item.tratamiento || "");
+        if (!sessionsByCategory[cat]) sessionsByCategory[cat] = [];
+        const numSesiones = Number(item.sesiones) || 1;
+        for (let s = 1; s <= numSesiones; s++) {
+          sessionsByCategory[cat].push({
+            nombre: item.nombre || item.tratamiento || "Tratamiento",
+            sesionNum: s,
+            totalSesiones: numSesiones,
+          });
+        }
+      });
+
+      // Calcular semanas necesarias
+      const maxSessions = Math.max(...Object.values(sessionsByCategory).map(arr => arr.length), 1);
+      const numWeeks = Math.max(4, maxSessions);
+
+      // ─── Dibujar el gráfico tipo timeline ───
+      const graphX = 15;
+      const graphY = yPos;
+      const graphWidth = pageWidth - 30;
+      const laneHeight = 38;
+      const catKeys = Object.keys(sessionsByCategory);
+      const activeCats = catKeys.length > 0 ? catKeys : ['armonizacion'];
+      const graphHeight = activeCats.length * laneHeight + 30; // +30 para header de semanas
+
+      // Fondo del gráfico
+      doc.setFillColor(255, 252, 247);
+      doc.roundedRect(graphX, graphY, graphWidth, graphHeight, 4, 4, "F");
+      doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(graphX, graphY, graphWidth, graphHeight, 4, 4, "S");
+
+      // Header con semanas
+      const weekWidth = graphWidth / numWeeks;
+      const headerY2 = graphY;
+      
+      doc.setFillColor(245, 240, 230);
+      doc.rect(graphX, headerY2, graphWidth, 10, "F");
+      
+      for (let w = 0; w < numWeeks; w++) {
+        const wx = graphX + w * weekWidth + weekWidth / 2;
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(marron[0], marron[1], marron[2]);
+        doc.text(`SEM ${w + 1}`, wx, headerY2 + 7, { align: "center" });
+        
+        // Líneas verticales divisorias
+        if (w > 0) {
+          doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+          doc.setLineWidth(0.15);
+          doc.line(graphX + w * weekWidth, headerY2, graphX + w * weekWidth, graphY + graphHeight);
+        }
+      }
+
+      // Dibujar carriles por categoría
+      activeCats.forEach((catKey, catIdx) => {
+        const config = categoryConfig[catKey] || categoryConfig.armonizacion;
+        const laneY = graphY + 12 + catIdx * laneHeight;
+        const sessions = sessionsByCategory[catKey] || [];
+
+        // Etiqueta de categoría (lado izquierdo, dentro del carril)
+        // Círculo con inicial
+        const labelX = graphX + 4;
+        const labelY = laneY + laneHeight / 2;
+        doc.setFillColor(config.color[0], config.color[1], config.color[2]);
+        doc.circle(labelX + 4, labelY, 4, "F");
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text(config.initial, labelX + 4, labelY + 2.5, { align: "center" });
+
+        // Nombre de categoría
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(config.color[0], config.color[1], config.color[2]);
+        doc.text(config.label, labelX + 10, labelY + 2);
+
+        // Línea horizontal del carril (guía)
+        const lineStartX = graphX + 35;
+        const lineEndX = graphX + graphWidth - 5;
+        doc.setDrawColor(config.color[0], config.color[1], config.color[2]);
+        doc.setLineWidth(0.3);
+        doc.setLineDashPattern([2, 2], 0);
+        doc.line(lineStartX, labelY, lineEndX, labelY);
+        doc.setLineDashPattern([], 0);
+
+        // Dibujar nodos de sesiones
+        const nodeStartX = graphX + 38;
+        const availableWidth = graphWidth - 45;
+        
+        sessions.forEach((session, sIdx) => {
+          const weekForSession = sIdx; // Una sesión por semana
+          const nodeX = nodeStartX + (weekForSession + 0.5) * (availableWidth / numWeeks);
+          const nodeY = labelY;
+          const nodeR = 5;
+
+          // Círculo del nodo (pendiente - borde punteado)
+          doc.setFillColor(255, 252, 247);
+          doc.setDrawColor(config.color[0], config.color[1], config.color[2]);
+          doc.setLineWidth(0.6);
+          doc.circle(nodeX, nodeY, nodeR, "FD");
+
+          // Número de orden dentro del nodo
+          doc.setFontSize(6);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(config.color[0], config.color[1], config.color[2]);
+          doc.text(`${sIdx + 1}`, nodeX, nodeY + 2, { align: "center" });
+
+          // Nombre del tratamiento debajo del nodo (solo primera sesión de cada tratamiento)
+          if (session.sesionNum === 1 || sessions.length <= numWeeks) {
+            doc.setFontSize(5);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+            const nombre = session.nombre.length > 18 ? session.nombre.substring(0, 16) + "..." : session.nombre;
+            doc.text(nombre, nodeX, nodeY + nodeR + 4, { align: "center" });
+          }
+
+          // Conectar nodos con línea
+          if (sIdx > 0) {
+            const prevNodeX = nodeStartX + (sIdx - 1 + 0.5) * (availableWidth / numWeeks);
+            doc.setDrawColor(config.color[0], config.color[1], config.color[2]);
+            doc.setLineWidth(0.5);
+            doc.line(prevNodeX + nodeR, nodeY, nodeX - nodeR, nodeY);
+          }
+        });
+      });
+
+      // ─── Línea de ALTA al final ───
+      const altaX = graphX + graphWidth - 8;
+      doc.setDrawColor(76, 175, 80);
+      doc.setLineWidth(0.8);
+      doc.line(altaX, graphY + 10, altaX, graphY + graphHeight - 2);
+      
+      // Etiqueta ALTA
+      doc.setFillColor(76, 175, 80);
+      doc.roundedRect(altaX - 7, graphY + 10, 14, 5, 1.5, 1.5, "F");
+      doc.setFontSize(6);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("ALTA", altaX, graphY + 13.5, { align: "center" });
+
+      // ─── LEYENDA ───
+      yPos = graphY + graphHeight + 10;
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(marron[0], marron[1], marron[2]);
+      doc.text("LEYENDA", 15, yPos);
+      yPos += 6;
+
+      const legendItems = [
+        { color: [95, 147, 138], label: "Cosmiatría Corporal — Modelado y reductivos" },
+        { color: [192, 132, 109], label: "Cosmiatría Facial — Aparatología y limpieza" },
+        { color: [200, 169, 110], label: "Armonización — Inyectables y rellenos" },
+      ];
+
+      legendItems.forEach((item) => {
+        doc.setFillColor(item.color[0], item.color[1], item.color[2]);
+        doc.circle(20, yPos - 1.5, 2.5, "F");
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+        doc.text(item.label, 25, yPos);
+        yPos += 6;
+      });
+
+      // Nota del cronograma
+      yPos += 4;
+      doc.setFillColor(crema[0], crema[1], crema[2]);
+      doc.roundedRect(15, yPos, pageWidth - 30, 18, 3, 3, "F");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+      doc.text("Nota: El cronograma es referencial. Las fechas exactas de cada sesión se", 20, yPos + 6);
+      doc.text("coordinarán con su especialista según disponibilidad y evolución del tratamiento.", 20, yPos + 11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(bronce[0], bronce[1], bronce[2]);
+      doc.text("Frecuencia recomendada: 1 sesión por semana.", 20, yPos + 16);
+
+      // Footer en la segunda página
+      for (let i = 0; i < footerStripes; i++) {
+        const ratio = i / footerStripes;
+        const r = marron[0] + (bronce[0] - marron[0]) * ratio;
+        const g = marron[1] + (bronce[1] - marron[1]) * ratio;
+        const b = marron[2] + (bronce[2] - marron[2]) * ratio;
+        doc.setFillColor(r, g, b);
+        doc.rect(0, footerY + (footerHeight / footerStripes) * i, pageWidth, footerHeight / footerStripes, "F");
+      }
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+      doc.text("ShowClinic", 15, footerY + 7);
+      
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "normal");
+      doc.text("Tel: +51 974 212 114  |  Av. Ejército 616, Centro de Negocios, Yanahuara, Perú", 15, footerY + 12);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setFillColor(dorado[0], dorado[1], dorado[2]);
+      doc.roundedRect(pageWidth - 45, footerY + 5, 30, 7, 2, 2, "F");
+      doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+      doc.text("@showclinic", pageWidth - 30, footerY + 9.5, { align: "center" });
+    }
 
     // ============================================
     // GUARDAR PDF

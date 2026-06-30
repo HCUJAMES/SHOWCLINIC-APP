@@ -8035,19 +8035,26 @@ const HistorialClinico = () => {
             startIcon={<Print />}
             onClick={async () => {
               if (presupuestoParaProforma && pacienteSeleccionado) {
-                const allItems = presupuestoParaProforma.items || [];
-                const ofertaId = presupuestoParaProforma.id;
-                const filtrados = allItems.filter((_, idx) => {
-                  const est = tratamientosMarcados[`${ofertaId}-${idx}`];
-                  return est === "gold" || est === "purple";
-                });
-                const itemsParaPDF = filtrados.length > 0 ? filtrados : allItems;
-                await generarProformaPDF(
-                  { ...presupuestoParaProforma, items: itemsParaPDF, descuento: Number(descuentoProforma) || 0 },
-                  pacienteSeleccionado
-                );
-                setModalDescuento(false);
-                showToast({ severity: "success", message: "Proforma generada correctamente" });
+                try {
+                  const allItems = presupuestoParaProforma.items || [];
+                  const ofertaId = presupuestoParaProforma.id;
+                  const filtrados = allItems.filter((_, idx) => {
+                    const est = tratamientosMarcados[`${ofertaId}-${idx}`];
+                    return est === "gold" || est === "purple";
+                  });
+                  const itemsParaPDF = filtrados.length > 0 ? filtrados : allItems;
+                  
+                  await generarProformaPDF(
+                    { ...presupuestoParaProforma, items: itemsParaPDF, descuento: Number(descuentoProforma) || 0 },
+                    pacienteSeleccionado
+                  );
+                  
+                  setModalDescuento(false);
+                  showToast({ severity: "success", message: "Proforma generada correctamente" });
+                } catch (error) {
+                  console.error("Error generando proforma:", error);
+                  showToast({ severity: "error", message: "Error al generar la proforma" });
+                }
               }
             }}
             sx={{
