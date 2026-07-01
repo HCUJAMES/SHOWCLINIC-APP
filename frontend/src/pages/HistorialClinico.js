@@ -42,6 +42,7 @@ import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProf
 import generarConsentimientoPDF from "../utils/generarConsentimientoPDF";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import { useToast } from "../components/ToastProvider";
 import ReciboTicket from "../components/ReciboTicket";
 import ReciboConsolidado from "../components/ReciboConsolidado";
@@ -282,6 +283,7 @@ const HistorialClinico = () => {
   // Control para la regla automática de exosomas en el editor de presupuesto:
   // si el doctor lo elimina manualmente, no se vuelve a agregar en esa sesión de edición.
   const exosomasRemovedRef = useRef(false);
+  const timelineRefs = useRef({});
 
   // Wrapper que persiste marcas en la base de datos (sincroniza entre dispositivos)
   const setTratamientosMarcados = (valOrFn) => {
@@ -5831,7 +5833,7 @@ const HistorialClinico = () => {
                 if (hiddenTimelines[presupuesto.id]) return null;
 
                 return (
-                  <div key={`timeline-${presupuesto.id}`} style={{ marginBottom: 24 }}>
+                  <div key={`timeline-${presupuesto.id}`} ref={(el) => { timelineRefs.current[presupuesto.id] = el; }} style={{ marginBottom: 24 }}>
                     <TreatmentTimelineMatrix
                       presupuestoId={presupuesto.id}
                       especialistas={especialistas}
@@ -8036,6 +8038,42 @@ const HistorialClinico = () => {
             onClick={async () => {
               if (presupuestoParaProforma && pacienteSeleccionado) {
                 try {
+                  showToast({ severity: "info", message: "Preparando proforma..." });
+                  
+                  // Buscar presupuesto asignado correspondiente
+                  let seguimientoImageBase64 = null;
+                  const presAsignado = presupuestosAsignados.find(p => p.oferta_id === presupuestoParaProforma.id);
+                  
+                  if (presAsignado) {
+                    const timelineElement = timelineRefs.current[presAsignado.id];
+                    
+                    if (timelineElement) {
+                      try {
+                        showToast({ severity: "info", message: "Capturando cronograma..." });
+                        
+                        // Esperar 300ms para asegurar que el timeline esté completamente renderizado
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        
+                        // Captura de ALTA CALIDAD
+                        const canvas = await html2canvas(timelineElement, {
+                          scale: 3, // Mayor escala = mejor calidad
+                          backgroundColor: '#FFF8F0',
+                          logging: false,
+                          useCORS: true,
+                          allowTaint: true,
+                          imageTimeout: 0,
+                          removeContainer: false,
+                        });
+                        
+                        seguimientoImageBase64 = canvas.toDataURL('image/png', 1.0); // Calidad máxima
+                        console.log("✅ Cronograma capturado exitosamente");
+                      } catch (captureError) {
+                        console.error("❌ Error capturando cronograma:", captureError);
+                        showToast({ severity: "warning", message: "Generando cronograma alternativo..." });
+                      }
+                    }
+                  }
+
                   const allItems = presupuestoParaProforma.items || [];
                   const ofertaId = presupuestoParaProforma.id;
                   const filtrados = allItems.filter((_, idx) => {
@@ -8047,7 +8085,8 @@ const HistorialClinico = () => {
                   await generarProformaPDF(
                     { ...presupuestoParaProforma, items: itemsParaPDF, descuento: Number(descuentoProforma) || 0 },
                     pacienteSeleccionado,
-                    "presupuesto"
+                    "presupuesto",
+                    seguimientoImageBase64
                   );
                   
                   setModalDescuento(false);

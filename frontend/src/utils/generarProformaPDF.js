@@ -28,12 +28,13 @@ const loadImageAsBase64 = (url) => {
 /**
  * Generar proforma en PDF con diseño profesional VERTICAL (A4 Portrait)
  * Diseño elegante con colores de ShowClinic según especificaciones
- * Incluye segunda página HORIZONTAL con cronograma visual premium dibujado vectorialmente
+ * Incluye segunda página HORIZONTAL con cronograma visual
  * @param {Object} presupuesto - Datos del presupuesto
  * @param {Object} paciente - Datos del paciente
  * @param {string} tipo - Tipo de documento
+ * @param {string|null} seguimientoImageBase64 - Captura del cronograma real (prioridad)
  */
-export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupuesto") => {
+export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupuesto", seguimientoImageBase64 = null) => {
   try {
     console.log("Generando proforma PDF con cronograma...", { presupuesto, paciente, tipo });
     
@@ -530,8 +531,50 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       yPos += 10;
 
       // ═══════════════════════════════════════════════
-      // CRONOGRAMA VISUAL PREMIUM (dibujado vectorial)
+      // CRONOGRAMA DEL TRATAMIENTO
       // ═══════════════════════════════════════════════
+      
+      // Si tenemos la captura real del cronograma, usarla (PRIORIDAD)
+      if (seguimientoImageBase64) {
+        try {
+          // Espacio disponible
+          const availableWidth = pgW - 40;
+          const availableHeight = pgH - yPos - ftrH - 10;
+          
+          // Calcular dimensiones manteniendo aspect ratio
+          const img = new Image();
+          img.src = seguimientoImageBase64;
+          
+          // Esperar a que la imagen cargue para obtener dimensiones reales
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+          
+          const aspectRatio = img.width / img.height;
+          let finalWidth = availableWidth * 0.95;
+          let finalHeight = finalWidth / aspectRatio;
+          
+          // Si la altura excede el espacio, ajustar por altura
+          if (finalHeight > availableHeight) {
+            finalHeight = availableHeight * 0.95;
+            finalWidth = finalHeight * aspectRatio;
+          }
+          
+          const imgX = (pgW - finalWidth) / 2; // Centrar horizontalmente
+          const imgY = yPos;
+          
+          doc.addImage(seguimientoImageBase64, "PNG", imgX, imgY, finalWidth, finalHeight);
+          
+          console.log("✅ Cronograma real insertado en PDF");
+        } catch (e) {
+          console.error("Error agregando cronograma capturado:", e);
+          // Continuar con el cronograma dibujado como fallback
+        }
+      }
+      
+      // Si NO hay imagen capturada, dibujar cronograma vectorial
+      if (!seguimientoImageBase64) {
       // Categorizar tratamientos
       const categorizeTreatment = (nombre) => {
         const n = (nombre || '').toLowerCase();
@@ -755,6 +798,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       doc.setFont("helvetica", "bold");
       doc.setTextColor(bronce[0], bronce[1], bronce[2]);
       doc.text("Frecuencia recomendada: 1 sesión por semana.", 20, yPos + 16);
+      } // fin if (!seguimientoImageBase64)
 
       // Footer en la segunda página (landscape)
       for (let i = 0; i < footerStripes; i++) {
