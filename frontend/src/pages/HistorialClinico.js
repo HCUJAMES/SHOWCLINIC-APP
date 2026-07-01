@@ -8054,9 +8054,9 @@ const HistorialClinico = () => {
                         // Esperar 300ms para asegurar que el timeline esté completamente renderizado
                         await new Promise(resolve => setTimeout(resolve, 300));
                         
-                        // Captura de ALTA CALIDAD
+                        // Captura optimizada (balance calidad/tamaño)
                         const canvas = await html2canvas(timelineElement, {
-                          scale: 3, // Mayor escala = mejor calidad
+                          scale: 2, // Escala 2x = buena calidad sin exceso de peso
                           backgroundColor: '#FFF8F0',
                           logging: false,
                           useCORS: true,
@@ -8065,7 +8065,8 @@ const HistorialClinico = () => {
                           removeContainer: false,
                         });
                         
-                        seguimientoImageBase64 = canvas.toDataURL('image/png', 1.0); // Calidad máxima
+                        // Usar JPEG con 85% de calidad para reducir tamaño (vs PNG sin compresión)
+                        seguimientoImageBase64 = canvas.toDataURL('image/jpeg', 0.85);
                         console.log("✅ Cronograma capturado exitosamente");
                       } catch (captureError) {
                         console.error("❌ Error capturando cronograma:", captureError);

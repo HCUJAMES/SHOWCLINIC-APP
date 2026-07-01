@@ -564,7 +564,8 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
           const imgX = (pgW - finalWidth) / 2; // Centrar horizontalmente
           const imgY = yPos;
           
-          doc.addImage(seguimientoImageBase64, "PNG", imgX, imgY, finalWidth, finalHeight);
+          // Usar JPEG para menor tamaño de archivo
+          doc.addImage(seguimientoImageBase64, "JPEG", imgX, imgY, finalWidth, finalHeight);
           
           console.log("✅ Cronograma real insertado en PDF");
         } catch (e) {
