@@ -28,13 +28,12 @@ const loadImageAsBase64 = (url) => {
 /**
  * Generar proforma en PDF con diseño profesional VERTICAL (A4 Portrait)
  * Diseño elegante con colores de ShowClinic según especificaciones
- * Incluye segunda página con cronograma visual del tratamiento
+ * Incluye segunda página HORIZONTAL con cronograma visual premium dibujado vectorialmente
  * @param {Object} presupuesto - Datos del presupuesto
  * @param {Object} paciente - Datos del paciente
  * @param {string} tipo - Tipo de documento
- * @param {string|null} seguimientoImageBase64 - Captura del gráfico de seguimiento (si existe)
  */
-export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupuesto", seguimientoImageBase64 = null) => {
+export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupuesto") => {
   try {
     console.log("Generando proforma PDF con cronograma...", { presupuesto, paciente, tipo });
     
@@ -528,39 +527,11 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       const totalSesiones = items.reduce((sum, item) => sum + (Number(item.sesiones) || 1), 0);
       doc.text(`Total de sesiones: ${totalSesiones}`, pgW - 15, yPos, { align: "right" });
 
-      yPos += 8;
+      yPos += 10;
 
-      // Si tenemos la captura real del gráfico, usarla directamente
-      if (seguimientoImageBase64) {
-        try {
-          // Espacio disponible
-          const availableWidth = pgW - 40;
-          const availableHeight = pgH - yPos - ftrH - 15;
-          
-          // Usar aspect ratio típico del timeline (aproximadamente 2.5:1 ancho:alto)
-          // Esto evita problemas de carga asíncrona de imagen
-          const aspectRatio = 2.5;
-          let finalWidth = availableWidth * 0.85;
-          let finalHeight = finalWidth / aspectRatio;
-          
-          // Si la altura excede el espacio, ajustar por altura
-          if (finalHeight > availableHeight) {
-            finalHeight = availableHeight * 0.85;
-            finalWidth = finalHeight * aspectRatio;
-          }
-          
-          const imgX = (pgW - finalWidth) / 2; // Centrar horizontalmente
-          const imgY = yPos + 5;
-          
-          doc.addImage(seguimientoImageBase64, "PNG", imgX, imgY, finalWidth, finalHeight);
-        } catch (e) {
-          console.error("Error agregando imagen de seguimiento:", e);
-          doc.setFontSize(10);
-          doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
-          doc.text("No se pudo cargar la imagen del seguimiento", pgW / 2, yPos + 20, { align: "center" });
-        }
-      } else {
-      // ─── DIBUJAR CRONOGRAMA VISUAL (fallback) ───
+      // ═══════════════════════════════════════════════
+      // CRONOGRAMA VISUAL PREMIUM (dibujado vectorial)
+      // ═══════════════════════════════════════════════
       // Categorizar tratamientos
       const categorizeTreatment = (nombre) => {
         const n = (nombre || '').toLowerCase();
@@ -603,112 +574,132 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       const maxSessions = Math.max(...Object.values(sessionsByCategory).map(arr => arr.length), 1);
       const numWeeks = Math.max(4, maxSessions);
 
-      // ─── Dibujar el gráfico tipo timeline ───
-      const graphX = 15;
+      // ─── Dibujar el gráfico tipo timeline PREMIUM ───
+      const graphX = 20;
       const graphY = yPos;
-      const graphWidth = pgW - 30;
-      const laneHeight = 38;
+      const graphWidth = pgW - 40;
+      const laneHeight = 45; // Más alto para mejor legibilidad
       const catKeys = Object.keys(sessionsByCategory);
       const activeCats = catKeys.length > 0 ? catKeys : ['armonizacion'];
-      const graphHeight = activeCats.length * laneHeight + 30; // +30 para header de semanas
+      const graphHeight = activeCats.length * laneHeight + 35;
 
-      // Fondo del gráfico
-      doc.setFillColor(255, 252, 247);
-      doc.roundedRect(graphX, graphY, graphWidth, graphHeight, 4, 4, "F");
+      // Sombra sutil del gráfico
+      doc.setFillColor(220, 215, 205);
+      doc.roundedRect(graphX + 1, graphY + 1, graphWidth, graphHeight, 5, 5, "F");
+      
+      // Fondo del gráfico con gradiente simulado
+      doc.setFillColor(255, 253, 250);
+      doc.roundedRect(graphX, graphY, graphWidth, graphHeight, 5, 5, "F");
+      
+      // Borde elegante
       doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(graphX, graphY, graphWidth, graphHeight, 4, 4, "S");
+      doc.setLineWidth(0.5);
+      doc.roundedRect(graphX, graphY, graphWidth, graphHeight, 5, 5, "S");
 
-      // Header con semanas
+      // Header con semanas (más elegante)
       const weekWidth = graphWidth / numWeeks;
       const headerY2 = graphY;
+      const headerH = 12;
       
-      doc.setFillColor(245, 240, 230);
-      doc.rect(graphX, headerY2, graphWidth, 10, "F");
+      // Gradiente sutil en header
+      doc.setFillColor(240, 235, 225);
+      doc.rect(graphX, headerY2, graphWidth, headerH, "F");
+      doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+      doc.setLineWidth(0.3);
+      doc.line(graphX, headerY2 + headerH, graphX + graphWidth, headerY2 + headerH);
       
       for (let w = 0; w < numWeeks; w++) {
         const wx = graphX + w * weekWidth + weekWidth / 2;
-        doc.setFontSize(7);
+        doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(marron[0], marron[1], marron[2]);
-        doc.text(`SEM ${w + 1}`, wx, headerY2 + 7, { align: "center" });
+        doc.text(`SEM ${w + 1}`, wx, headerY2 + 8.5, { align: "center" });
         
-        // Líneas verticales divisorias
+        // Líneas verticales divisorias (más sutiles)
         if (w > 0) {
-          doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
-          doc.setLineWidth(0.15);
-          doc.line(graphX + w * weekWidth, headerY2, graphX + w * weekWidth, graphY + graphHeight);
+          doc.setDrawColor(230, 225, 215);
+          doc.setLineWidth(0.2);
+          doc.line(graphX + w * weekWidth, headerY2 + headerH, graphX + w * weekWidth, graphY + graphHeight);
         }
       }
 
       // Dibujar carriles por categoría
       activeCats.forEach((catKey, catIdx) => {
         const config = categoryConfig[catKey] || categoryConfig.armonizacion;
-        const laneY = graphY + 12 + catIdx * laneHeight;
+        const laneY = graphY + 15 + catIdx * laneHeight;
         const sessions = sessionsByCategory[catKey] || [];
 
-        // Etiqueta de categoría (lado izquierdo, dentro del carril)
-        // Círculo con inicial
-        const labelX = graphX + 4;
+        // Etiqueta de categoría (más elegante)
+        const labelX = graphX + 6;
         const labelY = laneY + laneHeight / 2;
+        
+        // Círculo con sombra
+        doc.setFillColor(config.color[0] - 20, config.color[1] - 20, config.color[2] - 20);
+        doc.circle(labelX + 5.5, labelY + 0.5, 5, "F");
         doc.setFillColor(config.color[0], config.color[1], config.color[2]);
-        doc.circle(labelX + 4, labelY, 4, "F");
-        doc.setFontSize(7);
+        doc.circle(labelX + 5, labelY, 5, "F");
+        
+        doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(255, 255, 255);
-        doc.text(config.initial, labelX + 4, labelY + 2.5, { align: "center" });
+        doc.text(config.initial, labelX + 5, labelY + 3, { align: "center" });
 
         // Nombre de categoría
-        doc.setFontSize(6.5);
-        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
         doc.setTextColor(config.color[0], config.color[1], config.color[2]);
-        doc.text(config.label, labelX + 10, labelY + 2);
+        doc.text(config.label, labelX + 13, labelY + 2.5);
 
-        // Línea horizontal del carril (guía)
-        const lineStartX = graphX + 35;
-        const lineEndX = graphX + graphWidth - 5;
-        doc.setDrawColor(config.color[0], config.color[1], config.color[2]);
-        doc.setLineWidth(0.3);
-        doc.setLineDashPattern([2, 2], 0);
+        // Línea horizontal del carril (más elegante)
+        const lineStartX = graphX + 50;
+        const lineEndX = graphX + graphWidth - 10;
+        doc.setDrawColor(config.color[0] + 40, config.color[1] + 40, config.color[2] + 40);
+        doc.setLineWidth(0.4);
+        doc.setLineDashPattern([3, 2], 0);
         doc.line(lineStartX, labelY, lineEndX, labelY);
         doc.setLineDashPattern([], 0);
 
-        // Dibujar nodos de sesiones
-        const nodeStartX = graphX + 38;
-        const availableWidth = graphWidth - 45;
+        // Dibujar nodos de sesiones (más grandes y elegantes)
+        const nodeStartX = graphX + 55;
+        const availableWidth = graphWidth - 65;
         
         sessions.forEach((session, sIdx) => {
           const weekForSession = sIdx; // Una sesión por semana
           const nodeX = nodeStartX + (weekForSession + 0.5) * (availableWidth / numWeeks);
           const nodeY = labelY;
-          const nodeR = 5;
+          const nodeR = 6.5; // Nodos más grandes
 
-          // Círculo del nodo (pendiente - borde punteado)
-          doc.setFillColor(255, 252, 247);
+          // Sombra del nodo
+          doc.setFillColor(200, 195, 185);
+          doc.circle(nodeX + 0.5, nodeY + 0.5, nodeR, "F");
+          
+          // Círculo del nodo con gradiente simulado
+          doc.setFillColor(255, 253, 250);
+          doc.circle(nodeX, nodeY, nodeR, "F");
           doc.setDrawColor(config.color[0], config.color[1], config.color[2]);
-          doc.setLineWidth(0.6);
-          doc.circle(nodeX, nodeY, nodeR, "FD");
+          doc.setLineWidth(1.2);
+          doc.circle(nodeX, nodeY, nodeR, "S");
 
           // Número de orden dentro del nodo
-          doc.setFontSize(6);
+          doc.setFontSize(7.5);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(config.color[0], config.color[1], config.color[2]);
-          doc.text(`${sIdx + 1}`, nodeX, nodeY + 2, { align: "center" });
+          doc.text(`${sIdx + 1}`, nodeX, nodeY + 2.5, { align: "center" });
 
-          // Nombre del tratamiento debajo del nodo (solo primera sesión de cada tratamiento)
+          // Nombre del tratamiento debajo del nodo
           if (session.sesionNum === 1 || sessions.length <= numWeeks) {
-            doc.setFontSize(5);
+            doc.setFontSize(6);
             doc.setFont("helvetica", "normal");
             doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
-            const nombre = session.nombre.length > 18 ? session.nombre.substring(0, 16) + "..." : session.nombre;
-            doc.text(nombre, nodeX, nodeY + nodeR + 4, { align: "center" });
+            const nombre = session.nombre.length > 20 ? session.nombre.substring(0, 18) + "..." : session.nombre;
+            doc.text(nombre, nodeX, nodeY + nodeR + 5, { align: "center" });
           }
 
-          // Conectar nodos con línea
+          // Conectar nodos con línea elegante
           if (sIdx > 0) {
             const prevNodeX = nodeStartX + (sIdx - 1 + 0.5) * (availableWidth / numWeeks);
-            doc.setDrawColor(config.color[0], config.color[1], config.color[2]);
-            doc.setLineWidth(0.5);
+            doc.setDrawColor(config.color[0] + 30, config.color[1] + 30, config.color[2] + 30);
+            doc.setLineWidth(0.8);
             doc.line(prevNodeX + nodeR, nodeY, nodeX - nodeR, nodeY);
           }
         });
@@ -764,7 +755,6 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       doc.setFont("helvetica", "bold");
       doc.setTextColor(bronce[0], bronce[1], bronce[2]);
       doc.text("Frecuencia recomendada: 1 sesión por semana.", 20, yPos + 16);
-      } // fin else (cronograma generado)
 
       // Footer en la segunda página (landscape)
       for (let i = 0; i < footerStripes; i++) {
