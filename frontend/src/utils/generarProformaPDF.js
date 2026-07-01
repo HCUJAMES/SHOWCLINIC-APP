@@ -533,9 +533,11 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       // Si tenemos la captura real del gráfico, usarla directamente
       if (seguimientoImageBase64) {
         try {
-          const imgWidth = pgW - 20;
-          const imgHeight = pgH - yPos - ftrH - 5;
-          doc.addImage(seguimientoImageBase64, "PNG", 10, yPos, imgWidth, imgHeight);
+          // Reducir al 70% del espacio disponible para que no se vea tan grande
+          const maxWidth = (pgW - 40) * 0.7;
+          const maxHeight = (pgH - yPos - ftrH - 10) * 0.7;
+          const imgX = (pgW - maxWidth) / 2; // Centrar horizontalmente
+          doc.addImage(seguimientoImageBase64, "PNG", imgX, yPos + 5, maxWidth, maxHeight);
         } catch (e) {
           console.error("Error agregando imagen de seguimiento:", e);
           doc.setFontSize(10);
