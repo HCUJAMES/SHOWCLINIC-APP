@@ -533,16 +533,13 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       // Si tenemos la captura real del gráfico, usarla directamente
       if (seguimientoImageBase64) {
         try {
-          // Crear imagen temporal para obtener dimensiones reales
-          const img = new Image();
-          img.src = seguimientoImageBase64;
-          
           // Espacio disponible
           const availableWidth = pgW - 40;
           const availableHeight = pgH - yPos - ftrH - 15;
           
-          // Calcular dimensiones manteniendo aspect ratio
-          const aspectRatio = img.width / img.height;
+          // Usar aspect ratio típico del timeline (aproximadamente 2.5:1 ancho:alto)
+          // Esto evita problemas de carga asíncrona de imagen
+          const aspectRatio = 2.5;
           let finalWidth = availableWidth * 0.85;
           let finalHeight = finalWidth / aspectRatio;
           

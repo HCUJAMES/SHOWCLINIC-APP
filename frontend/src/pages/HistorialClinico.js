@@ -8042,23 +8042,36 @@ const HistorialClinico = () => {
                   let seguimientoImageBase64 = null;
                   const presAsignado = presupuestosAsignados.find(p => p.oferta_id === presupuestoParaProforma.id);
                   
+                  console.log("🔍 Buscando presupuesto asignado para oferta:", presupuestoParaProforma.id);
+                  console.log("📊 Presupuesto asignado encontrado:", presAsignado);
+                  console.log("📋 Refs disponibles:", Object.keys(timelineRefs.current));
+                  
                   if (presAsignado) {
                     const timelineElement = timelineRefs.current[presAsignado.id];
+                    console.log("🎯 Timeline element para presupuesto", presAsignado.id, ":", timelineElement);
+                    
                     if (timelineElement) {
                       try {
                         showToast({ severity: "info", message: "Capturando seguimiento..." });
+                        console.log("📸 Iniciando captura con html2canvas...");
                         const canvas = await html2canvas(timelineElement, {
                           scale: 2,
                           backgroundColor: '#FFF8F0',
-                          logging: false,
+                          logging: true,
                           useCORS: true,
                           allowTaint: true,
                         });
                         seguimientoImageBase64 = canvas.toDataURL('image/png');
+                        console.log("✅ Captura exitosa, longitud:", seguimientoImageBase64.length);
                       } catch (captureError) {
-                        console.error("Error capturando seguimiento:", captureError);
+                        console.error("❌ Error capturando seguimiento:", captureError);
+                        showToast({ severity: "warning", message: "No se pudo capturar el seguimiento" });
                       }
+                    } else {
+                      console.warn("⚠️ No se encontró el elemento timeline en los refs");
                     }
+                  } else {
+                    console.warn("⚠️ No hay presupuesto asignado para esta oferta");
                   }
 
                   const allItems = presupuestoParaProforma.items || [];
