@@ -863,7 +863,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(marron[0], marron[1], marron[2]);
-    doc.text("💉 Botox (toxina botulínica)", 20, infoY + 6);
+    doc.text("Botox (toxina botulínica)", 20, infoY + 6);
     
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
@@ -885,7 +885,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(marron[0], marron[1], marron[2]);
-    doc.text("✨ Bioestimulador de colágeno", 20, infoY + 6);
+    doc.text("Bioestimulador de colágeno", 20, infoY + 6);
     
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
@@ -907,7 +907,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(marron[0], marron[1], marron[2]);
-    doc.text("🧬 Enzimas recombinantes", 20, infoY + 6);
+    doc.text("Enzimas recombinantes", 20, infoY + 6);
     
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
@@ -928,7 +928,7 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(marron[0], marron[1], marron[2]);
-    doc.text("🩺 Cuidados posteriores en todos los tratamientos", 20, infoY + 6);
+    doc.text("Cuidados posteriores en todos los tratamientos", 20, infoY + 6);
     
     doc.setFontSize(8);
     doc.setFont("helvetica", "bold");
@@ -954,15 +954,15 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(marron[0], marron[1], marron[2]);
-    doc.text("💫 Recomendaciones generales después del tratamiento", 20, infoY + 6);
+    doc.text("Recomendaciones generales después del tratamiento", 20, infoY + 6);
     
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
-    doc.text("💧 Mantener una adecuada hidratación", 25, infoY + 13);
-    doc.text("🥗 Llevar una alimentación saludable", 25, infoY + 17);
-    doc.text("🚶‍♀️ Realizar actividad física de forma regular", 25, infoY + 21);
-    doc.text("😴 Dormir lo suficiente", 25, infoY + 25);
+    doc.text("• Mantener una adecuada hidratación", 25, infoY + 13);
+    doc.text("• Llevar una alimentación saludable", 25, infoY + 17);
+    doc.text("• Realizar actividad física de forma regular", 25, infoY + 21);
+    doc.text("• Dormir lo suficiente", 25, infoY + 25);
 
     // Footer de la tercera página
     const pg3FooterY = pg3H - 18;
