@@ -353,39 +353,16 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     doc.text(`S/ ${total.toFixed(2)}`, totalesX + totalesWidth - 4, totalY + 9, { align: "right" });
 
     // ============================================
-    // DOS BLOQUES: TÉRMINOS Y CONDICIONES + MEDIOS DE PAGO
+    // MEDIOS DE PAGO (ancho completo)
     // ============================================
     finalY = totalY + totalBoxHeight + 12;
-    const blockWidth = (pageWidth - 40) / 2;
-    const blockX1 = 15;
-    const blockX2 = blockX1 + blockWidth + 10;
+    const blockX = 15;
 
-    // Bloque 1: Términos y Condiciones
+    // Medios de Pago
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(marron[0], marron[1], marron[2]);
-    doc.text("TÉRMINOS Y CONDICIONES", blockX1, finalY);
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
-    const terminos = [
-      "Esta proforma tiene una validez de 15 días desde la fecha",
-      "de emisión. Los precios incluyen IGV. Para confirmar su",
-      "cita y reservar el tratamiento, comuníquese con nuestra",
-      "recepción."
-    ];
-    let terminosY = finalY + 5;
-    terminos.forEach(linea => {
-      doc.text(linea, blockX1, terminosY);
-      terminosY += 4;
-    });
-
-    // Bloque 2: Medios de Pago
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(marron[0], marron[1], marron[2]);
-    doc.text("MEDIOS DE PAGO", blockX2, finalY);
+    doc.text("MEDIOS DE PAGO", blockX, finalY);
 
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -400,11 +377,17 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     
     mediosPago.forEach(medio => {
       doc.setFont("helvetica", "bold");
-      doc.text(medio.label, blockX2, pagosY);
+      doc.text(medio.label, blockX, pagosY);
       doc.setFont("helvetica", "normal");
-      doc.text(medio.value, blockX2 + blockWidth - 4, pagosY, { align: "right" });
+      doc.text(medio.value, blockX + 60, pagosY);
       pagosY += 4.5;
     });
+
+    // Nota de validez
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.text("* Esta proforma tiene una validez de 15 días. Los precios incluyen IGV.", blockX, pagosY + 2);
 
     // ============================================
     // FIRMA AUTORIZADA (alineada a la derecha)
@@ -827,6 +810,186 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
       doc.setTextColor(blanco[0], blanco[1], blanco[2]);
       doc.text("@showclinic", pgW - 30, ftrY + 9.5, { align: "center" });
     }
+
+    // ============================================
+    // TERCERA PÁGINA: INFORMACIÓN DE TRATAMIENTOS
+    // ============================================
+    doc.addPage('p'); // portrait
+    const pg3W = doc.internal.pageSize.getWidth();
+    const pg3H = doc.internal.pageSize.getHeight();
+    
+    // Header con gradiente
+    for (let i = 0; i < stripes; i++) {
+      const ratio = i / stripes;
+      const r = marron[0] + (bronce[0] - marron[0]) * ratio;
+      const g = marron[1] + (bronce[1] - marron[1]) * ratio;
+      const b = marron[2] + (bronce[2] - marron[2]) * ratio;
+      doc.setFillColor(r, g, b);
+      doc.rect(0, (headerHeight / stripes) * i, pg3W, headerHeight / stripes, "F");
+    }
+
+    // Logo
+    doc.setFillColor(blanco[0], blanco[1], blanco[2]);
+    doc.roundedRect(logoX, logoY, logoSize, logoSize, 3, 3, "F");
+    if (logoBase64) {
+      try {
+        doc.addImage(logoBase64, "PNG", logoX + 2, logoY + 2, logoSize - 4, logoSize - 4);
+      } catch (e) {
+        console.log("No se pudo agregar el logo");
+      }
+    }
+
+    // Título
+    doc.setFontSize(16);
+    doc.setFont("times", "bold");
+    doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+    doc.text("INFORMACIÓN IMPORTANTE", pg3W / 2, 18, { align: "center" });
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("Resultados y cuidados posteriores", pg3W / 2, 25, { align: "center" });
+
+    // Línea de acento
+    doc.setDrawColor(dorado[0], dorado[1], dorado[2]);
+    doc.setLineWidth(1);
+    doc.line(0, headerHeight, pg3W, headerHeight);
+
+    let infoY = headerHeight + 12;
+
+    // ═══ BOTOX ═══
+    doc.setFillColor(crema[0], crema[1], crema[2]);
+    doc.roundedRect(15, infoY, pg3W - 30, 32, 3, 3, "F");
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(marron[0], marron[1], marron[2]);
+    doc.text("💉 Botox (toxina botulínica)", 20, infoY + 6);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(bronce[0], bronce[1], bronce[2]);
+    doc.text("¿Cuándo se ven los resultados?", 20, infoY + 12);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.text("• Primeros cambios: entre 6 y 8 días", 25, infoY + 17);
+    doc.text("• Resultado completo: entre 13 y 15 días", 25, infoY + 21);
+    doc.text("• Duración: 3 a 6 meses", 25, infoY + 25);
+
+    infoY += 36;
+
+    // ═══ BIOESTIMULADOR ═══
+    doc.setFillColor(crema[0], crema[1], crema[2]);
+    doc.roundedRect(15, infoY, pg3W - 30, 32, 3, 3, "F");
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(marron[0], marron[1], marron[2]);
+    doc.text("✨ Bioestimulador de colágeno", 20, infoY + 6);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(bronce[0], bronce[1], bronce[2]);
+    doc.text("¿Cuándo se ven los resultados?", 20, infoY + 12);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.text("• Primeros cambios: 4 a 6 semanas", 25, infoY + 17);
+    doc.text("• Resultado máximo: entre 2 y 6 meses", 25, infoY + 21);
+    doc.text("• Duración: 1 año, según el producto", 25, infoY + 25);
+
+    infoY += 36;
+
+    // ═══ ENZIMAS ═══
+    doc.setFillColor(crema[0], crema[1], crema[2]);
+    doc.roundedRect(15, infoY, pg3W - 30, 28, 3, 3, "F");
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(marron[0], marron[1], marron[2]);
+    doc.text("🧬 Enzimas recombinantes", 20, infoY + 6);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(bronce[0], bronce[1], bronce[2]);
+    doc.text("¿Cuándo se ven los resultados?", 20, infoY + 12);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.text("• Mejoría inicial: desde los 7 a 15 días", 25, infoY + 17);
+    doc.text("• Resultado más evidente: entre 4 y 8 semanas", 25, infoY + 21);
+
+    infoY += 32;
+
+    // ═══ CUIDADOS POSTERIORES ═══
+    doc.setFillColor(245, 240, 235);
+    doc.roundedRect(15, infoY, pg3W - 30, 56, 3, 3, "F");
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(marron[0], marron[1], marron[2]);
+    doc.text("🩺 Cuidados posteriores en todos los tratamientos", 20, infoY + 6);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(bronce[0], bronce[1], bronce[2]);
+    doc.text("Durante las primeras 48-72 horas:", 20, infoY + 12);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.text("• Evitar exposición al sol intenso", 25, infoY + 17);
+    doc.text("• Evitar saunas, baños de vapor, jacuzzi y duchas muy calientes", 25, infoY + 21);
+    doc.text("• No realizar ejercicio físico intenso durante las primeras 24-48 horas", 25, infoY + 25);
+    doc.text("• No masajear ni presionar la zona tratada, salvo indicación del profesional", 25, infoY + 29);
+    doc.text("• Evitar fumar y limitar el consumo de alcohol", 25, infoY + 33);
+    doc.text("• Mantener una adecuada hidratación", 25, infoY + 37);
+    doc.text("• Evitar temporalmente alimentos como pescado, mariscos y carne de cerdo", 25, infoY + 41);
+
+    infoY += 60;
+
+    // ═══ RECOMENDACIONES GENERALES ═══
+    doc.setFillColor(crema[0], crema[1], crema[2]);
+    doc.roundedRect(15, infoY, pg3W - 30, 28, 3, 3, "F");
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(marron[0], marron[1], marron[2]);
+    doc.text("💫 Recomendaciones generales después del tratamiento", 20, infoY + 6);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(grisTexto[0], grisTexto[1], grisTexto[2]);
+    doc.text("💧 Mantener una adecuada hidratación", 25, infoY + 13);
+    doc.text("🥗 Llevar una alimentación saludable", 25, infoY + 17);
+    doc.text("🚶‍♀️ Realizar actividad física de forma regular", 25, infoY + 21);
+    doc.text("😴 Dormir lo suficiente", 25, infoY + 25);
+
+    // Footer de la tercera página
+    const pg3FooterY = pg3H - 18;
+    for (let i = 0; i < footerStripes; i++) {
+      const ratio = i / footerStripes;
+      const r = marron[0] + (bronce[0] - marron[0]) * ratio;
+      const g = marron[1] + (bronce[1] - marron[1]) * ratio;
+      const b = marron[2] + (bronce[2] - marron[2]) * ratio;
+      doc.setFillColor(r, g, b);
+      doc.rect(0, pg3FooterY + (18 / footerStripes) * i, pg3W, 18 / footerStripes, "F");
+    }
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+    doc.text("ShowClinic", 15, pg3FooterY + 7);
+    
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text("Tel: +51 974 212 114  |  Av. Ejército 616, Centro de Negocios, Yanahuara, Perú", 15, pg3FooterY + 12);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setFillColor(dorado[0], dorado[1], dorado[2]);
+    doc.roundedRect(pg3W - 45, pg3FooterY + 5, 30, 7, 2, 2, "F");
+    doc.setTextColor(blanco[0], blanco[1], blanco[2]);
+    doc.text("@showclinic", pg3W - 30, pg3FooterY + 9.5, { align: "center" });
 
     // ============================================
     // GUARDAR PDF
