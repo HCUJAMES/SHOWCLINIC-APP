@@ -3,10 +3,22 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Box, Button } from "@mui/material";
 import { useToast } from "./ToastProvider";
 
-const ProtectedRoute = ({ children, requiredRole }) => {
+const ProtectedRoute = ({ children, requiredRole, allowedRoles }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
+
+  const checkRole = () => {
+    const userRole = localStorage.getItem("role");
+    if (userRole === "master") return true;
+    if (allowedRoles && Array.isArray(allowedRoles)) {
+      return allowedRoles.includes(userRole);
+    }
+    if (requiredRole) {
+      return userRole === requiredRole;
+    }
+    return true;
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -16,24 +28,16 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       return;
     }
 
-    // Verificar rol si es requerido (master tiene acceso total)
-    if (requiredRole) {
-      const userRole = localStorage.getItem("role");
-      if (userRole !== "master" && userRole !== requiredRole) {
-        showToast({ severity: "error", message: "No tienes permisos para acceder a esta sección" });
-        navigate("/dashboard", { replace: true });
-      }
+    if (!checkRole()) {
+      showToast({ severity: "error", message: "No tienes permisos para acceder a esta sección" });
+      navigate("/dashboard", { replace: true });
     }
-  }, [navigate, showToast, location.pathname, requiredRole]);
+  }, [navigate, showToast, location.pathname, requiredRole, allowedRoles]);
 
   const token = localStorage.getItem("token");
   if (!token) return null;
 
-  // Verificar rol si es requerido (master tiene acceso total)
-  if (requiredRole) {
-    const userRole = localStorage.getItem("role");
-    if (userRole !== "master" && userRole !== requiredRole) return null;
-  }
+  if (!checkRole()) return null;
 
   const logout = () => {
     localStorage.removeItem("token");

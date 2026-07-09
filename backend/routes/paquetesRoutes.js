@@ -1026,6 +1026,32 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
       }
     }
 
+    // Crear lineas_presupuesto para el módulo de gestión del dueño
+    for (const item of itemsConMarca) {
+      const numSesiones = Number(item.sesiones) >= 1 ? Number(item.sesiones) : 1;
+      const precioItem = Number(item.precio) || 0;
+      try {
+        await dbRun(
+          `INSERT INTO lineas_presupuesto (
+            presupuesto_asignado_id, tratamiento_nombre, tratamiento_id,
+            especialista_id, sesiones_totales, sesiones_realizadas,
+            precio, estado, creado_en
+          ) VALUES (?, ?, ?, ?, ?, 0, ?, 'pendiente', ?)`,
+          [
+            presupuestoAsignadoId,
+            item.nombre,
+            item.tratamientoId || item.tratamiento_id || null,
+            especialista_id || null,
+            numSesiones,
+            precioItem,
+            ahora
+          ]
+        );
+      } catch (lineaErr) {
+        console.log("⚠️ Error creando linea_presupuesto (no crítico):", lineaErr.message);
+      }
+    }
+
     res.json({ 
       message: "✅ Presupuesto asignado exitosamente",
       presupuesto_asignado_id: presupuestoAsignadoId
@@ -1147,6 +1173,25 @@ router.patch("/presupuesto/sesion/:sesion_id/completar", requirePaquetesAsignar,
       );
     }
 
+    // Actualizar lineas_presupuesto (módulo gestión dueño)
+    try {
+      const realizadas = await dbGet(
+        `SELECT COUNT(*) as c FROM presupuestos_sesiones WHERE presupuesto_asignado_id = ? AND tratamiento_nombre = ? AND estado = 'completada'`,
+        [sesion.presupuesto_asignado_id, sesion.tratamiento_nombre]
+      );
+      const linea = await dbGet(
+        `SELECT id, sesiones_totales, estado FROM lineas_presupuesto WHERE presupuesto_asignado_id = ? AND tratamiento_nombre = ?`,
+        [sesion.presupuesto_asignado_id, sesion.tratamiento_nombre]
+      );
+      if (linea && linea.estado !== "culminado") {
+        const nuevoEstado = realizadas.c >= linea.sesiones_totales ? "listo_para_culminar" : realizadas.c > 0 ? "en_curso" : "pendiente";
+        await dbRun(
+          `UPDATE lineas_presupuesto SET sesiones_realizadas = ?, estado = ?, especialista_id = COALESCE(especialista_id, ?) WHERE id = ?`,
+          [realizadas.c, nuevoEstado, especialista_id || null, linea.id]
+        );
+      }
+    } catch (lineaErr) { /* no crítico */ }
+
     res.json({ message: "✅ Sesión completada exitosamente" });
   } catch (err) {
     console.error("❌ Error al completar sesión:", err.message);
@@ -1183,6 +1228,25 @@ router.patch("/presupuesto/sesion/:sesion_id/desmarcar", requirePaquetesAsignar,
       `UPDATE presupuestos_asignados SET estado = 'activo', fecha_fin = NULL WHERE id = ? AND estado = 'completado'`,
       [sesion.presupuesto_asignado_id]
     );
+
+    // Actualizar lineas_presupuesto (módulo gestión dueño)
+    try {
+      const realizadas = await dbGet(
+        `SELECT COUNT(*) as c FROM presupuestos_sesiones WHERE presupuesto_asignado_id = ? AND tratamiento_nombre = ? AND estado = 'completada'`,
+        [sesion.presupuesto_asignado_id, sesion.tratamiento_nombre]
+      );
+      const linea = await dbGet(
+        `SELECT id, sesiones_totales, estado FROM lineas_presupuesto WHERE presupuesto_asignado_id = ? AND tratamiento_nombre = ?`,
+        [sesion.presupuesto_asignado_id, sesion.tratamiento_nombre]
+      );
+      if (linea && linea.estado !== "culminado") {
+        const nuevoEstado = realizadas.c === 0 ? "pendiente" : realizadas.c >= linea.sesiones_totales ? "listo_para_culminar" : "en_curso";
+        await dbRun(
+          `UPDATE lineas_presupuesto SET sesiones_realizadas = ?, estado = ? WHERE id = ?`,
+          [realizadas.c, nuevoEstado, linea.id]
+        );
+      }
+    } catch (lineaErr) { /* no crítico */ }
 
     res.json({ message: "✅ Sesión desmarcada exitosamente" });
   } catch (err) {

@@ -22,6 +22,7 @@ import paquetesRoutes from "./routes/paquetesRoutes.js";
 import whatsappRoutes from "./routes/whatsappRoutes.js";
 import n8nIntegrationRoutes from "./routes/n8nIntegrationRoutes.js";
 import gestionClinicaRoutes from "./routes/gestionClinicaRoutes.js";
+import gestionDuenoRoutes from "./routes/gestionDuenoRoutes.js";
 import barcodeRoutes from "./routes/barcodeRoutes.js";
 import bcrypt from "bcryptjs";
 import { autoEmitMiddleware } from "./utils/socketEmitter.js";
@@ -1345,6 +1346,87 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
     db.run("CREATE INDEX IF NOT EXISTS idx_stock_ajustes_fecha ON stock_ajustes(fecha)");
     console.log("✅ Tabla stock_ajustes creada");
 
+    // 📊 MÓDULO GESTIÓN DUEÑO — Tablas nuevas (aditivas)
+
+    // Líneas de presupuesto: entidad agrupadora por tratamiento dentro de un presupuesto
+    db.run(`
+      CREATE TABLE IF NOT EXISTS lineas_presupuesto (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        presupuesto_asignado_id INTEGER NOT NULL,
+        tratamiento_nombre TEXT NOT NULL,
+        tratamiento_id INTEGER,
+        especialista_id INTEGER,
+        sesiones_totales INTEGER DEFAULT 1,
+        sesiones_realizadas INTEGER DEFAULT 0,
+        precio REAL DEFAULT 0,
+        comision_porcentaje REAL,
+        comision_monto REAL DEFAULT 0,
+        estado TEXT DEFAULT 'pendiente',
+        culminado_en TEXT,
+        culminado_por TEXT,
+        revertido_en TEXT,
+        revertido_por TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(presupuesto_asignado_id) REFERENCES presupuestos_asignados(id),
+        FOREIGN KEY(especialista_id) REFERENCES especialistas(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_lineas_presupuesto_presupuesto ON lineas_presupuesto(presupuesto_asignado_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_lineas_presupuesto_especialista ON lineas_presupuesto(especialista_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_lineas_presupuesto_estado ON lineas_presupuesto(estado)");
+    console.log("✅ Tabla lineas_presupuesto creada");
+
+    // Comisiones por línea culminada
+    db.run(`
+      CREATE TABLE IF NOT EXISTS comisiones_especialistas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        especialista_id INTEGER NOT NULL,
+        linea_presupuesto_id INTEGER NOT NULL,
+        presupuesto_asignado_id INTEGER NOT NULL,
+        paciente_id INTEGER,
+        monto REAL NOT NULL,
+        estado TEXT DEFAULT 'pendiente',
+        liquidacion_id INTEGER,
+        liquidado_en TEXT,
+        liquidado_por TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        revertido INTEGER DEFAULT 0,
+        revertido_en TEXT,
+        revertido_por TEXT,
+        FOREIGN KEY(especialista_id) REFERENCES especialistas(id),
+        FOREIGN KEY(linea_presupuesto_id) REFERENCES lineas_presupuesto(id),
+        FOREIGN KEY(presupuesto_asignado_id) REFERENCES presupuestos_asignados(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_comisiones_especialista ON comisiones_especialistas(especialista_id)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_comisiones_estado ON comisiones_especialistas(estado)");
+    db.run("CREATE INDEX IF NOT EXISTS idx_comisiones_linea ON comisiones_especialistas(linea_presupuesto_id)");
+    console.log("✅ Tabla comisiones_especialistas creada");
+
+    // Liquidaciones agrupadas de pagos a especialistas
+    db.run(`
+      CREATE TABLE IF NOT EXISTS liquidaciones_especialistas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        especialista_id INTEGER NOT NULL,
+        monto_total REAL NOT NULL,
+        metodo_pago TEXT,
+        fecha TEXT NOT NULL,
+        notas TEXT,
+        creado_por TEXT,
+        creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(especialista_id) REFERENCES especialistas(id)
+      )
+    `);
+    db.run("CREATE INDEX IF NOT EXISTS idx_liquidaciones_especialista ON liquidaciones_especialistas(especialista_id)");
+    console.log("✅ Tabla liquidaciones_especialistas creada");
+
+    // Columna aditiva: estado de gestión en presupuestos_asignados
+    db.run(`ALTER TABLE presupuestos_asignados ADD COLUMN estado_gestion TEXT DEFAULT 'activo'`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna estado_gestion:", err.message);
+      }
+    });
+
     console.log("⚡ Índices y optimizaciones SQLite aplicados");
     console.log("🧩 Todas las tablas listas para usar ✅");
 
@@ -1370,6 +1452,7 @@ app.use("/api/backup", backupRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/n8n", n8nIntegrationRoutes);
 app.use("/api/gestion-clinica", gestionClinicaRoutes);
+app.use("/api/gestion-dueno", gestionDuenoRoutes);
 app.use("/api/barcodes", barcodeRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
 app.use("/uploads/especialistas", express.static("uploads/especialistas"));
