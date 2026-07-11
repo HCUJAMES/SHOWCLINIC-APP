@@ -112,7 +112,7 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
 
     // Ingresos totales (desde finanzas tipo ingreso)
     const ingresos = await dbGet(
-      `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas WHERE tipo = 'ingreso' ${condFechaFin}`,
+      `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas f WHERE f.tipo = 'ingreso' ${condFechaFin}`,
       paramsFin
     );
 
