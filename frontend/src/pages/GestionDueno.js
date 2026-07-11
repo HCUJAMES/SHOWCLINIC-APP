@@ -1,19 +1,25 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   Box, Typography, Card, CardContent, Grid,
   Button, Chip, Avatar, Divider, IconButton,
   Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableBody, TableCell, TableHead, TableRow,
-  Tabs, Tab, LinearProgress, Select, MenuItem, FormControl,
+  LinearProgress, Select, MenuItem, FormControl,
   InputLabel, Collapse, Alert, Tooltip
 } from "@mui/material";
 import {
-  TrendingUp, People, Receipt, AttachMoney,
+  TrendingUp, TrendingDown, People, AttachMoney,
   CheckCircle, ExpandMore, ExpandLess,
-  AccountBalance, ArrowBack, Refresh, FilterList,
-  OpenInNew, VerifiedUser, Warning
+  ArrowBack, Refresh, FilterList,
+  OpenInNew, VerifiedUser, Warning, SpaceDashboardRounded,
+  ReceiptLongRounded, GroupsRounded, PaymentsRounded,
+  LogoutRounded, HomeRounded, InsightsRounded
 } from "@mui/icons-material";
+
+const MotionCard = motion(Card);
+const MotionBox = motion(Box);
 
 const API = "/api/gestion-dueno";
 
@@ -56,8 +62,26 @@ const colors = {
   successBorder: "#CDE0D3",
   amberText: "#C08A3E",
   amberBg: "#F7EEDC",
-  error: "#d32f2f"
+  error: "#d32f2f",
+  // sidebar
+  sideBg: "#3E2A24",
+  sideBgDeep: "#2C1D18",
+  sideActive: "rgba(200,169,110,0.18)",
+  sideText: "#E9DDD0",
+  sideMuted: "#A88F7E"
 };
+
+// gradientes premium (para íconos KPI y detalles)
+const grads = {
+  gold: "linear-gradient(135deg, #D9BE86 0%, #B98F4E 100%)",
+  brown: "linear-gradient(135deg, #7A5140 0%, #4E342E 100%)",
+  green: "linear-gradient(135deg, #7FB49A 0%, #4F8069 100%)",
+  amber: "linear-gradient(135deg, #E6BE7C 0%, #C08A3E 100%)",
+  violet: "linear-gradient(135deg, #A88BC4 0%, #6E4E92 100%)"
+};
+
+// paleta para segmentos de gráficos (tonos de marca)
+const chartPalette = ["#8B5E3C", "#C8A96E", "#A67C52", "#D9C29A", "#6B4226", "#E4D4B4", "#B98F4E"];
 
 const fonts = {
   title: "'Cormorant Garamond', serif",
@@ -67,12 +91,54 @@ const fonts = {
 const cardSx = {
   bgcolor: colors.white,
   border: `1px solid ${colors.border}`,
-  borderRadius: "16px",
-  boxShadow: "0 1px 3px rgba(93,64,55,0.05)"
+  borderRadius: "18px",
+  boxShadow: "0 2px 10px rgba(93,64,55,0.06)"
+};
+
+// variantes de animación reutilizables
+const fadeUp = {
+  hidden: { opacity: 0, y: 18 },
+  show: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.45, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] } })
 };
 
 function formatMoney(val) {
   return `S/ ${(Number(val) || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function isoDate(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Devuelve {fechaInicio, fechaFin} para un preset dado
+function rangoPreset(preset) {
+  const hoy = new Date();
+  if (preset === "hoy") {
+    const s = isoDate(hoy);
+    return { fechaInicio: s, fechaFin: s };
+  }
+  if (preset === "semana") {
+    const primer = new Date(hoy); primer.setDate(hoy.getDate() - hoy.getDay());
+    const ultimo = new Date(primer); ultimo.setDate(primer.getDate() + 6);
+    return { fechaInicio: isoDate(primer), fechaFin: isoDate(ultimo) };
+  }
+  if (preset === "mes") {
+    return { fechaInicio: isoDate(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), fechaFin: isoDate(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0)) };
+  }
+  if (preset === "anio") {
+    return { fechaInicio: isoDate(new Date(hoy.getFullYear(), 0, 1)), fechaFin: isoDate(new Date(hoy.getFullYear(), 11, 31)) };
+  }
+  return { fechaInicio: "", fechaFin: "" }; // todo
+}
+
+function buildDateQuery(fi, ff) {
+  const p = new URLSearchParams();
+  if (fi) p.append("fecha_inicio", fi);
+  if (ff) p.append("fecha_fin", ff);
+  const s = p.toString();
+  return s ? `?${s}` : "";
 }
 
 /* ======================================================================
@@ -86,6 +152,11 @@ export default function GestionDueno() {
 
   // Dashboard
   const [dashboardData, setDashboardData] = useState(null);
+
+  // Filtro de periodo (compartido: dashboard + presupuestos)
+  const [fechaInicio, setFechaInicio] = useState("");
+  const [fechaFin, setFechaFin] = useState("");
+  const [periodoPreset, setPeriodoPreset] = useState("todo");
 
   // Presupuestos
   const [presupuestos, setPresupuestos] = useState([]);
@@ -109,22 +180,26 @@ export default function GestionDueno() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch("/dashboard");
+      const data = await apiFetch(`/dashboard${buildDateQuery(fechaInicio, fechaFin)}`);
       setDashboardData(data);
     } catch (e) { setError(e.message); }
     setLoading(false);
-  }, []);
+  }, [fechaInicio, fechaFin]);
 
   const loadPresupuestos = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const query = filtroEstado ? `?estado=${filtroEstado}` : "";
-      const data = await apiFetch(`/presupuestos${query}`);
+      const p = new URLSearchParams();
+      if (filtroEstado) p.append("estado", filtroEstado);
+      if (fechaInicio) p.append("fecha_inicio", fechaInicio);
+      if (fechaFin) p.append("fecha_fin", fechaFin);
+      const qs = p.toString();
+      const data = await apiFetch(`/presupuestos${qs ? `?${qs}` : ""}`);
       setPresupuestos(data);
     } catch (e) { setError(e.message); }
     setLoading(false);
-  }, [filtroEstado]);
+  }, [filtroEstado, fechaInicio, fechaFin]);
 
   const loadEspecialistas = useCallback(async () => {
     setLoading(true);
@@ -204,78 +279,142 @@ export default function GestionDueno() {
     } catch (e) { setError(e.message); }
   };
 
+  /* ── HELPERS DE UI ── */
+  const username = localStorage.getItem("username") || "Dueño";
+  const rol = (localStorage.getItem("role") || "").toLowerCase();
+  const rolLabel = rol === "master" ? "Administrador" : rol === "doctor" ? "Doctor" : "Dueño";
+
+  const handleTabChange = (v) => {
+    setTab(v);
+    setPresupuestoDetalle(null);
+    setEspecialistaDetalle(null);
+  };
+
+  const reloadCurrent = () => {
+    if (tab === 0) loadDashboard();
+    else if (tab === 1) loadPresupuestos();
+    else if (tab === 2) loadEspecialistas();
+    else if (tab === 3) loadPendientes();
+  };
+
+  const applyPreset = (preset) => {
+    const r = rangoPreset(preset);
+    setPeriodoPreset(preset);
+    setFechaInicio(r.fechaInicio);
+    setFechaFin(r.fechaFin);
+  };
+
+  const applyCustomRange = (fi, ff) => {
+    setPeriodoPreset("custom");
+    setFechaInicio(fi);
+    setFechaFin(ff);
+  };
+
+  const navMeta = [
+    { title: "Dashboard", subtitle: "Resumen general de tu clínica." },
+    { title: "Presupuestos", subtitle: "Seguimiento de tratamientos y líneas." },
+    { title: "Especialistas", subtitle: "Rendimiento y comisiones del equipo." },
+    { title: "Liquidaciones", subtitle: "Pagos y comisiones pendientes." }
+  ];
+
   /* ── RENDER ── */
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: colors.cream, fontFamily: fonts.body, color: colors.textBody }}>
-      <Box sx={{ maxWidth: 1280, mx: "auto", px: { xs: 2, md: "28px" }, py: { xs: 2, md: 3 } }}>
-      {/* Header */}
-      <Box sx={{ display: "flex", alignItems: "center", mb: "20px", gap: 1.5 }}>
-        <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "30px", color: colors.primaryDark, lineHeight: 1.2 }}>
-          Gestión Clínica
-        </Typography>
-        <Chip label="Dueño" size="small" sx={{ bgcolor: colors.goldSoft, color: colors.primaryDark, fontWeight: 600, fontFamily: fonts.body, fontSize: "0.75rem", height: 26, borderRadius: "13px" }} />
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: colors.cream, fontFamily: fonts.body, color: colors.textBody }}>
+      <SideBar tab={tab} onTab={handleTabChange} navigate={navigate} />
+
+      <Box sx={{ flex: 1, minWidth: 0, ml: { xs: "76px", md: "264px" } }}>
+        {/* Top header */}
+        <Box sx={{
+          position: "sticky", top: 0, zIndex: 5,
+          px: { xs: 2, md: "36px" }, py: "18px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          bgcolor: "rgba(255,248,240,0.85)", backdropFilter: "blur(10px)",
+          borderBottom: `1px solid ${colors.border}`
+        }}>
+          <Box>
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: { xs: "24px", md: "30px" }, color: colors.primaryDark, lineHeight: 1.1 }}>
+              {tab === 0 ? `¡Bienvenido, ${username}!` : navMeta[tab].title}
+            </Typography>
+            <Typography sx={{ fontSize: "13.5px", color: colors.textMuted, fontFamily: fonts.body, mt: "2px" }}>
+              {navMeta[tab].subtitle}
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <Tooltip title="Actualizar datos">
+              <IconButton onClick={reloadCurrent} sx={{ bgcolor: colors.white, border: `1px solid ${colors.border}`, borderRadius: "12px", width: 42, height: 42, color: colors.primary, "&:hover": { bgcolor: colors.creamPanel } }}>
+                <Refresh sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Tooltip>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "10px", bgcolor: colors.white, border: `1px solid ${colors.border}`, borderRadius: "40px", pl: "6px", pr: { xs: "6px", sm: "16px" }, py: "5px" }}>
+              <Avatar sx={{ width: 34, height: 34, background: grads.brown, fontFamily: fonts.title, fontWeight: 700, fontSize: 16 }}>
+                {username.charAt(0).toUpperCase()}
+              </Avatar>
+              <Box sx={{ display: { xs: "none", sm: "block" }, lineHeight: 1.1 }}>
+                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.body }}>{username}</Typography>
+                <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>{rolLabel}</Typography>
+              </Box>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{ px: { xs: 2, md: "36px" }, py: { xs: 2, md: "28px" }, maxWidth: 1440, mx: "auto" }}>
+          {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: "18px", borderRadius: "12px" }}>{error}</Alert>}
+
+          {/* Filtro de periodo (Dashboard y Presupuestos) */}
+          {(tab === 0 || (tab === 1 && !presupuestoDetalle)) && (
+            <PeriodoFilter
+              preset={periodoPreset}
+              fechaInicio={fechaInicio}
+              fechaFin={fechaFin}
+              onPreset={applyPreset}
+              onCustom={applyCustomRange}
+            />
+          )}
+
+          {loading && <LinearProgress sx={{ mb: "18px", borderRadius: 2, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: colors.gold } }} />}
+
+          {/* TAB 0: Dashboard */}
+          {tab === 0 && dashboardData && <DashboardView data={dashboardData} />}
+
+          {/* TAB 1: Presupuestos */}
+          {tab === 1 && (
+            <PresupuestosView
+              presupuestos={presupuestos}
+              filtroEstado={filtroEstado}
+              setFiltroEstado={setFiltroEstado}
+              onLoadPresupuestos={loadPresupuestos}
+              onSync={handleSync}
+              onSelectPresupuesto={loadPresupuestoDetalle}
+              detalle={presupuestoDetalle}
+              onBack={() => setPresupuestoDetalle(null)}
+              onCulminar={(linea) => setDialogCulminar(linea)}
+              onRevertir={handleRevertir}
+              navigate={navigate}
+            />
+          )}
+
+          {/* TAB 2: Especialistas */}
+          {tab === 2 && (
+            <EspecialistasView
+              especialistas={especialistas}
+              detalle={especialistaDetalle}
+              onSelect={loadEspecialistaDetalle}
+              onBack={() => setEspecialistaDetalle(null)}
+              onCulminar={(linea) => setDialogCulminar(linea)}
+            />
+          )}
+
+          {/* TAB 3: Liquidaciones */}
+          {tab === 3 && (
+            <LiquidacionesView
+              pendientes={pendientes}
+              historial={historialLiq}
+              onLiquidar={(esp) => setDialogLiquidar(esp)}
+            />
+          )}
+        </Box>
       </Box>
-
-      {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: "18px", borderRadius: "12px" }}>{error}</Alert>}
-
-      {/* Tabs */}
-      <Tabs
-        value={tab}
-        onChange={(e, v) => { setTab(v); setPresupuestoDetalle(null); setEspecialistaDetalle(null); }}
-        sx={{
-          mb: "20px",
-          "& .MuiTab-root": { fontWeight: 600, fontFamily: fonts.body, color: colors.textMuted, textTransform: "none", fontSize: "0.9rem", minHeight: 44 },
-          "& .Mui-selected": { color: `${colors.primary} !important` },
-          "& .MuiTabs-indicator": { bgcolor: colors.primary, height: 3, borderRadius: "3px 3px 0 0" }
-        }}
-      >
-        <Tab label="Dashboard" icon={<TrendingUp sx={{ fontSize: 18 }} />} iconPosition="start" />
-        <Tab label="Presupuestos" icon={<Receipt sx={{ fontSize: 18 }} />} iconPosition="start" />
-        <Tab label="Especialistas" icon={<People sx={{ fontSize: 18 }} />} iconPosition="start" />
-        <Tab label="Liquidaciones" icon={<AccountBalance sx={{ fontSize: 18 }} />} iconPosition="start" />
-      </Tabs>
-
-      {loading && <LinearProgress sx={{ mb: "18px", borderRadius: 2, "& .MuiLinearProgress-bar": { bgcolor: colors.primary } }} />}
-
-      {/* TAB 0: Dashboard */}
-      {tab === 0 && dashboardData && <DashboardView data={dashboardData} />}
-
-      {/* TAB 1: Presupuestos */}
-      {tab === 1 && (
-        <PresupuestosView
-          presupuestos={presupuestos}
-          filtroEstado={filtroEstado}
-          setFiltroEstado={setFiltroEstado}
-          onLoadPresupuestos={loadPresupuestos}
-          onSync={handleSync}
-          onSelectPresupuesto={loadPresupuestoDetalle}
-          detalle={presupuestoDetalle}
-          onBack={() => setPresupuestoDetalle(null)}
-          onCulminar={(linea) => setDialogCulminar(linea)}
-          onRevertir={handleRevertir}
-          navigate={navigate}
-        />
-      )}
-
-      {/* TAB 2: Especialistas */}
-      {tab === 2 && (
-        <EspecialistasView
-          especialistas={especialistas}
-          detalle={especialistaDetalle}
-          onSelect={loadEspecialistaDetalle}
-          onBack={() => setEspecialistaDetalle(null)}
-          onCulminar={(linea) => setDialogCulminar(linea)}
-        />
-      )}
-
-      {/* TAB 3: Liquidaciones */}
-      {tab === 3 && (
-        <LiquidacionesView
-          pendientes={pendientes}
-          historial={historialLiq}
-          onLiquidar={(esp) => setDialogLiquidar(esp)}
-        />
-      )}
 
       {/* Dialog Culminar */}
       <Dialog open={!!dialogCulminar} onClose={() => setDialogCulminar(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
@@ -324,8 +463,194 @@ export default function GestionDueno() {
         onClose={() => setDialogLiquidar(null)}
         onConfirm={handleLiquidar}
       />
+    </Box>
+  );
+}
+
+/* ======================================================================
+   SIDEBAR
+====================================================================== */
+function SideBar({ tab, onTab, navigate }) {
+  const items = [
+    { icon: SpaceDashboardRounded, label: "Dashboard" },
+    { icon: ReceiptLongRounded, label: "Presupuestos" },
+    { icon: GroupsRounded, label: "Especialistas" },
+    { icon: PaymentsRounded, label: "Liquidaciones" }
+  ];
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("username");
+    navigate("/login");
+  };
+
+  return (
+    <Box sx={{
+      position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 20,
+      width: { xs: 76, md: 264 },
+      background: `linear-gradient(180deg, ${colors.sideBg} 0%, ${colors.sideBgDeep} 100%)`,
+      display: "flex", flexDirection: "column",
+      py: "22px", px: { xs: "10px", md: "18px" },
+      overflow: "hidden"
+    }}>
+      {/* decor */}
+      <Box sx={{ position: "absolute", bottom: -40, left: -30, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(200,169,110,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      {/* Logo */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: "12px", mb: "30px", px: { xs: 0, md: "6px" }, justifyContent: { xs: "center", md: "flex-start" } }}>
+        <Box sx={{ width: 42, height: 42, borderRadius: "13px", background: grads.gold, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 12px rgba(0,0,0,0.25)" }}>
+          <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, color: "#fff", fontSize: 22, lineHeight: 1 }}>S</Typography>
+        </Box>
+        <Box sx={{ display: { xs: "none", md: "block" }, lineHeight: 1.1 }}>
+          <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, color: "#fff", fontSize: 20 }}>ShowClinic</Typography>
+          <Typography sx={{ fontFamily: fonts.body, color: colors.sideMuted, fontSize: 11, letterSpacing: "0.5px" }}>Clínica Estética</Typography>
+        </Box>
+      </Box>
+
+      <Typography sx={{ display: { xs: "none", md: "block" }, color: colors.sideMuted, fontSize: 10.5, fontWeight: 700, letterSpacing: "1.5px", px: "10px", mb: "10px" }}>
+        MÓDULO DUEÑO
+      </Typography>
+
+      {/* Nav */}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        {items.map((it, i) => {
+          const active = tab === i;
+          const Icon = it.icon;
+          return (
+            <MotionBox
+              key={it.label}
+              onClick={() => onTab(i)}
+              whileHover={{ x: active ? 0 : 3 }}
+              whileTap={{ scale: 0.97 }}
+              sx={{
+                position: "relative", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: "13px",
+                justifyContent: { xs: "center", md: "flex-start" },
+                px: { xs: 0, md: "14px" }, py: "11px", borderRadius: "12px",
+                bgcolor: active ? colors.sideActive : "transparent",
+                transition: "background 0.2s",
+                "&:hover": { bgcolor: active ? colors.sideActive : "rgba(255,255,255,0.05)" }
+              }}
+            >
+              {active && <Box sx={{ position: "absolute", left: 0, top: "22%", bottom: "22%", width: 3, borderRadius: "0 4px 4px 0", bgcolor: colors.gold, display: { xs: "none", md: "block" } }} />}
+              <Icon sx={{ fontSize: 21, color: active ? colors.gold : colors.sideMuted }} />
+              <Typography sx={{ display: { xs: "none", md: "block" }, fontFamily: fonts.body, fontSize: 14, fontWeight: active ? 700 : 500, color: active ? "#fff" : colors.sideText }}>
+                {it.label}
+              </Typography>
+            </MotionBox>
+          );
+        })}
+      </Box>
+
+      <Box sx={{ flex: 1 }} />
+
+      {/* Footer */}
+      <Box sx={{ display: "flex", flexDirection: "column", gap: "6px", borderTop: "1px solid rgba(255,255,255,0.08)", pt: "12px" }}>
+        <SideAction icon={HomeRounded} label="Volver al inicio" onClick={() => navigate("/dashboard")} />
+        <SideAction icon={LogoutRounded} label="Cerrar sesión" onClick={handleLogout} danger />
       </Box>
     </Box>
+  );
+}
+
+function SideAction({ icon: Icon, label, onClick, danger }) {
+  return (
+    <Box
+      onClick={onClick}
+      sx={{
+        cursor: "pointer", display: "flex", alignItems: "center", gap: "13px",
+        justifyContent: { xs: "center", md: "flex-start" },
+        px: { xs: 0, md: "14px" }, py: "10px", borderRadius: "12px",
+        transition: "background 0.2s",
+        "&:hover": { bgcolor: danger ? "rgba(211,47,47,0.15)" : "rgba(255,255,255,0.06)" }
+      }}
+    >
+      <Icon sx={{ fontSize: 20, color: danger ? "#E8907E" : colors.sideMuted }} />
+      <Typography sx={{ display: { xs: "none", md: "block" }, fontFamily: fonts.body, fontSize: 13.5, fontWeight: 500, color: danger ? "#E8907E" : colors.sideText }}>
+        {label}
+      </Typography>
+    </Box>
+  );
+}
+
+/* ======================================================================
+   FILTRO DE PERIODO (estilo Finanzas)
+====================================================================== */
+function PeriodoFilter({ preset, fechaInicio, fechaFin, onPreset, onCustom }) {
+  const [fi, setFi] = useState(fechaInicio || "");
+  const [ff, setFf] = useState(fechaFin || "");
+
+  useEffect(() => { setFi(fechaInicio || ""); setFf(fechaFin || ""); }, [fechaInicio, fechaFin]);
+
+  const presets = [
+    { key: "hoy", label: "Hoy" },
+    { key: "semana", label: "Esta semana" },
+    { key: "mes", label: "Este mes" },
+    { key: "anio", label: "Este año" },
+    { key: "todo", label: "Todo" }
+  ];
+
+  const inputSx = {
+    fontFamily: fonts.body, fontSize: "13px", color: colors.textBody,
+    border: `1px solid ${colors.border}`, borderRadius: "10px",
+    padding: "8px 10px", background: colors.white, outline: "none"
+  };
+
+  return (
+    <MotionCard
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      sx={{ ...cardSx, p: 0, mb: "20px" }}
+    >
+      <CardContent sx={{ p: "16px", "&:last-child": { pb: "16px" }, display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mr: "4px" }}>
+          <FilterList sx={{ fontSize: 18, color: colors.gold }} />
+          <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13px", color: colors.primaryDark }}>Periodo</Typography>
+        </Box>
+
+        {/* Chips de preset */}
+        <Box sx={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+          {presets.map((p) => {
+            const active = preset === p.key;
+            return (
+              <MotionBox key={p.key} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+                <Chip
+                  label={p.label}
+                  onClick={() => onPreset(p.key)}
+                  sx={{
+                    cursor: "pointer", fontFamily: fonts.body, fontWeight: 600, fontSize: "12.5px", height: 32, borderRadius: "16px",
+                    border: `1px solid ${active ? "transparent" : colors.border}`,
+                    ...(active
+                      ? { background: grads.gold, color: "#fff" }
+                      : { bgcolor: colors.white, color: colors.textBody, "&:hover": { bgcolor: colors.creamPanel } })
+                  }}
+                />
+              </MotionBox>
+            );
+          })}
+        </Box>
+
+        <Box sx={{ flex: 1 }} />
+
+        {/* Rango personalizado */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <Box component="input" type="date" value={fi} onChange={(e) => setFi(e.target.value)} sx={inputSx} />
+          <Typography sx={{ color: colors.textMuted, fontSize: "13px" }}>—</Typography>
+          <Box component="input" type="date" value={ff} onChange={(e) => setFf(e.target.value)} sx={inputSx} />
+          <Button
+            size="small"
+            variant="contained"
+            onClick={() => onCustom(fi, ff)}
+            disabled={!fi && !ff}
+            sx={{ background: grads.brown, color: "#fff", textTransform: "none", borderRadius: "10px", fontFamily: fonts.body, fontWeight: 600, boxShadow: "none", "&:hover": { boxShadow: "none", opacity: 0.92 } }}
+          >
+            Aplicar
+          </Button>
+        </Box>
+      </CardContent>
+    </MotionCard>
   );
 }
 
@@ -335,161 +660,127 @@ export default function GestionDueno() {
 function DashboardView({ data }) {
   const { kpis, ingresos_por_mes, tratamientos_mas_vendidos, pagos_pendientes, ultimos_tratamientos, rendimiento_especialistas } = data;
 
-  const thSx = { fontWeight: 600, fontFamily: fonts.body, fontSize: "11px", textTransform: "uppercase", color: colors.textMuted, letterSpacing: "0.5px", borderBottom: `1px solid ${colors.border}`, py: "10px" };
-  const tdSx = { fontFamily: fonts.body, fontSize: "13px", color: colors.textBody, borderBottom: `1px solid ${colors.border}`, py: "11px" };
+  const thSx = { fontWeight: 700, fontFamily: fonts.body, fontSize: "11px", textTransform: "uppercase", color: colors.textMuted, letterSpacing: "0.5px", borderBottom: `1px solid ${colors.border}`, py: "10px" };
+  const tdSx = { fontFamily: fonts.body, fontSize: "13px", color: colors.textBody, borderBottom: `1px solid ${colors.border}`, py: "12px" };
+
+  // serie ascendente para el gráfico de área
+  const serie = useMemo(() => (ingresos_por_mes || []).slice(0, 12).slice().reverse(), [ingresos_por_mes]);
+
+  // tendencia mes vs mes anterior (real)
+  const trendIngresos = useMemo(() => {
+    if (!ingresos_por_mes || ingresos_por_mes.length < 2) return null;
+    const cur = ingresos_por_mes[0]?.total || 0;
+    const prev = ingresos_por_mes[1]?.total || 0;
+    if (prev === 0) return null;
+    return ((cur - prev) / prev) * 100;
+  }, [ingresos_por_mes]);
+
+  // segmentos donut: top 5 + otros
+  const donutData = useMemo(() => {
+    const list = (tratamientos_mas_vendidos || []).slice();
+    const top = list.slice(0, 5);
+    const otros = list.slice(5).reduce((a, t) => a + (t.cantidad || 0), 0);
+    const segs = top.map((t, i) => ({ label: t.tratamiento_nombre, value: t.cantidad || 0, color: chartPalette[i % chartPalette.length] }));
+    if (otros > 0) segs.push({ label: "Otros", value: otros, color: chartPalette[5] });
+    return segs;
+  }, [tratamientos_mas_vendidos]);
 
   return (
-    <Box>
+    <MotionBox initial="hidden" animate="show">
       {/* KPIs */}
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, gap: "16px", mb: "20px" }}>
-        <KPICard title="Ingresos Totales" value={formatMoney(kpis.ingresos_totales)} icon={<AttachMoney />} tint="#E8F0EA" iconColor={colors.successText} />
-        <KPICard title="Tratamientos" value={kpis.tratamientos_realizados} icon={<CheckCircle />} tint={colors.creamPanel} iconColor={colors.primary} />
-        <KPICard title="Pacientes" value={kpis.pacientes_atendidos} icon={<People />} tint="#EDE7F6" iconColor="#5E35B1" />
-        <KPICard title="Ticket Promedio" value={formatMoney(kpis.ticket_promedio)} icon={<TrendingUp />} tint={colors.amberBg} iconColor={colors.amberText} />
-        <KPICard title="Presup. Activos" value={kpis.presupuestos_activos} icon={<Receipt />} tint={colors.goldSoft + "66"} iconColor={colors.gold} />
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(4, 1fr)" }, gap: "18px", mb: "22px" }}>
+        <KPICard i={0} title="Ingresos totales" value={formatMoney(kpis.ingresos_totales)} icon={<AttachMoney />} grad={grads.green} trend={trendIngresos} trendLabel="vs mes anterior" />
+        <KPICard i={1} title="Tratamientos realizados" value={kpis.tratamientos_realizados} icon={<CheckCircle />} grad={grads.brown} caption="sesiones completadas" />
+        <KPICard i={2} title="Pacientes atendidos" value={kpis.pacientes_atendidos} icon={<People />} grad={grads.violet} caption="pacientes únicos" />
+        <KPICard i={3} title="Ticket promedio" value={formatMoney(kpis.ticket_promedio)} icon={<InsightsRounded />} grad={grads.amber} caption="por paciente" />
       </Box>
 
-      {/* Ingresos por mes */}
-      {ingresos_por_mes && ingresos_por_mes.length > 0 && (
-        <Card sx={{ ...cardSx, mb: "20px", p: 0 }}>
-          <CardContent sx={{ p: "20px" }}>
-            <SectionTitle>Ingresos por Mes</SectionTitle>
-            <Box sx={{ display: "flex", gap: "6px", alignItems: "flex-end", height: 130 }}>
-              {ingresos_por_mes.slice(0, 8).reverse().map((m, i) => {
-                const max = Math.max(...ingresos_por_mes.slice(0, 8).map(x => x.total || 0), 1);
-                const pct = ((m.total || 0) / max) * 100;
-                return (
-                  <Tooltip key={i} title={`${m.mes}: ${formatMoney(m.total)}`}>
-                    <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-                      <Typography sx={{ fontSize: "10px", fontWeight: 600, color: colors.primaryDark, fontFamily: fonts.body }}>
-                        {formatMoney(m.total).replace("S/ ", "")}
-                      </Typography>
-                      <Box sx={{
-                        width: "100%", maxWidth: 48,
-                        height: `${Math.max(pct, 6)}%`,
-                        bgcolor: colors.gold,
-                        borderRadius: "6px 6px 0 0",
-                        minHeight: 6,
-                        transition: "height 0.3s ease"
-                      }} />
-                      <Typography sx={{ fontSize: "10px", color: colors.textMuted, fontFamily: fonts.body }}>
-                        {m.mes?.slice(5)}
-                      </Typography>
-                    </Box>
-                  </Tooltip>
-                );
-              })}
-            </Box>
-          </CardContent>
-        </Card>
-      )}
+      {/* Fila media: Ingresos + Donut + Pagos */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1.55fr 1.15fr 1fr" }, gap: "18px", mb: "22px", alignItems: "stretch" }}>
+        <PanelCard i={4} title="Ingresos por mes">
+          {serie.length > 0
+            ? <AreaChart data={serie} />
+            : <Empty text="Sin datos de ingresos" />}
+        </PanelCard>
 
-      {/* Rendimiento especialistas */}
-      <Card sx={{ ...cardSx, mb: "20px", p: 0 }}>
-        <CardContent sx={{ p: "20px" }}>
-          <SectionTitle>Rendimiento por Especialista</SectionTitle>
+        <PanelCard i={5} title="Tratamientos más vendidos">
+          {donutData.length > 0
+            ? <DonutChart data={donutData} />
+            : <Empty text="Sin datos" />}
+        </PanelCard>
+
+        <PanelCard i={6} title="Pagos pendientes" badge={pagos_pendientes.length || null}>
+          {pagos_pendientes.length === 0 && <Empty text="Todo al día" />}
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            {pagos_pendientes.slice(0, 6).map((p, i) => (
+              <Box key={p.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "10px", borderTop: i > 0 ? `1px solid ${colors.border}` : "none" }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                  <Avatar sx={{ width: 34, height: 34, background: grads.brown, fontSize: 14, fontFamily: fonts.title, fontWeight: 700 }}>{p.nombre?.charAt(0)}</Avatar>
+                  <Typography noWrap sx={{ fontSize: "13px", fontFamily: fonts.body, color: colors.textBody, fontWeight: 600 }}>{p.nombre}</Typography>
+                </Box>
+                <Typography sx={{ color: colors.error, fontWeight: 700, fontSize: "13px", fontFamily: fonts.body, flexShrink: 0 }}>{formatMoney(p.monto_pendiente)}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </PanelCard>
+      </Box>
+
+      {/* Fila inferior: Últimos tratamientos + Rendimiento especialistas */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1.4fr 1fr" }, gap: "18px" }}>
+        <PanelCard i={7} title="Últimos tratamientos realizados">
           <Table size="small" sx={{ tableLayout: "auto" }}>
             <TableHead>
               <TableRow>
+                <TableCell sx={thSx}>Tratamiento</TableCell>
+                <TableCell sx={thSx}>Paciente</TableCell>
                 <TableCell sx={thSx}>Especialista</TableCell>
-                <TableCell align="center" sx={{ ...thSx, width: 80 }}>Líneas</TableCell>
-                <TableCell align="center" sx={{ ...thSx, width: 100 }}>Culminadas</TableCell>
-                <TableCell align="right" sx={{ ...thSx, width: 120 }}>Ingresos</TableCell>
+                <TableCell align="right" sx={{ ...thSx, width: 100 }}>Precio</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {rendimiento_especialistas.map((esp) => (
-                <TableRow key={esp.id} hover sx={{ "&:hover": { bgcolor: colors.creamPanel } }}>
-                  <TableCell sx={{ ...tdSx, fontWeight: 500 }}>{esp.nombre}</TableCell>
-                  <TableCell align="center" sx={tdSx}>{esp.lineas_total}</TableCell>
-                  <TableCell align="center" sx={tdSx}>
-                    <Chip label={esp.lineas_culminadas} size="small" sx={{ bgcolor: colors.successBg, color: colors.successText, border: `1px solid ${colors.successBorder}`, fontWeight: 600, height: 22, fontSize: "0.7rem" }} />
-                  </TableCell>
-                  <TableCell align="right" sx={{ ...tdSx, fontWeight: 700, color: colors.primary }}>{formatMoney(esp.ingresos_generados)}</TableCell>
+              {(ultimos_tratamientos || []).slice(0, 8).map((t, i) => (
+                <TableRow key={i} hover sx={{ "&:hover": { bgcolor: colors.creamPanel } }}>
+                  <TableCell sx={{ ...tdSx, fontWeight: 600, color: colors.primaryDark }}>{t.tratamiento_nombre}</TableCell>
+                  <TableCell sx={tdSx}>{t.paciente_nombre} {t.paciente_apellido}</TableCell>
+                  <TableCell sx={{ ...tdSx, color: colors.textMuted }}>{t.especialista || "—"}</TableCell>
+                  <TableCell align="right" sx={{ ...tdSx, fontWeight: 700, color: colors.primary }}>{formatMoney(t.precio_sesion)}</TableCell>
                 </TableRow>
               ))}
-              {rendimiento_especialistas.length === 0 && (
-                <TableRow><TableCell colSpan={4} align="center" sx={tdSx}><Typography sx={{ color: colors.textMuted, fontSize: "13px" }}>Sin datos de especialistas</Typography></TableCell></TableRow>
+              {(!ultimos_tratamientos || ultimos_tratamientos.length === 0) && (
+                <TableRow><TableCell colSpan={4} sx={tdSx}><Empty text="Sin tratamientos recientes" /></TableCell></TableRow>
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </PanelCard>
 
-      {/* Tratamientos más vendidos + Pagos pendientes */}
-      <Grid container spacing="16px" sx={{ mb: "20px" }}>
-        <Grid item xs={12} md={6}>
-          <Card sx={{ ...cardSx, height: "100%", p: 0 }}>
-            <CardContent sx={{ p: "20px" }}>
-              <SectionTitle>Tratamientos Más Vendidos</SectionTitle>
-              {tratamientos_mas_vendidos.length === 0 && <Typography sx={{ color: colors.textMuted, fontSize: "13px" }}>Sin datos</Typography>}
-              {tratamientos_mas_vendidos.slice(0, 8).map((t, i) => (
-                <Box key={i} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "8px", borderTop: i > 0 ? `1px solid ${colors.border}` : "none" }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Box sx={{ bgcolor: colors.goldSoft, color: colors.primaryDark, borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700, fontFamily: fonts.body, flexShrink: 0 }}>
-                      {i + 1}
+        <PanelCard i={8} title="Rendimiento de especialistas">
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            {rendimiento_especialistas.map((esp, i) => {
+              const max = Math.max(...rendimiento_especialistas.map(e => e.ingresos_generados || 0), 1);
+              const pct = ((esp.ingresos_generados || 0) / max) * 100;
+              return (
+                <Box key={esp.id} sx={{ py: "11px", borderTop: i > 0 ? `1px solid ${colors.border}` : "none" }}>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mb: "6px" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                      <Avatar sx={{ width: 32, height: 32, background: grads.gold, fontSize: 13, fontFamily: fonts.title, fontWeight: 700 }}>{esp.nombre?.charAt(0)?.toUpperCase()}</Avatar>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography noWrap sx={{ fontSize: "13px", fontWeight: 600, color: colors.primaryDark, fontFamily: fonts.body }}>{esp.nombre}</Typography>
+                        <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>{esp.lineas_culminadas}/{esp.lineas_total} culminadas</Typography>
+                      </Box>
                     </Box>
-                    <Typography sx={{ fontSize: "13px", fontFamily: fonts.body, color: colors.textBody }}>{t.tratamiento_nombre}</Typography>
+                    <Typography sx={{ fontSize: "13px", fontWeight: 700, color: colors.primary, fontFamily: fonts.body, flexShrink: 0 }}>{formatMoney(esp.ingresos_generados)}</Typography>
                   </Box>
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexShrink: 0 }}>
-                    <Chip label={`${t.cantidad}x`} size="small" sx={{ height: 22, fontSize: "0.7rem", fontWeight: 600, bgcolor: colors.creamPanel, color: colors.textBody, border: `1px solid ${colors.border}` }} />
-                    <Typography sx={{ fontWeight: 700, color: colors.primary, fontSize: "13px", fontFamily: fonts.body, minWidth: 80, textAlign: "right" }}>{formatMoney(t.ingresos)}</Typography>
+                  <Box sx={{ height: 6, borderRadius: 3, bgcolor: colors.creamPanel, overflow: "hidden" }}>
+                    <MotionBox initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.8, delay: 0.2 + i * 0.05, ease: "easeOut" }} sx={{ height: "100%", borderRadius: 3, background: grads.gold }} />
                   </Box>
                 </Box>
-              ))}
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Card sx={{ ...cardSx, height: "100%", p: 0 }}>
-            <CardContent sx={{ p: "20px" }}>
-              <SectionTitle>Pagos Pendientes a Especialistas</SectionTitle>
-              {pagos_pendientes.length === 0 && <Typography sx={{ color: colors.textMuted, fontSize: "13px" }}>Sin pagos pendientes — todo al día</Typography>}
-              {pagos_pendientes.map((p, i) => (
-                <Box key={p.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "8px", borderTop: i > 0 ? `1px solid ${colors.border}` : "none" }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Avatar sx={{ width: 30, height: 30, bgcolor: colors.primary, fontSize: 13, fontFamily: fonts.body }}>{p.nombre?.charAt(0)}</Avatar>
-                    <Typography sx={{ fontSize: "13px", fontFamily: fonts.body, color: colors.textBody }}>{p.nombre}</Typography>
-                  </Box>
-                  <Chip label={formatMoney(p.monto_pendiente)} size="small" sx={{ bgcolor: colors.amberBg, color: colors.amberText, fontWeight: 700, fontSize: "0.75rem", height: 24, border: "none" }} />
-                </Box>
-              ))}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Últimos tratamientos realizados */}
-      {ultimos_tratamientos && ultimos_tratamientos.length > 0 && (
-        <Card sx={{ ...cardSx, p: 0 }}>
-          <CardContent sx={{ p: "20px" }}>
-            <SectionTitle>Últimos Tratamientos Realizados</SectionTitle>
-            <Table size="small" sx={{ tableLayout: "auto" }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={thSx}>Tratamiento</TableCell>
-                  <TableCell sx={thSx}>Paciente</TableCell>
-                  <TableCell sx={thSx}>Especialista</TableCell>
-                  <TableCell sx={{ ...thSx, width: 90 }}>Fecha</TableCell>
-                  <TableCell align="right" sx={{ ...thSx, width: 100 }}>Precio</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {ultimos_tratamientos.slice(0, 10).map((t, i) => (
-                  <TableRow key={i} hover sx={{ "&:hover": { bgcolor: colors.creamPanel } }}>
-                    <TableCell sx={{ ...tdSx, fontWeight: 500 }}>{t.tratamiento_nombre}</TableCell>
-                    <TableCell sx={tdSx}>{t.paciente_nombre} {t.paciente_apellido}</TableCell>
-                    <TableCell sx={{ ...tdSx, color: colors.textMuted }}>{t.especialista || "—"}</TableCell>
-                    <TableCell sx={{ ...tdSx, color: colors.textMuted }}>{t.fecha_realizada?.split(" ")[0]}</TableCell>
-                    <TableCell align="right" sx={{ ...tdSx, fontWeight: 700, color: colors.primary }}>{formatMoney(t.precio_sesion)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-    </Box>
+              );
+            })}
+            {rendimiento_especialistas.length === 0 && <Empty text="Sin datos de especialistas" />}
+          </Box>
+        </PanelCard>
+      </Box>
+    </MotionBox>
   );
 }
 
@@ -501,35 +792,251 @@ function SectionTitle({ children }) {
   );
 }
 
-function KPICard({ title, value, icon, tint, iconColor }) {
+function Empty({ text }) {
+  return <Typography sx={{ color: colors.textMuted, fontSize: "13px", fontFamily: fonts.body, py: "10px" }}>{text}</Typography>;
+}
+
+/* Contenedor de panel con título, animación de entrada y hover */
+function PanelCard({ children, title, badge, i = 0, action }) {
   return (
-    <Card sx={{ ...cardSx, p: 0 }}>
-      <CardContent sx={{ display: "flex", alignItems: "center", gap: "14px", p: "20px", "&:last-child": { pb: "20px" } }}>
-        <Box sx={{ width: 54, height: 54, borderRadius: "14px", bgcolor: tint, display: "flex", alignItems: "center", justifyContent: "center", color: iconColor, flexShrink: 0 }}>
-          {icon}
+    <MotionCard
+      custom={i}
+      variants={fadeUp}
+      whileHover={{ y: -3, boxShadow: "0 12px 28px rgba(93,64,55,0.12)" }}
+      sx={{ ...cardSx, p: 0, height: "100%", display: "flex", flexDirection: "column" }}
+    >
+      <CardContent sx={{ p: "22px", flex: 1, "&:last-child": { pb: "22px" } }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: "14px" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Typography sx={{ fontFamily: fonts.title, fontSize: "20px", fontWeight: 600, color: colors.primaryDark }}>{title}</Typography>
+            {badge != null && (
+              <Box sx={{ minWidth: 22, height: 22, px: "6px", borderRadius: "11px", bgcolor: colors.error, color: "#fff", fontSize: 11, fontWeight: 700, fontFamily: fonts.body, display: "flex", alignItems: "center", justifyContent: "center" }}>{badge}</Box>
+            )}
+          </Box>
+          {action}
         </Box>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontSize: "13px", color: colors.textMuted, fontFamily: fonts.body, fontWeight: 500, lineHeight: 1.3 }}>{title}</Typography>
-          <Typography sx={{ fontFamily: fonts.title, fontSize: "26px", fontWeight: 700, color: colors.primaryDark, lineHeight: 1.2 }}>{value}</Typography>
-        </Box>
+        {children}
       </CardContent>
-    </Card>
+    </MotionCard>
+  );
+}
+
+/* Tarjeta KPI premium */
+function KPICard({ title, value, icon, grad, trend, trendLabel, caption, i = 0 }) {
+  const up = trend != null && trend >= 0;
+  return (
+    <MotionCard
+      custom={i}
+      variants={fadeUp}
+      whileHover={{ y: -4, boxShadow: "0 14px 30px rgba(93,64,55,0.14)" }}
+      sx={{ ...cardSx, p: 0, position: "relative", overflow: "hidden" }}
+    >
+      <Box sx={{ position: "absolute", top: -30, right: -30, width: 110, height: 110, borderRadius: "50%", background: grad, opacity: 0.08 }} />
+      <CardContent sx={{ p: "20px", "&:last-child": { pb: "20px" } }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: "14px" }}>
+          <Box sx={{ width: 52, height: 52, borderRadius: "15px", background: grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 6px 14px rgba(93,64,55,0.18)", "& svg": { fontSize: 26 } }}>
+            {icon}
+          </Box>
+          {trend != null && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: "3px", px: "8px", py: "3px", borderRadius: "20px", bgcolor: up ? colors.successBg : "#FDECEA" }}>
+              {up ? <TrendingUp sx={{ fontSize: 14, color: colors.successText }} /> : <TrendingDown sx={{ fontSize: 14, color: colors.error }} />}
+              <Typography sx={{ fontSize: "11.5px", fontWeight: 700, fontFamily: fonts.body, color: up ? colors.successText : colors.error }}>
+                {up ? "+" : ""}{trend.toFixed(1)}%
+              </Typography>
+            </Box>
+          )}
+        </Box>
+        <Typography sx={{ fontSize: "13px", color: colors.textMuted, fontFamily: fonts.body, fontWeight: 500 }}>{title}</Typography>
+        <Typography sx={{ fontFamily: fonts.title, fontSize: "28px", fontWeight: 700, color: colors.primaryDark, lineHeight: 1.15, mt: "2px" }}>{value}</Typography>
+        <Typography sx={{ fontSize: "11.5px", color: colors.textMuted, fontFamily: fonts.body, mt: "4px" }}>
+          {trend != null ? trendLabel : caption}
+        </Typography>
+      </CardContent>
+    </MotionCard>
+  );
+}
+
+/* ======================================================================
+   GRÁFICO DE ÁREA (SVG animado)
+====================================================================== */
+function AreaChart({ data }) {
+  const W = 620, H = 240;
+  const padL = 52, padR = 14, padT = 18, padB = 30;
+  const n = data.length;
+  const max = Math.max(...data.map(d => d.total || 0), 1);
+  const niceMax = max * 1.15;
+
+  const pts = data.map((d, i) => ({
+    x: padL + (n === 1 ? (W - padL - padR) / 2 : (i / (n - 1)) * (W - padL - padR)),
+    y: H - padB - ((d.total || 0) / niceMax) * (H - padT - padB),
+    label: d.mes,
+    val: d.total || 0
+  }));
+
+  const linePath = smoothPath(pts);
+  const areaPath = `${linePath} L ${pts[pts.length - 1].x} ${H - padB} L ${pts[0].x} ${H - padB} Z`;
+
+  const gridVals = [0, 0.25, 0.5, 0.75, 1].map(f => f * niceMax);
+  const gid = "gd-area-grad";
+
+  return (
+    <Box sx={{ width: "100%" }}>
+      <Box component="svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" sx={{ width: "100%", height: { xs: 200, md: 240 }, display: "block", overflow: "visible" }}>
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={colors.gold} stopOpacity="0.35" />
+            <stop offset="100%" stopColor={colors.gold} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* grid + labels */}
+        {gridVals.map((gv, i) => {
+          const y = H - padB - (gv / niceMax) * (H - padT - padB);
+          return (
+            <g key={i}>
+              <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={colors.border} strokeWidth="1" strokeDasharray="3 4" />
+              <text x={padL - 8} y={y + 3} textAnchor="end" fontSize="9.5" fill={colors.textMuted} fontFamily="'DM Sans', sans-serif">
+                {Math.round(gv / 1000)}k
+              </text>
+            </g>
+          );
+        })}
+
+        {/* area */}
+        <motion.path d={areaPath} fill={`url(#${gid})`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.3 }} />
+        {/* line */}
+        <motion.path d={linePath} fill="none" stroke={colors.primary} strokeWidth="2.5" strokeLinecap="round"
+          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.1, ease: "easeInOut" }} />
+
+        {/* dots */}
+        {pts.map((p, i) => (
+          <motion.circle key={i} cx={p.x} cy={p.y} r="3.5" fill="#fff" stroke={colors.primary} strokeWidth="2"
+            initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6 + i * 0.05 }}>
+            <title>{`${p.label}: ${formatMoney(p.val)}`}</title>
+          </motion.circle>
+        ))}
+
+        {/* x labels */}
+        {pts.map((p, i) => (
+          <text key={i} x={p.x} y={H - padB + 16} textAnchor="middle" fontSize="9.5" fill={colors.textMuted} fontFamily="'DM Sans', sans-serif">
+            {p.label?.slice(5)}
+          </text>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+function smoothPath(pts) {
+  if (!pts.length) return "";
+  if (pts.length < 2) return `M ${pts[0].x} ${pts[0].y}`;
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] || p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
+/* ======================================================================
+   GRÁFICO DONA (SVG animado)
+====================================================================== */
+function DonutChart({ data }) {
+  const total = data.reduce((a, d) => a + (d.value || 0), 0) || 1;
+  const size = 160, stroke = 22, r = (size - stroke) / 2, cx = size / 2, cy = size / 2;
+  const C = 2 * Math.PI * r;
+
+  let cumulative = 0;
+  const segs = data.map((d) => {
+    const frac = (d.value || 0) / total;
+    const seg = { ...d, frac, offset: cumulative };
+    cumulative += frac;
+    return seg;
+  });
+
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+      <Box sx={{ position: "relative", width: size, height: size, flexShrink: 0, mx: "auto" }}>
+        <Box component="svg" width={size} height={size} sx={{ transform: "rotate(-90deg)" }}>
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke={colors.creamPanel} strokeWidth={stroke} />
+          {segs.map((s, i) => (
+            <motion.circle
+              key={i}
+              cx={cx} cy={cy} r={r} fill="none"
+              stroke={s.color} strokeWidth={stroke} strokeLinecap="butt"
+              strokeDasharray={`${s.frac * C} ${C}`}
+              initial={{ strokeDashoffset: C }}
+              animate={{ strokeDashoffset: -s.offset * C }}
+              transition={{ duration: 0.9, delay: 0.2 + i * 0.12, ease: "easeOut" }}
+            />
+          ))}
+        </Box>
+        <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <Typography sx={{ fontFamily: fonts.title, fontSize: 26, fontWeight: 700, color: colors.primaryDark, lineHeight: 1 }}>{total}</Typography>
+          <Typography sx={{ fontSize: 10.5, color: colors.textMuted, fontFamily: fonts.body }}>total</Typography>
+        </Box>
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 140, display: "flex", flexDirection: "column", gap: "8px" }}>
+        {segs.map((s, i) => (
+          <Box key={i} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+              <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: s.color, flexShrink: 0 }} />
+              <Typography noWrap sx={{ fontSize: "12.5px", fontFamily: fonts.body, color: colors.textBody }}>{s.label}</Typography>
+            </Box>
+            <Typography sx={{ fontSize: "12.5px", fontWeight: 700, fontFamily: fonts.body, color: colors.primaryDark, flexShrink: 0 }}>{Math.round(s.frac * 100)}%</Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
   );
 }
 
 /* ======================================================================
    VISTA PRESUPUESTOS
 ====================================================================== */
-function PresupuestosView({ presupuestos, filtroEstado, setFiltroEstado, onLoadPresupuestos, onSync, onSelectPresupuesto, detalle, onBack, onCulminar, onRevertir, navigate }) {
+function PresupuestosView({ presupuestos, filtroEstado, setFiltroEstado, onSync, onSelectPresupuesto, detalle, onBack, onCulminar, onRevertir, navigate }) {
   if (detalle) {
     return <PresupuestoDetalleView detalle={detalle} onBack={onBack} onCulminar={onCulminar} onRevertir={onRevertir} navigate={navigate} />;
   }
 
+  // Agrupar presupuestos por especialista involucrado (sin hooks: cálculo directo)
+  const map = new Map();
+  const sinAsignar = [];
+  presupuestos.forEach((p) => {
+    const esps = p.especialistas_involucrados || [];
+    if (esps.length === 0) { sinAsignar.push(p); return; }
+    esps.forEach((nombre) => {
+      if (!map.has(nombre)) map.set(nombre, []);
+      map.get(nombre).push(p);
+    });
+  });
+
+  const grupos = [...map.entries()].map(([nombre, lista]) => {
+    let total = 0, lineas = 0, culminadas = 0;
+    lista.forEach((p) => {
+      (p.lineas || []).forEach((l) => {
+        if (l.especialista_nombre === nombre) {
+          total += Number(l.precio) || 0;
+          lineas += 1;
+          if (l.estado === "culminado") culminadas += 1;
+        }
+      });
+    });
+    return { nombre, lista, total, lineas, culminadas };
+  }).sort((a, b) => b.total - a.total);
+
   return (
     <Box>
-      {/* Filtros */}
+      {/* Barra de acciones */}
       <Box sx={{ display: "flex", gap: "12px", mb: "18px", alignItems: "center", flexWrap: "wrap" }}>
-        <FormControl size="small" sx={{ minWidth: 150, "& .MuiOutlinedInput-root": { borderRadius: "10px", fontFamily: fonts.body, fontSize: "13px", "& fieldset": { borderColor: colors.border } } }}>
+        <FormControl size="small" sx={{ minWidth: 160, "& .MuiOutlinedInput-root": { borderRadius: "10px", fontFamily: fonts.body, fontSize: "13px", bgcolor: colors.white, "& fieldset": { borderColor: colors.border } } }}>
           <InputLabel sx={{ fontFamily: fonts.body, fontSize: "13px" }}>Estado</InputLabel>
           <Select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} label="Estado">
             <MenuItem value="">Todos</MenuItem>
@@ -538,56 +1045,118 @@ function PresupuestosView({ presupuestos, filtroEstado, setFiltroEstado, onLoadP
             <MenuItem value="anulado">Anulado</MenuItem>
           </Select>
         </FormControl>
-        <Button size="small" startIcon={<FilterList />} onClick={onLoadPresupuestos} sx={{ color: colors.primary, fontFamily: fonts.body, textTransform: "none", borderRadius: "10px" }}>Filtrar</Button>
-        <Button size="small" startIcon={<Refresh />} onClick={onSync} sx={{ color: colors.gold, fontFamily: fonts.body, textTransform: "none", borderRadius: "10px" }}>Sincronizar Líneas</Button>
+        <Box sx={{ flex: 1 }} />
+        <Button size="small" variant="outlined" startIcon={<Refresh />} onClick={onSync} sx={{ color: colors.gold, borderColor: colors.border, fontFamily: fonts.body, textTransform: "none", borderRadius: "10px", "&:hover": { borderColor: colors.gold, bgcolor: colors.creamPanel } }}>Sincronizar líneas</Button>
       </Box>
 
-      {/* Lista */}
-      <Grid container spacing="16px">
-        {presupuestos.map((p) => (
-          <Grid item xs={12} md={6} lg={4} key={p.id}>
-            <Card
-              sx={{ ...cardSx, cursor: "pointer", "&:hover": { borderColor: colors.gold, boxShadow: "0 4px 12px rgba(93,64,55,0.1)" }, transition: "all 0.2s", p: 0 }}
-              onClick={() => onSelectPresupuesto(p.id)}
-            >
-              <CardContent sx={{ p: "18px" }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.body, fontSize: "14px", color: colors.primaryDark }}>
-                    {p.paciente_nombre} {p.paciente_apellido}
-                  </Typography>
-                  <EstadoChip estado={p.estado_gestion || "activo"} />
-                </Box>
-                <Typography sx={{ fontSize: "12px", color: colors.textMuted, fontFamily: fonts.body }}>#{p.id} — {p.creado_en?.split(" ")[0]}</Typography>
-                <Divider sx={{ my: 1, borderColor: colors.border }} />
-                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                  <Typography sx={{ fontSize: "13px", fontFamily: fonts.body, color: colors.textBody }}>Total: <strong style={{ color: colors.primary }}>{formatMoney(p.precio_total)}</strong></Typography>
-                  <Typography sx={{ fontSize: "13px", fontFamily: fonts.body, color: colors.textMuted }}>
-                    Líneas: {p.lineas_culminadas}/{p.total_lineas}
-                  </Typography>
-                </Box>
-                <Box sx={{ mt: 1 }}>
-                  <LinearProgress
-                    variant="determinate"
-                    value={p.total_lineas > 0 ? (p.lineas_culminadas / p.total_lineas) * 100 : 0}
-                    sx={{ height: 5, borderRadius: 3, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: colors.successText, borderRadius: 3 } }}
-                  />
-                </Box>
-                {p.especialistas_involucrados?.length > 0 && (
-                  <Box sx={{ mt: 1, display: "flex", gap: 0.5, flexWrap: "wrap" }}>
-                    {p.especialistas_involucrados.map((e, i) => (
-                      <Chip key={i} label={e} size="small" sx={{ fontSize: "0.65rem", height: 20, bgcolor: colors.creamPanel, color: colors.textBody, border: `1px solid ${colors.border}` }} />
-                    ))}
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+      {/* Grupos por especialista */}
+      <MotionBox initial="hidden" animate="show" sx={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        {grupos.map((g, i) => (
+          <EspecialistaGrupo key={g.nombre} grupo={g} index={i} onSelectPresupuesto={onSelectPresupuesto} />
         ))}
-      </Grid>
-      {presupuestos.length === 0 && !filtroEstado && (
-        <Typography sx={{ mt: "20px", textAlign: "center", color: colors.textMuted, fontSize: "13px", fontFamily: fonts.body }}>No hay presupuestos registrados</Typography>
+        {sinAsignar.length > 0 && (
+          <EspecialistaGrupo
+            key="__sin__"
+            index={grupos.length}
+            grupo={{ nombre: "Sin especialista asignado", lista: sinAsignar, total: sinAsignar.reduce((a, p) => a + (Number(p.precio_total) || 0), 0), lineas: sinAsignar.reduce((a, p) => a + (p.total_lineas || 0), 0), culminadas: sinAsignar.reduce((a, p) => a + (p.lineas_culminadas || 0), 0) }}
+            onSelectPresupuesto={onSelectPresupuesto}
+            sinAsignar
+          />
+        )}
+      </MotionBox>
+
+      {presupuestos.length === 0 && (
+        <Typography sx={{ mt: "20px", textAlign: "center", color: colors.textMuted, fontSize: "13px", fontFamily: fonts.body }}>No hay presupuestos en este periodo</Typography>
       )}
     </Box>
+  );
+}
+
+/* Grupo colapsable de un especialista con sus presupuestos */
+function EspecialistaGrupo({ grupo, index, onSelectPresupuesto, sinAsignar }) {
+  const [open, setOpen] = useState(index === 0 && !sinAsignar);
+  const { nombre, lista, total, lineas, culminadas } = grupo;
+  const progreso = lineas > 0 ? (culminadas / lineas) * 100 : 0;
+
+  return (
+    <MotionCard custom={index} variants={fadeUp} sx={{ ...cardSx, p: 0, overflow: "hidden" }}>
+      {/* Cabecera clickeable */}
+      <MotionBox
+        onClick={() => setOpen((o) => !o)}
+        whileHover={{ backgroundColor: colors.creamPanel }}
+        sx={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "14px", p: "16px 20px" }}
+      >
+        <Avatar sx={{ width: 46, height: 46, background: sinAsignar ? "linear-gradient(135deg,#B0A79C,#8A8078)" : grads.gold, fontFamily: fonts.title, fontWeight: 700, fontSize: 20, flexShrink: 0 }}>
+          {sinAsignar ? "?" : nombre?.charAt(0)?.toUpperCase()}
+        </Avatar>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "15px", color: colors.primaryDark }}>{nombre}</Typography>
+          <Box sx={{ display: "flex", gap: "12px", flexWrap: "wrap", mt: "2px" }}>
+            <Typography sx={{ fontSize: "12px", color: colors.textMuted, fontFamily: fonts.body }}>
+              {lista.length} presupuesto{lista.length !== 1 ? "s" : ""}
+            </Typography>
+            {!sinAsignar && (
+              <Typography sx={{ fontSize: "12px", color: colors.textMuted, fontFamily: fonts.body }}>
+                {culminadas}/{lineas} líneas culminadas
+              </Typography>
+            )}
+          </Box>
+        </Box>
+        <Box sx={{ textAlign: "right", flexShrink: 0, mr: "6px" }}>
+          <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>{sinAsignar ? "Total presup." : "Generado"}</Typography>
+          <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "18px", color: colors.primary, lineHeight: 1.1 }}>{formatMoney(total)}</Typography>
+        </Box>
+        <MotionBox animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.25 }}>
+          <ExpandMore sx={{ color: colors.textMuted }} />
+        </MotionBox>
+      </MotionBox>
+
+      {!sinAsignar && (
+        <Box sx={{ px: "20px", pb: open ? 0 : "14px" }}>
+          <LinearProgress variant="determinate" value={progreso} sx={{ height: 5, borderRadius: 3, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: progreso === 100 ? colors.successText : colors.gold, borderRadius: 3 } }} />
+        </Box>
+      )}
+
+      <Collapse in={open} timeout={300}>
+        <Box sx={{ p: "18px 20px 20px", borderTop: `1px solid ${colors.border}`, mt: "14px", bgcolor: colors.cream }}>
+          <Grid container spacing="14px">
+            {lista.map((p) => (
+              <Grid item xs={12} sm={6} lg={4} key={p.id}>
+                <MotionCard
+                  whileHover={{ y: -4, boxShadow: "0 10px 22px rgba(93,64,55,0.12)" }}
+                  onClick={() => onSelectPresupuesto(p.id)}
+                  sx={{ ...cardSx, cursor: "pointer", p: 0, "&:hover": { borderColor: colors.gold } }}
+                >
+                  <CardContent sx={{ p: "16px", "&:last-child": { pb: "16px" } }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: "6px" }}>
+                      <Typography sx={{ fontWeight: 700, fontFamily: fonts.body, fontSize: "13.5px", color: colors.primaryDark, minWidth: 0 }} noWrap>
+                        {p.paciente_nombre} {p.paciente_apellido}
+                      </Typography>
+                      <EstadoChip estado={p.estado_gestion || "activo"} />
+                    </Box>
+                    <Typography sx={{ fontSize: "11.5px", color: colors.textMuted, fontFamily: fonts.body }}>#{p.id} · {p.creado_en?.split(" ")[0]}</Typography>
+                    <Divider sx={{ my: "10px", borderColor: colors.border }} />
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography sx={{ fontSize: "13px", fontFamily: fonts.body, color: colors.textBody }}>
+                        <strong style={{ color: colors.primary }}>{formatMoney(p.precio_total)}</strong>
+                      </Typography>
+                      <Typography sx={{ fontSize: "11.5px", fontFamily: fonts.body, color: colors.textMuted }}>
+                        {p.lineas_culminadas}/{p.total_lineas} líneas
+                      </Typography>
+                    </Box>
+                    <LinearProgress
+                      variant="determinate"
+                      value={p.total_lineas > 0 ? (p.lineas_culminadas / p.total_lineas) * 100 : 0}
+                      sx={{ mt: "8px", height: 4, borderRadius: 2, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: colors.successText, borderRadius: 2 } }}
+                    />
+                  </CardContent>
+                </MotionCard>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+      </Collapse>
+    </MotionCard>
   );
 }
 
