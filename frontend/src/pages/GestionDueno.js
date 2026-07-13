@@ -15,7 +15,8 @@ import {
   ArrowBack, Refresh, FilterList,
   OpenInNew, VerifiedUser, Warning, SpaceDashboardRounded,
   ReceiptLongRounded, GroupsRounded, PaymentsRounded,
-  LogoutRounded, HomeRounded, InsightsRounded
+  LogoutRounded, HomeRounded, InsightsRounded,
+  FlagRounded, EditRounded
 } from "@mui/icons-material";
 
 const MotionCard = motion(Card);
@@ -258,6 +259,13 @@ export default function GestionDueno() {
     } catch (e) { setError(e.message); }
   };
 
+  const handleSaveMeta = async (monto) => {
+    try {
+      await apiFetch("/meta", { method: "PUT", body: JSON.stringify({ meta_mensual: monto }) });
+      loadDashboard();
+    } catch (e) { setError(e.message); }
+  };
+
   const loadPresupuestoDetalle = async (id) => {
     try {
       const data = await apiFetch(`/presupuestos/${id}`);
@@ -375,7 +383,7 @@ export default function GestionDueno() {
           {loading && <LinearProgress sx={{ mb: "18px", borderRadius: 2, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: colors.gold } }} />}
 
           {/* TAB 0: Dashboard */}
-          {tab === 0 && dashboardData && <DashboardView data={dashboardData} />}
+          {tab === 0 && dashboardData && <DashboardView data={dashboardData} onSaveMeta={handleSaveMeta} />}
 
           {/* TAB 1: Presupuestos */}
           {tab === 1 && (
@@ -655,10 +663,191 @@ function PeriodoFilter({ preset, fechaInicio, fechaFin, onPreset, onCustom }) {
 }
 
 /* ======================================================================
+   META DEL MES (configurable + proyección)
+====================================================================== */
+function MetaPanel({ meta, onSaveMeta }) {
+  const metaMensual = Number(meta?.meta_mensual) || 0;
+  const ingresos = Number(meta?.ingresos_mes_actual) || 0;
+
+  const [open, setOpen] = useState(false);
+  const [valor, setValor] = useState(String(metaMensual || ""));
+  useEffect(() => { setValor(String(metaMensual || "")); }, [metaMensual]);
+
+  // Cálculos de proyección (mes actual, hora local)
+  const now = new Date();
+  const diasMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const diaActual = now.getDate();
+  const diasRestantes = Math.max(0, diasMes - diaActual);
+  const semanasMes = diasMes / 7;
+  const semanasRestantes = Math.max(diasRestantes / 7, 0);
+
+  const pct = metaMensual > 0 ? Math.min(100, (ingresos / metaMensual) * 100) : 0;
+  const falta = Math.max(0, metaMensual - ingresos);
+  const objetivoSemanal = metaMensual > 0 ? metaMensual / semanasMes : 0;
+  const ritmoNecesario = semanasRestantes > 0 ? falta / semanasRestantes : falta;
+  const proyeccion = diaActual > 0 ? (ingresos / diaActual) * diasMes : 0;
+  const enCamino = metaMensual > 0 && proyeccion >= metaMensual;
+  const cumplida = metaMensual > 0 && ingresos >= metaMensual;
+
+  // Anillo SVG
+  const R = 52, C = 2 * Math.PI * R;
+  const dash = (pct / 100) * C;
+
+  const nombresMes = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  const mesLabel = `${nombresMes[now.getMonth()]} ${now.getFullYear()}`;
+
+  const guardar = () => {
+    const n = parseFloat(valor);
+    if (isNaN(n) || n < 0) return;
+    onSaveMeta(n);
+    setOpen(false);
+  };
+
+  const inputSx = {
+    width: "100%", fontFamily: fonts.body, fontSize: "18px", fontWeight: 700, color: colors.primaryDark,
+    border: `1px solid ${colors.border}`, borderRadius: "10px", padding: "12px 14px", outline: "none", boxSizing: "border-box"
+  };
+
+  const statSx = { flex: "1 1 150px", minWidth: 140, bgcolor: colors.cream, border: `1px solid ${colors.border}`, borderRadius: "12px", p: "12px 14px" };
+
+  return (
+    <MotionCard custom={3.5} variants={fadeUp} sx={{ ...cardSx, p: 0, mb: "22px", overflow: "hidden" }}>
+      {/* borde superior dorado */}
+      <Box sx={{ height: 4, background: grads.gold }} />
+      <CardContent sx={{ p: { xs: "18px", md: "22px" }, "&:last-child": { pb: { xs: "18px", md: "22px" } } }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "18px" }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: "10px", background: grads.gold, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <FlagRounded sx={{ color: "#fff", fontSize: 20 }} />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "17px", color: colors.primaryDark, lineHeight: 1.1 }}>Meta del mes</Typography>
+            <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>{mesLabel}</Typography>
+          </Box>
+          <Button
+            size="small"
+            startIcon={<EditRounded sx={{ fontSize: 16 }} />}
+            onClick={() => setOpen(true)}
+            sx={{ color: colors.primary, fontFamily: fonts.body, textTransform: "none", borderRadius: "10px", border: `1px solid ${colors.border}`, bgcolor: colors.white, "&:hover": { bgcolor: colors.creamPanel } }}
+          >
+            {metaMensual > 0 ? "Editar meta" : "Definir meta"}
+          </Button>
+        </Box>
+
+        {metaMensual <= 0 ? (
+          <Box sx={{ textAlign: "center", py: "20px" }}>
+            <Typography sx={{ fontFamily: fonts.body, fontSize: "14px", color: colors.textMuted }}>
+              Aún no has definido una meta mensual. Configúrala para ver tu progreso y proyección.
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: "24px", alignItems: "center" }}>
+            {/* Anillo de progreso */}
+            <Box sx={{ position: "relative", width: 132, height: 132, flexShrink: 0, mx: "auto" }}>
+              <svg width="132" height="132" viewBox="0 0 132 132">
+                <circle cx="66" cy="66" r={R} fill="none" stroke={colors.border} strokeWidth="12" />
+                <motion.circle
+                  cx="66" cy="66" r={R} fill="none"
+                  stroke={cumplida ? colors.successText : colors.gold}
+                  strokeWidth="12" strokeLinecap="round"
+                  transform="rotate(-90 66 66)"
+                  strokeDasharray={C}
+                  initial={{ strokeDashoffset: C }}
+                  animate={{ strokeDashoffset: C - dash }}
+                  transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+                />
+              </svg>
+              <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "26px", color: colors.primaryDark, lineHeight: 1 }}>{pct.toFixed(0)}%</Typography>
+                <Typography sx={{ fontFamily: fonts.body, fontSize: "10.5px", color: colors.textMuted }}>de la meta</Typography>
+              </Box>
+            </Box>
+
+            {/* Estadísticas */}
+            <Box sx={{ flex: 1, minWidth: 260 }}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+                <Box sx={statSx}>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Meta mensual</Typography>
+                  <Typography sx={{ fontSize: "17px", fontWeight: 700, fontFamily: fonts.title, color: colors.primaryDark }}>{formatMoney(metaMensual)}</Typography>
+                </Box>
+                <Box sx={statSx}>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Logrado este mes</Typography>
+                  <Typography sx={{ fontSize: "17px", fontWeight: 700, fontFamily: fonts.title, color: colors.successText }}>{formatMoney(ingresos)}</Typography>
+                </Box>
+                <Box sx={statSx}>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>{cumplida ? "Excedente" : "Falta para la meta"}</Typography>
+                  <Typography sx={{ fontSize: "17px", fontWeight: 700, fontFamily: fonts.title, color: cumplida ? colors.successText : colors.primary }}>
+                    {cumplida ? formatMoney(ingresos - metaMensual) : formatMoney(falta)}
+                  </Typography>
+                </Box>
+                <Box sx={statSx}>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Objetivo semanal</Typography>
+                  <Typography sx={{ fontSize: "17px", fontWeight: 700, fontFamily: fonts.title, color: colors.primaryDark }}>{formatMoney(objetivoSemanal)}</Typography>
+                </Box>
+              </Box>
+
+              {/* Barra + proyección */}
+              <Box sx={{ mt: "14px" }}>
+                <LinearProgress variant="determinate" value={pct} sx={{ height: 8, borderRadius: 4, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: cumplida ? colors.successText : colors.gold, borderRadius: 4 } }} />
+              </Box>
+
+              <Box sx={{ mt: "12px", display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" }}>
+                <Chip
+                  size="small"
+                  icon={enCamino ? <TrendingUp sx={{ fontSize: 15 }} /> : <TrendingDown sx={{ fontSize: 15 }} />}
+                  label={cumplida ? "¡Meta cumplida!" : `Proyección: ${formatMoney(proyeccion)}`}
+                  sx={{
+                    fontFamily: fonts.body, fontWeight: 600, fontSize: "12px",
+                    bgcolor: enCamino || cumplida ? colors.successBg : colors.amberBg,
+                    color: enCamino || cumplida ? colors.successText : colors.amberText,
+                    border: `1px solid ${enCamino || cumplida ? colors.successBorder : colors.gold}`,
+                    "& .MuiChip-icon": { color: "inherit" }
+                  }}
+                />
+                {!cumplida && (
+                  <Typography sx={{ fontSize: "12px", color: colors.textMuted, fontFamily: fonts.body }}>
+                    Necesitas <strong style={{ color: colors.primary }}>{formatMoney(ritmoNecesario)}</strong>/semana los {diasRestantes} días restantes.
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          </Box>
+        )}
+      </CardContent>
+
+      {/* Dialog editar meta */}
+      <Dialog open={open} onClose={() => setOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
+        <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark }}>Meta mensual de ingresos</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted, mb: "12px" }}>
+            Define cuánto dinero deseas facturar este mes. Verás tu progreso, objetivo semanal y proyección.
+          </Typography>
+          <Box
+            component="input"
+            type="number"
+            min="0"
+            step="50"
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") guardar(); }}
+            placeholder="Ej. 20000"
+            autoFocus
+            sx={inputSx}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: "24px", pb: "18px" }}>
+          <Button onClick={() => setOpen(false)} sx={{ color: colors.textMuted, textTransform: "none", fontFamily: fonts.body }}>Cancelar</Button>
+          <Button onClick={guardar} variant="contained" sx={{ background: grads.brown, textTransform: "none", borderRadius: "10px", fontFamily: fonts.body, fontWeight: 600, boxShadow: "none", "&:hover": { boxShadow: "none", opacity: 0.92 } }}>Guardar meta</Button>
+        </DialogActions>
+      </Dialog>
+    </MotionCard>
+  );
+}
+
+/* ======================================================================
    VISTA DASHBOARD
 ====================================================================== */
-function DashboardView({ data }) {
-  const { kpis, ingresos_por_mes, tratamientos_mas_vendidos, pagos_pendientes, ultimos_tratamientos, rendimiento_especialistas } = data;
+function DashboardView({ data, onSaveMeta }) {
+  const { kpis, meta, ingresos_por_mes, tratamientos_mas_vendidos, pagos_pendientes, ultimos_tratamientos, rendimiento_especialistas } = data;
 
   const thSx = { fontWeight: 700, fontFamily: fonts.body, fontSize: "11px", textTransform: "uppercase", color: colors.textMuted, letterSpacing: "0.5px", borderBottom: `1px solid ${colors.border}`, py: "10px" };
   const tdSx = { fontFamily: fonts.body, fontSize: "13px", color: colors.textBody, borderBottom: `1px solid ${colors.border}`, py: "12px" };
@@ -694,6 +883,9 @@ function DashboardView({ data }) {
         <KPICard i={2} title="Pacientes atendidos" value={kpis.pacientes_atendidos} icon={<People />} grad={grads.violet} caption="pacientes únicos" />
         <KPICard i={3} title="Ticket promedio" value={formatMoney(kpis.ticket_promedio)} icon={<InsightsRounded />} grad={grads.amber} caption="por paciente" />
       </Box>
+
+      {/* Meta del mes */}
+      <MetaPanel meta={meta} onSaveMeta={onSaveMeta} />
 
       {/* Fila media: Ingresos + Donut + Pagos */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1.55fr 1.15fr 1fr" }, gap: "18px", mb: "22px", alignItems: "stretch" }}>

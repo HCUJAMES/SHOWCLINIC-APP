@@ -84,6 +84,38 @@ async function ensureLineasMigration() {
 }
 
 /* ======================================================================
+   ⚙️ CONFIGURACIÓN DEL DUEÑO (clave/valor) — p.ej. meta mensual
+====================================================================== */
+let configTableReady = false;
+async function ensureConfigTable() {
+  if (configTableReady) return;
+  try {
+    await dbRun(`CREATE TABLE IF NOT EXISTS config_dueno (
+      clave TEXT PRIMARY KEY,
+      valor TEXT
+    )`);
+    configTableReady = true;
+  } catch (err) {
+    console.error("❌ Error creando config_dueno:", err.message);
+  }
+}
+
+async function getConfig(clave, porDefecto = null) {
+  await ensureConfigTable();
+  const row = await dbGet("SELECT valor FROM config_dueno WHERE clave = ?", [clave]);
+  return row ? row.valor : porDefecto;
+}
+
+async function setConfig(clave, valor) {
+  await ensureConfigTable();
+  await dbRun(
+    `INSERT INTO config_dueno (clave, valor) VALUES (?, ?)
+     ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor`,
+    [clave, String(valor)]
+  );
+}
+
+/* ======================================================================
    📊 DASHBOARD KPIs DEL DUEÑO
 ====================================================================== */
 router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
@@ -94,20 +126,26 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
 
     let condFecha = "";
     let condFechaFin = "";
+    let condFechaPres = ""; // sobre presupuestos_asignados.creado_en (sin alias, para subquery)
     let params = [];
     let paramsFin = [];
+    let paramsPres = [];
 
     if (fecha_inicio) {
       condFecha += " AND DATE(pa.creado_en) >= ?";
       condFechaFin += " AND DATE(f.fecha) >= ?";
+      condFechaPres += " AND DATE(creado_en) >= ?";
       params.push(fecha_inicio);
       paramsFin.push(fecha_inicio);
+      paramsPres.push(fecha_inicio);
     }
     if (fecha_fin) {
       condFecha += " AND DATE(pa.creado_en) <= ?";
       condFechaFin += " AND DATE(f.fecha) <= ?";
+      condFechaPres += " AND DATE(creado_en) <= ?";
       params.push(fecha_fin);
       paramsFin.push(fecha_fin);
+      paramsPres.push(fecha_fin);
     }
 
     // Ingresos totales (desde finanzas tipo ingreso)
@@ -173,21 +211,32 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
       ORDER BY ps.fecha_realizada DESC LIMIT 20
     `);
 
-    // Rendimiento por especialista
+    // Rendimiento por especialista (respeta el filtro de periodo por fecha del presupuesto)
     const rendimientoEspecialistas = await dbAll(`
       SELECT e.id, e.nombre, e.comision_porcentaje,
         COUNT(DISTINCT lp.id) as lineas_total,
         SUM(CASE WHEN lp.estado = 'culminado' THEN 1 ELSE 0 END) as lineas_culminadas,
         COALESCE(SUM(lp.precio), 0) as ingresos_generados
       FROM especialistas e
-      LEFT JOIN lineas_presupuesto lp ON lp.especialista_id = e.id
+      LEFT JOIN lineas_presupuesto lp
+        ON lp.especialista_id = e.id
+        AND lp.presupuesto_asignado_id IN (SELECT id FROM presupuestos_asignados WHERE 1=1 ${condFechaPres})
       GROUP BY e.id
       ORDER BY ingresos_generados DESC
-    `);
+    `, paramsPres);
 
     // Presupuestos activos
     const presupuestosActivos = await dbGet(
       `SELECT COUNT(*) as total FROM presupuestos_asignados WHERE estado_gestion = 'activo' OR estado_gestion IS NULL`
+    );
+
+    // Meta mensual (configurable) + ingresos del MES ACTUAL (para proyección)
+    const metaMensual = Number(await getConfig("meta_mensual", 0)) || 0;
+    const mesActual = fechaLima().slice(0, 7); // YYYY-MM (hora Lima)
+    const ingresosMes = await dbGet(
+      `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas
+       WHERE tipo = 'ingreso' AND strftime('%Y-%m', fecha) = ?`,
+      [mesActual]
     );
 
     res.json({
@@ -197,6 +246,11 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
         pacientes_atendidos: pacientesAtendidos.total,
         ticket_promedio: ticketPromedio,
         presupuestos_activos: presupuestosActivos.total
+      },
+      meta: {
+        meta_mensual: metaMensual,
+        ingresos_mes_actual: Number(ingresosMes?.total || 0),
+        mes: mesActual
       },
       ingresos_por_mes: ingresosPorMes,
       tratamientos_mas_vendidos: tratamientosMasVendidos,
@@ -780,6 +834,33 @@ router.put("/presupuestos/:id/estado", authMiddleware, requireOwner, async (req,
   } catch (err) {
     console.error("❌ Error actualizando estado:", err.message);
     res.status(500).json({ message: "Error al actualizar estado", error: err.message });
+  }
+});
+
+/* ======================================================================
+   🎯 META MENSUAL (configurable)
+====================================================================== */
+router.get("/meta", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    const meta = Number(await getConfig("meta_mensual", 0)) || 0;
+    res.json({ meta_mensual: meta });
+  } catch (err) {
+    console.error("❌ Error obteniendo meta:", err.message);
+    res.status(500).json({ message: "Error al obtener meta", error: err.message });
+  }
+});
+
+router.put("/meta", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    const monto = Number(req.body?.meta_mensual);
+    if (isNaN(monto) || monto < 0) {
+      return res.status(400).json({ message: "meta_mensual debe ser un número mayor o igual a 0" });
+    }
+    await setConfig("meta_mensual", monto);
+    res.json({ message: "Meta actualizada", meta_mensual: monto });
+  } catch (err) {
+    console.error("❌ Error guardando meta:", err.message);
+    res.status(500).json({ message: "Error al guardar meta", error: err.message });
   }
 });
 
