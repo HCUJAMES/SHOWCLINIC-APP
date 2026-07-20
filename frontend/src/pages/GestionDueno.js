@@ -16,7 +16,8 @@ import {
   OpenInNew, VerifiedUser, Warning, SpaceDashboardRounded,
   ReceiptLongRounded, GroupsRounded, PaymentsRounded,
   LogoutRounded, HomeRounded, InsightsRounded,
-  FlagRounded, EditRounded
+  FlagRounded, EditRounded, TuneRounded,
+  PercentRounded, PaidRounded, CategoryRounded
 } from "@mui/icons-material";
 
 const MotionCard = motion(Card);
@@ -287,6 +288,12 @@ export default function GestionDueno() {
     } catch (e) { setError(e.message); }
   };
 
+  const handleEditComision = async (lineaId, payload) => {
+    await apiFetch(`/lineas/${lineaId}/comision`, { method: "PUT", body: JSON.stringify(payload) });
+    if (presupuestoDetalle) loadPresupuestoDetalle(presupuestoDetalle.presupuesto.id);
+    if (especialistaDetalle) loadEspecialistaDetalle(especialistaDetalle.especialista.id);
+  };
+
   /* ── HELPERS DE UI ── */
   const username = localStorage.getItem("username") || "Dueño";
   const rol = (localStorage.getItem("role") || "").toLowerCase();
@@ -398,6 +405,7 @@ export default function GestionDueno() {
               onBack={() => setPresupuestoDetalle(null)}
               onCulminar={(linea) => setDialogCulminar(linea)}
               onRevertir={handleRevertir}
+              onEditComision={handleEditComision}
               navigate={navigate}
             />
           )}
@@ -410,6 +418,8 @@ export default function GestionDueno() {
               onSelect={loadEspecialistaDetalle}
               onBack={() => setEspecialistaDetalle(null)}
               onCulminar={(linea) => setDialogCulminar(linea)}
+              onEditComision={handleEditComision}
+              onReloadEspecialistas={loadEspecialistas}
             />
           )}
 
@@ -1193,9 +1203,9 @@ function DonutChart({ data }) {
 /* ======================================================================
    VISTA PRESUPUESTOS
 ====================================================================== */
-function PresupuestosView({ presupuestos, filtroEstado, setFiltroEstado, onSync, onSelectPresupuesto, detalle, onBack, onCulminar, onRevertir, navigate }) {
+function PresupuestosView({ presupuestos, filtroEstado, setFiltroEstado, onSync, onSelectPresupuesto, detalle, onBack, onCulminar, onRevertir, onEditComision, navigate }) {
   if (detalle) {
-    return <PresupuestoDetalleView detalle={detalle} onBack={onBack} onCulminar={onCulminar} onRevertir={onRevertir} navigate={navigate} />;
+    return <PresupuestoDetalleView detalle={detalle} onBack={onBack} onCulminar={onCulminar} onRevertir={onRevertir} onEditComision={onEditComision} navigate={navigate} />;
   }
 
   // Agrupar presupuestos por especialista involucrado (sin hooks: cálculo directo)
@@ -1352,7 +1362,7 @@ function EspecialistaGrupo({ grupo, index, onSelectPresupuesto, sinAsignar }) {
   );
 }
 
-function PresupuestoDetalleView({ detalle, onBack, onCulminar, onRevertir, navigate }) {
+function PresupuestoDetalleView({ detalle, onBack, onCulminar, onRevertir, onEditComision, navigate }) {
   const { presupuesto, lineas } = detalle;
   const totalLineas = lineas.length;
   const lineasCulminadas = lineas.filter(l => l.estado === "culminado").length;
@@ -1417,17 +1427,139 @@ function PresupuestoDetalleView({ detalle, onBack, onCulminar, onRevertir, navig
       {/* Líneas de tratamiento */}
       <SectionTitle>Líneas de Tratamiento</SectionTitle>
       {lineas.map((linea) => (
-        <LineaCard key={linea.id} linea={linea} onCulminar={onCulminar} onRevertir={onRevertir} />
+        <LineaCard key={linea.id} linea={linea} onCulminar={onCulminar} onRevertir={onRevertir} onEditComision={onEditComision} />
       ))}
     </Box>
   );
 }
 
-function LineaCard({ linea, onCulminar, onRevertir }) {
+const CATEGORIA_STYLES = {
+  "Armonización": { bg: "#f3e8ff", text: "#7c3aed", border: "#d8b4fe" },
+  "Cosmiatría Facial": { bg: "#e0f2fe", text: "#0369a1", border: "#bae6fd" },
+  "Cosmiatría Corporal": { bg: "#dcfce7", text: "#15803d", border: "#bbf7d0" }
+};
+
+function CategoriaChip({ categoria }) {
+  if (!categoria) return null;
+  const s = CATEGORIA_STYLES[categoria] || { bg: colors.creamPanel, text: colors.textMuted, border: colors.border };
+  return (
+    <Chip
+      icon={<CategoryRounded sx={{ fontSize: 13, color: `${s.text} !important` }} />}
+      label={categoria}
+      size="small"
+      sx={{ height: 20, fontSize: "0.65rem", fontFamily: fonts.body, fontWeight: 600, bgcolor: s.bg, color: s.text, border: `1px solid ${s.border}` }}
+    />
+  );
+}
+
+// Diálogo para editar la comisión de una línea (% o monto fijo)
+function ComisionEditorDialog({ open, linea, onClose, onSave }) {
+  const [tipo, setTipo] = useState("porcentaje");
+  const [pct, setPct] = useState("20");
+  const [fijo, setFijo] = useState("0");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!linea) return;
+    setTipo(linea.comision_tipo === "fijo" ? "fijo" : "porcentaje");
+    setPct(String(linea.comision_porcentaje_efectivo ?? linea.comision_porcentaje ?? 20));
+    setFijo(String(linea.comision_fija ?? 0));
+  }, [linea]);
+
+  if (!linea) return null;
+
+  const preview = tipo === "fijo"
+    ? (parseFloat(fijo) || 0)
+    : (Number(linea.precio) || 0) * ((parseFloat(pct) || 0) / 100);
+
+  const guardar = async () => {
+    let payload;
+    if (tipo === "porcentaje") {
+      const n = parseFloat(pct);
+      if (isNaN(n) || n < 0 || n > 100) return;
+      payload = { comision_tipo: "porcentaje", comision_porcentaje: n };
+    } else {
+      const n = parseFloat(fijo);
+      if (isNaN(n) || n < 0) return;
+      payload = { comision_tipo: "fijo", comision_fija: n };
+    }
+    setSaving(true);
+    try { await onSave(payload); onClose(); } finally { setSaving(false); }
+  };
+
+  const tabSx = (active) => ({
+    flex: 1, textAlign: "center", py: "10px", cursor: "pointer", borderRadius: "10px",
+    fontFamily: fonts.body, fontWeight: 700, fontSize: "13px",
+    border: `1px solid ${active ? colors.gold : colors.border}`,
+    bgcolor: active ? colors.goldSoft : colors.white,
+    color: active ? colors.primaryDark : colors.textMuted,
+    display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", transition: "all .15s"
+  });
+  const inputSx = {
+    width: "100%", fontFamily: fonts.body, fontSize: "18px", fontWeight: 700, color: colors.primaryDark,
+    border: `1px solid ${colors.border}`, borderRadius: "10px", padding: "12px 14px", outline: "none", boxSizing: "border-box"
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
+      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark }}>
+        Comisión — {linea.tratamiento_nombre}
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted, mb: "12px" }}>
+          Precio del tratamiento: <strong style={{ color: colors.primary }}>{formatMoney(linea.precio)}</strong>
+        </Typography>
+        <Box sx={{ display: "flex", gap: "10px", mb: "16px" }}>
+          <Box sx={tabSx(tipo === "porcentaje")} onClick={() => setTipo("porcentaje")}>
+            <PercentRounded sx={{ fontSize: 16 }} /> Porcentaje
+          </Box>
+          <Box sx={tabSx(tipo === "fijo")} onClick={() => setTipo("fijo")}>
+            <PaidRounded sx={{ fontSize: 16 }} /> Monto fijo
+          </Box>
+        </Box>
+        {tipo === "porcentaje" ? (
+          <Box>
+            <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted, mb: "6px" }}>Porcentaje sobre el precio (%)</Typography>
+            <Box component="input" type="number" min="0" max="100" step="1" value={pct}
+              onChange={(e) => setPct(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") guardar(); }} autoFocus sx={inputSx} />
+          </Box>
+        ) : (
+          <Box>
+            <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted, mb: "6px" }}>Monto fijo a pagar (S/)</Typography>
+            <Box component="input" type="number" min="0" step="10" value={fijo}
+              onChange={(e) => setFijo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") guardar(); }} autoFocus sx={inputSx} />
+          </Box>
+        )}
+        <Box sx={{ mt: "16px", p: "12px 14px", bgcolor: colors.cream, borderRadius: "12px", border: `1px solid ${colors.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>Comisión resultante</Typography>
+          <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "18px", color: colors.successText }}>{formatMoney(preview)}</Typography>
+        </Box>
+        {linea.comision?.estado === "liquidado" && (
+          <Alert severity="info" sx={{ mt: "12px", borderRadius: "10px", fontFamily: fonts.body, fontSize: "12px" }}>
+            La comisión de esta línea ya fue liquidada; el cambio aplicará solo a cálculos futuros.
+          </Alert>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: "24px", pb: "18px" }}>
+        <Button onClick={onClose} sx={{ color: colors.textMuted, textTransform: "none", fontFamily: fonts.body }}>Cancelar</Button>
+        <Button onClick={guardar} disabled={saving} variant="contained" sx={{ background: grads.brown, textTransform: "none", borderRadius: "10px", fontFamily: fonts.body, fontWeight: 600, boxShadow: "none", "&:hover": { boxShadow: "none", opacity: 0.92 } }}>
+          {saving ? "Guardando..." : "Guardar"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
   const [expanded, setExpanded] = useState(false);
+  const [comOpen, setComOpen] = useState(false);
   const progreso = linea.sesiones_totales > 0 ? (linea.sesiones_realizadas / linea.sesiones_totales) * 100 : 0;
-  const comisionPct = linea.comision_porcentaje || linea.esp_comision_porcentaje || 20;
-  const comisionEstimada = linea.precio * (comisionPct / 100);
+  const esFijo = linea.comision_tipo === "fijo";
+  const comisionPct = linea.comision_porcentaje_efectivo ?? linea.comision_porcentaje ?? 20;
+  const comisionEstimada = linea.comision_estimada != null
+    ? linea.comision_estimada
+    : (esFijo ? (Number(linea.comision_fija) || 0) : linea.precio * (comisionPct / 100));
+  const comisionLabel = esFijo ? "fijo" : `${comisionPct}%`;
 
   const isCulminado = linea.estado === "culminado";
   const isListo = linea.estado === "listo_para_culminar";
@@ -1451,6 +1583,7 @@ function LineaCard({ linea, onCulminar, onRevertir }) {
                 {linea.tratamiento_nombre}
               </Typography>
               <EstadoChip estado={linea.estado} />
+              <CategoriaChip categoria={linea.categoria} />
               {isCulminado && <VerifiedUser sx={{ fontSize: 15, color: colors.successText }} />}
               {isListo && <Warning sx={{ fontSize: 15, color: colors.amberText }} />}
             </Box>
@@ -1461,9 +1594,18 @@ function LineaCard({ linea, onCulminar, onRevertir }) {
               <Typography sx={{ fontSize: "12px", fontFamily: fonts.body, color: colors.textMuted }}>
                 Precio: <strong style={{ color: colors.primary }}>{formatMoney(linea.precio)}</strong>
               </Typography>
-              <Typography sx={{ fontSize: "12px", fontFamily: fonts.body, color: colors.textMuted }}>
-                Comisión ({comisionPct}%): <strong style={{ color: colors.textBody }}>{formatMoney(comisionEstimada)}</strong>
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <Typography sx={{ fontSize: "12px", fontFamily: fonts.body, color: colors.textMuted }}>
+                  Comisión ({comisionLabel}): <strong style={{ color: esFijo ? colors.gold : colors.textBody }}>{formatMoney(comisionEstimada)}</strong>
+                </Typography>
+                {onEditComision && (
+                  <Tooltip title="Editar comisión (% o monto fijo)">
+                    <IconButton size="small" onClick={() => setComOpen(true)} sx={{ p: "2px", color: colors.primary }}>
+                      <EditRounded sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
               {linea.especialista_nombre && (
                 <Typography sx={{ fontSize: "12px", fontFamily: fonts.body, color: colors.primary, fontWeight: 600 }}>
                   {linea.especialista_nombre}
@@ -1566,6 +1708,14 @@ function LineaCard({ linea, onCulminar, onRevertir }) {
           </Box>
         </Collapse>
       </CardContent>
+      {onEditComision && (
+        <ComisionEditorDialog
+          open={comOpen}
+          linea={linea}
+          onClose={() => setComOpen(false)}
+          onSave={(payload) => onEditComision(linea.id, payload)}
+        />
+      )}
     </Card>
   );
 }
@@ -1573,13 +1723,32 @@ function LineaCard({ linea, onCulminar, onRevertir }) {
 /* ======================================================================
    VISTA ESPECIALISTAS
 ====================================================================== */
-function EspecialistasView({ especialistas, detalle, onSelect, onBack, onCulminar }) {
+function EspecialistasView({ especialistas, detalle, onSelect, onBack, onCulminar, onEditComision, onReloadEspecialistas }) {
+  const [tratOpen, setTratOpen] = useState(false);
+
   if (detalle) {
-    return <EspecialistaDetalleView detalle={detalle} onBack={onBack} onCulminar={onCulminar} />;
+    return <EspecialistaDetalleView detalle={detalle} onBack={onBack} onCulminar={onCulminar} onEditComision={onEditComision} />;
   }
 
   return (
-    <Grid container spacing="16px">
+    <Box>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", mb: "18px" }}>
+        <Box>
+          <Typography sx={{ fontFamily: fonts.title, fontSize: "22px", fontWeight: 600, color: colors.primaryDark }}>Equipo de Especialistas</Typography>
+          <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>
+            Comisión por defecto: 20% del presupuesto de los tratamientos que realizan.
+          </Typography>
+        </Box>
+        <Button
+          startIcon={<TuneRounded sx={{ fontSize: 18 }} />}
+          onClick={() => setTratOpen(true)}
+          sx={{ fontFamily: fonts.body, textTransform: "none", borderRadius: "12px", fontWeight: 600, color: colors.primaryDark, border: `1px solid ${colors.gold}`, bgcolor: colors.goldSoft, px: "16px", py: "8px", "&:hover": { bgcolor: colors.gold, color: colors.white } }}
+        >
+          Comisiones por tratamiento
+        </Button>
+      </Box>
+
+      <Grid container spacing="16px">
       {especialistas.map((esp) => (
         <Grid item xs={12} sm={6} md={4} key={esp.id}>
           <Card
@@ -1619,15 +1788,166 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onCulmina
           </Card>
         </Grid>
       ))}
-    </Grid>
+      </Grid>
+
+      <TratamientosComisionDialog open={tratOpen} onClose={() => setTratOpen(false)} onSaved={onReloadEspecialistas} />
+    </Box>
   );
 }
 
-function EspecialistaDetalleView({ detalle, onBack, onCulminar }) {
+/* ======================================================================
+   GESTOR: COMISIONES POR TRATAMIENTO (precio fijo global / porcentaje)
+====================================================================== */
+function TratamientosComisionDialog({ open, onClose, onSaved }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [savingId, setSavingId] = useState(null);
+  const [drafts, setDrafts] = useState({}); // { [id]: { tipo, fijo } }
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch("/tratamientos-comision");
+      setRows(data);
+      const d = {};
+      data.forEach((t) => { d[t.id] = { tipo: t.comision_tipo === "fijo" ? "fijo" : "porcentaje", fijo: String(t.comision_fija ?? 0) }; });
+      setDrafts(d);
+    } catch (e) { /* noop */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { if (open) load(); }, [open, load]);
+
+  const filtradas = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((t) =>
+      (t.nombre || "").toLowerCase().includes(q) ||
+      (t.procedimiento || "").toLowerCase().includes(q)
+    );
+  }, [rows, busca]);
+
+  const setDraft = (id, patch) => setDrafts((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+
+  const guardar = async (t) => {
+    const d = drafts[t.id] || {};
+    let payload;
+    if (d.tipo === "fijo") {
+      const n = parseFloat(d.fijo);
+      if (isNaN(n) || n < 0) return;
+      payload = { comision_tipo: "fijo", comision_fija: n };
+    } else {
+      payload = { comision_tipo: "porcentaje" };
+    }
+    setSavingId(t.id);
+    try {
+      await apiFetch(`/tratamientos/${t.id}/comision`, { method: "PUT", body: JSON.stringify(payload) });
+      setRows((prev) => prev.map((r) => r.id === t.id ? { ...r, comision_tipo: payload.comision_tipo, comision_fija: payload.comision_fija ?? 0 } : r));
+      if (onSaved) onSaved();
+    } finally { setSavingId(null); }
+  };
+
+  const smallInput = {
+    width: 110, fontFamily: fonts.body, fontSize: "13px", fontWeight: 700, color: colors.primaryDark,
+    border: `1px solid ${colors.border}`, borderRadius: "8px", padding: "7px 10px", outline: "none", boxSizing: "border-box"
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: "18px" } }}>
+      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, fontSize: "24px", pb: "4px" }}>
+        Comisiones por tratamiento
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted, mb: "14px" }}>
+          Define un <strong>precio fijo</strong> de comisión por tratamiento (por ejemplo, un monto plano por procedimiento) o deja el
+          <strong> porcentaje</strong> (20% del presupuesto por defecto). El cambio se aplica a las líneas aún no culminadas.
+        </Typography>
+        <Box component="input" placeholder="Buscar tratamiento..." value={busca} onChange={(e) => setBusca(e.target.value)}
+          sx={{ width: "100%", fontFamily: fonts.body, fontSize: "14px", color: colors.textBody, border: `1px solid ${colors.border}`, borderRadius: "10px", padding: "10px 14px", outline: "none", boxSizing: "border-box", mb: "14px" }} />
+
+        {loading && <LinearProgress sx={{ mb: "12px", borderRadius: 2, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: colors.gold } }} />}
+
+        <Box sx={{ maxHeight: 420, overflowY: "auto", pr: "4px" }}>
+          {filtradas.map((t) => {
+            const d = drafts[t.id] || { tipo: "porcentaje", fijo: "0" };
+            const dirty = (d.tipo !== (t.comision_tipo === "fijo" ? "fijo" : "porcentaje")) ||
+              (d.tipo === "fijo" && parseFloat(d.fijo || 0) !== Number(t.comision_fija || 0));
+            return (
+              <Box key={t.id} sx={{ display: "flex", alignItems: "center", gap: "12px", py: "10px", borderBottom: `1px solid ${colors.border}`, flexWrap: "wrap" }}>
+                <Box sx={{ flex: 1, minWidth: 180 }}>
+                  <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.primaryDark }}>{t.nombre}</Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mt: "2px" }}>
+                    <CategoriaChip categoria={t.procedimiento} />
+                    <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted }}>
+                      Precio ref.: <strong style={{ color: colors.primary }}>{formatMoney(t.precio)}</strong>
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Box sx={{ display: "flex", gap: "6px" }}>
+                  {["porcentaje", "fijo"].map((tp) => (
+                    <Box key={tp} onClick={() => setDraft(t.id, { tipo: tp })} sx={{
+                      cursor: "pointer", px: "12px", py: "6px", borderRadius: "8px", fontFamily: fonts.body, fontWeight: 700, fontSize: "12px",
+                      display: "flex", alignItems: "center", gap: "5px",
+                      border: `1px solid ${d.tipo === tp ? colors.gold : colors.border}`,
+                      bgcolor: d.tipo === tp ? colors.goldSoft : colors.white,
+                      color: d.tipo === tp ? colors.primaryDark : colors.textMuted
+                    }}>
+                      {tp === "porcentaje" ? <><PercentRounded sx={{ fontSize: 14 }} />20%</> : <><PaidRounded sx={{ fontSize: 14 }} />Fijo</>}
+                    </Box>
+                  ))}
+                </Box>
+
+                {d.tipo === "fijo" ? (
+                  <Box component="input" type="number" min="0" step="10" value={d.fijo}
+                    onChange={(e) => setDraft(t.id, { fijo: e.target.value })} sx={smallInput} placeholder="S/ 0" />
+                ) : (
+                  <Typography sx={{ width: 110, fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted, textAlign: "center" }}>
+                    {formatMoney(t.precio * 0.2)}
+                  </Typography>
+                )}
+
+                <Button size="small" disabled={!dirty || savingId === t.id} onClick={() => guardar(t)}
+                  variant="contained" sx={{ minWidth: 84, background: dirty ? grads.brown : colors.border, color: dirty ? "#fff" : colors.textMuted, textTransform: "none", borderRadius: "8px", fontFamily: fonts.body, fontWeight: 600, boxShadow: "none", "&:hover": { boxShadow: "none", opacity: 0.92 } }}>
+                  {savingId === t.id ? "..." : "Guardar"}
+                </Button>
+              </Box>
+            );
+          })}
+          {!loading && filtradas.length === 0 && (
+            <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted, textAlign: "center", py: "20px" }}>
+              No se encontraron tratamientos.
+            </Typography>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: "24px", pb: "18px" }}>
+        <Button onClick={onClose} sx={{ color: colors.textMuted, textTransform: "none", fontFamily: fonts.body }}>Cerrar</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function EspecialistaDetalleView({ detalle, onBack, onCulminar, onEditComision }) {
   const { especialista, resumen, lineas } = detalle;
 
-  const lineasEnCurso = lineas.filter(l => ["pendiente", "en_curso", "listo_para_culminar"].includes(l.estado));
-  const lineasCulminadas = lineas.filter(l => l.estado === "culminado");
+  // Agrupar líneas por paciente
+  const grupos = useMemo(() => {
+    const map = new Map();
+    for (const l of lineas) {
+      const key = l.paciente_id ?? `sin-${l.id}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          paciente_id: l.paciente_id,
+          nombre: `${l.paciente_nombre || "Paciente"} ${l.paciente_apellido || ""}`.trim(),
+          lineas: []
+        });
+      }
+      map.get(key).lineas.push(l);
+    }
+    return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [lineas]);
 
   return (
     <Box>
@@ -1673,31 +1993,47 @@ function EspecialistaDetalleView({ detalle, onBack, onCulminar }) {
         </CardContent>
       </Card>
 
-      {/* Líneas EN CURSO */}
-      {lineasEnCurso.length > 0 && (
-        <Box sx={{ mb: "20px" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mb: "12px" }}>
-            <Typography sx={{ fontFamily: fonts.title, fontSize: "22px", fontWeight: 600, color: colors.primaryDark }}>En Curso</Typography>
-            <Chip label={lineasEnCurso.length} size="small" sx={{ bgcolor: colors.goldSoft, color: colors.primaryDark, fontWeight: 700, fontFamily: fonts.body, height: 22, fontSize: "0.7rem" }} />
+      {/* Resumen de comisiones estimadas */}
+      {lineas.length > 0 && (
+        <Box sx={{ display: "flex", gap: "12px", flexWrap: "wrap", mb: "20px" }}>
+          <Box sx={{ flex: 1, minWidth: 200, p: "16px", borderRadius: "16px", bgcolor: colors.creamPanel, border: `1px solid ${colors.border}` }}>
+            <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body, textTransform: "uppercase", letterSpacing: "0.5px" }}>Comisión estimada total</Typography>
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "24px", color: colors.primaryDark }}>{formatMoney(resumen.comision_estimada_total ?? 0)}</Typography>
           </Box>
-          {lineasEnCurso.map((linea) => (
-            <LineaCard key={linea.id} linea={{ ...linea, sesiones: [] }} onCulminar={onCulminar} onRevertir={() => {}} />
-          ))}
+          <Box sx={{ flex: 1, minWidth: 200, p: "16px", borderRadius: "16px", bgcolor: colors.amberBg, border: `1px solid ${colors.goldSoft}` }}>
+            <Typography sx={{ fontSize: "11px", color: colors.amberText, fontFamily: fonts.body, textTransform: "uppercase", letterSpacing: "0.5px" }}>Proyectado (en curso)</Typography>
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "24px", color: colors.amberText }}>{formatMoney(resumen.comision_proyectada ?? 0)}</Typography>
+          </Box>
         </Box>
       )}
 
-      {/* Líneas CULMINADAS */}
-      {lineasCulminadas.length > 0 && (
-        <Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mb: "12px" }}>
-            <Typography sx={{ fontFamily: fonts.title, fontSize: "22px", fontWeight: 600, color: colors.successText }}>Culminados</Typography>
-            <Chip label={lineasCulminadas.length} size="small" sx={{ bgcolor: colors.successBg, color: colors.successText, border: `1px solid ${colors.successBorder}`, fontWeight: 700, fontFamily: fonts.body, height: 22, fontSize: "0.7rem" }} />
+      {/* Líneas agrupadas por paciente */}
+      {grupos.map((g, gi) => (
+        <MotionBox
+          key={g.paciente_id ?? gi}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: gi * 0.04 }}
+          sx={{ mb: "20px" }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "10px" }}>
+            <Avatar sx={{ width: 30, height: 30, bgcolor: colors.goldSoft, color: colors.primaryDark, fontFamily: fonts.title, fontWeight: 700, fontSize: 14 }}>
+              {g.nombre?.charAt(0)?.toUpperCase()}
+            </Avatar>
+            <Typography sx={{ fontFamily: fonts.title, fontSize: "18px", fontWeight: 600, color: colors.primaryDark }}>{g.nombre}</Typography>
+            <Chip label={`${g.lineas.length} ${g.lineas.length === 1 ? "línea" : "líneas"}`} size="small" sx={{ bgcolor: colors.creamPanel, color: colors.textMuted, border: `1px solid ${colors.border}`, fontWeight: 600, fontFamily: fonts.body, height: 22, fontSize: "0.68rem" }} />
           </Box>
-          {lineasCulminadas.map((linea) => (
-            <LineaCard key={linea.id} linea={{ ...linea, sesiones: [] }} onCulminar={onCulminar} onRevertir={() => {}} />
+          {g.lineas.map((linea) => (
+            <LineaCard
+              key={linea.id}
+              linea={{ ...linea, sesiones: [] }}
+              onCulminar={onCulminar}
+              onRevertir={() => {}}
+              onEditComision={onEditComision}
+            />
           ))}
-        </Box>
-      )}
+        </MotionBox>
+      ))}
 
       {lineas.length === 0 && (
         <Alert severity="info" sx={{ mt: "18px", borderRadius: "12px" }}>Este especialista no tiene líneas de tratamiento asignadas</Alert>

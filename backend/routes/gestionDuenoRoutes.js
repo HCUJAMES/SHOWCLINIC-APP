@@ -100,6 +100,40 @@ async function ensureConfigTable() {
   }
 }
 
+/* ======================================================================
+   💵 SCHEMA DE COMISIONES (fija por tratamiento + override por línea)
+====================================================================== */
+let comisionSchemaReady = false;
+async function ensureComisionSchema() {
+  if (comisionSchemaReady) return;
+  const addColumn = async (tabla, columna, definicion) => {
+    try {
+      await dbRun(`ALTER TABLE ${tabla} ADD COLUMN ${columna} ${definicion}`);
+    } catch (err) {
+      if (!String(err.message).includes("duplicate column")) {
+        console.error(`❌ Error agregando ${tabla}.${columna}:`, err.message);
+      }
+    }
+  };
+  // Config global por tratamiento
+  await addColumn("tratamientos", "comision_tipo", "TEXT");        // 'porcentaje' | 'fijo'
+  await addColumn("tratamientos", "comision_fija", "REAL DEFAULT 0");
+  // Override por línea de presupuesto
+  await addColumn("lineas_presupuesto", "comision_tipo", "TEXT");  // 'porcentaje' | 'fijo'
+  await addColumn("lineas_presupuesto", "comision_fija", "REAL");
+  comisionSchemaReady = true;
+}
+
+// Calcula el monto de comisión de una línea (fijo tiene prioridad si está configurado)
+function comisionDeLinea(linea) {
+  const tipo = linea.comision_tipo || (linea.comision_fija > 0 ? "fijo" : "porcentaje");
+  if (tipo === "fijo") {
+    return Number(linea.comision_fija) || 0;
+  }
+  const pct = linea.comision_porcentaje != null ? Number(linea.comision_porcentaje) : 20;
+  return (Number(linea.precio) || 0) * (pct / 100);
+}
+
 async function getConfig(clave, porDefecto = null) {
   await ensureConfigTable();
   const row = await dbGet("SELECT valor FROM config_dueno WHERE clave = ?", [clave]);
@@ -413,6 +447,7 @@ router.get("/presupuestos/:id", authMiddleware, requireOwner, async (req, res) =
 ====================================================================== */
 router.put("/lineas/:linea_id/especialista", authMiddleware, requireOwner, async (req, res) => {
   try {
+    await ensureComisionSchema();
     const { linea_id } = req.params;
     const { especialista_id } = req.body;
 
@@ -426,10 +461,27 @@ router.put("/lineas/:linea_id/especialista", authMiddleware, requireOwner, async
       return res.status(404).json({ message: "Especialista no encontrado" });
     }
 
-    await dbRun(
-      `UPDATE lineas_presupuesto SET especialista_id = ?, comision_porcentaje = ? WHERE id = ?`,
-      [especialista_id, esp.comision_porcentaje || 20, linea_id]
-    );
+    // Buscar regla de comisión del tratamiento (fijo global) si existe
+    const linea = await dbGet("SELECT tratamiento_id FROM lineas_presupuesto WHERE id = ?", [linea_id]);
+    let regla = null;
+    if (linea?.tratamiento_id) {
+      regla = await dbGet(
+        "SELECT comision_tipo, comision_fija FROM tratamientos WHERE id = ?",
+        [linea.tratamiento_id]
+      );
+    }
+
+    if (regla && regla.comision_tipo === "fijo" && Number(regla.comision_fija) > 0) {
+      await dbRun(
+        `UPDATE lineas_presupuesto SET especialista_id = ?, comision_porcentaje = ?, comision_tipo = 'fijo', comision_fija = ? WHERE id = ?`,
+        [especialista_id, esp.comision_porcentaje || 20, Number(regla.comision_fija), linea_id]
+      );
+    } else {
+      await dbRun(
+        `UPDATE lineas_presupuesto SET especialista_id = ?, comision_porcentaje = ?, comision_tipo = 'porcentaje' WHERE id = ?`,
+        [especialista_id, esp.comision_porcentaje || 20, linea_id]
+      );
+    }
 
     res.json({ message: "Especialista asignado a la línea" });
   } catch (err) {
@@ -439,10 +491,74 @@ router.put("/lineas/:linea_id/especialista", authMiddleware, requireOwner, async
 });
 
 /* ======================================================================
+   💵 EDITAR COMISIÓN DE UNA LÍNEA (% o monto fijo) — recalcula si aplica
+====================================================================== */
+router.put("/lineas/:linea_id/comision", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    await ensureComisionSchema();
+    const { linea_id } = req.params;
+    let { comision_tipo, comision_porcentaje, comision_fija } = req.body;
+
+    const linea = await dbGet("SELECT * FROM lineas_presupuesto WHERE id = ?", [linea_id]);
+    if (!linea) return res.status(404).json({ message: "Línea no encontrada" });
+
+    comision_tipo = comision_tipo === "fijo" ? "fijo" : "porcentaje";
+
+    if (comision_tipo === "porcentaje") {
+      const pct = Number(comision_porcentaje);
+      if (isNaN(pct) || pct < 0 || pct > 100) {
+        return res.status(400).json({ message: "Porcentaje inválido (0-100)" });
+      }
+      await dbRun(
+        "UPDATE lineas_presupuesto SET comision_tipo = 'porcentaje', comision_porcentaje = ?, comision_fija = 0 WHERE id = ?",
+        [pct, linea_id]
+      );
+    } else {
+      const fijo = Number(comision_fija);
+      if (isNaN(fijo) || fijo < 0) {
+        return res.status(400).json({ message: "Monto fijo inválido" });
+      }
+      await dbRun(
+        "UPDATE lineas_presupuesto SET comision_tipo = 'fijo', comision_fija = ? WHERE id = ?",
+        [fijo, linea_id]
+      );
+    }
+
+    // Recalcular monto si la línea ya está culminada
+    const actualizada = await dbGet("SELECT * FROM lineas_presupuesto WHERE id = ?", [linea_id]);
+    const nuevoMonto = comisionDeLinea(actualizada);
+
+    if (actualizada.estado === "culminado") {
+      const comision = await dbGet(
+        "SELECT * FROM comisiones_especialistas WHERE linea_presupuesto_id = ? AND revertido = 0",
+        [linea_id]
+      );
+      if (comision && comision.estado === "liquidado") {
+        return res.json({
+          message: "Regla de comisión guardada, pero la comisión actual ya fue liquidada y no se recalcula.",
+          comision_monto: comision.monto,
+          recalculado: false
+        });
+      }
+      if (comision) {
+        await dbRun("UPDATE comisiones_especialistas SET monto = ? WHERE id = ?", [nuevoMonto, comision.id]);
+      }
+      await dbRun("UPDATE lineas_presupuesto SET comision_monto = ? WHERE id = ?", [nuevoMonto, linea_id]);
+    }
+
+    res.json({ message: "Comisión de la línea actualizada", comision_monto: nuevoMonto, comision_tipo, recalculado: true });
+  } catch (err) {
+    console.error("❌ Error actualizando comisión de línea:", err.message);
+    res.status(500).json({ message: "Error al actualizar comisión", error: err.message });
+  }
+});
+
+/* ======================================================================
    ✅ CULMINAR LÍNEA DE TRATAMIENTO (check manual + auditoría + comisión)
 ====================================================================== */
 router.post("/lineas/:linea_id/culminar", authMiddleware, requireOwner, async (req, res) => {
   try {
+    await ensureComisionSchema();
     const { linea_id } = req.params;
     const username = req.user?.username || "sistema";
 
@@ -467,9 +583,8 @@ router.post("/lineas/:linea_id/culminar", authMiddleware, requireOwner, async (r
 
     const ahora = fechaLima();
 
-    // Obtener comisión porcentaje
-    const comisionPct = linea.comision_porcentaje || 20;
-    const comisionMonto = linea.precio * (comisionPct / 100);
+    // Calcular comisión (fijo por tratamiento o % del precio)
+    const comisionMonto = comisionDeLinea(linea);
 
     // Actualizar línea a culminado
     await dbRun(
@@ -570,6 +685,7 @@ router.post("/lineas/:linea_id/revertir", authMiddleware, requireOwner, async (r
 ====================================================================== */
 router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req, res) => {
   await ensureLineasMigration();
+  await ensureComisionSchema();
 
   try {
     const { id } = req.params;
@@ -578,6 +694,7 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
     if (!especialista) {
       return res.status(404).json({ message: "Especialista no encontrado" });
     }
+    const pctDefault = especialista.comision_porcentaje != null ? Number(especialista.comision_porcentaje) : 20;
 
     // Resumen: líneas asignadas
     const resumen = await dbGet(`
@@ -599,22 +716,41 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
       [id]
     );
 
-    // Líneas agrupadas por presupuesto/paciente
+    // Líneas agrupadas por presupuesto/paciente (con categoría del tratamiento)
     const lineas = await dbAll(`
       SELECT lp.*, pa.paciente_id,
-             p.nombre as paciente_nombre, p.apellido as paciente_apellido
+             p.nombre as paciente_nombre, p.apellido as paciente_apellido,
+             t.procedimiento as categoria
       FROM lineas_presupuesto lp
       JOIN presupuestos_asignados pa ON lp.presupuesto_asignado_id = pa.id
       JOIN patients p ON pa.paciente_id = p.id
+      LEFT JOIN tratamientos t ON lp.tratamiento_id = t.id
       WHERE lp.especialista_id = ?
       ORDER BY lp.estado ASC, lp.creado_en DESC
     `, [id]);
+
+    // Comisión estimada por línea (aplica fijo o %, con fallback al % del especialista)
+    let comisionEstimadaTotal = 0;
+    let comisionProyectada = 0; // de líneas aún no culminadas
+    for (const l of lineas) {
+      const base = {
+        comision_tipo: l.comision_tipo,
+        comision_fija: l.comision_fija,
+        comision_porcentaje: l.comision_porcentaje != null ? l.comision_porcentaje : pctDefault,
+        precio: l.precio
+      };
+      const est = comisionDeLinea(base);
+      l.comision_estimada = est;
+      l.comision_porcentaje_efectivo = base.comision_porcentaje;
+      comisionEstimadaTotal += est;
+      if (l.estado !== "culminado") comisionProyectada += est;
+    }
 
     // Ticket promedio
     const ticketPromedio = resumen.total_lineas > 0 ? resumen.ingresos_generados / resumen.total_lineas : 0;
 
     res.json({
-      especialista,
+      especialista: { ...especialista, comision_porcentaje: pctDefault },
       resumen: {
         total_lineas: resumen.total_lineas,
         culminadas: resumen.culminadas,
@@ -622,7 +758,9 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
         ingresos_generados: resumen.ingresos_generados,
         ticket_promedio: ticketPromedio,
         comision_pendiente: comisionPendiente.total,
-        comision_liquidada: comisionLiquidada.total
+        comision_liquidada: comisionLiquidada.total,
+        comision_estimada_total: comisionEstimadaTotal,
+        comision_proyectada: comisionProyectada
       },
       lineas
     });
@@ -817,7 +955,64 @@ router.get("/especialistas", authMiddleware, requireOwner, async (req, res) => {
 });
 
 /* ======================================================================
-   🔄 CAMBIAR ESTADO DE GESTIÓN DEL PRESUPUESTO
+   � CONFIGURACIÓN DE COMISIÓN POR TRATAMIENTO (precio fijo global)
+====================================================================== */
+router.get("/tratamientos-comision", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    await ensureComisionSchema();
+    const rows = await dbAll(`
+      SELECT id, nombre, procedimiento, precio,
+        COALESCE(comision_tipo, 'porcentaje') as comision_tipo,
+        COALESCE(comision_fija, 0) as comision_fija
+      FROM tratamientos
+      ORDER BY (procedimiento IS NULL), procedimiento ASC, nombre ASC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Error listando comisiones de tratamientos:", err.message);
+    res.status(500).json({ message: "Error al listar comisiones de tratamientos", error: err.message });
+  }
+});
+
+router.put("/tratamientos/:id/comision", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    await ensureComisionSchema();
+    const { id } = req.params;
+    let { comision_tipo, comision_fija } = req.body;
+
+    const trat = await dbGet("SELECT id FROM tratamientos WHERE id = ?", [id]);
+    if (!trat) return res.status(404).json({ message: "Tratamiento no encontrado" });
+
+    comision_tipo = comision_tipo === "fijo" ? "fijo" : "porcentaje";
+
+    if (comision_tipo === "fijo") {
+      const fijo = Number(comision_fija);
+      if (isNaN(fijo) || fijo < 0) {
+        return res.status(400).json({ message: "Monto fijo inválido" });
+      }
+      await dbRun("UPDATE tratamientos SET comision_tipo = 'fijo', comision_fija = ? WHERE id = ?", [fijo, id]);
+      // Propagar a líneas NO culminadas de este tratamiento
+      await dbRun(
+        "UPDATE lineas_presupuesto SET comision_tipo = 'fijo', comision_fija = ? WHERE tratamiento_id = ? AND estado != 'culminado'",
+        [fijo, id]
+      );
+    } else {
+      await dbRun("UPDATE tratamientos SET comision_tipo = 'porcentaje', comision_fija = 0 WHERE id = ?", [id]);
+      await dbRun(
+        "UPDATE lineas_presupuesto SET comision_tipo = 'porcentaje', comision_fija = 0 WHERE tratamiento_id = ? AND estado != 'culminado'",
+        [id]
+      );
+    }
+
+    res.json({ message: "Comisión del tratamiento actualizada", comision_tipo });
+  } catch (err) {
+    console.error("❌ Error actualizando comisión de tratamiento:", err.message);
+    res.status(500).json({ message: "Error al actualizar comisión del tratamiento", error: err.message });
+  }
+});
+
+/* ======================================================================
+   �� CAMBIAR ESTADO DE GESTIÓN DEL PRESUPUESTO
 ====================================================================== */
 router.put("/presupuestos/:id/estado", authMiddleware, requireOwner, async (req, res) => {
   try {
