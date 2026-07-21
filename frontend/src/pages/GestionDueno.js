@@ -207,11 +207,11 @@ export default function GestionDueno() {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiFetch("/especialistas");
+      const data = await apiFetch(`/especialistas${buildDateQuery(fechaInicio, fechaFin)}`);
       setEspecialistas(data);
     } catch (e) { setError(e.message); }
     setLoading(false);
-  }, []);
+  }, [fechaInicio, fechaFin]);
 
   const loadPendientes = useCallback(async () => {
     setLoading(true);
@@ -231,6 +231,14 @@ export default function GestionDueno() {
     else if (tab === 2) loadEspecialistas();
     else if (tab === 3) loadPendientes();
   }, [tab, loadDashboard, loadPresupuestos, loadEspecialistas, loadPendientes]);
+
+  // Recargar el detalle del especialista al cambiar el periodo
+  useEffect(() => {
+    if (tab === 2 && especialistaDetalle) {
+      loadEspecialistaDetalle(especialistaDetalle.especialista.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fechaInicio, fechaFin]);
 
   /* ── ACCIONES ── */
   const handleCulminar = async (lineaId) => {
@@ -276,7 +284,7 @@ export default function GestionDueno() {
 
   const loadEspecialistaDetalle = async (id) => {
     try {
-      const data = await apiFetch(`/especialistas/${id}/perfil`);
+      const data = await apiFetch(`/especialistas/${id}/perfil${buildDateQuery(fechaInicio, fechaFin)}`);
       setEspecialistaDetalle(data);
     } catch (e) { setError(e.message); }
   };
@@ -291,6 +299,19 @@ export default function GestionDueno() {
   const handleEditComision = async (lineaId, payload) => {
     await apiFetch(`/lineas/${lineaId}/comision`, { method: "PUT", body: JSON.stringify(payload) });
     if (presupuestoDetalle) loadPresupuestoDetalle(presupuestoDetalle.presupuesto.id);
+    if (especialistaDetalle) loadEspecialistaDetalle(especialistaDetalle.especialista.id);
+  };
+
+  // % de comisión por defecto del especialista
+  const handleEditEspecialistaComision = async (espId, pct) => {
+    await apiFetch(`/especialistas/${espId}/comision`, { method: "PUT", body: JSON.stringify({ comision_porcentaje: pct }) });
+    loadEspecialistas();
+    if (especialistaDetalle) loadEspecialistaDetalle(especialistaDetalle.especialista.id);
+  };
+
+  // % de comisión de un presupuesto (override). pct = null vuelve al % del especialista.
+  const handleEditPresupuestoComision = async (presId, pct) => {
+    await apiFetch(`/presupuestos/${presId}/comision`, { method: "PUT", body: JSON.stringify({ comision_porcentaje: pct }) });
     if (especialistaDetalle) loadEspecialistaDetalle(especialistaDetalle.especialista.id);
   };
 
@@ -376,8 +397,8 @@ export default function GestionDueno() {
         <Box sx={{ px: { xs: 2, md: "36px" }, py: { xs: 2, md: "28px" }, maxWidth: 1440, mx: "auto" }}>
           {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: "18px", borderRadius: "12px" }}>{error}</Alert>}
 
-          {/* Filtro de periodo (Dashboard y Presupuestos) */}
-          {(tab === 0 || (tab === 1 && !presupuestoDetalle)) && (
+          {/* Filtro de periodo (Dashboard, Presupuestos y Especialistas) */}
+          {(tab === 0 || (tab === 1 && !presupuestoDetalle) || tab === 2) && (
             <PeriodoFilter
               preset={periodoPreset}
               fechaInicio={fechaInicio}
@@ -417,9 +438,9 @@ export default function GestionDueno() {
               detalle={especialistaDetalle}
               onSelect={loadEspecialistaDetalle}
               onBack={() => setEspecialistaDetalle(null)}
-              onCulminar={(linea) => setDialogCulminar(linea)}
-              onEditComision={handleEditComision}
               onReloadEspecialistas={loadEspecialistas}
+              onEditEspecialistaComision={handleEditEspecialistaComision}
+              onEditPresupuestoComision={handleEditPresupuestoComision}
             />
           )}
 
@@ -1723,29 +1744,27 @@ function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
 /* ======================================================================
    VISTA ESPECIALISTAS
 ====================================================================== */
-function EspecialistasView({ especialistas, detalle, onSelect, onBack, onCulminar, onEditComision, onReloadEspecialistas }) {
-  const [tratOpen, setTratOpen] = useState(false);
+function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onEditEspecialistaComision, onEditPresupuestoComision }) {
+  const [pctEsp, setPctEsp] = useState(null); // especialista en edición de %
 
   if (detalle) {
-    return <EspecialistaDetalleView detalle={detalle} onBack={onBack} onCulminar={onCulminar} onEditComision={onEditComision} />;
+    return (
+      <EspecialistaDetalleView
+        detalle={detalle}
+        onBack={onBack}
+        onEditEspecialistaComision={onEditEspecialistaComision}
+        onEditPresupuestoComision={onEditPresupuestoComision}
+      />
+    );
   }
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", mb: "18px" }}>
-        <Box>
-          <Typography sx={{ fontFamily: fonts.title, fontSize: "22px", fontWeight: 600, color: colors.primaryDark }}>Equipo de Especialistas</Typography>
-          <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>
-            Comisión por defecto: 20% del presupuesto de los tratamientos que realizan.
-          </Typography>
-        </Box>
-        <Button
-          startIcon={<TuneRounded sx={{ fontSize: 18 }} />}
-          onClick={() => setTratOpen(true)}
-          sx={{ fontFamily: fonts.body, textTransform: "none", borderRadius: "12px", fontWeight: 600, color: colors.primaryDark, border: `1px solid ${colors.gold}`, bgcolor: colors.goldSoft, px: "16px", py: "8px", "&:hover": { bgcolor: colors.gold, color: colors.white } }}
-        >
-          Comisiones por tratamiento
-        </Button>
+      <Box sx={{ mb: "18px" }}>
+        <Typography sx={{ fontFamily: fonts.title, fontSize: "22px", fontWeight: 600, color: colors.primaryDark }}>Equipo de Especialistas</Typography>
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>
+          La comisión se calcula como un porcentaje sobre el <strong>precio final</strong> (con descuento) de cada presupuesto asignado.
+        </Typography>
       </Box>
 
       <Grid container spacing="16px">
@@ -1764,24 +1783,29 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onCulmina
                   <Typography sx={{ fontWeight: 700, fontFamily: fonts.body, fontSize: "14px", color: colors.primaryDark }}>{esp.nombre}</Typography>
                   <Typography sx={{ fontSize: "12px", color: colors.textMuted, fontFamily: fonts.body }}>{esp.tipo} | {esp.especialidad || "General"}</Typography>
                 </Box>
+                <Chip
+                  onClick={(e) => { e.stopPropagation(); setPctEsp(esp); }}
+                  icon={<PercentRounded sx={{ fontSize: 13, color: `${colors.primaryDark} !important` }} />}
+                  label={`${Number(esp.comision_porcentaje)}%`}
+                  size="small"
+                  sx={{ bgcolor: colors.goldSoft, color: colors.primaryDark, fontWeight: 700, fontFamily: fonts.body, height: 24, fontSize: "0.72rem", border: `1px solid ${colors.gold}`, "&:hover": { bgcolor: colors.gold } }}
+                />
               </Box>
               <Divider sx={{ my: "12px", borderColor: colors.border }} />
               <Grid container spacing={1}>
                 <Grid item xs={6}>
-                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Líneas</Typography>
-                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "20px", color: colors.primaryDark }}>{esp.total_lineas}</Typography>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Presupuestos</Typography>
+                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "20px", color: colors.primaryDark }}>{esp.num_presupuestos}</Typography>
                 </Grid>
                 <Grid item xs={6}>
-                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Culminadas</Typography>
-                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "20px", color: colors.successText }}>{esp.lineas_culminadas}</Typography>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Facturación</Typography>
+                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.body, fontSize: "13px", color: colors.primary, mt: "4px" }}>{formatMoney(esp.base_total)}</Typography>
                 </Grid>
-                <Grid item xs={6}>
-                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Ingresos</Typography>
-                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.body, fontSize: "13px", color: colors.primary }}>{formatMoney(esp.ingresos_generados)}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Pendiente</Typography>
-                  <Chip label={formatMoney(esp.comision_pendiente)} size="small" sx={{ bgcolor: colors.amberBg, color: colors.amberText, fontWeight: 700, fontSize: "0.7rem", height: 22, border: "none", mt: "2px" }} />
+                <Grid item xs={12}>
+                  <Box sx={{ mt: "6px", p: "10px 12px", borderRadius: "12px", bgcolor: colors.creamPanel, border: `1px solid ${colors.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography sx={{ fontSize: "11.5px", color: colors.textMuted, fontFamily: fonts.body }}>Pago estimado</Typography>
+                    <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "18px", color: colors.primaryDark }}>{formatMoney(esp.comision_total)}</Typography>
+                  </Box>
                 </Grid>
               </Grid>
             </CardContent>
@@ -1790,8 +1814,61 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onCulmina
       ))}
       </Grid>
 
-      <TratamientosComisionDialog open={tratOpen} onClose={() => setTratOpen(false)} onSaved={onReloadEspecialistas} />
+      {especialistas.length === 0 && (
+        <Alert severity="info" sx={{ mt: "18px", borderRadius: "12px" }}>No hay especialistas registrados.</Alert>
+      )}
+
+      <PorcentajeEspecialistaDialog
+        especialista={pctEsp}
+        onClose={() => setPctEsp(null)}
+        onSave={async (pct) => { await onEditEspecialistaComision(pctEsp.id, pct); setPctEsp(null); }}
+      />
     </Box>
+  );
+}
+
+/* ======================================================================
+   DIALOG: EDITAR % DE COMISIÓN POR DEFECTO DEL ESPECIALISTA
+====================================================================== */
+function PorcentajeEspecialistaDialog({ especialista, onClose, onSave }) {
+  const [pct, setPct] = useState("20");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (especialista) setPct(String(Number(especialista.comision_porcentaje) ?? 20));
+  }, [especialista]);
+
+  if (!especialista) return null;
+
+  const valido = !isNaN(parseFloat(pct)) && parseFloat(pct) >= 0 && parseFloat(pct) <= 100;
+
+  return (
+    <Dialog open={!!especialista} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "18px" } }}>
+      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, fontSize: "22px" }}>
+        Comisión de {especialista.nombre}
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted, mb: "16px" }}>
+          Este porcentaje se aplica sobre el precio final de todos los presupuestos del especialista (salvo que un presupuesto tenga un porcentaje propio).
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Box component="input" type="number" min="0" max="100" step="1" value={pct} autoFocus
+            onChange={(e) => setPct(e.target.value)}
+            sx={{ width: 120, fontFamily: fonts.title, fontSize: "28px", fontWeight: 700, color: colors.primaryDark, textAlign: "center", border: `1px solid ${valido ? colors.border : colors.error}`, borderRadius: "12px", padding: "10px", outline: "none" }} />
+          <Typography sx={{ fontFamily: fonts.title, fontSize: "28px", fontWeight: 700, color: colors.gold }}>%</Typography>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: "24px", pb: "18px" }}>
+        <Button onClick={onClose} sx={{ color: colors.textMuted, textTransform: "none", fontFamily: fonts.body }}>Cancelar</Button>
+        <Button
+          variant="contained" disabled={!valido || saving}
+          onClick={async () => { setSaving(true); try { await onSave(parseFloat(pct)); } finally { setSaving(false); } }}
+          sx={{ background: grads.brown, color: "#fff", textTransform: "none", borderRadius: "10px", fontFamily: fonts.body, fontWeight: 600, boxShadow: "none", "&:hover": { boxShadow: "none", opacity: 0.92 } }}
+        >
+          {saving ? "Guardando..." : "Guardar"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
@@ -1929,25 +2006,10 @@ function TratamientosComisionDialog({ open, onClose, onSaved }) {
   );
 }
 
-function EspecialistaDetalleView({ detalle, onBack, onCulminar, onEditComision }) {
-  const { especialista, resumen, lineas } = detalle;
-
-  // Agrupar líneas por paciente
-  const grupos = useMemo(() => {
-    const map = new Map();
-    for (const l of lineas) {
-      const key = l.paciente_id ?? `sin-${l.id}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          paciente_id: l.paciente_id,
-          nombre: `${l.paciente_nombre || "Paciente"} ${l.paciente_apellido || ""}`.trim(),
-          lineas: []
-        });
-      }
-      map.get(key).lineas.push(l);
-    }
-    return Array.from(map.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [lineas]);
+function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision }) {
+  const { especialista, resumen, presupuestos = [] } = detalle;
+  const [pctEspOpen, setPctEspOpen] = useState(false);
+  const [presEdit, setPresEdit] = useState(null); // presupuesto en edición de %
 
   return (
     <Box>
@@ -1956,16 +2018,16 @@ function EspecialistaDetalleView({ detalle, onBack, onCulminar, onEditComision }
       {/* Header especialista */}
       <Card sx={{ ...cardSx, mb: "20px", p: 0 }}>
         <CardContent sx={{ p: "24px" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: "14px", mb: "20px" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "14px", mb: "20px", flexWrap: "wrap" }}>
             <Avatar sx={{ bgcolor: colors.primary, width: 56, height: 56, fontSize: 24, fontFamily: fonts.title, fontWeight: 700 }}>
               {especialista.nombre?.charAt(0)?.toUpperCase()}
             </Avatar>
-            <Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography sx={{ fontFamily: fonts.title, color: colors.primaryDark, fontWeight: 700, fontSize: "24px" }}>
                 {especialista.nombre}
               </Typography>
               <Typography sx={{ color: colors.textMuted, fontSize: "13px", fontFamily: fonts.body }}>
-                {especialista.tipo || "Especialista"} · {especialista.especialidad || "General"} · Comisión: {especialista.comision_porcentaje || 20}%
+                {especialista.tipo || "Especialista"} · {especialista.especialidad || "General"}
               </Typography>
               {especialista.cuenta_bancaria && (
                 <Typography sx={{ color: colors.textMuted, fontSize: "12px", fontFamily: fonts.body }}>
@@ -1973,72 +2035,242 @@ function EspecialistaDetalleView({ detalle, onBack, onCulminar, onEditComision }
                 </Typography>
               )}
             </Box>
+            <Button
+              onClick={() => setPctEspOpen(true)}
+              startIcon={<PercentRounded sx={{ fontSize: 16 }} />}
+              sx={{ fontFamily: fonts.body, textTransform: "none", borderRadius: "12px", fontWeight: 700, color: colors.primaryDark, border: `1px solid ${colors.gold}`, bgcolor: colors.goldSoft, px: "16px", py: "8px", "&:hover": { bgcolor: colors.gold, color: colors.white } }}
+            >
+              Comisión: {Number(especialista.comision_porcentaje)}%
+            </Button>
           </Box>
 
           {/* KPIs del especialista */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" }, gap: "12px" }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: "12px" }}>
             {[
-              { label: "Líneas Total", value: resumen.total_lineas, color: colors.primaryDark, bg: colors.creamPanel },
-              { label: "Culminadas", value: resumen.culminadas, color: colors.successText, bg: colors.successBg },
-              { label: "Comisión Pend.", value: formatMoney(resumen.comision_pendiente), color: colors.amberText, bg: colors.amberBg },
-              { label: "Liquidado", value: formatMoney(resumen.comision_liquidada), color: colors.successText, bg: colors.successBg },
-              { label: "Ticket Promedio", value: formatMoney(resumen.ticket_promedio), color: colors.primary, bg: colors.creamPanel }
+              { label: "Presupuestos", value: resumen.num_presupuestos, color: colors.primaryDark, bg: colors.creamPanel },
+              { label: "Facturación (con desc.)", value: formatMoney(resumen.base_total), color: colors.primary, bg: colors.creamPanel },
+              { label: "Pagado por pacientes", value: formatMoney(resumen.pagado_total), color: colors.successText, bg: colors.successBg },
+              { label: "Pago al especialista", value: formatMoney(resumen.comision_total), color: colors.primaryDark, bg: colors.goldSoft }
             ].map((kpi, i) => (
               <Box key={i} sx={{ textAlign: "center", p: "14px", bgcolor: kpi.bg, borderRadius: "14px" }}>
                 <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>{kpi.label}</Typography>
-                <Typography sx={{ fontWeight: 700, color: kpi.color, fontFamily: fonts.title, fontSize: "22px", lineHeight: 1.2 }}>{kpi.value}</Typography>
+                <Typography sx={{ fontWeight: 700, color: kpi.color, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{kpi.value}</Typography>
               </Box>
             ))}
           </Box>
         </CardContent>
       </Card>
 
-      {/* Resumen de comisiones estimadas */}
-      {lineas.length > 0 && (
-        <Box sx={{ display: "flex", gap: "12px", flexWrap: "wrap", mb: "20px" }}>
-          <Box sx={{ flex: 1, minWidth: 200, p: "16px", borderRadius: "16px", bgcolor: colors.creamPanel, border: `1px solid ${colors.border}` }}>
-            <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body, textTransform: "uppercase", letterSpacing: "0.5px" }}>Comisión estimada total</Typography>
-            <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "24px", color: colors.primaryDark }}>{formatMoney(resumen.comision_estimada_total ?? 0)}</Typography>
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 200, p: "16px", borderRadius: "16px", bgcolor: colors.amberBg, border: `1px solid ${colors.goldSoft}` }}>
-            <Typography sx={{ fontSize: "11px", color: colors.amberText, fontFamily: fonts.body, textTransform: "uppercase", letterSpacing: "0.5px" }}>Proyectado (en curso)</Typography>
-            <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "24px", color: colors.amberText }}>{formatMoney(resumen.comision_proyectada ?? 0)}</Typography>
-          </Box>
-        </Box>
-      )}
+      {/* Presupuestos asignados */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mb: "12px" }}>
+        <Typography sx={{ fontFamily: fonts.title, fontSize: "20px", fontWeight: 600, color: colors.primaryDark }}>Presupuestos asignados</Typography>
+        <Chip label={presupuestos.length} size="small" sx={{ bgcolor: colors.goldSoft, color: colors.primaryDark, fontWeight: 700, fontFamily: fonts.body, height: 22, fontSize: "0.7rem" }} />
+      </Box>
 
-      {/* Líneas agrupadas por paciente */}
-      {grupos.map((g, gi) => (
-        <MotionBox
-          key={g.paciente_id ?? gi}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: gi * 0.04 }}
-          sx={{ mb: "20px" }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "10px" }}>
-            <Avatar sx={{ width: 30, height: 30, bgcolor: colors.goldSoft, color: colors.primaryDark, fontFamily: fonts.title, fontWeight: 700, fontSize: 14 }}>
-              {g.nombre?.charAt(0)?.toUpperCase()}
-            </Avatar>
-            <Typography sx={{ fontFamily: fonts.title, fontSize: "18px", fontWeight: 600, color: colors.primaryDark }}>{g.nombre}</Typography>
-            <Chip label={`${g.lineas.length} ${g.lineas.length === 1 ? "línea" : "líneas"}`} size="small" sx={{ bgcolor: colors.creamPanel, color: colors.textMuted, border: `1px solid ${colors.border}`, fontWeight: 600, fontFamily: fonts.body, height: 22, fontSize: "0.68rem" }} />
-          </Box>
-          {g.lineas.map((linea) => (
-            <LineaCard
-              key={linea.id}
-              linea={{ ...linea, sesiones: [] }}
-              onCulminar={onCulminar}
-              onRevertir={() => {}}
-              onEditComision={onEditComision}
-            />
-          ))}
-        </MotionBox>
+      {presupuestos.map((pres, i) => (
+        <PresupuestoComisionCard
+          key={pres.id}
+          pres={pres}
+          index={i}
+          pctDefault={Number(especialista.comision_porcentaje)}
+          onEditPct={() => setPresEdit(pres)}
+        />
       ))}
 
-      {lineas.length === 0 && (
-        <Alert severity="info" sx={{ mt: "18px", borderRadius: "12px" }}>Este especialista no tiene líneas de tratamiento asignadas</Alert>
+      {presupuestos.length === 0 && (
+        <Alert severity="info" sx={{ mt: "8px", borderRadius: "12px" }}>
+          Este especialista no tiene presupuestos asignados en el periodo seleccionado.
+        </Alert>
       )}
+
+      <PorcentajeEspecialistaDialog
+        especialista={pctEspOpen ? especialista : null}
+        onClose={() => setPctEspOpen(false)}
+        onSave={async (pct) => { await onEditEspecialistaComision(especialista.id, pct); setPctEspOpen(false); }}
+      />
+
+      <PorcentajePresupuestoDialog
+        pres={presEdit}
+        pctDefault={Number(especialista.comision_porcentaje)}
+        onClose={() => setPresEdit(null)}
+        onSave={async (pct) => { await onEditPresupuestoComision(presEdit.id, pct); setPresEdit(null); }}
+      />
     </Box>
+  );
+}
+
+/* ======================================================================
+   TARJETA: PRESUPUESTO CON COMISIÓN (base = precio final con descuento)
+====================================================================== */
+function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct }) {
+  const [open, setOpen] = useState(false);
+  const paciente = `${pres.paciente_nombre || "Paciente"} ${pres.paciente_apellido || ""}`.trim();
+  const precioTotal = Number(pres.precio_total) || 0;
+  const descuento = Number(pres.descuento) || 0;
+  const base = Number(pres.base_comision) || 0;
+  const pct = Number(pres.comision_porcentaje_efectivo);
+  const comision = Number(pres.comision_estimada) || 0;
+  const fecha = (pres.creado_en || "").slice(0, 10);
+
+  const estadoPagoStyle = pres.estado_pago === "pagado"
+    ? { bg: colors.successBg, text: colors.successText, label: "Pagado" }
+    : pres.estado_pago === "adelanto"
+    ? { bg: colors.amberBg, text: colors.amberText, label: "Adelanto" }
+    : { bg: colors.creamPanel, text: colors.textMuted, label: "Pendiente" };
+
+  return (
+    <MotionBox
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay: Math.min(index * 0.04, 0.3) }}
+    >
+      <Card sx={{ ...cardSx, mb: "12px", p: 0 }}>
+        <CardContent sx={{ p: "18px", "&:last-child": { pb: "18px" } }}>
+          {/* Encabezado */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <Avatar sx={{ width: 38, height: 38, bgcolor: colors.goldSoft, color: colors.primaryDark, fontFamily: fonts.title, fontWeight: 700, fontSize: 15 }}>
+              {paciente.charAt(0)?.toUpperCase()}
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 140 }}>
+              <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "14.5px", color: colors.primaryDark }}>{paciente}</Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mt: "2px", flexWrap: "wrap" }}>
+                <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted }}>#{pres.id} · {fecha}</Typography>
+                <Chip label={estadoPagoStyle.label} size="small" sx={{ bgcolor: estadoPagoStyle.bg, color: estadoPagoStyle.text, fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
+                <Chip label={`${pres.sesiones_completadas || 0}/${pres.sesiones_totales || 0} sesiones`} size="small" sx={{ bgcolor: colors.creamPanel, color: colors.textMuted, border: `1px solid ${colors.border}`, fontWeight: 600, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
+              </Box>
+            </Box>
+            <Box sx={{ textAlign: "right" }}>
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "10.5px", color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Comisión</Typography>
+              <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "22px", color: colors.primaryDark, lineHeight: 1.1 }}>{formatMoney(comision)}</Typography>
+            </Box>
+          </Box>
+
+          {/* Cálculo de comisión */}
+          <Box sx={{ mt: "14px", p: "12px 14px", borderRadius: "14px", bgcolor: colors.creamPanel, border: `1px solid ${colors.border}` }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: "10px" }}>
+              <Box>
+                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Precio total</Typography>
+                <Typography sx={{ fontFamily: fonts.body, fontWeight: 600, fontSize: "13.5px", color: colors.textBody }}>{formatMoney(precioTotal)}</Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Descuento</Typography>
+                <Typography sx={{ fontFamily: fonts.body, fontWeight: 600, fontSize: "13.5px", color: descuento > 0 ? colors.error : colors.textBody }}>
+                  {descuento > 0 ? `- ${formatMoney(descuento)}` : formatMoney(0)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Precio final (base)</Typography>
+                <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.primary }}>{formatMoney(base)}</Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Porcentaje</Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.primaryDark }}>{pct}%</Typography>
+                  {pres.usa_override && (
+                    <Chip label="propio" size="small" sx={{ height: 16, fontSize: "0.6rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, "& .MuiChip-label": { px: "6px" } }} />
+                  )}
+                </Box>
+              </Box>
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: "10px", pt: "10px", borderTop: `1px dashed ${colors.border}` }}>
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>
+                {formatMoney(base)} × {pct}% = <strong style={{ color: colors.primaryDark }}>{formatMoney(comision)}</strong>
+              </Typography>
+              <Button
+                size="small" onClick={onEditPct} startIcon={<PercentRounded sx={{ fontSize: 14 }} />}
+                sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "12px", fontWeight: 600, color: colors.primary, borderRadius: "8px", "&:hover": { bgcolor: colors.goldSoft } }}
+              >
+                Editar %
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Tratamientos del presupuesto */}
+          {pres.tratamientos && pres.tratamientos.length > 0 && (
+            <Box sx={{ mt: "10px" }}>
+              <Button
+                size="small" onClick={() => setOpen(!open)} endIcon={<ExpandMore sx={{ fontSize: 18, transform: open ? "rotate(180deg)" : "none", transition: "0.2s" }} />}
+                sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "12px", color: colors.textMuted, p: 0, "&:hover": { bgcolor: "transparent", color: colors.primary } }}
+              >
+                {pres.tratamientos.length} {pres.tratamientos.length === 1 ? "tratamiento" : "tratamientos"}
+              </Button>
+              <Collapse in={open}>
+                <Box sx={{ mt: "8px" }}>
+                  {pres.tratamientos.map((t, ti) => (
+                    <Box key={ti} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "6px", borderTop: ti > 0 ? `1px solid ${colors.border}` : "none" }}>
+                      <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textBody }}>
+                        {t.nombre} {t.sesiones > 1 && <span style={{ color: colors.textMuted }}>({t.sesiones} sesiones)</span>}
+                      </Typography>
+                      <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", fontWeight: 600, color: colors.primary }}>{formatMoney(t.precio)}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Collapse>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+    </MotionBox>
+  );
+}
+
+/* ======================================================================
+   DIALOG: EDITAR % DE COMISIÓN DE UN PRESUPUESTO (override)
+====================================================================== */
+function PorcentajePresupuestoDialog({ pres, pctDefault, onClose, onSave }) {
+  const [pct, setPct] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (pres) setPct(pres.usa_override ? String(Number(pres.comision_porcentaje)) : "");
+  }, [pres]);
+
+  if (!pres) return null;
+
+  const usandoDefault = pct === "";
+  const valido = usandoDefault || (!isNaN(parseFloat(pct)) && parseFloat(pct) >= 0 && parseFloat(pct) <= 100);
+  const base = Number(pres.base_comision) || 0;
+  const pctEfectivo = usandoDefault ? pctDefault : parseFloat(pct) || 0;
+  const preview = base * (pctEfectivo / 100);
+
+  return (
+    <Dialog open={!!pres} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "18px" } }}>
+      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, fontSize: "22px", pb: "4px" }}>
+        Comisión del presupuesto
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted, mb: "16px" }}>
+          Aplica un porcentaje propio para este presupuesto, o déjalo vacío para usar el {pctDefault}% del especialista.
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Box component="input" type="number" min="0" max="100" step="1" value={pct} autoFocus
+            placeholder={String(pctDefault)}
+            onChange={(e) => setPct(e.target.value)}
+            sx={{ width: 130, fontFamily: fonts.title, fontSize: "26px", fontWeight: 700, color: colors.primaryDark, textAlign: "center", border: `1px solid ${valido ? colors.border : colors.error}`, borderRadius: "12px", padding: "10px", outline: "none" }} />
+          <Typography sx={{ fontFamily: fonts.title, fontSize: "26px", fontWeight: 700, color: colors.gold }}>%</Typography>
+          {!usandoDefault && (
+            <Button size="small" onClick={() => setPct("")} sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "12px", color: colors.textMuted }}>
+              Usar {pctDefault}%
+            </Button>
+          )}
+        </Box>
+        <Box sx={{ mt: "16px", p: "12px 14px", borderRadius: "12px", bgcolor: colors.creamPanel, border: `1px solid ${colors.border}` }}>
+          <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>
+            {formatMoney(base)} × {pctEfectivo}% = <strong style={{ color: colors.primaryDark, fontSize: "15px" }}>{formatMoney(preview)}</strong>
+          </Typography>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ px: "24px", pb: "18px" }}>
+        <Button onClick={onClose} sx={{ color: colors.textMuted, textTransform: "none", fontFamily: fonts.body }}>Cancelar</Button>
+        <Button
+          variant="contained" disabled={!valido || saving}
+          onClick={async () => { setSaving(true); try { await onSave(usandoDefault ? null : parseFloat(pct)); } finally { setSaving(false); } }}
+          sx={{ background: grads.brown, color: "#fff", textTransform: "none", borderRadius: "10px", fontFamily: fonts.body, fontWeight: 600, boxShadow: "none", "&:hover": { boxShadow: "none", opacity: 0.92 } }}
+        >
+          {saving ? "Guardando..." : "Guardar"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

@@ -121,7 +121,25 @@ async function ensureComisionSchema() {
   // Override por línea de presupuesto
   await addColumn("lineas_presupuesto", "comision_tipo", "TEXT");  // 'porcentaje' | 'fijo'
   await addColumn("lineas_presupuesto", "comision_fija", "REAL");
+  // Override de comisión por presupuesto asignado (porcentaje sobre el precio final)
+  await addColumn("presupuestos_asignados", "comision_porcentaje", "REAL");
   comisionSchemaReady = true;
+}
+
+// Base de comisión de un presupuesto = precio final (precio_total - descuento), nunca negativo
+function baseComisionPresupuesto(pres) {
+  const precio = Number(pres.precio_total) || 0;
+  const descuento = Number(pres.descuento) || 0;
+  return Math.max(0, precio - descuento);
+}
+
+// Porcentaje efectivo de comisión de un presupuesto (override del presupuesto > default del especialista > 20)
+function pctComisionPresupuesto(pres, pctEspecialista) {
+  if (pres.comision_porcentaje != null && pres.comision_porcentaje !== "") {
+    return Number(pres.comision_porcentaje);
+  }
+  if (pctEspecialista != null) return Number(pctEspecialista);
+  return 20;
 }
 
 // Calcula el monto de comisión de una línea (fijo tiene prioridad si está configurado)
@@ -689,6 +707,7 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
 
   try {
     const { id } = req.params;
+    const { fecha_inicio, fecha_fin } = req.query;
 
     const especialista = await dbGet("SELECT * FROM especialistas WHERE id = ?", [id]);
     if (!especialista) {
@@ -696,73 +715,75 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
     }
     const pctDefault = especialista.comision_porcentaje != null ? Number(especialista.comision_porcentaje) : 20;
 
-    // Resumen: líneas asignadas
-    const resumen = await dbGet(`
-      SELECT
-        COUNT(*) as total_lineas,
-        SUM(CASE WHEN estado = 'culminado' THEN 1 ELSE 0 END) as culminadas,
-        SUM(CASE WHEN estado IN ('pendiente','en_curso','listo_para_culminar') THEN 1 ELSE 0 END) as en_curso,
-        COALESCE(SUM(precio), 0) as ingresos_generados
-      FROM lineas_presupuesto WHERE especialista_id = ?
-    `, [id]);
+    // Presupuestos asignados a este especialista (con filtro de fechas opcional)
+    let cond = "pa.especialista_id = ?";
+    const params = [id];
+    if (fecha_inicio) { cond += " AND DATE(pa.creado_en) >= ?"; params.push(fecha_inicio); }
+    if (fecha_fin) { cond += " AND DATE(pa.creado_en) <= ?"; params.push(fecha_fin); }
 
-    // Comisiones
-    const comisionPendiente = await dbGet(
-      `SELECT COALESCE(SUM(monto), 0) as total FROM comisiones_especialistas WHERE especialista_id = ? AND estado = 'pendiente' AND revertido = 0`,
-      [id]
-    );
-    const comisionLiquidada = await dbGet(
-      `SELECT COALESCE(SUM(monto), 0) as total FROM comisiones_especialistas WHERE especialista_id = ? AND estado = 'liquidado' AND revertido = 0`,
-      [id]
-    );
-
-    // Líneas agrupadas por presupuesto/paciente (con categoría del tratamiento)
-    const lineas = await dbAll(`
-      SELECT lp.*, pa.paciente_id,
-             p.nombre as paciente_nombre, p.apellido as paciente_apellido,
-             t.procedimiento as categoria
-      FROM lineas_presupuesto lp
-      JOIN presupuestos_asignados pa ON lp.presupuesto_asignado_id = pa.id
+    const presupuestos = await dbAll(`
+      SELECT pa.id, pa.paciente_id, pa.precio_total, pa.descuento, pa.estado,
+             pa.estado_pago, pa.monto_pagado, pa.saldo_pendiente,
+             pa.comision_porcentaje, pa.creado_en, pa.tratamientos_json,
+             p.nombre as paciente_nombre, p.apellido as paciente_apellido, p.dni as paciente_dni,
+             (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id AND ps.estado = 'completada') as sesiones_completadas,
+             (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id) as sesiones_totales
+      FROM presupuestos_asignados pa
       JOIN patients p ON pa.paciente_id = p.id
-      LEFT JOIN tratamientos t ON lp.tratamiento_id = t.id
-      WHERE lp.especialista_id = ?
-      ORDER BY lp.estado ASC, lp.creado_en DESC
-    `, [id]);
+      WHERE ${cond}
+      ORDER BY pa.creado_en DESC
+    `, params);
 
-    // Comisión estimada por línea (aplica fijo o %, con fallback al % del especialista)
-    let comisionEstimadaTotal = 0;
-    let comisionProyectada = 0; // de líneas aún no culminadas
-    for (const l of lineas) {
-      const base = {
-        comision_tipo: l.comision_tipo,
-        comision_fija: l.comision_fija,
-        comision_porcentaje: l.comision_porcentaje != null ? l.comision_porcentaje : pctDefault,
-        precio: l.precio
-      };
-      const est = comisionDeLinea(base);
-      l.comision_estimada = est;
-      l.comision_porcentaje_efectivo = base.comision_porcentaje;
-      comisionEstimadaTotal += est;
-      if (l.estado !== "culminado") comisionProyectada += est;
+    let baseTotal = 0;        // facturación con descuento
+    let comisionTotal = 0;    // pago estimado al especialista
+    let pagadoTotal = 0;      // lo que el paciente ya pagó
+
+    for (const pres of presupuestos) {
+      // Tratamientos (nombres + sesiones) desde el JSON
+      try {
+        const items = pres.tratamientos_json ? JSON.parse(pres.tratamientos_json) : [];
+        pres.tratamientos = items
+          .filter((it) => it.marca === undefined || it.marca === "gold" || it.marca === "purple")
+          .map((it) => ({ nombre: it.nombre, sesiones: Number(it.sesiones) || 1, precio: Number(it.precio) || 0, marca: it.marca || "gold" }));
+      } catch (e) {
+        pres.tratamientos = [];
+      }
+      delete pres.tratamientos_json;
+
+      // Pago real desde finanzas (fuente de verdad)
+      const sumaPagos = await dbGet(
+        `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas
+         WHERE referencia_id = ? AND referencia_tipo = 'presupuesto_asignado' AND tipo = 'ingreso'`,
+        [pres.id]
+      );
+      pres.monto_pagado_real = parseFloat(sumaPagos?.total) || 0;
+
+      const base = baseComisionPresupuesto(pres);
+      const pct = pctComisionPresupuesto(pres, pctDefault);
+      const comision = base * (pct / 100);
+
+      pres.base_comision = base;              // precio final (precio_total - descuento)
+      pres.comision_porcentaje_efectivo = pct;
+      pres.comision_estimada = comision;
+      pres.usa_override = pres.comision_porcentaje != null;
+
+      baseTotal += base;
+      comisionTotal += comision;
+      pagadoTotal += pres.monto_pagado_real;
     }
 
-    // Ticket promedio
-    const ticketPromedio = resumen.total_lineas > 0 ? resumen.ingresos_generados / resumen.total_lineas : 0;
+    const ticketPromedio = presupuestos.length > 0 ? baseTotal / presupuestos.length : 0;
 
     res.json({
       especialista: { ...especialista, comision_porcentaje: pctDefault },
       resumen: {
-        total_lineas: resumen.total_lineas,
-        culminadas: resumen.culminadas,
-        en_curso: resumen.en_curso,
-        ingresos_generados: resumen.ingresos_generados,
-        ticket_promedio: ticketPromedio,
-        comision_pendiente: comisionPendiente.total,
-        comision_liquidada: comisionLiquidada.total,
-        comision_estimada_total: comisionEstimadaTotal,
-        comision_proyectada: comisionProyectada
+        num_presupuestos: presupuestos.length,
+        base_total: baseTotal,
+        comision_total: comisionTotal,
+        pagado_total: pagadoTotal,
+        ticket_promedio: ticketPromedio
       },
-      lineas
+      presupuestos
     });
   } catch (err) {
     console.error("❌ Error perfil especialista:", err.message);
@@ -934,23 +955,90 @@ router.post("/lineas/sync", authMiddleware, requireOwner, async (req, res) => {
 ====================================================================== */
 router.get("/especialistas", authMiddleware, requireOwner, async (req, res) => {
   await ensureLineasMigration();
+  await ensureComisionSchema();
 
   try {
+    const { fecha_inicio, fecha_fin } = req.query;
+
+    // Filtro de fechas sobre la fecha de creación del presupuesto
+    let joinCond = "pa.especialista_id = e.id";
+    const params = [];
+    if (fecha_inicio) { joinCond += " AND DATE(pa.creado_en) >= ?"; params.push(fecha_inicio); }
+    if (fecha_fin) { joinCond += " AND DATE(pa.creado_en) <= ?"; params.push(fecha_fin); }
+
+    // Comisión = % efectivo (override del presupuesto o default del especialista) sobre el precio final (precio_total - descuento)
     const especialistas = await dbAll(`
-      SELECT e.*,
-        (SELECT COUNT(*) FROM lineas_presupuesto lp WHERE lp.especialista_id = e.id) as total_lineas,
-        (SELECT COUNT(*) FROM lineas_presupuesto lp WHERE lp.especialista_id = e.id AND lp.estado = 'culminado') as lineas_culminadas,
-        (SELECT COALESCE(SUM(lp.precio), 0) FROM lineas_presupuesto lp WHERE lp.especialista_id = e.id) as ingresos_generados,
+      SELECT e.id, e.nombre, e.tipo, e.especialidad, e.cuenta_bancaria,
+        COALESCE(e.comision_porcentaje, 20) as comision_porcentaje,
+        COUNT(pa.id) as num_presupuestos,
+        COALESCE(SUM(MAX(pa.precio_total - COALESCE(pa.descuento, 0), 0)), 0) as base_total,
+        COALESCE(SUM(
+          MAX(pa.precio_total - COALESCE(pa.descuento, 0), 0)
+          * (COALESCE(pa.comision_porcentaje, e.comision_porcentaje, 20) / 100.0)
+        ), 0) as comision_total,
         (SELECT COALESCE(SUM(c.monto), 0) FROM comisiones_especialistas c WHERE c.especialista_id = e.id AND c.estado = 'pendiente' AND c.revertido = 0) as comision_pendiente,
         (SELECT COALESCE(SUM(c.monto), 0) FROM comisiones_especialistas c WHERE c.especialista_id = e.id AND c.estado = 'liquidado' AND c.revertido = 0) as comision_liquidada
       FROM especialistas e
+      LEFT JOIN presupuestos_asignados pa ON ${joinCond}
+      GROUP BY e.id
       ORDER BY e.nombre ASC
-    `);
+    `, params);
 
     res.json(especialistas);
   } catch (err) {
     console.error("❌ Error listando especialistas:", err.message);
     res.status(500).json({ message: "Error al listar especialistas", error: err.message });
+  }
+});
+
+/* ======================================================================
+   💵 EDITAR % DE COMISIÓN POR DEFECTO DEL ESPECIALISTA
+====================================================================== */
+router.put("/especialistas/:id/comision", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pct = Number(req.body?.comision_porcentaje);
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      return res.status(400).json({ message: "Porcentaje inválido (0-100)" });
+    }
+    const esp = await dbGet("SELECT id FROM especialistas WHERE id = ?", [id]);
+    if (!esp) return res.status(404).json({ message: "Especialista no encontrado" });
+
+    await dbRun("UPDATE especialistas SET comision_porcentaje = ? WHERE id = ?", [pct, id]);
+    res.json({ message: "Comisión del especialista actualizada", comision_porcentaje: pct });
+  } catch (err) {
+    console.error("❌ Error actualizando comisión del especialista:", err.message);
+    res.status(500).json({ message: "Error al actualizar comisión", error: err.message });
+  }
+});
+
+/* ======================================================================
+   💵 EDITAR % DE COMISIÓN DE UN PRESUPUESTO ASIGNADO (override)
+   Enviar comision_porcentaje = null para volver al % del especialista.
+====================================================================== */
+router.put("/presupuestos/:id/comision", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    await ensureComisionSchema();
+    const { id } = req.params;
+    let { comision_porcentaje } = req.body;
+
+    const pres = await dbGet("SELECT id FROM presupuestos_asignados WHERE id = ?", [id]);
+    if (!pres) return res.status(404).json({ message: "Presupuesto no encontrado" });
+
+    if (comision_porcentaje === null || comision_porcentaje === "" || comision_porcentaje === undefined) {
+      await dbRun("UPDATE presupuestos_asignados SET comision_porcentaje = NULL WHERE id = ?", [id]);
+      return res.json({ message: "Comisión del presupuesto restablecida al % del especialista" });
+    }
+
+    const pct = Number(comision_porcentaje);
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      return res.status(400).json({ message: "Porcentaje inválido (0-100)" });
+    }
+    await dbRun("UPDATE presupuestos_asignados SET comision_porcentaje = ? WHERE id = ?", [pct, id]);
+    res.json({ message: "Comisión del presupuesto actualizada", comision_porcentaje: pct });
+  } catch (err) {
+    console.error("❌ Error actualizando comisión del presupuesto:", err.message);
+    res.status(500).json({ message: "Error al actualizar comisión del presupuesto", error: err.message });
   }
 });
 
