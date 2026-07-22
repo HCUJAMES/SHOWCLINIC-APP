@@ -2014,14 +2014,14 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
 
   const toggleFiltro = (f) => setFiltros((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
 
-  // Filtrar presupuestos según los filtros activos (OR entre los seleccionados)
+  // Filtrar presupuestos según los filtros activos (AND: debe cumplir TODOS los seleccionados)
   const filteredPresupuestos = useMemo(() => {
     if (filtros.length === 0) return presupuestos;
     return presupuestos.filter((p) => {
-      if (filtros.includes("pagado") && p.estado_pago === "pagado") return true;
-      if (filtros.includes("pendiente") && (p.estado_pago === "pendiente" || p.estado_pago === "adelanto")) return true;
-      if (filtros.includes("sesiones_completas") && Number(p.sesiones_completadas) > 0 && Number(p.sesiones_completadas) >= Number(p.sesiones_totales)) return true;
-      return false;
+      if (filtros.includes("pagado") && p.estado_pago !== "pagado") return false;
+      if (filtros.includes("pendiente") && p.estado_pago !== "pendiente" && p.estado_pago !== "adelanto") return false;
+      if (filtros.includes("sesiones_completas") && !(Number(p.sesiones_completadas) > 0 && Number(p.sesiones_completadas) >= Number(p.sesiones_totales))) return false;
+      return true;
     });
   }, [presupuestos, filtros]);
 
