@@ -2009,7 +2009,40 @@ function TratamientosComisionDialog({ open, onClose, onSaved }) {
 function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision }) {
   const { especialista, resumen, presupuestos = [] } = detalle;
   const [pctEspOpen, setPctEspOpen] = useState(false);
-  const [presEdit, setPresEdit] = useState(null); // presupuesto en edición de %
+  const [presEdit, setPresEdit] = useState(null);
+  const [filtros, setFiltros] = useState([]); // ["pagado", "pendiente", "sesiones_completas"]
+
+  const toggleFiltro = (f) => setFiltros((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
+
+  // Filtrar presupuestos según los filtros activos (OR entre los seleccionados)
+  const filteredPresupuestos = useMemo(() => {
+    if (filtros.length === 0) return presupuestos;
+    return presupuestos.filter((p) => {
+      if (filtros.includes("pagado") && p.estado_pago === "pagado") return true;
+      if (filtros.includes("pendiente") && (p.estado_pago === "pendiente" || p.estado_pago === "adelanto")) return true;
+      if (filtros.includes("sesiones_completas") && Number(p.sesiones_completadas) > 0 && Number(p.sesiones_completadas) >= Number(p.sesiones_totales)) return true;
+      return false;
+    });
+  }, [presupuestos, filtros]);
+
+  // Recalcular KPIs según lo filtrado
+  const kpisCalc = useMemo(() => {
+    const list = filtros.length === 0 ? presupuestos : filteredPresupuestos;
+    let baseTotal = 0, comisionTotal = 0, pagadoTotal = 0;
+    for (const p of list) {
+      baseTotal += Number(p.base_comision) || 0;
+      comisionTotal += Number(p.comision_estimada) || 0;
+      pagadoTotal += Number(p.monto_pagado_real) || 0;
+    }
+    return { num: list.length, baseTotal, comisionTotal, pagadoTotal };
+  }, [presupuestos, filteredPresupuestos, filtros]);
+
+  const filtroChipSx = (activo) => ({
+    fontFamily: fonts.body, fontWeight: 600, fontSize: "0.75rem", height: 30, borderRadius: "10px", cursor: "pointer", transition: "all 0.2s",
+    ...(activo
+      ? { bgcolor: colors.primaryDark, color: "#fff", border: `1px solid ${colors.primaryDark}`, "&:hover": { bgcolor: colors.primary } }
+      : { bgcolor: colors.white, color: colors.textBody, border: `1px solid ${colors.border}`, "&:hover": { bgcolor: colors.creamPanel } })
+  });
 
   return (
     <Box>
@@ -2044,13 +2077,13 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
             </Button>
           </Box>
 
-          {/* KPIs del especialista */}
+          {/* KPIs del especialista (dinámicos según filtro) */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: "12px" }}>
             {[
-              { label: "Presupuestos", value: resumen.num_presupuestos, color: colors.primaryDark, bg: colors.creamPanel },
-              { label: "Facturación (con desc.)", value: formatMoney(resumen.base_total), color: colors.primary, bg: colors.creamPanel },
-              { label: "Pagado por pacientes", value: formatMoney(resumen.pagado_total), color: colors.successText, bg: colors.successBg },
-              { label: "Pago al especialista", value: formatMoney(resumen.comision_total), color: colors.primaryDark, bg: colors.goldSoft }
+              { label: "Presupuestos", value: kpisCalc.num, color: colors.primaryDark, bg: colors.creamPanel },
+              { label: "Facturación (con desc.)", value: formatMoney(kpisCalc.baseTotal), color: colors.primary, bg: colors.creamPanel },
+              { label: "Pagado por pacientes", value: formatMoney(kpisCalc.pagadoTotal), color: colors.successText, bg: colors.successBg },
+              { label: "Pago al especialista", value: formatMoney(kpisCalc.comisionTotal), color: colors.primaryDark, bg: colors.goldSoft }
             ].map((kpi, i) => (
               <Box key={i} sx={{ textAlign: "center", p: "14px", bgcolor: kpi.bg, borderRadius: "14px" }}>
                 <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>{kpi.label}</Typography>
@@ -2061,13 +2094,25 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
         </CardContent>
       </Card>
 
-      {/* Presupuestos asignados */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mb: "12px" }}>
-        <Typography sx={{ fontFamily: fonts.title, fontSize: "20px", fontWeight: 600, color: colors.primaryDark }}>Presupuestos asignados</Typography>
-        <Chip label={presupuestos.length} size="small" sx={{ bgcolor: colors.goldSoft, color: colors.primaryDark, fontWeight: 700, fontFamily: fonts.body, height: 22, fontSize: "0.7rem" }} />
+      {/* Filtros + título */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "14px", flexWrap: "wrap" }}>
+        <Typography sx={{ fontFamily: fonts.title, fontSize: "20px", fontWeight: 600, color: colors.primaryDark }}>Presupuestos</Typography>
+        <Chip label={filteredPresupuestos.length} size="small" sx={{ bgcolor: colors.goldSoft, color: colors.primaryDark, fontWeight: 700, fontFamily: fonts.body, height: 22, fontSize: "0.7rem" }} />
+        <Box sx={{ flex: 1 }} />
+        <Box sx={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <Chip label="Pagado" onClick={() => toggleFiltro("pagado")} sx={filtroChipSx(filtros.includes("pagado"))} />
+          <Chip label="Pendiente" onClick={() => toggleFiltro("pendiente")} sx={filtroChipSx(filtros.includes("pendiente"))} />
+          <Chip label="Sesiones completas" onClick={() => toggleFiltro("sesiones_completas")} sx={filtroChipSx(filtros.includes("sesiones_completas"))} />
+        </Box>
       </Box>
 
-      {presupuestos.map((pres, i) => (
+      {filtros.length > 0 && (
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted, mb: "10px" }}>
+          Mostrando {filteredPresupuestos.length} de {presupuestos.length} presupuestos · Pago filtrado: <strong>{formatMoney(kpisCalc.comisionTotal)}</strong>
+        </Typography>
+      )}
+
+      {filteredPresupuestos.map((pres, i) => (
         <PresupuestoComisionCard
           key={pres.id}
           pres={pres}
@@ -2077,9 +2122,11 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
         />
       ))}
 
-      {presupuestos.length === 0 && (
+      {filteredPresupuestos.length === 0 && (
         <Alert severity="info" sx={{ mt: "8px", borderRadius: "12px" }}>
-          Este especialista no tiene presupuestos asignados en el periodo seleccionado.
+          {filtros.length > 0
+            ? "No hay presupuestos que coincidan con los filtros seleccionados."
+            : "Este especialista no tiene presupuestos asignados en el periodo seleccionado."}
         </Alert>
       )}
 
