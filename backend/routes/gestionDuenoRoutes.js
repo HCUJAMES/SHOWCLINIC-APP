@@ -758,7 +758,18 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
       );
       pres.monto_pagado_real = parseFloat(sumaPagos?.total) || 0;
 
+      // Recalcular estado_pago basado en finanzas (fuente de verdad)
       const base = baseComisionPresupuesto(pres);
+      if (base > 0) {
+        if (pres.monto_pagado_real >= base - 0.01) {
+          pres.estado_pago = "pagado";
+        } else if (pres.monto_pagado_real > 0) {
+          pres.estado_pago = "adelanto";
+        } else {
+          pres.estado_pago = "pendiente";
+        }
+      }
+
       const pct = pctComisionPresupuesto(pres, pctDefault);
       const comision = base * (pct / 100);
 

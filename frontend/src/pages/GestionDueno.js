@@ -2019,7 +2019,7 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
     if (filtros.length === 0) return presupuestos;
     return presupuestos.filter((p) => {
       if (filtros.includes("pagado") && p.estado_pago !== "pagado") return false;
-      if (filtros.includes("pendiente") && p.estado_pago !== "pendiente" && p.estado_pago !== "adelanto") return false;
+      if (filtros.includes("pendiente") && p.estado_pago !== "pendiente" && p.estado_pago !== "adelanto" && p.estado_pago !== "pendiente_pago") return false;
       if (filtros.includes("sesiones_completas") && !(Number(p.sesiones_completadas) > 0 && Number(p.sesiones_completadas) >= Number(p.sesiones_totales))) return false;
       return true;
     });
