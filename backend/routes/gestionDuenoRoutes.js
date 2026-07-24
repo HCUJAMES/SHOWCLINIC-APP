@@ -445,10 +445,10 @@ router.get("/presupuestos/:id", authMiddleware, requireOwner, async (req, res) =
       linea.comision = comision || null;
     }
 
-    // Recalcular pagos desde finanzas
+    // Recalcular pagos desde finanzas (incluye pagos directos + consultas vinculadas)
     const sumaPagos = await dbGet(
       `SELECT COALESCE(SUM(monto), 0) as total_pagado FROM finanzas
-       WHERE referencia_id = ? AND referencia_tipo = 'presupuesto_asignado' AND tipo = 'ingreso'`,
+       WHERE referencia_id = ? AND referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta') AND tipo = 'ingreso'`,
       [id]
     );
     presupuesto.monto_pagado_real = parseFloat(sumaPagos?.total_pagado) || 0;
@@ -725,6 +725,7 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
       SELECT pa.id, pa.paciente_id, pa.precio_total, pa.descuento, pa.estado,
              pa.estado_pago, pa.monto_pagado, pa.saldo_pendiente,
              pa.comision_porcentaje, pa.creado_en, pa.tratamientos_json,
+             pa.monto_consulta,
              p.nombre as paciente_nombre, p.apellido as paciente_apellido, p.dni as paciente_dni,
              (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id AND ps.estado = 'completada') as sesiones_completadas,
              (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id) as sesiones_totales
@@ -751,17 +752,20 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
       delete pres.tratamientos_json;
 
       // Pago real desde finanzas (fuente de verdad)
+      // Incluye pagos directos al presupuesto + consultas vinculadas
       const sumaPagos = await dbGet(
         `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas
-         WHERE referencia_id = ? AND referencia_tipo = 'presupuesto_asignado' AND tipo = 'ingreso'`,
+         WHERE referencia_id = ? AND referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta') AND tipo = 'ingreso'`,
         [pres.id]
       );
       pres.monto_pagado_real = parseFloat(sumaPagos?.total) || 0;
 
-      // Recalcular estado_pago basado en finanzas (fuente de verdad)
-      const base = baseComisionPresupuesto(pres);
-      if (base > 0) {
-        if (pres.monto_pagado_real >= base - 0.01) {
+      // Recalcular estado_pago basado en precio original (sin desc consulta) vs pagos directos
+      const precioOriginal = Number(pres.precio_total) || 0;
+      const descSinConsulta = Math.max(0, (Number(pres.descuento) || 0) - (Number(pres.monto_consulta) || 0));
+      const baseParaEstado = Math.max(0, precioOriginal - descSinConsulta);
+      if (baseParaEstado > 0) {
+        if (pres.monto_pagado_real >= baseParaEstado - 0.01) {
           pres.estado_pago = "pagado";
         } else if (pres.monto_pagado_real > 0) {
           pres.estado_pago = "adelanto";
@@ -770,6 +774,7 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
         }
       }
 
+      const base = baseComisionPresupuesto(pres);
       const pct = pctComisionPresupuesto(pres, pctDefault);
       const comision = base * (pct / 100);
 
