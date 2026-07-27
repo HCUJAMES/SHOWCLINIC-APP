@@ -1746,6 +1746,7 @@ function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
 ====================================================================== */
 function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onEditEspecialistaComision, onEditPresupuestoComision }) {
   const [pctEsp, setPctEsp] = useState(null); // especialista en edición de %
+  const [reconOpen, setReconOpen] = useState(false);
 
   if (detalle) {
     return (
@@ -1760,11 +1761,20 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
 
   return (
     <Box>
-      <Box sx={{ mb: "18px" }}>
-        <Typography sx={{ fontFamily: fonts.title, fontSize: "22px", fontWeight: 600, color: colors.primaryDark }}>Equipo de Especialistas</Typography>
-        <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>
-          La comisión se calcula como un porcentaje sobre el <strong>precio final</strong> (con descuento) de cada presupuesto asignado.
-        </Typography>
+      <Box sx={{ mb: "18px", display: "flex", alignItems: "flex-start", gap: "12px", flexWrap: "wrap" }}>
+        <Box sx={{ flex: 1, minWidth: 220 }}>
+          <Typography sx={{ fontFamily: fonts.title, fontSize: "22px", fontWeight: 600, color: colors.primaryDark }}>Equipo de Especialistas</Typography>
+          <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>
+            La comisión se calcula como un porcentaje sobre el <strong>precio final</strong> (con descuento) de cada presupuesto asignado.
+          </Typography>
+        </Box>
+        <Button
+          onClick={() => setReconOpen(true)}
+          startIcon={<InsightsRounded sx={{ fontSize: 18 }} />}
+          sx={{ fontFamily: fonts.body, textTransform: "none", borderRadius: "12px", fontWeight: 700, color: colors.primaryDark, border: `1px solid ${colors.border}`, bgcolor: colors.white, px: "16px", py: "8px", "&:hover": { bgcolor: colors.creamPanel, borderColor: colors.gold } }}
+        >
+          Verificar cuadre
+        </Button>
       </Box>
 
       <Grid container spacing="16px">
@@ -1823,7 +1833,131 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
         onClose={() => setPctEsp(null)}
         onSave={async (pct) => { await onEditEspecialistaComision(pctEsp.id, pct); setPctEsp(null); }}
       />
+
+      <ReconciliacionDialog open={reconOpen} onClose={() => setReconOpen(false)} />
     </Box>
+  );
+}
+
+/* ======================================================================
+   DIALOG: RECONCILIACIÓN — verificar por qué no cuadra especialistas vs finanzas
+====================================================================== */
+const TIPO_LABELS = {
+  presupuesto_asignado: "Presupuestos (pagos directos)",
+  presupuesto_consulta: "Presupuestos (consultas)",
+  paquete_paciente: "Paquetes",
+  paquete_consulta: "Paquetes (consultas)",
+  deuda_tratamiento: "Deudas de tratamiento",
+  tratamiento_realizado: "Tratamientos (modelo antiguo)",
+  consulta_directa: "Consultas directas",
+  finanza: "Abonos manuales (finanza)"
+};
+
+function ReconciliacionDialog({ open, onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancel = false;
+    (async () => {
+      setLoading(true); setErr(null); setData(null);
+      try {
+        const d = await apiFetch("/reconciliacion");
+        if (!cancel) setData(d);
+      } catch (e) {
+        if (!cancel) setErr(e.message);
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [open]);
+
+  const cuadra = data && Math.abs(Number(data.diferencia_finanzas_vs_especialistas) || 0) < 0.5;
+
+  const Row = ({ label, value, bold, color, tint }) => (
+    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "10px", px: "12px", borderRadius: "10px", bgcolor: tint || "transparent" }}>
+      <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", fontWeight: bold ? 700 : 500, color: color || colors.textBody }}>{label}</Typography>
+      <Typography sx={{ fontFamily: fonts.title, fontSize: bold ? "17px" : "15px", fontWeight: 700, color: color || colors.primaryDark }}>{formatMoney(value)}</Typography>
+    </Box>
+  );
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "18px" } }}>
+      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, fontSize: "22px" }}>
+        Verificación de cuadre
+      </DialogTitle>
+      <DialogContent>
+        {loading && <LinearProgress sx={{ my: "18px", borderRadius: 2, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: colors.gold } }} />}
+        {err && <Alert severity="error" sx={{ borderRadius: "12px", my: "12px" }}>{err}</Alert>}
+        {data && (
+          <Box sx={{ fontFamily: fonts.body }}>
+            <Alert
+              severity={cuadra ? "success" : "info"}
+              sx={{ borderRadius: "12px", mb: "16px", ...(cuadra ? { bgcolor: colors.successBg, color: colors.successText } : { bgcolor: colors.amberBg, color: colors.amberText }) }}
+            >
+              {cuadra
+                ? "Todo cuadra: la suma de los especialistas coincide con los pagos de presupuestos en finanzas."
+                : `Diferencia de ${formatMoney(Math.abs(Number(data.diferencia_finanzas_vs_especialistas) || 0))}. Abajo se explica de dónde viene.`}
+            </Alert>
+
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 600, color: colors.primaryDark, fontSize: "16px", mb: "6px" }}>
+              Total de ingresos en Finanzas
+            </Typography>
+            <Row label="Todos los ingresos (lo que ves en Finanzas)" value={data.total_finanzas_ingresos} bold color={colors.primaryDark} tint={colors.creamPanel} />
+
+            <Divider sx={{ my: "14px", borderColor: colors.border }} />
+
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 600, color: colors.primaryDark, fontSize: "16px", mb: "6px" }}>
+              Desglose por origen
+            </Typography>
+            {(data.desglose_por_referencia_tipo || []).map((t) => (
+              <Row
+                key={t.referencia_tipo || "sin_tipo"}
+                label={`${TIPO_LABELS[t.referencia_tipo] || t.referencia_tipo || "Sin tipo"} (${t.n})`}
+                value={t.total}
+              />
+            ))}
+
+            <Divider sx={{ my: "14px", borderColor: colors.border }} />
+
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 600, color: colors.primaryDark, fontSize: "16px", mb: "6px" }}>
+              Presupuestos: a quién se asignan
+            </Typography>
+            <Row label="Con especialista asignado (sí se reparte)" value={data.presupuestos_con_especialista} color={colors.successText} tint={colors.successBg} />
+            <Row label="Sin especialista asignado (no aparece en nadie)" value={data.presupuestos_sin_especialista} color={colors.amberText} tint={colors.amberBg} />
+            {Number(data.pagos_huerfanos_presupuesto_borrado) > 0 && (
+              <Row label="Pagos de presupuestos ya borrados" value={data.pagos_huerfanos_presupuesto_borrado} color={colors.error} />
+            )}
+
+            <Divider sx={{ my: "14px", borderColor: colors.border }} />
+
+            <Row label="Suma pagada a especialistas (lo que ves sumando todos)" value={data.suma_pagado_por_especialistas} bold color={colors.primaryDark} tint={colors.goldSoft} />
+
+            <Box sx={{ mt: "16px" }}>
+              <Typography sx={{ fontFamily: fonts.title, fontWeight: 600, color: colors.primaryDark, fontSize: "15px", mb: "6px" }}>
+                Detalle por especialista
+              </Typography>
+              {(data.detalle_por_especialista || []).map((e) => (
+                <Box key={e.id} sx={{ display: "flex", justifyContent: "space-between", py: "6px", borderBottom: `1px solid ${colors.border}` }}>
+                  <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textBody }}>{e.nombre}</Typography>
+                  <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", fontWeight: 700, color: colors.primaryDark }}>{formatMoney(e.pagado_total)}</Typography>
+                </Box>
+              ))}
+            </Box>
+
+            <Alert severity="info" sx={{ borderRadius: "12px", mt: "16px", bgcolor: colors.creamPanel, color: colors.textBody, "& .MuiAlert-icon": { color: colors.primary } }}>
+              La diferencia con el total de Finanzas es normal: Finanzas incluye <strong>paquetes, consultas directas, tratamientos antiguos y presupuestos sin especialista</strong>, que no se reparten entre especialistas.
+            </Alert>
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: "24px", pb: "18px" }}>
+        <Button onClick={onClose} sx={{ color: colors.textMuted, textTransform: "none", fontFamily: fonts.body }}>Cerrar</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 
