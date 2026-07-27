@@ -441,6 +441,8 @@ export default function GestionDueno() {
               onReloadEspecialistas={loadEspecialistas}
               onEditEspecialistaComision={handleEditEspecialistaComision}
               onEditPresupuestoComision={handleEditPresupuestoComision}
+              fechaInicio={fechaInicio}
+              fechaFin={fechaFin}
             />
           )}
 
@@ -1744,7 +1746,7 @@ function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
 /* ======================================================================
    VISTA ESPECIALISTAS
 ====================================================================== */
-function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onEditEspecialistaComision, onEditPresupuestoComision }) {
+function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onEditEspecialistaComision, onEditPresupuestoComision, fechaInicio, fechaFin }) {
   const [pctEsp, setPctEsp] = useState(null); // especialista en edición de %
   const [reconOpen, setReconOpen] = useState(false);
 
@@ -1834,7 +1836,7 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
         onSave={async (pct) => { await onEditEspecialistaComision(pctEsp.id, pct); setPctEsp(null); }}
       />
 
-      <ReconciliacionDialog open={reconOpen} onClose={() => setReconOpen(false)} />
+      <ReconciliacionDialog open={reconOpen} onClose={() => setReconOpen(false)} fechaInicio={fechaInicio} fechaFin={fechaFin} />
     </Box>
   );
 }
@@ -1853,7 +1855,7 @@ const TIPO_LABELS = {
   finanza: "Abonos manuales (finanza)"
 };
 
-function ReconciliacionDialog({ open, onClose }) {
+function ReconciliacionDialog({ open, onClose, fechaInicio, fechaFin }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
@@ -1864,7 +1866,7 @@ function ReconciliacionDialog({ open, onClose }) {
     (async () => {
       setLoading(true); setErr(null); setData(null);
       try {
-        const d = await apiFetch("/reconciliacion");
+        const d = await apiFetch(`/reconciliacion${buildDateQuery(fechaInicio, fechaFin)}`);
         if (!cancel) setData(d);
       } catch (e) {
         if (!cancel) setErr(e.message);
@@ -1873,7 +1875,11 @@ function ReconciliacionDialog({ open, onClose }) {
       }
     })();
     return () => { cancel = true; };
-  }, [open]);
+  }, [open, fechaInicio, fechaFin]);
+
+  const periodoLabel = (fechaInicio || fechaFin)
+    ? `${fechaInicio || "inicio"} → ${fechaFin || "hoy"}`
+    : "Todo el histórico";
 
   const cuadra = data && Math.abs(Number(data.diferencia_finanzas_vs_especialistas) || 0) < 0.5;
 
@@ -1886,8 +1892,11 @@ function ReconciliacionDialog({ open, onClose }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "18px" } }}>
-      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, fontSize: "22px" }}>
+      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, fontSize: "22px", pb: "2px" }}>
         Verificación de cuadre
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", fontWeight: 500, color: colors.textMuted, mt: "2px" }}>
+          Periodo: <strong style={{ color: colors.primary }}>{periodoLabel}</strong> · según fecha de pago
+        </Typography>
       </DialogTitle>
       <DialogContent>
         {loading && <LinearProgress sx={{ my: "18px", borderRadius: 2, bgcolor: colors.border, "& .MuiLinearProgress-bar": { bgcolor: colors.gold } }} />}
