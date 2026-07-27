@@ -1,6 +1,7 @@
 import express from "express";
 import db, { dbAll, dbGet, dbRun } from "../db/database.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { getReporteFinanciero } from "./finanzasRoutes.js";
 
 const router = express.Router();
 
@@ -1008,98 +1009,101 @@ router.get("/especialistas", authMiddleware, requireOwner, async (req, res) => {
 });
 
 /* ======================================================================
-   RECONCILIACIÓN: verificar el cuadre por especialista
-   Usa el MISMO criterio que la vista de cada especialista (creado_en +
-   suma de todos los pagos del presupuesto) para que coincida 1:1.
+   RECONCILIACIÓN: descompone el total EXACTO de Finanzas
+   Reutiliza getReporteFinanciero (misma lógica que la página de Finanzas)
+   y reparte su total en buckets, uno de ellos por especialista, para que
+   la suma cuadre exactamente con lo que muestra Finanzas.
 ====================================================================== */
 router.get("/reconciliacion", authMiddleware, requireOwner, async (req, res) => {
   await ensureComisionSchema();
   try {
     const { fecha_inicio, fecha_fin } = req.query;
 
-    // IMPORTANTE: usamos EXACTAMENTE el mismo criterio que la vista de cada especialista
-    // (endpoint /especialistas/:id/perfil): los presupuestos se filtran por su fecha de
-    // CREACIÓN (pa.creado_en) y luego se suman TODOS sus pagos, sin importar cuándo se pagaron.
-    // Así el "Detalle por especialista" del panel coincide 1:1 con lo que se ve por especialista.
-    let paCond = "";
-    const pp = [];
-    if (fecha_inicio) { paCond += " AND DATE(pa.creado_en) >= ?"; pp.push(fecha_inicio); }
-    if (fecha_fin) { paCond += " AND DATE(pa.creado_en) <= ?"; pp.push(fecha_fin); }
+    // Reutilizamos EXACTAMENTE el mismo cálculo que la página de Finanzas.
+    // getReporteFinanciero devuelve el array completo (todosResultados) donde cada fila
+    // ya trae `monto_cobrado` (con descuento POS de tarjeta aplicado) y `totalGeneral`,
+    // que es el número EXACTO que ve el usuario en Finanzas. Descomponemos ese total sol
+    // por sol, así el cuadre está garantizado por construcción.
+    const rep = await getReporteFinanciero({ fechaInicio: fecha_inicio, fechaFin: fecha_fin });
+    const rows = rep.resultados || [];
+    const totalFinanzas = Number(rep.totalGeneral) || 0;
 
-    const TIPOS_PRES = "('presupuesto_asignado', 'presupuesto_consulta')";
+    // Mapear cada presupuesto (asignado o consulta) a su especialista
+    const presIds = new Set();
+    for (const r of rows) {
+      if ((r.referencia_tipo === "presupuesto_asignado" || r.referencia_tipo === "presupuesto_consulta") && r.referencia_id) {
+        presIds.add(Number(r.referencia_id));
+      }
+    }
+    const espMap = {}; // presupuesto_id -> { especialista_id, nombre }
+    if (presIds.size > 0) {
+      const ph = [...presIds];
+      const placeholders = ph.map(() => "?").join(",");
+      const presRows = await dbAll(
+        `SELECT pa.id, pa.especialista_id, e.nombre as especialista_nombre
+         FROM presupuestos_asignados pa
+         LEFT JOIN especialistas e ON e.id = pa.especialista_id
+         WHERE pa.id IN (${placeholders})`,
+        ph
+      );
+      presRows.forEach((pr) => { espMap[pr.id] = { especialista_id: pr.especialista_id, nombre: pr.especialista_nombre }; });
+    }
 
-    // 1) Detalle por especialista (mismo cálculo que /perfil: creado_en + suma de TODOS los pagos)
-    const porEspecialista = await dbAll(
-      `SELECT e.id, e.nombre,
-              COALESCE(SUM(f.monto), 0) as pagado_total,
-              COUNT(DISTINCT pa.id) as num_presupuestos
-       FROM especialistas e
-       LEFT JOIN presupuestos_asignados pa ON pa.especialista_id = e.id${paCond}
-       LEFT JOIN finanzas f ON f.referencia_id = pa.id
-         AND f.tipo = 'ingreso'
-         AND f.referencia_tipo IN ${TIPOS_PRES}
-       GROUP BY e.id
-       ORDER BY pagado_total DESC`,
-      pp
-    );
-    const sumaEspecialistas = porEspecialista.reduce((a, r) => a + (Number(r.pagado_total) || 0), 0);
+    // Buckets que suman EXACTAMENTE el total de Finanzas
+    const buckets = {
+      presupuestos_con_especialista: 0,
+      presupuestos_sin_especialista: 0,
+      paquetes: 0,
+      consultas_directas: 0,
+      deudas_tratamiento: 0,
+      tratamientos_antiguos: 0,
+      otros: 0
+    };
+    const porEsp = {}; // especialista_id -> { id, nombre, pagado_total }
 
-    // 2) Total pagado de presupuestos CON especialista (debe igualar la suma de arriba)
-    const conEspecialista = await dbGet(
-      `SELECT COALESCE(SUM(f.monto), 0) as total
-       FROM presupuestos_asignados pa
-       JOIN finanzas f ON f.referencia_id = pa.id
-         AND f.tipo = 'ingreso' AND f.referencia_tipo IN ${TIPOS_PRES}
-       WHERE pa.especialista_id IS NOT NULL${paCond}`,
-      pp
-    );
+    for (const r of rows) {
+      const cobrado = Number(r.monto_cobrado) || 0;
+      const rt = r.referencia_tipo;
 
-    // 3) Total pagado de presupuestos SIN especialista asignado (no aparece en ningún especialista)
-    const sinEspecialista = await dbGet(
-      `SELECT COALESCE(SUM(f.monto), 0) as total
-       FROM presupuestos_asignados pa
-       JOIN finanzas f ON f.referencia_id = pa.id
-         AND f.tipo = 'ingreso' AND f.referencia_tipo IN ${TIPOS_PRES}
-       WHERE pa.especialista_id IS NULL${paCond}`,
-      pp
-    );
+      // Tratamientos del modelo antiguo (tratamientos_realizados): no tienen referencia_tipo
+      if (r.tipo_registro === "tratamiento" && !rt) { buckets.tratamientos_antiguos += cobrado; continue; }
 
-    const totalPresupuestos = (Number(conEspecialista?.total) || 0) + (Number(sinEspecialista?.total) || 0);
+      if (rt === "presupuesto_asignado" || rt === "presupuesto_consulta") {
+        let espId = (rt === "presupuesto_asignado" && r.presupuesto_especialista_id != null)
+          ? r.presupuesto_especialista_id : null;
+        const m = espMap[Number(r.referencia_id)];
+        let espNombre = m?.nombre || null;
+        if (espId == null && m) espId = m.especialista_id;
+        if (espId != null) {
+          buckets.presupuestos_con_especialista += cobrado;
+          if (!porEsp[espId]) porEsp[espId] = { id: espId, nombre: espNombre || "Especialista", pagado_total: 0 };
+          porEsp[espId].pagado_total += cobrado;
+        } else {
+          buckets.presupuestos_sin_especialista += cobrado;
+        }
+        continue;
+      }
 
-    // 4) CONTEXTO (informativo): otros ingresos de finanzas que NO son presupuestos.
-    //    Se listan por fecha de pago solo como referencia; no entran en el cuadre de especialistas.
-    let fpCond = "";
-    const fp = [];
-    if (fecha_inicio) { fpCond += " AND DATE(f.fecha) >= ?"; fp.push(fecha_inicio); }
-    if (fecha_fin) { fpCond += " AND DATE(f.fecha) <= ?"; fp.push(fecha_fin); }
+      if (rt === "paquete_paciente" || rt === "paquete_consulta") { buckets.paquetes += cobrado; continue; }
+      if (rt === "consulta_directa") { buckets.consultas_directas += cobrado; continue; }
+      if (rt === "deuda_tratamiento") { buckets.deudas_tratamiento += cobrado; continue; }
+      buckets.otros += cobrado;
+    }
 
-    const otrosIngresos = await dbAll(
-      `SELECT f.referencia_tipo, COALESCE(SUM(f.monto), 0) as total, COUNT(*) as n
-       FROM finanzas f
-       WHERE f.tipo = 'ingreso'
-         AND f.categoria IN ('presupuesto', 'paquete', 'abono_deuda', 'consulta')
-         AND f.referencia_tipo NOT IN ${TIPOS_PRES}${fpCond}
-       GROUP BY f.referencia_tipo
-       ORDER BY total DESC`,
-      fp
-    );
-
-    // Diferencia interna: suma por especialista vs bucket "con especialista" (debe ser ~0)
-    const diferenciaInterna = sumaEspecialistas - (Number(conEspecialista?.total) || 0);
+    const sumaBuckets = Object.values(buckets).reduce((a, b) => a + b, 0);
+    const detallePorEspecialista = Object.values(porEsp).sort((a, b) => b.pagado_total - a.pagado_total);
 
     res.json({
       filtro: {
         fecha_inicio: fecha_inicio || null,
         fecha_fin: fecha_fin || null,
-        criterio: "fecha de creación del presupuesto (igual que la vista de cada especialista)"
+        criterio: "mismo cálculo que Finanzas (fecha de pago + descuento POS tarjeta)"
       },
-      presupuestos_con_especialista: Number(conEspecialista?.total) || 0,
-      presupuestos_sin_especialista: Number(sinEspecialista?.total) || 0,
-      total_pagado_presupuestos: totalPresupuestos,
-      suma_pagado_por_especialistas: sumaEspecialistas,
-      diferencia_interna: diferenciaInterna,
-      detalle_por_especialista: porEspecialista,
-      otros_ingresos_no_presupuesto: otrosIngresos
+      total_finanzas: totalFinanzas,
+      buckets,
+      suma_buckets: sumaBuckets,
+      diferencia_total: totalFinanzas - sumaBuckets, // debe ser ~0 (cuadre exacto)
+      detalle_por_especialista: detallePorEspecialista
     });
   } catch (err) {
     console.error("❌ Error en reconciliación:", err.message);

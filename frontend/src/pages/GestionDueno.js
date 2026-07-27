@@ -1842,19 +1842,8 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
 }
 
 /* ======================================================================
-   DIALOG: RECONCILIACIÓN — verificar por qué no cuadra especialistas vs finanzas
+   DIALOG: RECONCILIACIÓN — descompone el total exacto de Finanzas
 ====================================================================== */
-const TIPO_LABELS = {
-  presupuesto_asignado: "Presupuestos (pagos directos)",
-  presupuesto_consulta: "Presupuestos (consultas)",
-  paquete_paciente: "Paquetes",
-  paquete_consulta: "Paquetes (consultas)",
-  deuda_tratamiento: "Deudas de tratamiento",
-  tratamiento_realizado: "Tratamientos (modelo antiguo)",
-  consulta_directa: "Consultas directas",
-  finanza: "Abonos manuales (finanza)"
-};
-
 function ReconciliacionDialog({ open, onClose, fechaInicio, fechaFin }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1881,24 +1870,27 @@ function ReconciliacionDialog({ open, onClose, fechaInicio, fechaFin }) {
     ? `${fechaInicio || "inicio"} → ${fechaFin || "hoy"}`
     : "Todo el histórico";
 
-  const cuadra = data && Math.abs(Number(data.diferencia_interna) || 0) < 0.5;
+  const b = data?.buckets || {};
+  const cuadra = data && Math.abs(Number(data.diferencia_total) || 0) < 0.5;
 
-  const Row = ({ label, value, bold, color, tint }) => (
-    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "10px", px: "12px", borderRadius: "10px", bgcolor: tint || "transparent" }}>
-      <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", fontWeight: bold ? 700 : 500, color: color || colors.textBody }}>{label}</Typography>
-      <Typography sx={{ fontFamily: fonts.title, fontSize: bold ? "17px" : "15px", fontWeight: 700, color: color || colors.primaryDark }}>{formatMoney(value)}</Typography>
-    </Box>
-  );
+  const Row = ({ label, value, bold, color, tint, hideZero }) => {
+    if (hideZero && !(Number(value) > 0)) return null;
+    return (
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "10px", px: "12px", borderRadius: "10px", bgcolor: tint || "transparent" }}>
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", fontWeight: bold ? 700 : 500, color: color || colors.textBody }}>{label}</Typography>
+        <Typography sx={{ fontFamily: fonts.title, fontSize: bold ? "17px" : "15px", fontWeight: 700, color: color || colors.primaryDark }}>{formatMoney(value)}</Typography>
+      </Box>
+    );
+  };
 
-  const otros = data?.otros_ingresos_no_presupuesto || [];
-  const totalOtros = otros.reduce((a, t) => a + (Number(t.total) || 0), 0);
+  const sumaEsp = (data?.detalle_por_especialista || []).reduce((a, e) => a + (Number(e.pagado_total) || 0), 0);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "18px" } }}>
       <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, fontSize: "22px", pb: "2px" }}>
         Verificación de cuadre
         <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", fontWeight: 500, color: colors.textMuted, mt: "2px" }}>
-          Periodo: <strong style={{ color: colors.primary }}>{periodoLabel}</strong> · mismo criterio que cada especialista
+          Periodo: <strong style={{ color: colors.primary }}>{periodoLabel}</strong> · descompone el total exacto de Finanzas
         </Typography>
       </DialogTitle>
       <DialogContent>
@@ -1911,16 +1903,26 @@ function ReconciliacionDialog({ open, onClose, fechaInicio, fechaFin }) {
               sx={{ borderRadius: "12px", mb: "16px", ...(cuadra ? { bgcolor: colors.successBg, color: colors.successText } : { bgcolor: colors.amberBg, color: colors.amberText }) }}
             >
               {cuadra
-                ? "Cuadra: la suma del detalle por especialista coincide exactamente con lo que ves al abrir cada especialista."
-                : `Descuadre interno de ${formatMoney(Math.abs(Number(data.diferencia_interna) || 0))}. Avísame si ves esto.`}
+                ? "Todo cuadra: las categorías de abajo suman exactamente el total que ves en Finanzas."
+                : `Descuadre de ${formatMoney(Math.abs(Number(data.diferencia_total) || 0))} (avísame si ves esto).`}
             </Alert>
 
+            <Row label="TOTAL EN FINANZAS (este periodo)" value={data.total_finanzas} bold color={colors.primaryDark} tint={colors.creamPanel} />
+
+            <Divider sx={{ my: "14px", borderColor: colors.border }} />
+
             <Typography sx={{ fontFamily: fonts.title, fontWeight: 600, color: colors.primaryDark, fontSize: "16px", mb: "6px" }}>
-              Pagado por pacientes (presupuestos)
+              De dónde viene ese total
             </Typography>
-            <Row label="Con especialista asignado" value={data.presupuestos_con_especialista} color={colors.successText} tint={colors.successBg} />
-            <Row label="Sin especialista asignado (no aparece en nadie)" value={data.presupuestos_sin_especialista} color={colors.amberText} tint={colors.amberBg} />
-            <Row label="Total pagado en presupuestos" value={data.total_pagado_presupuestos} bold color={colors.primaryDark} tint={colors.creamPanel} />
+            <Row label="Presupuestos CON especialista" value={b.presupuestos_con_especialista} color={colors.successText} tint={colors.successBg} />
+            <Row label="Presupuestos SIN especialista" value={b.presupuestos_sin_especialista} color={colors.amberText} tint={colors.amberBg} hideZero />
+            <Row label="Paquetes" value={b.paquetes} hideZero />
+            <Row label="Consultas directas" value={b.consultas_directas} hideZero />
+            <Row label="Abonos de deuda (tratamiento)" value={b.deudas_tratamiento} hideZero />
+            <Row label="Tratamientos (modelo antiguo)" value={b.tratamientos_antiguos} hideZero />
+            <Row label="Otros ingresos" value={b.otros} hideZero />
+            <Divider sx={{ my: "10px", borderColor: colors.border }} />
+            <Row label="Suma de categorías" value={data.suma_buckets} bold color={colors.primaryDark} tint={colors.goldSoft} />
 
             <Divider sx={{ my: "14px", borderColor: colors.border }} />
 
@@ -1929,41 +1931,23 @@ function ReconciliacionDialog({ open, onClose, fechaInicio, fechaFin }) {
                 Detalle por especialista
               </Typography>
               <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>
-                Suma: <strong style={{ color: colors.primaryDark }}>{formatMoney(data.suma_pagado_por_especialistas)}</strong>
+                Suma: <strong style={{ color: colors.primaryDark }}>{formatMoney(sumaEsp)}</strong>
               </Typography>
             </Box>
             {(data.detalle_por_especialista || []).map((e) => (
               <Box key={e.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "7px", borderBottom: `1px solid ${colors.border}` }}>
-                <Box>
-                  <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textBody }}>{e.nombre}</Typography>
-                  <Typography sx={{ fontFamily: fonts.body, fontSize: "11px", color: colors.textMuted }}>{e.num_presupuestos} presupuesto(s)</Typography>
-                </Box>
+                <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textBody }}>{e.nombre}</Typography>
                 <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", fontWeight: 700, color: colors.primaryDark }}>{formatMoney(e.pagado_total)}</Typography>
               </Box>
             ))}
-
-            {otros.length > 0 && (
-              <>
-                <Divider sx={{ my: "14px", borderColor: colors.border }} />
-                <Typography sx={{ fontFamily: fonts.title, fontWeight: 600, color: colors.primaryDark, fontSize: "16px", mb: "2px" }}>
-                  Otros ingresos (no son presupuestos)
-                </Typography>
-                <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted, mb: "6px" }}>
-                  Estos entran en Finanzas pero NO se reparten entre especialistas.
-                </Typography>
-                {otros.map((t) => (
-                  <Row
-                    key={t.referencia_tipo || "sin_tipo"}
-                    label={`${TIPO_LABELS[t.referencia_tipo] || t.referencia_tipo || "Sin tipo"} (${t.n})`}
-                    value={t.total}
-                  />
-                ))}
-                <Row label="Total otros ingresos" value={totalOtros} bold color={colors.textMuted} />
-              </>
+            {(data.detalle_por_especialista || []).length === 0 && (
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textMuted, py: "8px" }}>
+                No hay pagos de presupuestos con especialista en este periodo.
+              </Typography>
             )}
 
             <Alert severity="info" sx={{ borderRadius: "12px", mt: "16px", bgcolor: colors.creamPanel, color: colors.textBody, "& .MuiAlert-icon": { color: colors.primary } }}>
-              El detalle por especialista usa el <strong>mismo cálculo</strong> que al abrir cada especialista (presupuestos por fecha de creación + todos sus pagos). Por eso ahora coincide exactamente.
+              Este total usa el <strong>mismo cálculo que Finanzas</strong> (por fecha de pago y con el descuento POS del 4% en tarjeta). Puede diferir del "Pagado por pacientes" que ves dentro de cada especialista, porque ese usa el monto sin descuento POS y agrupa por fecha de creación del presupuesto.
             </Alert>
           </Box>
         )}

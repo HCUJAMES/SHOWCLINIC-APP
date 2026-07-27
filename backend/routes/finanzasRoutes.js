@@ -22,9 +22,11 @@ const calcularComisionPOS = (monto, metodo) => {
 };
 
 // 📊 OBTENER REPORTE FINANCIERO FILTRADO
-router.get("/reporte", (req, res) => {
-  const { fechaInicio, fechaFin, paciente, metodoPago } = req.query;
-
+// Función reutilizable: calcula el reporte y devuelve una Promise con los totales.
+// Se usa tanto en el endpoint /reporte como en la reconciliación de especialistas,
+// para garantizar que ambos usen EXACTAMENTE el mismo cálculo (mismo total).
+export function getReporteFinanciero({ fechaInicio, fechaFin, paciente, metodoPago } = {}) {
+ return new Promise((resolve, reject) => {
   let query = `
     SELECT 
       tr.id,
@@ -102,7 +104,7 @@ router.get("/reporte", (req, res) => {
   db.all(query, params, (err, rows) => {
     if (err) {
       console.error("❌ Error al obtener reporte financiero:", err.message);
-      return res.status(500).json({ message: "Error al obtener reporte financiero" });
+      return reject(new Error("Error al obtener reporte financiero"));
     }
 
     const resultados = (rows || []).map((r) => {
@@ -352,6 +354,7 @@ router.get("/reporte", (req, res) => {
         pa.monto_pagado AS presupuesto_monto_pagado,
         pa.saldo_pendiente AS presupuesto_saldo,
         pa.estado_pago AS presupuesto_estado_pago,
+        pa.especialista_id AS presupuesto_especialista_id,
         pp.precio_total AS paquete_precio_total,
         pp.monto_pagado AS paquete_monto_pagado,
         pp.saldo_pendiente AS paquete_saldo,
@@ -457,7 +460,7 @@ router.get("/reporte", (req, res) => {
         totalesPorMetodo[metodo] += aplicarComisionPOS(monto, metodo);
       });
 
-      res.json({
+      resolve({
         resultados: todosResultados,
         totalGeneral: totalGeneralFinal,
         totalBruto: totalBrutoFinal,
@@ -466,6 +469,18 @@ router.get("/reporte", (req, res) => {
       });
     });
   });
+ });
+}
+
+// 📊 Endpoint del reporte financiero (usa la función reutilizable)
+router.get("/reporte", async (req, res) => {
+  try {
+    const data = await getReporteFinanciero(req.query);
+    res.json(data);
+  } catch (e) {
+    console.error("❌ Error al obtener reporte financiero:", e.message);
+    res.status(500).json({ message: e.message || "Error al obtener reporte financiero" });
+  }
 });
 
 // 💰 MARCAR COMO PAGADO — registra pago en deuda o actualiza tratamiento
