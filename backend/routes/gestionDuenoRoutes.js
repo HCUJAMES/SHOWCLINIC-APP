@@ -1008,7 +1008,108 @@ router.get("/especialistas", authMiddleware, requireOwner, async (req, res) => {
 });
 
 /* ======================================================================
-   💵 EDITAR % DE COMISIÓN POR DEFECTO DEL ESPECIALISTA
+   � RECONCILIACIÓN: por qué no cuadran especialistas vs finanzas
+   Desglosa TODOS los ingresos de finanzas para ver dónde está cada sol.
+   Filtro opcional por fecha de PAGO (f.fecha), igual que finanzas.
+====================================================================== */
+router.get("/reconciliacion", authMiddleware, requireOwner, async (req, res) => {
+  await ensureComisionSchema();
+  try {
+    const { fecha_inicio, fecha_fin } = req.query;
+
+    // Filtro por fecha de PAGO (igual criterio que usa finanzas)
+    let fechaCond = "";
+    const fp = [];
+    if (fecha_inicio) { fechaCond += " AND DATE(f.fecha) >= ?"; fp.push(fecha_inicio); }
+    if (fecha_fin) { fechaCond += " AND DATE(f.fecha) <= ?"; fp.push(fecha_fin); }
+
+    // 1) Total general de ingresos en finanzas (lo que ve la página de finanzas)
+    const totalFinanzas = await dbGet(
+      `SELECT COALESCE(SUM(f.monto), 0) as total FROM finanzas f
+       WHERE f.tipo = 'ingreso'
+         AND f.categoria IN ('presupuesto', 'paquete', 'abono_deuda', 'consulta')${fechaCond}`,
+      fp
+    );
+
+    // 2) Desglose por referencia_tipo
+    const porTipo = await dbAll(
+      `SELECT f.referencia_tipo, COALESCE(SUM(f.monto), 0) as total, COUNT(*) as n
+       FROM finanzas f
+       WHERE f.tipo = 'ingreso'
+         AND f.categoria IN ('presupuesto', 'paquete', 'abono_deuda', 'consulta')${fechaCond}
+       GROUP BY f.referencia_tipo
+       ORDER BY total DESC`,
+      fp
+    );
+
+    // 3) Pagos de presupuestos (asignado + consulta) CON especialista asignado
+    const conEspecialista = await dbGet(
+      `SELECT COALESCE(SUM(f.monto), 0) as total, COUNT(*) as n
+       FROM finanzas f
+       JOIN presupuestos_asignados pa ON pa.id = f.referencia_id
+       WHERE f.tipo = 'ingreso'
+         AND f.referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta')
+         AND pa.especialista_id IS NOT NULL${fechaCond}`,
+      fp
+    );
+
+    // 4) Pagos de presupuestos SIN especialista asignado (aquí suele estar la diferencia)
+    const sinEspecialista = await dbGet(
+      `SELECT COALESCE(SUM(f.monto), 0) as total, COUNT(*) as n
+       FROM finanzas f
+       JOIN presupuestos_asignados pa ON pa.id = f.referencia_id
+       WHERE f.tipo = 'ingreso'
+         AND f.referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta')
+         AND pa.especialista_id IS NULL${fechaCond}`,
+      fp
+    );
+
+    // 5) Pagos de presupuestos cuyo referencia_id ya NO existe (presupuesto borrado)
+    const huerfanos = await dbGet(
+      `SELECT COALESCE(SUM(f.monto), 0) as total, COUNT(*) as n
+       FROM finanzas f
+       LEFT JOIN presupuestos_asignados pa ON pa.id = f.referencia_id
+       WHERE f.tipo = 'ingreso'
+         AND f.referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta')
+         AND pa.id IS NULL${fechaCond}`,
+      fp
+    );
+
+    // 6) Detalle por especialista de lo que SÍ se les cuenta
+    const porEspecialista = await dbAll(
+      `SELECT e.id, e.nombre,
+              COALESCE(SUM(f.monto), 0) as pagado_total, COUNT(f.id) as n_pagos
+       FROM especialistas e
+       LEFT JOIN presupuestos_asignados pa ON pa.especialista_id = e.id
+       LEFT JOIN finanzas f ON f.referencia_id = pa.id
+         AND f.tipo = 'ingreso'
+         AND f.referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta')${fechaCond}
+       GROUP BY e.id
+       ORDER BY pagado_total DESC`,
+      fp
+    );
+
+    const sumaEspecialistas = porEspecialista.reduce((a, r) => a + (Number(r.pagado_total) || 0), 0);
+
+    res.json({
+      filtro: { fecha_inicio: fecha_inicio || null, fecha_fin: fecha_fin || null, criterio: "fecha de pago (f.fecha)" },
+      total_finanzas_ingresos: Number(totalFinanzas?.total) || 0,
+      desglose_por_referencia_tipo: porTipo,
+      presupuestos_con_especialista: Number(conEspecialista?.total) || 0,
+      presupuestos_sin_especialista: Number(sinEspecialista?.total) || 0,
+      pagos_huerfanos_presupuesto_borrado: Number(huerfanos?.total) || 0,
+      suma_pagado_por_especialistas: sumaEspecialistas,
+      diferencia_finanzas_vs_especialistas: (Number(totalFinanzas?.total) || 0) - sumaEspecialistas,
+      detalle_por_especialista: porEspecialista
+    });
+  } catch (err) {
+    console.error("❌ Error en reconciliación:", err.message);
+    res.status(500).json({ message: "Error en reconciliación", error: err.message });
+  }
+});
+
+/* ======================================================================
+   �💵 EDITAR % DE COMISIÓN POR DEFECTO DEL ESPECIALISTA
 ====================================================================== */
 router.put("/especialistas/:id/comision", authMiddleware, requireOwner, async (req, res) => {
   try {
