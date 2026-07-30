@@ -18,7 +18,8 @@ import {
   LogoutRounded, HomeRounded, InsightsRounded,
   FlagRounded, EditRounded, TuneRounded,
   PercentRounded, PaidRounded, CategoryRounded,
-  PictureAsPdf, SaveRounded, CloseRounded
+  PictureAsPdf, SaveRounded, CloseRounded,
+  VisibilityOffRounded, VisibilityRounded
 } from "@mui/icons-material";
 
 const MotionCard = motion(Card);
@@ -2171,16 +2172,18 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
 
   const kpisCalc = useMemo(() => {
     const list = filtros.length === 0 ? presupuestos : filteredPresupuestos;
-    let comisionTotal = 0, pagadoTotal = 0;
+    let comisionTotal = 0, pagadoTotal = 0, visibles = 0;
     for (const p of list) {
       const ov = p.overrides;
+      if (ov && ov.oculto) continue; // no sumar ocultos
+      visibles++;
       comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : (Number(p.comision_estimada) || 0);
       pagadoTotal += (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : (Number(p.monto_pagado_real) || 0);
     }
     // Si hay KPI overrides globales, usarlos en vez de la suma
     const finalPagado = (kpi_overrides && kpi_overrides.pagado_total_override != null) ? Number(kpi_overrides.pagado_total_override) : pagadoTotal;
     const finalComision = (kpi_overrides && kpi_overrides.comision_total_override != null) ? Number(kpi_overrides.comision_total_override) : comisionTotal;
-    return { num: list.length, comisionTotal: finalComision, pagadoTotal: finalPagado, comisionCalc: comisionTotal, pagadoCalc: pagadoTotal };
+    return { num: visibles, comisionTotal: finalComision, pagadoTotal: finalPagado, comisionCalc: comisionTotal, pagadoCalc: pagadoTotal };
   }, [presupuestos, filteredPresupuestos, filtros, kpi_overrides]);
 
   const handleSaveOverride = async (presId, data) => {
@@ -2411,7 +2414,21 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
   const [editPagado, setEditPagado] = useState(ov.pagado_override != null ? String(ov.pagado_override) : "");
   const [editSesiones, setEditSesiones] = useState(ov.sesiones_override != null ? String(ov.sesiones_override) : "");
   const [editComision, setEditComision] = useState(ov.comision_override != null ? String(ov.comision_override) : "");
+  const [editNota, setEditNota] = useState(ov.nota || "");
   const [saving, setSaving] = useState(false);
+  const isHidden = !!(ov.oculto);
+
+  const handleToggleHidden = async () => {
+    if (onSaveOverride) {
+      await onSaveOverride(pres.id, {
+        pagado_override: ov.pagado_override ?? null,
+        sesiones_override: ov.sesiones_override ?? null,
+        comision_override: ov.comision_override ?? null,
+        nota: ov.nota ?? null,
+        oculto: !isHidden
+      });
+    }
+  };
 
   const paciente = `${pres.paciente_nombre || "Paciente"} ${pres.paciente_apellido || ""}`.trim();
   const precioTotal = Number(pres.precio_total) || 0;
@@ -2434,6 +2451,7 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
     setEditPagado(ov.pagado_override != null ? String(ov.pagado_override) : String(Number(pres.monto_pagado_real) || 0));
     setEditSesiones(ov.sesiones_override != null ? String(ov.sesiones_override) : String(pres.sesiones_completadas || 0));
     setEditComision(ov.comision_override != null ? String(ov.comision_override) : String(comisionCalc.toFixed(2)));
+    setEditNota(ov.nota || "");
     setEditing(true);
   };
 
@@ -2442,14 +2460,16 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
     const data = {
       pagado_override: editPagado !== "" ? parseFloat(editPagado) : null,
       sesiones_override: editSesiones !== "" ? parseInt(editSesiones) : null,
-      comision_override: editComision !== "" ? parseFloat(editComision) : null
+      comision_override: editComision !== "" ? parseFloat(editComision) : null,
+      nota: editNota.trim() || null,
+      oculto: isHidden
     };
     if (onSaveOverride) await onSaveOverride(pres.id, data);
     setSaving(false);
     setEditing(false);
   };
 
-  const hasOverrides = ov.pagado_override != null || ov.sesiones_override != null || ov.comision_override != null;
+  const hasOverrides = ov.pagado_override != null || ov.sesiones_override != null || ov.comision_override != null || ov.nota;
   const editFieldSx = { "& .MuiInputBase-input": { fontSize: "12px", fontFamily: fonts.body, p: "6px 8px", fontWeight: 600 }, "& .MuiOutlinedInput-root": { borderRadius: "8px" } };
 
   return (
@@ -2458,7 +2478,7 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: Math.min(index * 0.04, 0.3) }}
     >
-      <Card sx={{ ...cardSx, mb: "12px", p: 0, ...(hasOverrides ? { border: `1.5px solid ${colors.gold}` } : {}) }}>
+      <Card sx={{ ...cardSx, mb: "12px", p: 0, ...(hasOverrides ? { border: `1.5px solid ${colors.gold}` } : {}), ...(isHidden ? { opacity: 0.45, filter: "grayscale(0.6)" } : {}) }}>
         <CardContent sx={{ p: "18px", "&:last-child": { pb: "18px" } }}>
           {/* Encabezado */}
           <Box sx={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
@@ -2472,15 +2492,21 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
                 <Chip label={estadoPagoStyle.label} size="small" sx={{ bgcolor: estadoPagoStyle.bg, color: estadoPagoStyle.text, fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
                 <Chip label={`${sesionesDisplay}/${pres.sesiones_totales || 0} sesiones`} size="small" sx={{ bgcolor: colors.creamPanel, color: colors.textMuted, border: `1px solid ${colors.border}`, fontWeight: 600, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
                 {hasOverrides && <Chip label="editado" size="small" sx={{ height: 16, fontSize: "0.58rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, "& .MuiChip-label": { px: "5px" } }} />}
+                {isHidden && <Chip label="oculto" size="small" sx={{ height: 16, fontSize: "0.58rem", fontFamily: fonts.body, bgcolor: "#e0e0e0", color: "#777", "& .MuiChip-label": { px: "5px" } }} />}
               </Box>
             </Box>
             <Box sx={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
               <Typography sx={{ fontFamily: fonts.body, fontSize: "10.5px", color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Comisión</Typography>
               <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "22px", color: colors.primaryDark, lineHeight: 1.1 }}>{formatMoney(comisionDisplay)}</Typography>
               {!editing && isMaster && (
-                <IconButton size="small" onClick={handleStartEdit} sx={{ mt: "2px", color: colors.gold, "&:hover": { bgcolor: colors.goldSoft } }}>
-                  <EditRounded sx={{ fontSize: 16 }} />
-                </IconButton>
+                <Box sx={{ display: "flex", gap: "2px", mt: "2px" }}>
+                  <IconButton size="small" onClick={handleToggleHidden} title={isHidden ? "Mostrar presupuesto" : "Ocultar presupuesto"} sx={{ color: isHidden ? colors.textMuted : colors.gold, "&:hover": { bgcolor: colors.goldSoft } }}>
+                    {isHidden ? <VisibilityRounded sx={{ fontSize: 16 }} /> : <VisibilityOffRounded sx={{ fontSize: 16 }} />}
+                  </IconButton>
+                  <IconButton size="small" onClick={handleStartEdit} sx={{ color: colors.gold, "&:hover": { bgcolor: colors.goldSoft } }}>
+                    <EditRounded sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Box>
               )}
             </Box>
           </Box>
@@ -2494,6 +2520,12 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
                 <TextField label="Sesiones comp." size="small" value={editSesiones} onChange={(e) => setEditSesiones(e.target.value)} type="number" sx={editFieldSx} />
                 <TextField label="Comisión (S/)" size="small" value={editComision} onChange={(e) => setEditComision(e.target.value)} type="number" sx={editFieldSx} />
               </Box>
+              <TextField
+                label="Descripción / Nota del pago" size="small" fullWidth multiline minRows={2} maxRows={4}
+                value={editNota} onChange={(e) => setEditNota(e.target.value)}
+                placeholder="Ej: Pago parcial en efectivo, se completará la próxima semana..."
+                sx={{ mt: "10px", "& .MuiInputBase-input": { fontSize: "12px", fontFamily: fonts.body }, "& .MuiOutlinedInput-root": { borderRadius: "8px" } }}
+              />
               <Box sx={{ display: "flex", justifyContent: "flex-end", gap: "8px", mt: "10px" }}>
                 <Button size="small" onClick={() => setEditing(false)} startIcon={<CloseRounded sx={{ fontSize: 14 }} />} sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "11px", color: colors.textMuted }}>Cancelar</Button>
                 <Button size="small" onClick={handleSave} disabled={saving} startIcon={<SaveRounded sx={{ fontSize: 14 }} />} sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "11px", fontWeight: 700, color: colors.white, bgcolor: colors.primaryDark, borderRadius: "8px", px: "12px", "&:hover": { bgcolor: colors.primary } }}>
@@ -2546,6 +2578,14 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
               </Button>
             </Box>
           </Box>
+
+          {/* Nota/Descripción visible */}
+          {!editing && ov.nota && (
+            <Box sx={{ mt: "10px", p: "10px 14px", borderRadius: "10px", bgcolor: "#FFFDF8", border: `1px solid ${colors.gold}`, display: "flex", gap: "8px", alignItems: "flex-start" }}>
+              <Typography sx={{ fontSize: "11px", color: colors.gold, fontWeight: 700, fontFamily: fonts.body, mt: "1px" }}>📝</Typography>
+              <Typography sx={{ fontSize: "12px", color: colors.textBody, fontFamily: fonts.body, lineHeight: 1.4 }}>{ov.nota}</Typography>
+            </Box>
+          )}
 
           {/* Tratamientos del presupuesto */}
           {pres.tratamientos && pres.tratamientos.length > 0 && (

@@ -135,9 +135,11 @@ async function ensureComisionSchema() {
     sesiones_override INTEGER,
     comision_override REAL,
     nota TEXT,
+    oculto INTEGER DEFAULT 0,
     creado_en TEXT DEFAULT (datetime('now')),
     UNIQUE(especialista_id, presupuesto_id)
   )`);
+  await addColumn("especialista_presupuesto_overrides", "oculto", "INTEGER DEFAULT 0");
   // Overrides de KPIs globales por especialista (pagado total, comision total)
   await dbRun(`CREATE TABLE IF NOT EXISTS especialista_kpi_overrides (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -810,10 +812,13 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
 
       // Leer overrides editables (no afectan el presupuesto real)
       const ov = await dbGet(
-        `SELECT pagado_override, sesiones_override, comision_override, nota FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
+        `SELECT pagado_override, sesiones_override, comision_override, nota, oculto FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
         [id, pres.id]
       );
       pres.overrides = ov || null;
+
+      // Si está oculto, no sumar a los totales
+      if (ov && ov.oculto) continue;
 
       baseTotal += base;
       comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : comision;
@@ -854,16 +859,17 @@ router.put("/especialistas/:espId/presupuestos/:presId/override", authMiddleware
   await ensureComisionSchema();
   try {
     const { espId, presId } = req.params;
-    const { pagado_override, sesiones_override, comision_override, nota } = req.body;
+    const { pagado_override, sesiones_override, comision_override, nota, oculto } = req.body;
     await dbRun(
-      `INSERT INTO especialista_presupuesto_overrides (especialista_id, presupuesto_id, pagado_override, sesiones_override, comision_override, nota)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO especialista_presupuesto_overrides (especialista_id, presupuesto_id, pagado_override, sesiones_override, comision_override, nota, oculto)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(especialista_id, presupuesto_id) DO UPDATE SET
          pagado_override = excluded.pagado_override,
          sesiones_override = excluded.sesiones_override,
          comision_override = excluded.comision_override,
-         nota = excluded.nota`,
-      [espId, presId, pagado_override ?? null, sesiones_override ?? null, comision_override ?? null, nota ?? null]
+         nota = excluded.nota,
+         oculto = excluded.oculto`,
+      [espId, presId, pagado_override ?? null, sesiones_override ?? null, comision_override ?? null, nota ?? null, oculto ? 1 : 0]
     );
     res.json({ ok: true });
   } catch (err) {
@@ -940,9 +946,12 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
       const pagado = parseFloat(sumaPagos?.total) || 0;
 
       const ov = await dbGet(
-        `SELECT pagado_override, sesiones_override, comision_override FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
+        `SELECT pagado_override, sesiones_override, comision_override, nota, oculto FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
         [id, pres.id]
       );
+
+      // Saltar presupuestos ocultos en el PDF
+      if (ov && ov.oculto) continue;
 
       const comisionFinal = (ov && ov.comision_override != null) ? Number(ov.comision_override) : comision;
       const pagadoFinal = (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : pagado;
@@ -959,9 +968,19 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
         comision: comisionFinal,
         pagado: pagadoFinal,
         sesiones: sesionesFinal,
-        estado: pres.estado_pago
+        estado: pres.estado_pago,
+        nota: (ov && ov.nota) ? ov.nota : null
       });
     }
+
+    // Aplicar KPI overrides globales si existen
+    const periodoKey = `${fecha_inicio || "all"}_${fecha_fin || "all"}`;
+    const kpiOv = await dbGet(
+      `SELECT pagado_total_override, comision_total_override FROM especialista_kpi_overrides WHERE especialista_id = ? AND periodo_key = ?`,
+      [id, periodoKey]
+    );
+    if (kpiOv && kpiOv.comision_total_override != null) totalComision = Number(kpiOv.comision_total_override);
+    if (kpiOv && kpiOv.pagado_total_override != null) totalPagado = Number(kpiOv.pagado_total_override);
 
     // Generar PDF premium
     const doc = new PDFDocument({ size: "A4", margin: 50 });
@@ -1020,7 +1039,7 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
     // Filas de la tabla
     doc.font("Helvetica").fillColor(brown).fontSize(8);
     for (let i = 0; i < rows.length; i++) {
-      if (y > 750) {
+      if (y > 720) {
         doc.addPage();
         y = 50;
       }
@@ -1036,6 +1055,13 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
       doc.text(`S/ ${r.pagado.toFixed(2)}`, cols[5] + 6, y + 6, { width: 59 });
       doc.text(r.sesiones, cols[6] + 6, y + 6, { width: 40 });
       y += 20;
+      // Nota/descripción debajo de la fila si existe
+      if (r.nota) {
+        doc.fontSize(7).font("Helvetica-Oblique").fillColor("#777777");
+        doc.text(`↳ ${r.nota}`, cols[0] + 14, y + 2, { width: doc.page.width - 164 });
+        y += 14;
+        doc.font("Helvetica").fillColor(brown).fontSize(8);
+      }
     }
 
     // Línea final
