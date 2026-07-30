@@ -440,6 +440,7 @@ export default function GestionDueno() {
               onSelect={loadEspecialistaDetalle}
               onBack={() => setEspecialistaDetalle(null)}
               onReloadEspecialistas={loadEspecialistas}
+              onReloadDetalle={() => { if (especialistaDetalle) loadEspecialistaDetalle(especialistaDetalle.especialista.id); }}
               onEditEspecialistaComision={handleEditEspecialistaComision}
               onEditPresupuestoComision={handleEditPresupuestoComision}
               fechaInicio={fechaInicio}
@@ -1748,7 +1749,7 @@ function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
 /* ======================================================================
    VISTA ESPECIALISTAS
 ====================================================================== */
-function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onEditEspecialistaComision, onEditPresupuestoComision, fechaInicio, fechaFin, rol }) {
+function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onReloadDetalle, onEditEspecialistaComision, onEditPresupuestoComision, fechaInicio, fechaFin, rol }) {
   const [pctEsp, setPctEsp] = useState(null); // especialista en edición de %
   const [reconOpen, setReconOpen] = useState(false);
 
@@ -1759,7 +1760,7 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
         onBack={onBack}
         onEditEspecialistaComision={onEditEspecialistaComision}
         onEditPresupuestoComision={onEditPresupuestoComision}
-        onReload={onReloadEspecialistas}
+        onReload={onReloadDetalle}
         fechaInicio={fechaInicio}
         fechaFin={fechaFin}
         rol={rol}
