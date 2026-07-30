@@ -138,6 +138,16 @@ async function ensureComisionSchema() {
     creado_en TEXT DEFAULT (datetime('now')),
     UNIQUE(especialista_id, presupuesto_id)
   )`);
+  // Overrides de KPIs globales por especialista (pagado total, comision total)
+  await dbRun(`CREATE TABLE IF NOT EXISTS especialista_kpi_overrides (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    especialista_id INTEGER NOT NULL,
+    periodo_key TEXT NOT NULL,
+    pagado_total_override REAL,
+    comision_total_override REAL,
+    creado_en TEXT DEFAULT (datetime('now')),
+    UNIQUE(especialista_id, periodo_key)
+  )`);
   comisionSchemaReady = true;
 }
 
@@ -812,6 +822,13 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
 
     const ticketPromedio = presupuestos.length > 0 ? baseTotal / presupuestos.length : 0;
 
+    // KPI overrides por periodo
+    const periodoKey = `${fecha_inicio || "all"}_${fecha_fin || "all"}`;
+    const kpiOv = await dbGet(
+      `SELECT pagado_total_override, comision_total_override FROM especialista_kpi_overrides WHERE especialista_id = ? AND periodo_key = ?`,
+      [id, periodoKey]
+    );
+
     res.json({
       especialista: { ...especialista, comision_porcentaje: pctDefault },
       resumen: {
@@ -821,6 +838,7 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
         pagado_total: pagadoTotal,
         ticket_promedio: ticketPromedio
       },
+      kpi_overrides: kpiOv || null,
       presupuestos
     });
   } catch (err) {
@@ -851,6 +869,28 @@ router.put("/especialistas/:espId/presupuestos/:presId/override", authMiddleware
   } catch (err) {
     console.error("❌ Error guardando override:", err.message);
     res.status(500).json({ message: "Error al guardar override", error: err.message });
+  }
+});
+
+// Guardar KPI overrides (pagado total y comisión total) por periodo - solo master
+router.put("/especialistas/:espId/kpi-override", authMiddleware, requireRole("master"), async (req, res) => {
+  await ensureComisionSchema();
+  try {
+    const { espId } = req.params;
+    const { pagado_total_override, comision_total_override, fecha_inicio, fecha_fin } = req.body;
+    const periodoKey = `${fecha_inicio || "all"}_${fecha_fin || "all"}`;
+    await dbRun(
+      `INSERT INTO especialista_kpi_overrides (especialista_id, periodo_key, pagado_total_override, comision_total_override)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(especialista_id, periodo_key) DO UPDATE SET
+         pagado_total_override = excluded.pagado_total_override,
+         comision_total_override = excluded.comision_total_override`,
+      [espId, periodoKey, pagado_total_override ?? null, comision_total_override ?? null]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error guardando KPI override:", err.message);
+    res.status(500).json({ message: "Error al guardar KPI override", error: err.message });
   }
 });
 

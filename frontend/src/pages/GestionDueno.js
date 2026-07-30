@@ -444,6 +444,7 @@ export default function GestionDueno() {
               onEditPresupuestoComision={handleEditPresupuestoComision}
               fechaInicio={fechaInicio}
               fechaFin={fechaFin}
+              rol={rol}
             />
           )}
 
@@ -1747,7 +1748,7 @@ function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
 /* ======================================================================
    VISTA ESPECIALISTAS
 ====================================================================== */
-function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onEditEspecialistaComision, onEditPresupuestoComision, fechaInicio, fechaFin }) {
+function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onEditEspecialistaComision, onEditPresupuestoComision, fechaInicio, fechaFin, rol }) {
   const [pctEsp, setPctEsp] = useState(null); // especialista en edición de %
   const [reconOpen, setReconOpen] = useState(false);
 
@@ -1761,6 +1762,7 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
         onReload={onReloadEspecialistas}
         fechaInicio={fechaInicio}
         fechaFin={fechaFin}
+        rol={rol}
       />
     );
   }
@@ -2142,12 +2144,17 @@ function TratamientosComisionDialog({ open, onClose, onSaved }) {
   );
 }
 
-function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision, onReload, fechaInicio, fechaFin }) {
-  const { especialista, resumen, presupuestos = [] } = detalle;
+function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision, onReload, fechaInicio, fechaFin, rol }) {
+  const { especialista, resumen, presupuestos = [], kpi_overrides } = detalle;
   const [pctEspOpen, setPctEspOpen] = useState(false);
   const [presEdit, setPresEdit] = useState(null);
   const [filtros, setFiltros] = useState([]);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [editingKpis, setEditingKpis] = useState(false);
+  const [kpiPagado, setKpiPagado] = useState("");
+  const [kpiComision, setKpiComision] = useState("");
+  const [savingKpis, setSavingKpis] = useState(false);
+  const isMaster = rol === "master";
 
   const toggleFiltro = (f) => setFiltros((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
 
@@ -2169,8 +2176,11 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
       comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : (Number(p.comision_estimada) || 0);
       pagadoTotal += (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : (Number(p.monto_pagado_real) || 0);
     }
-    return { num: list.length, comisionTotal, pagadoTotal };
-  }, [presupuestos, filteredPresupuestos, filtros]);
+    // Si hay KPI overrides globales, usarlos en vez de la suma
+    const finalPagado = (kpi_overrides && kpi_overrides.pagado_total_override != null) ? Number(kpi_overrides.pagado_total_override) : pagadoTotal;
+    const finalComision = (kpi_overrides && kpi_overrides.comision_total_override != null) ? Number(kpi_overrides.comision_total_override) : comisionTotal;
+    return { num: list.length, comisionTotal: finalComision, pagadoTotal: finalPagado, comisionCalc: comisionTotal, pagadoCalc: pagadoTotal };
+  }, [presupuestos, filteredPresupuestos, filtros, kpi_overrides]);
 
   const handleSaveOverride = async (presId, data) => {
     try {
@@ -2203,6 +2213,33 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
       console.error("Error descargando PDF:", err);
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const handleStartEditKpis = () => {
+    setKpiPagado(String(kpisCalc.pagadoTotal));
+    setKpiComision(String(kpisCalc.comisionTotal));
+    setEditingKpis(true);
+  };
+
+  const handleSaveKpis = async () => {
+    setSavingKpis(true);
+    try {
+      await apiFetch(`/especialistas/${especialista.id}/kpi-override`, {
+        method: "PUT",
+        body: JSON.stringify({
+          pagado_total_override: kpiPagado !== "" ? parseFloat(kpiPagado) : null,
+          comision_total_override: kpiComision !== "" ? parseFloat(kpiComision) : null,
+          fecha_inicio: fechaInicio,
+          fecha_fin: fechaFin
+        })
+      });
+      if (onReload) onReload();
+    } catch (err) {
+      console.error("Error guardando KPI override:", err);
+    } finally {
+      setSavingKpis(false);
+      setEditingKpis(false);
     }
   };
 
@@ -2259,17 +2296,52 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
 
           {/* KPIs del especialista */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: "12px" }}>
-            {[
-              { label: "Presupuestos", value: kpisCalc.num, color: colors.primaryDark, bg: colors.creamPanel },
-              { label: "Pagado por pacientes", value: formatMoney(kpisCalc.pagadoTotal), color: colors.successText, bg: colors.successBg },
-              { label: "Pago al especialista", value: formatMoney(kpisCalc.comisionTotal), color: colors.primaryDark, bg: colors.goldSoft }
-            ].map((kpi, i) => (
-              <Box key={i} sx={{ textAlign: "center", p: "14px", bgcolor: kpi.bg, borderRadius: "14px" }}>
-                <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>{kpi.label}</Typography>
-                <Typography sx={{ fontWeight: 700, color: kpi.color, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{kpi.value}</Typography>
-              </Box>
-            ))}
+            {/* Presupuestos KPI */}
+            <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.creamPanel, borderRadius: "14px" }}>
+              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Presupuestos</Typography>
+              <Typography sx={{ fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{kpisCalc.num}</Typography>
+            </Box>
+            {/* Pagado por pacientes KPI */}
+            <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.successBg, borderRadius: "14px", position: "relative", ...(kpi_overrides?.pagado_total_override != null ? { border: `1.5px solid ${colors.gold}` } : {}) }}>
+              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Pagado por pacientes</Typography>
+              <Typography sx={{ fontWeight: 700, color: colors.successText, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{formatMoney(kpisCalc.pagadoTotal)}</Typography>
+              {kpi_overrides?.pagado_total_override != null && <Chip label="editado" size="small" sx={{ height: 14, fontSize: "0.55rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, position: "absolute", top: 6, right: 6, "& .MuiChip-label": { px: "4px" } }} />}
+            </Box>
+            {/* Pago al especialista KPI */}
+            <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.goldSoft, borderRadius: "14px", position: "relative", ...(kpi_overrides?.comision_total_override != null ? { border: `1.5px solid ${colors.gold}` } : {}) }}>
+              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Pago al especialista</Typography>
+              <Typography sx={{ fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{formatMoney(kpisCalc.comisionTotal)}</Typography>
+              {kpi_overrides?.comision_total_override != null && <Chip label="editado" size="small" sx={{ height: 14, fontSize: "0.55rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, position: "absolute", top: 6, right: 6, "& .MuiChip-label": { px: "4px" } }} />}
+            </Box>
           </Box>
+
+          {/* Edición de KPIs - solo master */}
+          {isMaster && !editingKpis && (
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: "10px" }}>
+              <Button size="small" onClick={handleStartEditKpis} startIcon={<EditRounded sx={{ fontSize: 14 }} />}
+                sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "11px", fontWeight: 600, color: colors.gold, borderRadius: "8px", "&:hover": { bgcolor: colors.goldSoft } }}>
+                Editar totales
+              </Button>
+            </Box>
+          )}
+          {isMaster && editingKpis && (
+            <Box sx={{ mt: "12px", p: "14px", borderRadius: "14px", bgcolor: "#FFFDF8", border: `1.5px solid ${colors.gold}` }}>
+              <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "12px", color: colors.primaryDark, mb: "10px" }}>Editar totales (no afecta datos originales)</Typography>
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <TextField label="Pagado por pacientes (S/)" size="small" value={kpiPagado} onChange={(e) => setKpiPagado(e.target.value)} type="number"
+                  sx={{ "& .MuiInputBase-input": { fontSize: "13px", fontFamily: fonts.body, p: "8px 10px", fontWeight: 600 }, "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
+                <TextField label="Pago al especialista (S/)" size="small" value={kpiComision} onChange={(e) => setKpiComision(e.target.value)} type="number"
+                  sx={{ "& .MuiInputBase-input": { fontSize: "13px", fontFamily: fonts.body, p: "8px 10px", fontWeight: 600 }, "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: "8px", mt: "10px" }}>
+                <Button size="small" onClick={() => setEditingKpis(false)} startIcon={<CloseRounded sx={{ fontSize: 14 }} />} sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "11px", color: colors.textMuted }}>Cancelar</Button>
+                <Button size="small" onClick={handleSaveKpis} disabled={savingKpis} startIcon={<SaveRounded sx={{ fontSize: 14 }} />}
+                  sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "11px", fontWeight: 700, color: colors.white, bgcolor: colors.primaryDark, borderRadius: "8px", px: "12px", "&:hover": { bgcolor: colors.primary } }}>
+                  {savingKpis ? "Guardando..." : "Guardar"}
+                </Button>
+              </Box>
+            </Box>
+          )}
         </CardContent>
       </Card>
 
@@ -2300,6 +2372,7 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
           onEditPct={() => setPresEdit(pres)}
           onSaveOverride={handleSaveOverride}
           especialistaId={especialista.id}
+          isMaster={isMaster}
         />
       ))}
 
@@ -2330,7 +2403,7 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
 /* ======================================================================
    TARJETA: PRESUPUESTO CON COMISIÓN (base = precio final con descuento)
 ====================================================================== */
-function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOverride, especialistaId }) {
+function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOverride, especialistaId, isMaster }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const ov = pres.overrides || {};
@@ -2403,7 +2476,7 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
             <Box sx={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
               <Typography sx={{ fontFamily: fonts.body, fontSize: "10.5px", color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Comisión</Typography>
               <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "22px", color: colors.primaryDark, lineHeight: 1.1 }}>{formatMoney(comisionDisplay)}</Typography>
-              {!editing && (
+              {!editing && isMaster && (
                 <IconButton size="small" onClick={handleStartEdit} sx={{ mt: "2px", color: colors.gold, "&:hover": { bgcolor: colors.goldSoft } }}>
                   <EditRounded sx={{ fontSize: 16 }} />
                 </IconButton>
