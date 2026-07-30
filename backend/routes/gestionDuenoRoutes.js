@@ -1109,11 +1109,24 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
     colDefs.forEach(c => doc.text(c.label.toUpperCase(), c.x + 8, y + 10, { width: c.w - 12 }));
     y += headerH;
 
+    // Helper: medir altura de texto antes de dibujarlo
+    const measureTextHeight = (text, fontSize, fontName, maxWidth) => {
+      doc.fontSize(fontSize).font(fontName);
+      return doc.heightOfString(text, { width: maxWidth });
+    };
+
     // Filas
     for (let i = 0; i < rows.length; i++) {
-      // Verificar espacio — si hay nota necesitamos más espacio
-      const needsNota = !!rows[i].nota;
-      const totalRowH = needsNota ? rowH + 22 : rowH;
+      const r = rows[i];
+
+      // Calcular altura de nota si existe
+      let notaH = 0;
+      const notaTextW = tableW - 56;
+      if (r.nota) {
+        const textH = measureTextHeight(r.nota, 8, "Helvetica-Oblique", notaTextW);
+        notaH = textH + 20; // padding arriba (10) + abajo (10)
+      }
+      const totalRowH = rowH + notaH;
 
       if (y + totalRowH > ph - 50) {
         drawPageFooter();
@@ -1126,12 +1139,10 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
         y += headerH;
       }
 
-      const r = rows[i];
       const rowBg = i % 2 === 0 ? white : "#FAFAF5";
 
-      // Fondo de fila
+      // Fondo de fila de datos
       doc.rect(ml, y, tableW, rowH).fill(rowBg);
-      // Línea separadora sutil inferior
       doc.rect(ml, y + rowH - 0.5, tableW, 0.5).fill("#EEEEEE");
 
       // Datos
@@ -1151,13 +1162,15 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
       doc.text(r.sesiones, colDefs[6].x + 8, y + 9, { width: colDefs[6].w - 12 });
       y += rowH;
 
-      // Nota / descripción — con espacio propio y estilo diferenciado
-      if (r.nota) {
-        doc.rect(ml, y, tableW, 20).fill("#FFFDF5");
-        doc.rect(ml + 16, y + 5, 2, 10).fill(gold); // barra vertical dorada decorativa
-        doc.fontSize(7.5).font("Helvetica-Oblique").fillColor("#8A7A6A");
-        doc.text(r.nota, ml + 26, y + 6, { width: tableW - 46 });
-        y += 22;
+      // Nota / descripción — altura dinámica con espacio generoso
+      if (r.nota && notaH > 0) {
+        doc.rect(ml, y, tableW, notaH).fill("#FFFDF5");
+        doc.rect(ml, y + notaH - 0.5, tableW, 0.5).fill("#EDE8DF");
+        // Barra vertical dorada decorativa (altura dinámica)
+        doc.rect(ml + 16, y + 8, 2.5, notaH - 16).fill(gold);
+        doc.fontSize(8).font("Helvetica-Oblique").fillColor("#7A6C5E");
+        doc.text(r.nota, ml + 28, y + 10, { width: notaTextW, lineGap: 2 });
+        y += notaH;
       }
     }
 
