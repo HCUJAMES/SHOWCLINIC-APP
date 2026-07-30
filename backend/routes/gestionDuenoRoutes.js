@@ -983,99 +983,209 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
     if (kpiOv && kpiOv.pagado_total_override != null) totalPagado = Number(kpiOv.pagado_total_override);
 
     // Generar PDF premium
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const doc = new PDFDocument({ size: "A4", margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=resumen_${especialista.nombre.replace(/\s/g, "_")}_${fecha_inicio || "all"}.pdf`);
     doc.pipe(res);
 
+    const pw = doc.page.width;
+    const ph = doc.page.height;
+    const ml = 40, mr = 40;
+    const cw = pw - ml - mr; // content width
+
     // Colores premium
     const brown = "#3E2A24";
+    const brownLight = "#5D4037";
     const gold = "#C8A96E";
-    const lightBg = "#FFF8F0";
+    const goldLight = "#E4D4B4";
+    const cream = "#FFF8F0";
+    const white = "#FFFFFF";
 
-    // Header con borde dorado
-    doc.rect(50, 50, doc.page.width - 100, 80).fill(brown);
-    doc.fontSize(22).font("Helvetica-Bold").fillColor("#FFFFFF").text("RESUMEN DE PAGOS", 70, 70, { align: "left" });
-    doc.fontSize(11).font("Helvetica").fillColor("#E4D4B4").text("ShowClinic · Gestión de Especialistas", 70, 96);
+    // Helper: formato moneda
+    const fmtMoney = (v) => `S/ ${Number(v).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-    // Línea dorada
-    doc.rect(50, 130, doc.page.width - 100, 3).fill(gold);
-
-    // Info del especialista
-    let y = 150;
-    doc.fontSize(14).font("Helvetica-Bold").fillColor(brown).text(especialista.nombre, 60, y);
-    y += 20;
-    doc.fontSize(10).font("Helvetica").fillColor("#666666");
-    doc.text(`Especialidad: ${especialista.especialidad || "General"}`, 60, y);
-    doc.text(`Comisión base: ${pctDefault}%`, 300, y);
-    y += 16;
-    const periodoText = fecha_inicio && fecha_fin ? `${fecha_inicio} al ${fecha_fin}` : fecha_inicio ? `Desde ${fecha_inicio}` : "Todo el periodo";
-    doc.text(`Periodo: ${periodoText}`, 60, y);
-    if (especialista.cuenta_bancaria) {
-      doc.text(`Cuenta: ${especialista.cuenta_bancaria}`, 300, y);
-    }
-    y += 30;
-
-    // KPIs en boxes
-    const kpiW = (doc.page.width - 100 - 30) / 3;
-    const drawKpi = (x, label, value) => {
-      doc.rect(x, y, kpiW, 50).lineWidth(1).strokeColor(gold).fillAndStroke("#FFFBF5", gold);
-      doc.fontSize(8).font("Helvetica").fillColor("#999999").text(label, x + 10, y + 10, { width: kpiW - 20 });
-      doc.fontSize(14).font("Helvetica-Bold").fillColor(brown).text(value, x + 10, y + 26, { width: kpiW - 20 });
+    // Helper: línea dorada decorativa
+    const drawGoldLine = (yPos, width) => {
+      doc.rect(ml, yPos, width || cw, 1.5).fill(gold);
     };
-    drawKpi(50, "TOTAL A PAGAR", `S/ ${totalComision.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-    drawKpi(50 + kpiW + 15, "PAGADO POR PACIENTES", `S/ ${totalPagado.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-    drawKpi(50 + (kpiW + 15) * 2, "PRESUPUESTOS", `${rows.length}`);
-    y += 70;
 
-    // Tabla header
-    doc.rect(50, y, doc.page.width - 100, 22).fill(brown);
-    const cols = [50, 160, 260, 330, 385, 440, 505];
-    const headers = ["Paciente", "Fecha", "Base", "%", "Comisión", "Pagado", "Sesiones"];
-    doc.fontSize(8).font("Helvetica-Bold").fillColor("#FFFFFF");
-    headers.forEach((h, i) => doc.text(h, cols[i] + 6, y + 7, { width: (cols[i + 1] || 560) - cols[i] - 6 }));
-    y += 22;
+    // Helper: agregar footer a cada página
+    const drawPageFooter = () => {
+      doc.fontSize(7).font("Helvetica").fillColor("#BBBBBB");
+      doc.text("ShowClinic", ml, ph - 30, { width: cw, align: "center" });
+    };
 
-    // Filas de la tabla
-    doc.font("Helvetica").fillColor(brown).fontSize(8);
+    // ═══════════════════════════════════════════
+    // HEADER — Banner oscuro con acento dorado
+    // ═══════════════════════════════════════════
+    doc.rect(0, 0, pw, 110).fill(brown);
+    doc.rect(0, 110, pw, 4).fill(gold);
+
+    // Logo/marca
+    doc.fontSize(9).font("Helvetica").fillColor(goldLight).text("SHOWCLINIC", ml + 2, 22, { characterSpacing: 4 });
+
+    // Título principal
+    doc.fontSize(24).font("Helvetica-Bold").fillColor(white).text("Resumen de Pagos", ml, 46);
+    doc.fontSize(10).font("Helvetica").fillColor(goldLight);
+    const periodoText = fecha_inicio && fecha_fin ? `${fecha_inicio}  al  ${fecha_fin}` : fecha_inicio ? `Desde ${fecha_inicio}` : "Todo el periodo";
+    doc.text(periodoText, ml, 78);
+
+    // Fecha de generación (derecha del header)
+    doc.fontSize(8).font("Helvetica").fillColor("#AAAAAA");
+    doc.text(`Generado: ${new Date().toLocaleString("es-PE", { timeZone: "America/Lima" })}`, pw - mr - 200, 92, { width: 200, align: "right" });
+
+    // ═══════════════════════════════════════════
+    // INFO DEL ESPECIALISTA
+    // ═══════════════════════════════════════════
+    let y = 130;
+
+    // Nombre del especialista destacado
+    doc.fontSize(18).font("Helvetica-Bold").fillColor(brown).text(especialista.nombre, ml, y);
+    y += 26;
+
+    // Datos en dos columnas
+    doc.fontSize(9).font("Helvetica").fillColor("#888888");
+    doc.text("ESPECIALIDAD", ml, y);
+    doc.text("COMISIÓN BASE", ml + 170, y);
+    if (especialista.cuenta_bancaria) doc.text("CUENTA BANCARIA", ml + 340, y);
+    y += 13;
+    doc.fontSize(10).font("Helvetica-Bold").fillColor(brownLight);
+    doc.text(especialista.especialidad || "General", ml, y);
+    doc.text(`${pctDefault}%`, ml + 170, y);
+    if (especialista.cuenta_bancaria) doc.text(especialista.cuenta_bancaria, ml + 340, y);
+    y += 24;
+
+    drawGoldLine(y);
+    y += 16;
+
+    // ═══════════════════════════════════════════
+    // KPIs — Tres tarjetas elegantes
+    // ═══════════════════════════════════════════
+    const kpiGap = 14;
+    const kpiW = (cw - kpiGap * 2) / 3;
+    const kpiH = 62;
+
+    const drawKpiCard = (x, label, value, accent) => {
+      // Fondo con borde redondeado simulado
+      doc.roundedRect(x, y, kpiW, kpiH, 6).lineWidth(1.2).strokeColor(accent === "gold" ? gold : "#E0E0E0").fillAndStroke(cream, accent === "gold" ? gold : "#E0E0E0");
+      // Barra superior de acento
+      doc.rect(x + 1, y + 1, kpiW - 2, 3).fill(accent === "gold" ? gold : brownLight);
+      // Label
+      doc.fontSize(7.5).font("Helvetica").fillColor("#999999").text(label, x + 14, y + 14, { width: kpiW - 28 });
+      // Valor
+      doc.fontSize(16).font("Helvetica-Bold").fillColor(brown).text(value, x + 14, y + 30, { width: kpiW - 28 });
+    };
+
+    drawKpiCard(ml, "PAGO AL ESPECIALISTA", fmtMoney(totalComision), "gold");
+    drawKpiCard(ml + kpiW + kpiGap, "PAGADO POR PACIENTES", fmtMoney(totalPagado), "dark");
+    drawKpiCard(ml + (kpiW + kpiGap) * 2, "PRESUPUESTOS ACTIVOS", `${rows.length}`, "dark");
+    y += kpiH + 24;
+
+    // ═══════════════════════════════════════════
+    // TABLA DE PRESUPUESTOS
+    // ═══════════════════════════════════════════
+
+    // Título de sección
+    doc.fontSize(12).font("Helvetica-Bold").fillColor(brown).text("Detalle de Presupuestos", ml, y);
+    y += 20;
+
+    // Definir columnas con mejor distribución
+    const colDefs = [
+      { label: "Paciente",  x: ml,       w: 120 },
+      { label: "Fecha",     x: ml + 120, w: 70  },
+      { label: "Base",      x: ml + 190, w: 70  },
+      { label: "%",         x: ml + 260, w: 35  },
+      { label: "Comisión",  x: ml + 295, w: 75  },
+      { label: "Pagado",    x: ml + 370, w: 75  },
+      { label: "Sesiones",  x: ml + 445, w: 70  }
+    ];
+    const tableW = cw;
+    const rowH = 26;
+    const headerH = 28;
+
+    // Header de tabla
+    doc.roundedRect(ml, y, tableW, headerH, 4).fill(brown);
+    doc.fontSize(7.5).font("Helvetica-Bold").fillColor(white);
+    colDefs.forEach(c => doc.text(c.label.toUpperCase(), c.x + 8, y + 10, { width: c.w - 12 }));
+    y += headerH;
+
+    // Filas
     for (let i = 0; i < rows.length; i++) {
-      if (y > 720) {
+      // Verificar espacio — si hay nota necesitamos más espacio
+      const needsNota = !!rows[i].nota;
+      const totalRowH = needsNota ? rowH + 22 : rowH;
+
+      if (y + totalRowH > ph - 50) {
+        drawPageFooter();
         doc.addPage();
-        y = 50;
+        y = 40;
+        // Re-dibujar header de tabla en nueva página
+        doc.roundedRect(ml, y, tableW, headerH, 4).fill(brown);
+        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(white);
+        colDefs.forEach(c => doc.text(c.label.toUpperCase(), c.x + 8, y + 10, { width: c.w - 12 }));
+        y += headerH;
       }
+
       const r = rows[i];
-      const rowBg = i % 2 === 0 ? "#FFFFFF" : "#FFF8F0";
-      doc.rect(50, y, doc.page.width - 100, 20).fill(rowBg);
+      const rowBg = i % 2 === 0 ? white : "#FAFAF5";
+
+      // Fondo de fila
+      doc.rect(ml, y, tableW, rowH).fill(rowBg);
+      // Línea separadora sutil inferior
+      doc.rect(ml, y + rowH - 0.5, tableW, 0.5).fill("#EEEEEE");
+
+      // Datos
+      doc.fontSize(8.5).font("Helvetica").fillColor(brown);
+      const nombre = r.paciente.length > 16 ? r.paciente.slice(0, 16) + "..." : r.paciente;
+      doc.font("Helvetica-Bold").text(nombre, colDefs[0].x + 8, y + 9, { width: colDefs[0].w - 12 });
+      doc.font("Helvetica").fillColor("#666666");
+      doc.text(r.fecha, colDefs[1].x + 8, y + 9, { width: colDefs[1].w - 12 });
       doc.fillColor(brown);
-      doc.text(r.paciente.length > 18 ? r.paciente.slice(0, 18) + "…" : r.paciente, cols[0] + 6, y + 6, { width: 104 });
-      doc.text(r.fecha, cols[1] + 6, y + 6, { width: 94 });
-      doc.text(`S/ ${r.base.toFixed(2)}`, cols[2] + 6, y + 6, { width: 64 });
-      doc.text(`${r.pct}%`, cols[3] + 6, y + 6, { width: 49 });
-      doc.text(`S/ ${r.comision.toFixed(2)}`, cols[4] + 6, y + 6, { width: 59 });
-      doc.text(`S/ ${r.pagado.toFixed(2)}`, cols[5] + 6, y + 6, { width: 59 });
-      doc.text(r.sesiones, cols[6] + 6, y + 6, { width: 40 });
-      y += 20;
-      // Nota/descripción debajo de la fila si existe
+      doc.text(fmtMoney(r.base), colDefs[2].x + 8, y + 9, { width: colDefs[2].w - 12 });
+      doc.text(`${r.pct}%`, colDefs[3].x + 8, y + 9, { width: colDefs[3].w - 12 });
+      doc.font("Helvetica-Bold").fillColor(brownLight);
+      doc.text(fmtMoney(r.comision), colDefs[4].x + 8, y + 9, { width: colDefs[4].w - 12 });
+      doc.font("Helvetica").fillColor(brown);
+      doc.text(fmtMoney(r.pagado), colDefs[5].x + 8, y + 9, { width: colDefs[5].w - 12 });
+      doc.fillColor("#888888");
+      doc.text(r.sesiones, colDefs[6].x + 8, y + 9, { width: colDefs[6].w - 12 });
+      y += rowH;
+
+      // Nota / descripción — con espacio propio y estilo diferenciado
       if (r.nota) {
-        doc.fontSize(7).font("Helvetica-Oblique").fillColor("#777777");
-        doc.text(`↳ ${r.nota}`, cols[0] + 14, y + 2, { width: doc.page.width - 164 });
-        y += 14;
-        doc.font("Helvetica").fillColor(brown).fontSize(8);
+        doc.rect(ml, y, tableW, 20).fill("#FFFDF5");
+        doc.rect(ml + 16, y + 5, 2, 10).fill(gold); // barra vertical dorada decorativa
+        doc.fontSize(7.5).font("Helvetica-Oblique").fillColor("#8A7A6A");
+        doc.text(r.nota, ml + 26, y + 6, { width: tableW - 46 });
+        y += 22;
       }
     }
 
-    // Línea final
-    y += 10;
-    doc.rect(50, y, doc.page.width - 100, 2).fill(gold);
-    y += 15;
-    doc.fontSize(11).font("Helvetica-Bold").fillColor(brown);
-    doc.text(`TOTAL COMISIÓN A PAGAR: S/ ${totalComision.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 60, y);
+    // ═══════════════════════════════════════════
+    // PIE DE TABLA — Total destacado
+    // ═══════════════════════════════════════════
+    y += 6;
+    doc.roundedRect(ml, y, tableW, 42, 4).lineWidth(1.5).strokeColor(gold).fillAndStroke("#FFFBF2", gold);
+    // Barra izquierda dorada
+    doc.rect(ml + 1, y + 1, 4, 40).fill(gold);
+    doc.fontSize(8).font("Helvetica").fillColor("#999999").text("TOTAL COMISIÓN A PAGAR", ml + 18, y + 10);
+    doc.fontSize(18).font("Helvetica-Bold").fillColor(brown).text(fmtMoney(totalComision), ml + 18, y + 22);
+    // Pagado por pacientes al lado
+    doc.fontSize(8).font("Helvetica").fillColor("#999999").text("TOTAL PAGADO POR PACIENTES", ml + 280, y + 10);
+    doc.fontSize(14).font("Helvetica-Bold").fillColor(brownLight).text(fmtMoney(totalPagado), ml + 280, y + 24);
+    y += 56;
 
-    // Footer
-    y += 40;
-    doc.fontSize(8).font("Helvetica").fillColor("#999999");
-    doc.text(`Generado: ${new Date().toLocaleString("es-PE", { timeZone: "America/Lima" })} · ShowClinic`, 60, y);
+    // ═══════════════════════════════════════════
+    // FOOTER
+    // ═══════════════════════════════════════════
+    drawGoldLine(y);
+    y += 12;
+    doc.fontSize(7.5).font("Helvetica").fillColor("#BBBBBB");
+    doc.text("Este documento es un resumen generado automáticamente por ShowClinic. Los montos reflejan los datos registrados al momento de su generación.", ml, y, { width: cw, align: "center" });
+    y += 16;
+    doc.fontSize(7).fillColor("#CCCCCC").text(`ShowClinic  ·  ${new Date().toLocaleString("es-PE", { timeZone: "America/Lima" })}`, ml, y, { width: cw, align: "center" });
 
+    drawPageFooter();
     doc.end();
   } catch (err) {
     console.error("❌ Error generando PDF:", err.message);
