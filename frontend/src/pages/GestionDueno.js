@@ -7,7 +7,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableBody, TableCell, TableHead, TableRow,
   LinearProgress, Select, MenuItem, FormControl,
-  InputLabel, Collapse, Alert, Tooltip
+  InputLabel, Collapse, Alert, Tooltip, TextField
 } from "@mui/material";
 import {
   TrendingUp, TrendingDown, People, AttachMoney,
@@ -17,7 +17,8 @@ import {
   ReceiptLongRounded, GroupsRounded, PaymentsRounded,
   LogoutRounded, HomeRounded, InsightsRounded,
   FlagRounded, EditRounded, TuneRounded,
-  PercentRounded, PaidRounded, CategoryRounded
+  PercentRounded, PaidRounded, CategoryRounded,
+  PictureAsPdf, SaveRounded, CloseRounded
 } from "@mui/icons-material";
 
 const MotionCard = motion(Card);
@@ -1757,6 +1758,9 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
         onBack={onBack}
         onEditEspecialistaComision={onEditEspecialistaComision}
         onEditPresupuestoComision={onEditPresupuestoComision}
+        onReload={onReloadEspecialistas}
+        fechaInicio={fechaInicio}
+        fechaFin={fechaFin}
       />
     );
   }
@@ -2138,15 +2142,15 @@ function TratamientosComisionDialog({ open, onClose, onSaved }) {
   );
 }
 
-function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision }) {
+function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision, onReload, fechaInicio, fechaFin }) {
   const { especialista, resumen, presupuestos = [] } = detalle;
   const [pctEspOpen, setPctEspOpen] = useState(false);
   const [presEdit, setPresEdit] = useState(null);
-  const [filtros, setFiltros] = useState([]); // ["pagado", "pendiente", "sesiones_completas"]
+  const [filtros, setFiltros] = useState([]);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const toggleFiltro = (f) => setFiltros((prev) => prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]);
 
-  // Filtrar presupuestos según los filtros activos (AND: debe cumplir TODOS los seleccionados)
   const filteredPresupuestos = useMemo(() => {
     if (filtros.length === 0) return presupuestos;
     return presupuestos.filter((p) => {
@@ -2157,17 +2161,50 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
     });
   }, [presupuestos, filtros]);
 
-  // Recalcular KPIs según lo filtrado
   const kpisCalc = useMemo(() => {
     const list = filtros.length === 0 ? presupuestos : filteredPresupuestos;
-    let baseTotal = 0, comisionTotal = 0, pagadoTotal = 0;
+    let comisionTotal = 0, pagadoTotal = 0;
     for (const p of list) {
-      baseTotal += Number(p.base_comision) || 0;
-      comisionTotal += Number(p.comision_estimada) || 0;
-      pagadoTotal += Number(p.monto_pagado_real) || 0;
+      const ov = p.overrides;
+      comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : (Number(p.comision_estimada) || 0);
+      pagadoTotal += (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : (Number(p.monto_pagado_real) || 0);
     }
-    return { num: list.length, baseTotal, comisionTotal, pagadoTotal };
+    return { num: list.length, comisionTotal, pagadoTotal };
   }, [presupuestos, filteredPresupuestos, filtros]);
+
+  const handleSaveOverride = async (presId, data) => {
+    try {
+      await apiFetch(`/especialistas/${especialista.id}/presupuestos/${presId}/override`, {
+        method: "PUT",
+        body: JSON.stringify(data)
+      });
+      if (onReload) onReload();
+    } catch (err) {
+      console.error("Error guardando override:", err);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    setPdfLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (fechaInicio) params.append("fecha_inicio", fechaInicio);
+      if (fechaFin) params.append("fecha_fin", fechaFin);
+      const url = `${API}/especialistas/${especialista.id}/pdf-resumen?${params.toString()}`;
+      const resp = await fetch(url, { headers: { Authorization: getToken() } });
+      if (!resp.ok) throw new Error("Error al generar PDF");
+      const blob = await resp.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `resumen_${especialista.nombre.replace(/\s/g, "_")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      console.error("Error descargando PDF:", err);
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   const filtroChipSx = (activo) => ({
     fontFamily: fonts.body, fontWeight: 600, fontSize: "0.75rem", height: 30, borderRadius: "10px", cursor: "pointer", transition: "all 0.2s",
@@ -2178,7 +2215,18 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
 
   return (
     <Box>
-      <Button startIcon={<ArrowBack />} onClick={onBack} sx={{ mb: "16px", color: colors.primary, fontFamily: fonts.body, textTransform: "none", borderRadius: "10px" }}>Volver</Button>
+      <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mb: "16px" }}>
+        <Button startIcon={<ArrowBack />} onClick={onBack} sx={{ color: colors.primary, fontFamily: fonts.body, textTransform: "none", borderRadius: "10px" }}>Volver</Button>
+        <Box sx={{ flex: 1 }} />
+        <Button
+          onClick={handleDownloadPdf}
+          disabled={pdfLoading}
+          startIcon={<PictureAsPdf sx={{ fontSize: 18 }} />}
+          sx={{ fontFamily: fonts.body, textTransform: "none", borderRadius: "12px", fontWeight: 700, color: colors.white, bgcolor: colors.primaryDark, px: "18px", py: "8px", "&:hover": { bgcolor: colors.primary }, "&:disabled": { opacity: 0.6 } }}
+        >
+          {pdfLoading ? "Generando..." : "Descargar PDF"}
+        </Button>
+      </Box>
 
       {/* Header especialista */}
       <Card sx={{ ...cardSx, mb: "20px", p: 0 }}>
@@ -2209,11 +2257,10 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
             </Button>
           </Box>
 
-          {/* KPIs del especialista (dinámicos según filtro) */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: "12px" }}>
+          {/* KPIs del especialista */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: "12px" }}>
             {[
               { label: "Presupuestos", value: kpisCalc.num, color: colors.primaryDark, bg: colors.creamPanel },
-              { label: "Facturación (con desc.)", value: formatMoney(kpisCalc.baseTotal), color: colors.primary, bg: colors.creamPanel },
               { label: "Pagado por pacientes", value: formatMoney(kpisCalc.pagadoTotal), color: colors.successText, bg: colors.successBg },
               { label: "Pago al especialista", value: formatMoney(kpisCalc.comisionTotal), color: colors.primaryDark, bg: colors.goldSoft }
             ].map((kpi, i) => (
@@ -2251,6 +2298,8 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
           index={i}
           pctDefault={Number(especialista.comision_porcentaje)}
           onEditPct={() => setPresEdit(pres)}
+          onSaveOverride={handleSaveOverride}
+          especialistaId={especialista.id}
         />
       ))}
 
@@ -2281,14 +2330,24 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
 /* ======================================================================
    TARJETA: PRESUPUESTO CON COMISIÓN (base = precio final con descuento)
 ====================================================================== */
-function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct }) {
+function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOverride, especialistaId }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const ov = pres.overrides || {};
+  const [editPagado, setEditPagado] = useState(ov.pagado_override != null ? String(ov.pagado_override) : "");
+  const [editSesiones, setEditSesiones] = useState(ov.sesiones_override != null ? String(ov.sesiones_override) : "");
+  const [editComision, setEditComision] = useState(ov.comision_override != null ? String(ov.comision_override) : "");
+  const [saving, setSaving] = useState(false);
+
   const paciente = `${pres.paciente_nombre || "Paciente"} ${pres.paciente_apellido || ""}`.trim();
   const precioTotal = Number(pres.precio_total) || 0;
   const descuento = Number(pres.descuento) || 0;
   const base = Number(pres.base_comision) || 0;
   const pct = Number(pres.comision_porcentaje_efectivo);
-  const comision = Number(pres.comision_estimada) || 0;
+  const comisionCalc = Number(pres.comision_estimada) || 0;
+  const comisionDisplay = ov.comision_override != null ? Number(ov.comision_override) : comisionCalc;
+  const pagadoDisplay = ov.pagado_override != null ? Number(ov.pagado_override) : (Number(pres.monto_pagado_real) || 0);
+  const sesionesDisplay = ov.sesiones_override != null ? `${ov.sesiones_override}` : `${pres.sesiones_completadas || 0}`;
   const fecha = (pres.creado_en || "").slice(0, 10);
 
   const estadoPagoStyle = pres.estado_pago === "pagado"
@@ -2297,13 +2356,35 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct }) {
     ? { bg: colors.amberBg, text: colors.amberText, label: "Adelanto" }
     : { bg: colors.creamPanel, text: colors.textMuted, label: "Pendiente" };
 
+  const handleStartEdit = () => {
+    setEditPagado(ov.pagado_override != null ? String(ov.pagado_override) : String(Number(pres.monto_pagado_real) || 0));
+    setEditSesiones(ov.sesiones_override != null ? String(ov.sesiones_override) : String(pres.sesiones_completadas || 0));
+    setEditComision(ov.comision_override != null ? String(ov.comision_override) : String(comisionCalc.toFixed(2)));
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const data = {
+      pagado_override: editPagado !== "" ? parseFloat(editPagado) : null,
+      sesiones_override: editSesiones !== "" ? parseInt(editSesiones) : null,
+      comision_override: editComision !== "" ? parseFloat(editComision) : null
+    };
+    if (onSaveOverride) await onSaveOverride(pres.id, data);
+    setSaving(false);
+    setEditing(false);
+  };
+
+  const hasOverrides = ov.pagado_override != null || ov.sesiones_override != null || ov.comision_override != null;
+  const editFieldSx = { "& .MuiInputBase-input": { fontSize: "12px", fontFamily: fonts.body, p: "6px 8px", fontWeight: 600 }, "& .MuiOutlinedInput-root": { borderRadius: "8px" } };
+
   return (
     <MotionBox
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, delay: Math.min(index * 0.04, 0.3) }}
     >
-      <Card sx={{ ...cardSx, mb: "12px", p: 0 }}>
+      <Card sx={{ ...cardSx, mb: "12px", p: 0, ...(hasOverrides ? { border: `1.5px solid ${colors.gold}` } : {}) }}>
         <CardContent sx={{ p: "18px", "&:last-child": { pb: "18px" } }}>
           {/* Encabezado */}
           <Box sx={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
@@ -2315,18 +2396,42 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct }) {
               <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mt: "2px", flexWrap: "wrap" }}>
                 <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted }}>#{pres.id} · {fecha}</Typography>
                 <Chip label={estadoPagoStyle.label} size="small" sx={{ bgcolor: estadoPagoStyle.bg, color: estadoPagoStyle.text, fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
-                <Chip label={`${pres.sesiones_completadas || 0}/${pres.sesiones_totales || 0} sesiones`} size="small" sx={{ bgcolor: colors.creamPanel, color: colors.textMuted, border: `1px solid ${colors.border}`, fontWeight: 600, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
+                <Chip label={`${sesionesDisplay}/${pres.sesiones_totales || 0} sesiones`} size="small" sx={{ bgcolor: colors.creamPanel, color: colors.textMuted, border: `1px solid ${colors.border}`, fontWeight: 600, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
+                {hasOverrides && <Chip label="editado" size="small" sx={{ height: 16, fontSize: "0.58rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, "& .MuiChip-label": { px: "5px" } }} />}
               </Box>
             </Box>
-            <Box sx={{ textAlign: "right" }}>
+            <Box sx={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
               <Typography sx={{ fontFamily: fonts.body, fontSize: "10.5px", color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>Comisión</Typography>
-              <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "22px", color: colors.primaryDark, lineHeight: 1.1 }}>{formatMoney(comision)}</Typography>
+              <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "22px", color: colors.primaryDark, lineHeight: 1.1 }}>{formatMoney(comisionDisplay)}</Typography>
+              {!editing && (
+                <IconButton size="small" onClick={handleStartEdit} sx={{ mt: "2px", color: colors.gold, "&:hover": { bgcolor: colors.goldSoft } }}>
+                  <EditRounded sx={{ fontSize: 16 }} />
+                </IconButton>
+              )}
             </Box>
           </Box>
 
+          {/* Panel de edición inline */}
+          {editing && (
+            <Box sx={{ mt: "12px", p: "14px", borderRadius: "14px", bgcolor: "#FFFDF8", border: `1.5px solid ${colors.gold}` }}>
+              <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "12px", color: colors.primaryDark, mb: "10px" }}>Editar datos (no afecta presupuesto original)</Typography>
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                <TextField label="Pagado (S/)" size="small" value={editPagado} onChange={(e) => setEditPagado(e.target.value)} type="number" sx={editFieldSx} />
+                <TextField label="Sesiones comp." size="small" value={editSesiones} onChange={(e) => setEditSesiones(e.target.value)} type="number" sx={editFieldSx} />
+                <TextField label="Comisión (S/)" size="small" value={editComision} onChange={(e) => setEditComision(e.target.value)} type="number" sx={editFieldSx} />
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", gap: "8px", mt: "10px" }}>
+                <Button size="small" onClick={() => setEditing(false)} startIcon={<CloseRounded sx={{ fontSize: 14 }} />} sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "11px", color: colors.textMuted }}>Cancelar</Button>
+                <Button size="small" onClick={handleSave} disabled={saving} startIcon={<SaveRounded sx={{ fontSize: 14 }} />} sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "11px", fontWeight: 700, color: colors.white, bgcolor: colors.primaryDark, borderRadius: "8px", px: "12px", "&:hover": { bgcolor: colors.primary } }}>
+                  {saving ? "Guardando..." : "Guardar"}
+                </Button>
+              </Box>
+            </Box>
+          )}
+
           {/* Cálculo de comisión */}
           <Box sx={{ mt: "14px", p: "12px 14px", borderRadius: "14px", bgcolor: colors.creamPanel, border: `1px solid ${colors.border}` }}>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: "10px" }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" }, gap: "10px" }}>
               <Box>
                 <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Precio total</Typography>
                 <Typography sx={{ fontFamily: fonts.body, fontWeight: 600, fontSize: "13.5px", color: colors.textBody }}>{formatMoney(precioTotal)}</Typography>
@@ -2338,8 +2443,12 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct }) {
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Precio final (base)</Typography>
+                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Base comisión</Typography>
                 <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.primary }}>{formatMoney(base)}</Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Pagado</Typography>
+                <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.successText }}>{formatMoney(pagadoDisplay)}</Typography>
               </Box>
               <Box>
                 <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Porcentaje</Typography>
@@ -2353,7 +2462,7 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct }) {
             </Box>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: "10px", pt: "10px", borderTop: `1px dashed ${colors.border}` }}>
               <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>
-                {formatMoney(base)} × {pct}% = <strong style={{ color: colors.primaryDark }}>{formatMoney(comision)}</strong>
+                {formatMoney(base)} × {pct}% = <strong style={{ color: colors.primaryDark }}>{formatMoney(comisionCalc)}</strong>
               </Typography>
               <Button
                 size="small" onClick={onEditPct} startIcon={<PercentRounded sx={{ fontSize: 14 }} />}

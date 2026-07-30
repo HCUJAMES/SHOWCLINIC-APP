@@ -2,6 +2,7 @@ import express from "express";
 import db, { dbAll, dbGet, dbRun } from "../db/database.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { getReporteFinanciero } from "./finanzasRoutes.js";
+import PDFDocument from "pdfkit";
 
 const router = express.Router();
 
@@ -124,6 +125,19 @@ async function ensureComisionSchema() {
   await addColumn("lineas_presupuesto", "comision_fija", "REAL");
   // Override de comisión por presupuesto asignado (porcentaje sobre el precio final)
   await addColumn("presupuestos_asignados", "comision_porcentaje", "REAL");
+
+  // Tabla de overrides para la vista de especialistas (no afecta el presupuesto original)
+  await dbRun(`CREATE TABLE IF NOT EXISTS especialista_presupuesto_overrides (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    especialista_id INTEGER NOT NULL,
+    presupuesto_id INTEGER NOT NULL,
+    pagado_override REAL,
+    sesiones_override INTEGER,
+    comision_override REAL,
+    nota TEXT,
+    creado_en TEXT DEFAULT (datetime('now')),
+    UNIQUE(especialista_id, presupuesto_id)
+  )`);
   comisionSchemaReady = true;
 }
 
@@ -784,9 +798,16 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
       pres.comision_estimada = comision;
       pres.usa_override = pres.comision_porcentaje != null;
 
+      // Leer overrides editables (no afectan el presupuesto real)
+      const ov = await dbGet(
+        `SELECT pagado_override, sesiones_override, comision_override, nota FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
+        [id, pres.id]
+      );
+      pres.overrides = ov || null;
+
       baseTotal += base;
-      comisionTotal += comision;
-      pagadoTotal += pres.monto_pagado_real;
+      comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : comision;
+      pagadoTotal += (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : pres.monto_pagado_real;
     }
 
     const ticketPromedio = presupuestos.length > 0 ? baseTotal / presupuestos.length : 0;
@@ -805,6 +826,194 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
   } catch (err) {
     console.error("❌ Error perfil especialista:", err.message);
     res.status(500).json({ message: "Error al obtener perfil", error: err.message });
+  }
+});
+
+/* ======================================================================
+   ✏️ OVERRIDES EDITABLES POR PRESUPUESTO EN VISTA ESPECIALISTA
+====================================================================== */
+router.put("/especialistas/:espId/presupuestos/:presId/override", authMiddleware, requireOwner, async (req, res) => {
+  await ensureComisionSchema();
+  try {
+    const { espId, presId } = req.params;
+    const { pagado_override, sesiones_override, comision_override, nota } = req.body;
+    await dbRun(
+      `INSERT INTO especialista_presupuesto_overrides (especialista_id, presupuesto_id, pagado_override, sesiones_override, comision_override, nota)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(especialista_id, presupuesto_id) DO UPDATE SET
+         pagado_override = excluded.pagado_override,
+         sesiones_override = excluded.sesiones_override,
+         comision_override = excluded.comision_override,
+         nota = excluded.nota`,
+      [espId, presId, pagado_override ?? null, sesiones_override ?? null, comision_override ?? null, nota ?? null]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("❌ Error guardando override:", err.message);
+    res.status(500).json({ message: "Error al guardar override", error: err.message });
+  }
+});
+
+/* ======================================================================
+   📄 PDF: RESUMEN MENSUAL DE PAGO A ESPECIALISTA (Premium)
+====================================================================== */
+router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async (req, res) => {
+  await ensureLineasMigration();
+  await ensureComisionSchema();
+  try {
+    const { id } = req.params;
+    const { fecha_inicio, fecha_fin } = req.query;
+
+    const especialista = await dbGet("SELECT * FROM especialistas WHERE id = ?", [id]);
+    if (!especialista) return res.status(404).json({ message: "Especialista no encontrado" });
+    const pctDefault = especialista.comision_porcentaje != null ? Number(especialista.comision_porcentaje) : 20;
+
+    let cond = "pa.especialista_id = ?";
+    const params = [id];
+    if (fecha_inicio) { cond += " AND DATE(pa.creado_en) >= ?"; params.push(fecha_inicio); }
+    if (fecha_fin) { cond += " AND DATE(pa.creado_en) <= ?"; params.push(fecha_fin); }
+
+    const presupuestos = await dbAll(`
+      SELECT pa.id, pa.precio_total, pa.descuento, pa.estado_pago, pa.comision_porcentaje, pa.creado_en,
+             p.nombre as paciente_nombre, p.apellido as paciente_apellido,
+             (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id AND ps.estado = 'completada') as sesiones_completadas,
+             (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id) as sesiones_totales
+      FROM presupuestos_asignados pa
+      JOIN patients p ON pa.paciente_id = p.id
+      WHERE ${cond}
+      ORDER BY pa.creado_en DESC
+    `, params);
+
+    let totalComision = 0;
+    let totalPagado = 0;
+    const rows = [];
+
+    for (const pres of presupuestos) {
+      const base = baseComisionPresupuesto(pres);
+      const pct = pctComisionPresupuesto(pres, pctDefault);
+      const comision = base * (pct / 100);
+
+      const sumaPagos = await dbGet(
+        `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas WHERE referencia_id = ? AND referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta') AND tipo = 'ingreso'`,
+        [pres.id]
+      );
+      const pagado = parseFloat(sumaPagos?.total) || 0;
+
+      const ov = await dbGet(
+        `SELECT pagado_override, sesiones_override, comision_override FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
+        [id, pres.id]
+      );
+
+      const comisionFinal = (ov && ov.comision_override != null) ? Number(ov.comision_override) : comision;
+      const pagadoFinal = (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : pagado;
+      const sesionesFinal = (ov && ov.sesiones_override != null) ? `${ov.sesiones_override}/${pres.sesiones_totales}` : `${pres.sesiones_completadas}/${pres.sesiones_totales}`;
+
+      totalComision += comisionFinal;
+      totalPagado += pagadoFinal;
+
+      rows.push({
+        paciente: `${pres.paciente_nombre || ""} ${pres.paciente_apellido || ""}`.trim(),
+        fecha: (pres.creado_en || "").slice(0, 10),
+        base,
+        pct,
+        comision: comisionFinal,
+        pagado: pagadoFinal,
+        sesiones: sesionesFinal,
+        estado: pres.estado_pago
+      });
+    }
+
+    // Generar PDF premium
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=resumen_${especialista.nombre.replace(/\s/g, "_")}_${fecha_inicio || "all"}.pdf`);
+    doc.pipe(res);
+
+    // Colores premium
+    const brown = "#3E2A24";
+    const gold = "#C8A96E";
+    const lightBg = "#FFF8F0";
+
+    // Header con borde dorado
+    doc.rect(50, 50, doc.page.width - 100, 80).fill(brown);
+    doc.fontSize(22).font("Helvetica-Bold").fillColor("#FFFFFF").text("RESUMEN DE PAGOS", 70, 70, { align: "left" });
+    doc.fontSize(11).font("Helvetica").fillColor("#E4D4B4").text("ShowClinic · Gestión de Especialistas", 70, 96);
+
+    // Línea dorada
+    doc.rect(50, 130, doc.page.width - 100, 3).fill(gold);
+
+    // Info del especialista
+    let y = 150;
+    doc.fontSize(14).font("Helvetica-Bold").fillColor(brown).text(especialista.nombre, 60, y);
+    y += 20;
+    doc.fontSize(10).font("Helvetica").fillColor("#666666");
+    doc.text(`Especialidad: ${especialista.especialidad || "General"}`, 60, y);
+    doc.text(`Comisión base: ${pctDefault}%`, 300, y);
+    y += 16;
+    const periodoText = fecha_inicio && fecha_fin ? `${fecha_inicio} al ${fecha_fin}` : fecha_inicio ? `Desde ${fecha_inicio}` : "Todo el periodo";
+    doc.text(`Periodo: ${periodoText}`, 60, y);
+    if (especialista.cuenta_bancaria) {
+      doc.text(`Cuenta: ${especialista.cuenta_bancaria}`, 300, y);
+    }
+    y += 30;
+
+    // KPIs en boxes
+    const kpiW = (doc.page.width - 100 - 30) / 3;
+    const drawKpi = (x, label, value) => {
+      doc.rect(x, y, kpiW, 50).lineWidth(1).strokeColor(gold).fillAndStroke("#FFFBF5", gold);
+      doc.fontSize(8).font("Helvetica").fillColor("#999999").text(label, x + 10, y + 10, { width: kpiW - 20 });
+      doc.fontSize(14).font("Helvetica-Bold").fillColor(brown).text(value, x + 10, y + 26, { width: kpiW - 20 });
+    };
+    drawKpi(50, "TOTAL A PAGAR", `S/ ${totalComision.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    drawKpi(50 + kpiW + 15, "PAGADO POR PACIENTES", `S/ ${totalPagado.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+    drawKpi(50 + (kpiW + 15) * 2, "PRESUPUESTOS", `${rows.length}`);
+    y += 70;
+
+    // Tabla header
+    doc.rect(50, y, doc.page.width - 100, 22).fill(brown);
+    const cols = [50, 160, 260, 330, 385, 440, 505];
+    const headers = ["Paciente", "Fecha", "Base", "%", "Comisión", "Pagado", "Sesiones"];
+    doc.fontSize(8).font("Helvetica-Bold").fillColor("#FFFFFF");
+    headers.forEach((h, i) => doc.text(h, cols[i] + 6, y + 7, { width: (cols[i + 1] || 560) - cols[i] - 6 }));
+    y += 22;
+
+    // Filas de la tabla
+    doc.font("Helvetica").fillColor(brown).fontSize(8);
+    for (let i = 0; i < rows.length; i++) {
+      if (y > 750) {
+        doc.addPage();
+        y = 50;
+      }
+      const r = rows[i];
+      const rowBg = i % 2 === 0 ? "#FFFFFF" : "#FFF8F0";
+      doc.rect(50, y, doc.page.width - 100, 20).fill(rowBg);
+      doc.fillColor(brown);
+      doc.text(r.paciente.length > 18 ? r.paciente.slice(0, 18) + "…" : r.paciente, cols[0] + 6, y + 6, { width: 104 });
+      doc.text(r.fecha, cols[1] + 6, y + 6, { width: 94 });
+      doc.text(`S/ ${r.base.toFixed(2)}`, cols[2] + 6, y + 6, { width: 64 });
+      doc.text(`${r.pct}%`, cols[3] + 6, y + 6, { width: 49 });
+      doc.text(`S/ ${r.comision.toFixed(2)}`, cols[4] + 6, y + 6, { width: 59 });
+      doc.text(`S/ ${r.pagado.toFixed(2)}`, cols[5] + 6, y + 6, { width: 59 });
+      doc.text(r.sesiones, cols[6] + 6, y + 6, { width: 40 });
+      y += 20;
+    }
+
+    // Línea final
+    y += 10;
+    doc.rect(50, y, doc.page.width - 100, 2).fill(gold);
+    y += 15;
+    doc.fontSize(11).font("Helvetica-Bold").fillColor(brown);
+    doc.text(`TOTAL COMISIÓN A PAGAR: S/ ${totalComision.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 60, y);
+
+    // Footer
+    y += 40;
+    doc.fontSize(8).font("Helvetica").fillColor("#999999");
+    doc.text(`Generado: ${new Date().toLocaleString("es-PE", { timeZone: "America/Lima" })} · ShowClinic`, 60, y);
+
+    doc.end();
+  } catch (err) {
+    console.error("❌ Error generando PDF:", err.message);
+    res.status(500).json({ message: "Error generando PDF", error: err.message });
   }
 });
 
