@@ -82,10 +82,14 @@ export default function Login() {
             variant="h2"
             sx={{
               color: "white",
-              fontWeight: 800,
+              fontFamily: "'Playfair Display', 'Cormorant Garamond', Georgia, 'Times New Roman', serif",
+              fontWeight: 600,
+              fontStyle: "italic",
               mb: 2,
-              fontSize: { md: "3rem", lg: "3.5rem" },
-              lineHeight: 1.2,
+              fontSize: { md: "3.2rem", lg: "3.8rem" },
+              lineHeight: 1.15,
+              letterSpacing: "0.5px",
+              textShadow: "0 2px 20px rgba(0,0,0,0.25)",
             }}
           >
             Bienvenido
