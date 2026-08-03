@@ -25,7 +25,10 @@ import {
 const MotionCard = motion(Card);
 const MotionBox = motion(Box);
 
-const API = "/api/gestion-dueno";
+// El backend corre en el puerto 4000; una ruta relativa apuntaría al dev server.
+const API_BASE_URL =
+  process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
+const API = `${API_BASE_URL}/api/gestion-dueno`;
 
 function getToken() {
   const t = localStorage.getItem("token");
@@ -884,7 +887,7 @@ function MetaPanel({ meta, onSaveMeta }) {
    VISTA DASHBOARD
 ====================================================================== */
 function DashboardView({ data, onSaveMeta }) {
-  const { kpis, meta, ingresos_por_mes, tratamientos_mas_vendidos, pagos_pendientes, ultimos_tratamientos, rendimiento_especialistas } = data;
+  const { kpis, meta, ingresos_por_mes, tratamientos_mas_vendidos, pagos_pendientes, ultimos_tratamientos, rendimiento_especialistas, alertas } = data;
 
   const thSx = { fontWeight: 700, fontFamily: fonts.body, fontSize: "11px", textTransform: "uppercase", color: colors.textMuted, letterSpacing: "0.5px", borderBottom: `1px solid ${colors.border}`, py: "10px" };
   const tdSx = { fontFamily: fonts.body, fontSize: "13px", color: colors.textBody, borderBottom: `1px solid ${colors.border}`, py: "12px" };
@@ -913,6 +916,14 @@ function DashboardView({ data, onSaveMeta }) {
 
   return (
     <MotionBox initial="hidden" animate="show">
+      {/* Aviso: trabajo realizado que nadie puede cobrar */}
+      {alertas?.sesiones_sin_especialista > 0 && (
+        <Alert severity="warning" sx={{ mb: "18px", borderRadius: "12px", fontFamily: fonts.body }}>
+          Hay <strong>{alertas.sesiones_sin_especialista} {alertas.sesiones_sin_especialista === 1 ? "sesión completada" : "sesiones completadas"} sin especialista registrado</strong>.
+          Esa comisión no se le está pagando a nadie. Asigna quién las realizó desde el historial del paciente.
+        </Alert>
+      )}
+
       {/* KPIs */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(4, 1fr)" }, gap: "18px", mb: "22px" }}>
         <KPICard i={0} title="Ingresos totales" value={formatMoney(kpis.ingresos_totales)} icon={<AttachMoney />} grad={grads.green} trend={trendIngresos} trendLabel="vs mes anterior" />
@@ -994,7 +1005,9 @@ function DashboardView({ data, onSaveMeta }) {
                       <Avatar sx={{ width: 32, height: 32, background: grads.gold, fontSize: 13, fontFamily: fonts.title, fontWeight: 700 }}>{esp.nombre?.charAt(0)?.toUpperCase()}</Avatar>
                       <Box sx={{ minWidth: 0 }}>
                         <Typography noWrap sx={{ fontSize: "13px", fontWeight: 600, color: colors.primaryDark, fontFamily: fonts.body }}>{esp.nombre}</Typography>
-                        <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>{esp.lineas_culminadas}/{esp.lineas_total} culminadas</Typography>
+                        <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>
+                          {esp.sesiones_realizadas} {esp.sesiones_realizadas === 1 ? "sesión" : "sesiones"} · comisión {formatMoney(esp.comision_a_pagar)}
+                        </Typography>
                       </Box>
                     </Box>
                     <Typography sx={{ fontSize: "13px", fontWeight: 700, color: colors.primary, fontFamily: fonts.body, flexShrink: 0 }}>{formatMoney(esp.ingresos_generados)}</Typography>
@@ -1775,7 +1788,8 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
         <Box sx={{ flex: 1, minWidth: 220 }}>
           <Typography sx={{ fontFamily: fonts.title, fontSize: "22px", fontWeight: 600, color: colors.primaryDark }}>Equipo de Especialistas</Typography>
           <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>
-            La comisión se calcula como un porcentaje sobre el <strong>precio final</strong> (con descuento) de cada presupuesto asignado.
+            El pago se calcula por <strong>sesión realizada</strong>: cada tratamiento reparte su comisión entre sus
+            sesiones y se acredita a quien la ejecutó. Un presupuesto atendido entre varios se divide entre ellos.
           </Typography>
         </Box>
         <Button
@@ -1812,22 +1826,38 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
                 />
               </Box>
               <Divider sx={{ my: "12px", borderColor: colors.border }} />
-              <Grid container spacing={1}>
-                <Grid item xs={6}>
-                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Presupuestos</Typography>
-                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "20px", color: colors.primaryDark }}>{esp.num_presupuestos}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Facturación</Typography>
-                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.body, fontSize: "13px", color: colors.primary, mt: "4px" }}>{formatMoney(esp.base_total)}</Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Box sx={{ mt: "6px", p: "10px 12px", borderRadius: "12px", bgcolor: colors.creamPanel, border: `1px solid ${colors.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography sx={{ fontSize: "11.5px", color: colors.textMuted, fontFamily: fonts.body }}>Pago estimado</Typography>
-                    <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "18px", color: colors.primaryDark }}>{formatMoney(esp.comision_total)}</Typography>
+              <Box sx={{ display: "flex", gap: "10px" }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Sesiones</Typography>
+                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "20px", color: colors.primaryDark, lineHeight: 1.2 }}>
+                    {esp.sesiones_realizadas ?? 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Pacientes</Typography>
+                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "20px", color: colors.primaryDark, lineHeight: 1.2 }}>
+                    {esp.pacientes_atendidos ?? 0}
+                  </Typography>
+                </Box>
+                <Box sx={{ flex: 1.4, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "11px", color: colors.textMuted, fontFamily: fonts.body }}>Generado</Typography>
+                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.body, fontSize: "13px", color: colors.primary, mt: "5px" }} noWrap>
+                    {formatMoney(esp.base_total)}
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ mt: "12px", p: "10px 12px", borderRadius: "12px", bgcolor: colors.creamPanel, border: `1px solid ${colors.border}` }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px" }}>
+                  <Typography sx={{ fontSize: "11.5px", color: colors.textMuted, fontFamily: fonts.body }}>Comisión</Typography>
+                  <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "18px", color: colors.primaryDark }}>{formatMoney(esp.comision_total)}</Typography>
+                </Box>
+                {Number(esp.pago_fijo) > 0 && (
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", mt: "6px", pt: "6px", borderTop: `1px dashed ${colors.border}` }}>
+                    <Typography sx={{ fontSize: "11.5px", color: colors.textMuted, fontFamily: fonts.body }}>+ fijo · total</Typography>
+                    <Typography sx={{ fontWeight: 700, fontFamily: fonts.title, fontSize: "16px", color: colors.primary }}>{formatMoney(esp.total_a_pagar)}</Typography>
                   </Box>
-                </Grid>
-              </Grid>
+                )}
+              </Box>
             </CardContent>
           </Card>
         </Grid>
@@ -2299,11 +2329,14 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
           </Box>
 
           {/* KPIs del especialista */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: "12px" }}>
-            {/* Presupuestos KPI */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: "12px" }}>
+            {/* Sesiones realizadas KPI */}
             <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.creamPanel, borderRadius: "14px" }}>
-              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Presupuestos</Typography>
-              <Typography sx={{ fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{kpisCalc.num}</Typography>
+              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Sesiones realizadas</Typography>
+              <Typography sx={{ fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{resumen?.sesiones_realizadas ?? 0}</Typography>
+              <Typography sx={{ color: colors.textMuted, fontSize: "10px", fontFamily: fonts.body }}>
+                en {kpisCalc.num} presupuesto{kpisCalc.num === 1 ? "" : "s"}
+              </Typography>
             </Box>
             {/* Pagado por pacientes KPI */}
             <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.successBg, borderRadius: "14px", position: "relative", ...(kpi_overrides?.pagado_total_override != null ? { border: `1.5px solid ${colors.gold}` } : {}) }}>
@@ -2313,11 +2346,28 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
             </Box>
             {/* Pago al especialista KPI */}
             <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.goldSoft, borderRadius: "14px", position: "relative", ...(kpi_overrides?.comision_total_override != null ? { border: `1.5px solid ${colors.gold}` } : {}) }}>
-              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Pago al especialista</Typography>
+              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Comisión por sesiones</Typography>
               <Typography sx={{ fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{formatMoney(kpisCalc.comisionTotal)}</Typography>
               {kpi_overrides?.comision_total_override != null && <Chip label="editado" size="small" sx={{ height: 14, fontSize: "0.55rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, position: "absolute", top: 6, right: 6, "& .MuiChip-label": { px: "4px" } }} />}
             </Box>
+            {/* Total a pagar (comisión + pago fijo) */}
+            <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.primaryDark, borderRadius: "14px" }}>
+              <Typography sx={{ color: "rgba(255,255,255,0.75)", fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Total a pagar</Typography>
+              <Typography sx={{ fontWeight: 700, color: colors.white, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>
+                {formatMoney(kpisCalc.comisionTotal + (Number(resumen?.pago_fijo) || 0))}
+              </Typography>
+              {Number(resumen?.pago_fijo) > 0 && (
+                <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: "10px", fontFamily: fonts.body }}>
+                  incl. fijo {formatMoney(resumen.pago_fijo)}
+                </Typography>
+              )}
+            </Box>
           </Box>
+
+          <Typography sx={{ mt: "12px", fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted, textAlign: "center" }}>
+            La comisión se paga por <strong>sesión realizada</strong>: cada tratamiento reparte su {Number(especialista.comision_porcentaje)}%
+            entre sus sesiones y se acredita a quien las ejecutó.
+          </Typography>
 
           {/* Edición de KPIs - solo master */}
           {isMaster && !editingKpis && (
@@ -2438,7 +2488,11 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
   const comisionCalc = Number(pres.comision_estimada) || 0;
   const comisionDisplay = ov.comision_override != null ? Number(ov.comision_override) : comisionCalc;
   const pagadoDisplay = ov.pagado_override != null ? Number(ov.pagado_override) : (Number(pres.monto_pagado_real) || 0);
-  const sesionesDisplay = ov.sesiones_override != null ? `${ov.sesiones_override}` : `${pres.sesiones_completadas || 0}`;
+  // Sesiones que realizó ESTE especialista (no las del presupuesto completo)
+  const misSesiones = pres.mis_sesiones != null ? pres.mis_sesiones : (pres.sesiones_completadas || 0);
+  const sesionesDisplay = ov.sesiones_override != null ? `${ov.sesiones_override}` : `${misSesiones}`;
+  const compartido = pres.compartido_con || [];
+  const detalleSesiones = pres.detalle_sesiones || [];
   const fecha = (pres.creado_en || "").slice(0, 10);
 
   const estadoPagoStyle = pres.estado_pago === "pagado"
@@ -2490,7 +2544,15 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
               <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mt: "2px", flexWrap: "wrap" }}>
                 <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted }}>#{pres.id} · {fecha}</Typography>
                 <Chip label={estadoPagoStyle.label} size="small" sx={{ bgcolor: estadoPagoStyle.bg, color: estadoPagoStyle.text, fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
-                <Chip label={`${sesionesDisplay}/${pres.sesiones_totales || 0} sesiones`} size="small" sx={{ bgcolor: colors.creamPanel, color: colors.textMuted, border: `1px solid ${colors.border}`, fontWeight: 600, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
+                <Chip
+                  label={`${sesionesDisplay} de ${pres.sesiones_totales || 0} sesiones`}
+                  size="small"
+                  title="Sesiones que realizó este especialista sobre el total del presupuesto"
+                  sx={{ bgcolor: colors.goldSoft, color: colors.primaryDark, border: `1px solid ${colors.gold}`, fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }}
+                />
+                {compartido.length > 0 && (
+                  <Chip label="compartido" size="small" sx={{ bgcolor: "#EDE7F6", color: "#5E35B1", border: "1px solid #B39DDB", fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
+                )}
                 {hasOverrides && <Chip label="editado" size="small" sx={{ height: 16, fontSize: "0.58rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, "& .MuiChip-label": { px: "5px" } }} />}
                 {isHidden && <Chip label="oculto" size="small" sx={{ height: 16, fontSize: "0.58rem", fontFamily: fonts.body, bgcolor: "#e0e0e0", color: "#777", "& .MuiChip-label": { px: "5px" } }} />}
               </Box>
@@ -2549,7 +2611,7 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Base comisión</Typography>
+                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Valor de sus sesiones</Typography>
                 <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.primary }}>{formatMoney(base)}</Typography>
               </Box>
               <Box>
@@ -2566,9 +2628,9 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
                 </Box>
               </Box>
             </Box>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: "10px", pt: "10px", borderTop: `1px dashed ${colors.border}` }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: "10px", pt: "10px", borderTop: `1px dashed ${colors.border}`, flexWrap: "wrap", gap: "8px" }}>
               <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>
-                {formatMoney(base)} × {pct}% = <strong style={{ color: colors.primaryDark }}>{formatMoney(comisionCalc)}</strong>
+                {misSesiones} {misSesiones === 1 ? "sesión" : "sesiones"} · {formatMoney(base)} × {pct}% = <strong style={{ color: colors.primaryDark }}>{formatMoney(comisionCalc)}</strong>
               </Typography>
               <Button
                 size="small" onClick={onEditPct} startIcon={<PercentRounded sx={{ fontSize: 14 }} />}
@@ -2579,6 +2641,25 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
             </Box>
           </Box>
 
+          {/* Reparto con otros especialistas del mismo presupuesto */}
+          {compartido.length > 0 && (
+            <Box sx={{ mt: "10px", p: "10px 14px", borderRadius: "12px", bgcolor: "#F6F2FC", border: "1px solid #D1C4E9" }}>
+              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#5E35B1", fontFamily: fonts.body, mb: "6px" }}>
+                Presupuesto compartido — comisión total S/ {Number(pres.comision_total_presupuesto || 0).toFixed(2)}
+              </Typography>
+              {compartido.map((c, ci) => (
+                <Box key={ci} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "3px" }}>
+                  <Typography sx={{ fontSize: "12px", color: colors.textBody, fontFamily: fonts.body }}>
+                    {c.especialista_nombre || "Sin registrar"} · {c.sesiones} {c.sesiones === 1 ? "sesión" : "sesiones"}
+                  </Typography>
+                  <Typography sx={{ fontSize: "12px", fontWeight: 600, color: "#5E35B1", fontFamily: fonts.body }}>
+                    {formatMoney(c.comision)}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+
           {/* Nota/Descripción visible */}
           {!editing && ov.nota && (
             <Box sx={{ mt: "10px", p: "10px 14px", borderRadius: "10px", bgcolor: "#FFFDF8", border: `1px solid ${colors.gold}`, display: "flex", gap: "8px", alignItems: "flex-start" }}>
@@ -2587,23 +2668,33 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
             </Box>
           )}
 
-          {/* Tratamientos del presupuesto */}
-          {pres.tratamientos && pres.tratamientos.length > 0 && (
+          {/* Detalle de las sesiones que realizó este especialista */}
+          {detalleSesiones.length > 0 && (
             <Box sx={{ mt: "10px" }}>
               <Button
                 size="small" onClick={() => setOpen(!open)} endIcon={<ExpandMore sx={{ fontSize: 18, transform: open ? "rotate(180deg)" : "none", transition: "0.2s" }} />}
                 sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "12px", color: colors.textMuted, p: 0, "&:hover": { bgcolor: "transparent", color: colors.primary } }}
               >
-                {pres.tratamientos.length} {pres.tratamientos.length === 1 ? "tratamiento" : "tratamientos"}
+                Ver sus {detalleSesiones.length} {detalleSesiones.length === 1 ? "sesión" : "sesiones"}
               </Button>
               <Collapse in={open}>
                 <Box sx={{ mt: "8px" }}>
-                  {pres.tratamientos.map((t, ti) => (
-                    <Box key={ti} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "6px", borderTop: ti > 0 ? `1px solid ${colors.border}` : "none" }}>
-                      <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textBody }}>
-                        {t.nombre} {t.sesiones > 1 && <span style={{ color: colors.textMuted }}>({t.sesiones} sesiones)</span>}
+                  {detalleSesiones.map((s, si) => (
+                    <Box key={si} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", py: "6px", borderTop: si > 0 ? `1px solid ${colors.border}` : "none" }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textBody }}>
+                          {s.tratamiento_nombre}
+                          {s.total_sesiones > 1 && (
+                            <span style={{ color: colors.textMuted }}> · sesión {s.sesion_numero}/{s.total_sesiones}</span>
+                          )}
+                        </Typography>
+                        <Typography sx={{ fontFamily: fonts.body, fontSize: "11px", color: colors.textMuted }}>
+                          {(s.fecha_realizada || "").slice(0, 10)} · valor {formatMoney(s.valor_sesion)}
+                        </Typography>
+                      </Box>
+                      <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", fontWeight: 700, color: colors.primary, whiteSpace: "nowrap" }}>
+                        {formatMoney(s.comision_sesion)}
                       </Typography>
-                      <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", fontWeight: 600, color: colors.primary }}>{formatMoney(t.precio)}</Typography>
                     </Box>
                   ))}
                 </Box>

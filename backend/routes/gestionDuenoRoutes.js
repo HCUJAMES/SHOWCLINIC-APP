@@ -2,6 +2,14 @@ import express from "express";
 import db, { dbAll, dbGet, dbRun } from "../db/database.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { getReporteFinanciero } from "./finanzasRoutes.js";
+import {
+  desglosarPresupuesto,
+  cargarPctEspecialistas,
+  trabajoDeEspecialista,
+  rendimientoEspecialistas as calcularRendimientoEspecialistas,
+  sesionesHuerfanas,
+  redondear,
+} from "../services/comisiones.js";
 import PDFDocument from "pdfkit";
 
 const router = express.Router();
@@ -153,22 +161,6 @@ async function ensureComisionSchema() {
   comisionSchemaReady = true;
 }
 
-// Base de comisión de un presupuesto = precio final (precio_total - descuento), nunca negativo
-function baseComisionPresupuesto(pres) {
-  const precio = Number(pres.precio_total) || 0;
-  const descuento = Number(pres.descuento) || 0;
-  return Math.max(0, precio - descuento);
-}
-
-// Porcentaje efectivo de comisión de un presupuesto (override del presupuesto > default del especialista > 20)
-function pctComisionPresupuesto(pres, pctEspecialista) {
-  if (pres.comision_porcentaje != null && pres.comision_porcentaje !== "") {
-    return Number(pres.comision_porcentaje);
-  }
-  if (pctEspecialista != null) return Number(pctEspecialista);
-  return 20;
-}
-
 // Calcula el monto de comisión de una línea (fijo tiene prioridad si está configurado)
 function comisionDeLinea(linea) {
   const tipo = linea.comision_tipo || (linea.comision_fija > 0 ? "fijo" : "porcentaje");
@@ -290,19 +282,16 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
       ORDER BY ps.fecha_realizada DESC LIMIT 20
     `);
 
-    // Rendimiento por especialista (respeta el filtro de periodo por fecha del presupuesto)
-    const rendimientoEspecialistas = await dbAll(`
-      SELECT e.id, e.nombre, e.comision_porcentaje,
-        COUNT(DISTINCT lp.id) as lineas_total,
-        SUM(CASE WHEN lp.estado = 'culminado' THEN 1 ELSE 0 END) as lineas_culminadas,
-        COALESCE(SUM(lp.precio), 0) as ingresos_generados
-      FROM especialistas e
-      LEFT JOIN lineas_presupuesto lp
-        ON lp.especialista_id = e.id
-        AND lp.presupuesto_asignado_id IN (SELECT id FROM presupuestos_asignados WHERE 1=1 ${condFechaPres})
-      GROUP BY e.id
-      ORDER BY ingresos_generados DESC
-    `, paramsPres);
+    // Rendimiento por especialista — calculado sobre las SESIONES realizadas
+    // en el periodo (quién hizo el trabajo), no sobre a quién se le asignó el
+    // presupuesto. Ver services/comisiones.js.
+    const rendimientoEspecialistas = await calcularRendimientoEspecialistas({
+      fecha_inicio,
+      fecha_fin,
+    });
+
+    // Sesiones completadas sin especialista registrado: trabajo que nadie cobra.
+    const huerfanas = await sesionesHuerfanas({ fecha_inicio, fecha_fin });
 
     // Presupuestos activos
     const presupuestosActivos = await dbGet(
@@ -335,7 +324,11 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
       tratamientos_mas_vendidos: tratamientosMasVendidos,
       pagos_pendientes: pagosPendientes,
       ultimos_tratamientos: ultimosTratamientos,
-      rendimiento_especialistas: rendimientoEspecialistas
+      rendimiento_especialistas: rendimientoEspecialistas,
+      alertas: {
+        sesiones_sin_especialista: huerfanas.length,
+        detalle_sin_especialista: huerfanas.slice(0, 20),
+      }
     });
   } catch (err) {
     console.error("❌ Error dashboard dueño:", err.message);
@@ -574,19 +567,31 @@ router.put("/lineas/:linea_id/comision", authMiddleware, requireOwner, async (re
     const nuevoMonto = comisionDeLinea(actualizada);
 
     if (actualizada.estado === "culminado") {
-      const comision = await dbGet(
+      // Una línea culminada puede tener una comisión por cada especialista que
+      // realizó sus sesiones: el nuevo monto se reparte en la misma proporción.
+      const comisiones = await dbAll(
         "SELECT * FROM comisiones_especialistas WHERE linea_presupuesto_id = ? AND revertido = 0",
         [linea_id]
       );
-      if (comision && comision.estado === "liquidado") {
+
+      if (comisiones.some((c) => c.estado === "liquidado")) {
         return res.json({
           message: "Regla de comisión guardada, pero la comisión actual ya fue liquidada y no se recalcula.",
-          comision_monto: comision.monto,
+          comision_monto: comisiones.reduce((a, c) => a + (Number(c.monto) || 0), 0),
           recalculado: false
         });
       }
-      if (comision) {
-        await dbRun("UPDATE comisiones_especialistas SET monto = ? WHERE id = ?", [nuevoMonto, comision.id]);
+
+      const totalPrevio = comisiones.reduce((a, c) => a + (Number(c.monto) || 0), 0);
+      for (const c of comisiones) {
+        // Sin monto previo (todos en 0) se reparte en partes iguales.
+        const proporcion = totalPrevio > 0
+          ? (Number(c.monto) || 0) / totalPrevio
+          : 1 / comisiones.length;
+        await dbRun("UPDATE comisiones_especialistas SET monto = ? WHERE id = ?", [
+          redondear(nuevoMonto * proporcion),
+          c.id,
+        ]);
       }
       await dbRun("UPDATE lineas_presupuesto SET comision_monto = ? WHERE id = ?", [nuevoMonto, linea_id]);
     }
@@ -622,14 +627,46 @@ router.post("/lineas/:linea_id/culminar", authMiddleware, requireOwner, async (r
       return res.status(400).json({ message: "La línea ya está culminada" });
     }
 
-    if (!linea.especialista_id) {
-      return res.status(400).json({ message: "La línea debe tener un especialista asignado para culminar" });
-    }
-
     const ahora = fechaLima();
 
-    // Calcular comisión (fijo por tratamiento o % del precio)
-    const comisionMonto = comisionDeLinea(linea);
+    // La comisión se reparte entre quienes REALIZARON las sesiones de este
+    // tratamiento, no entre quien figura asignado a la línea.
+    const presupuesto = await dbGet(
+      "SELECT * FROM presupuestos_asignados WHERE id = ?",
+      [linea.presupuesto_asignado_id]
+    );
+    const pctMap = await cargarPctEspecialistas();
+    const desglose = await desglosarPresupuesto(presupuesto, pctMap);
+
+    const sesionesDeLinea = desglose.sesiones.filter(
+      (s) => s.tratamiento_nombre === linea.tratamiento_nombre && s.estado === "completada"
+    );
+
+    if (sesionesDeLinea.length === 0) {
+      return res.status(400).json({
+        message: "No hay sesiones completadas de este tratamiento. Marca primero quién las realizó.",
+      });
+    }
+
+    const sinEspecialista = sesionesDeLinea.filter((s) => s.especialista_id == null);
+    if (sinEspecialista.length > 0) {
+      return res.status(400).json({
+        message: `${sinEspecialista.length} sesión(es) de este tratamiento no tienen especialista registrado. Asígnalo antes de culminar.`,
+      });
+    }
+
+    // Agrupar por especialista
+    const porEsp = new Map();
+    for (const s of sesionesDeLinea) {
+      const acum = porEsp.get(s.especialista_id) || { monto: 0, sesiones: 0 };
+      acum.monto += s.comision_sesion;
+      acum.sesiones += 1;
+      porEsp.set(s.especialista_id, acum);
+    }
+
+    const comisionMonto = redondear(
+      Array.from(porEsp.values()).reduce((a, v) => a + v.monto, 0)
+    );
 
     // Actualizar línea a culminado
     await dbRun(
@@ -637,12 +674,17 @@ router.post("/lineas/:linea_id/culminar", authMiddleware, requireOwner, async (r
       [ahora, username, comisionMonto, linea_id]
     );
 
-    // Crear registro de comisión pendiente
-    await dbRun(
-      `INSERT INTO comisiones_especialistas (especialista_id, linea_presupuesto_id, presupuesto_asignado_id, paciente_id, monto, estado, creado_en)
-       VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
-      [linea.especialista_id, linea_id, linea.presupuesto_asignado_id, linea.paciente_id, comisionMonto, ahora]
-    );
+    // Un registro de comisión por especialista que participó
+    const repartos = [];
+    for (const [espId, v] of porEsp.entries()) {
+      const monto = redondear(v.monto);
+      await dbRun(
+        `INSERT INTO comisiones_especialistas (especialista_id, linea_presupuesto_id, presupuesto_asignado_id, paciente_id, monto, estado, creado_en)
+         VALUES (?, ?, ?, ?, ?, 'pendiente', ?)`,
+        [espId, linea_id, linea.presupuesto_asignado_id, linea.paciente_id, monto, ahora]
+      );
+      repartos.push({ especialista_id: espId, sesiones: v.sesiones, monto });
+    }
 
     // Verificar si todas las líneas del presupuesto están culminadas → actualizar estado_gestion
     const pendientes = await dbGet(
@@ -658,8 +700,11 @@ router.post("/lineas/:linea_id/culminar", authMiddleware, requireOwner, async (r
     }
 
     res.json({
-      message: "✅ Línea culminada y comisión registrada",
+      message: repartos.length > 1
+        ? `✅ Línea culminada — comisión repartida entre ${repartos.length} especialistas`
+        : "✅ Línea culminada y comisión registrada",
       comision_monto: comisionMonto,
+      repartos,
       estado_presupuesto: pendientes.c === 0 ? "culminado" : "activo"
     });
   } catch (err) {
@@ -685,13 +730,13 @@ router.post("/lineas/:linea_id/revertir", authMiddleware, requireOwner, async (r
       return res.status(400).json({ message: "La línea no está culminada" });
     }
 
-    // Verificar que la comisión no esté liquidada
-    const comision = await dbGet(
+    // Una línea puede haber generado varias comisiones (una por especialista)
+    const comisiones = await dbAll(
       `SELECT * FROM comisiones_especialistas WHERE linea_presupuesto_id = ? AND revertido = 0`,
       [linea_id]
     );
 
-    if (comision && comision.estado === "liquidado") {
+    if (comisiones.some((c) => c.estado === "liquidado")) {
       return res.status(400).json({ message: "No se puede revertir: la comisión ya fue liquidada" });
     }
 
@@ -704,11 +749,11 @@ router.post("/lineas/:linea_id/revertir", authMiddleware, requireOwner, async (r
       [nuevoEstado, ahora, username, linea_id]
     );
 
-    // Revertir la comisión
-    if (comision) {
+    // Revertir todas las comisiones generadas por esta línea
+    for (const c of comisiones) {
       await dbRun(
         `UPDATE comisiones_especialistas SET revertido = 1, revertido_en = ?, revertido_por = ? WHERE id = ?`,
-        [ahora, username, comision.id]
+        [ahora, username, c.id]
       );
     }
 
@@ -742,90 +787,108 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
     }
     const pctDefault = especialista.comision_porcentaje != null ? Number(especialista.comision_porcentaje) : 20;
 
-    // Presupuestos asignados a este especialista (con filtro de fechas opcional)
-    let cond = "pa.especialista_id = ?";
-    const params = [id];
-    if (fecha_inicio) { cond += " AND DATE(pa.creado_en) >= ?"; params.push(fecha_inicio); }
-    if (fecha_fin) { cond += " AND DATE(pa.creado_en) <= ?"; params.push(fecha_fin); }
+    // ── Trabajo REALMENTE realizado por este especialista ─────────────────
+    // Se agrupa por sesión completada (no por presupuesto), de modo que si un
+    // presupuesto lo atienden varios especialistas, cada uno cobra solo lo suyo.
+    const trabajo = await trabajoDeEspecialista(id, { fecha_inicio, fecha_fin });
 
-    const presupuestos = await dbAll(`
-      SELECT pa.id, pa.paciente_id, pa.precio_total, pa.descuento, pa.estado,
-             pa.estado_pago, pa.monto_pagado, pa.saldo_pendiente,
-             pa.comision_porcentaje, pa.creado_en, pa.tratamientos_json,
-             pa.monto_consulta,
-             p.nombre as paciente_nombre, p.apellido as paciente_apellido, p.dni as paciente_dni,
-             (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id AND ps.estado = 'completada') as sesiones_completadas,
-             (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id) as sesiones_totales
-      FROM presupuestos_asignados pa
-      JOIN patients p ON pa.paciente_id = p.id
-      WHERE ${cond}
-      ORDER BY pa.creado_en DESC
-    `, params);
+    let baseTotal = 0;        // valor de las sesiones que hizo
+    let comisionTotal = 0;    // pago que le corresponde
+    let pagadoTotal = 0;      // lo que el paciente ya pagó de esos presupuestos
 
-    let baseTotal = 0;        // facturación con descuento
-    let comisionTotal = 0;    // pago estimado al especialista
-    let pagadoTotal = 0;      // lo que el paciente ya pagó
+    const presupuestos = [];
 
-    for (const pres of presupuestos) {
+    for (const t of trabajo.presupuestos) {
+      const pres = await dbGet(
+        `SELECT pa.*, p.nombre as paciente_nombre, p.apellido as paciente_apellido, p.dni as paciente_dni
+         FROM presupuestos_asignados pa JOIN patients p ON pa.paciente_id = p.id
+         WHERE pa.id = ?`,
+        [t.presupuesto_id]
+      );
+      if (!pres) continue;
+
       // Tratamientos (nombres + sesiones) desde el JSON
+      let tratamientos = [];
       try {
         const items = pres.tratamientos_json ? JSON.parse(pres.tratamientos_json) : [];
-        pres.tratamientos = items
+        tratamientos = items
           .filter((it) => it.marca === undefined || it.marca === "gold" || it.marca === "purple")
           .map((it) => ({ nombre: it.nombre, sesiones: Number(it.sesiones) || 1, precio: Number(it.precio) || 0, marca: it.marca || "gold" }));
       } catch (e) {
-        pres.tratamientos = [];
+        tratamientos = [];
       }
-      delete pres.tratamientos_json;
 
       // Pago real desde finanzas (fuente de verdad)
-      // Incluye pagos directos al presupuesto + consultas vinculadas
       const sumaPagos = await dbGet(
         `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas
          WHERE referencia_id = ? AND referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta') AND tipo = 'ingreso'`,
         [pres.id]
       );
-      pres.monto_pagado_real = parseFloat(sumaPagos?.total) || 0;
+      const montoPagadoReal = parseFloat(sumaPagos?.total) || 0;
 
       // Recalcular estado_pago basado en precio original (sin desc consulta) vs pagos directos
       const precioOriginal = Number(pres.precio_total) || 0;
       const descSinConsulta = Math.max(0, (Number(pres.descuento) || 0) - (Number(pres.monto_consulta) || 0));
       const baseParaEstado = Math.max(0, precioOriginal - descSinConsulta);
+      let estadoPago = pres.estado_pago;
       if (baseParaEstado > 0) {
-        if (pres.monto_pagado_real >= baseParaEstado - 0.01) {
-          pres.estado_pago = "pagado";
-        } else if (pres.monto_pagado_real > 0) {
-          pres.estado_pago = "adelanto";
-        } else {
-          pres.estado_pago = "pendiente";
-        }
+        if (montoPagadoReal >= baseParaEstado - 0.01) estadoPago = "pagado";
+        else if (montoPagadoReal > 0) estadoPago = "adelanto";
+        else estadoPago = "pendiente";
       }
-
-      const base = baseComisionPresupuesto(pres);
-      const pct = pctComisionPresupuesto(pres, pctDefault);
-      const comision = base * (pct / 100);
-
-      pres.base_comision = base;              // precio final (precio_total - descuento)
-      pres.comision_porcentaje_efectivo = pct;
-      pres.comision_estimada = comision;
-      pres.usa_override = pres.comision_porcentaje != null;
 
       // Leer overrides editables (no afectan el presupuesto real)
       const ov = await dbGet(
         `SELECT pagado_override, sesiones_override, comision_override, nota, oculto FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
         [id, pres.id]
       );
-      pres.overrides = ov || null;
+
+      const fila = {
+        id: pres.id,
+        paciente_id: pres.paciente_id,
+        paciente_nombre: pres.paciente_nombre,
+        paciente_apellido: pres.paciente_apellido,
+        paciente_dni: pres.paciente_dni,
+        precio_total: Number(pres.precio_total) || 0,
+        descuento: Number(pres.descuento) || 0,
+        estado: pres.estado,
+        estado_pago: estadoPago,
+        creado_en: pres.creado_en,
+        comision_porcentaje: pres.comision_porcentaje,
+        tratamientos,
+        monto_pagado_real: montoPagadoReal,
+
+        // Sesiones del presupuesto completo (contexto)
+        sesiones_totales: t.sesiones_totales,
+        sesiones_completadas: t.sesiones_realizadas,
+
+        // 👇 Lo que corresponde a ESTE especialista
+        mis_sesiones: t.mis_sesiones,
+        base_comision: t.mi_valor_generado,      // valor de SUS sesiones
+        comision_estimada: t.mi_comision,        // pago por SUS sesiones
+        comision_porcentaje_efectivo: t.detalle_sesiones[0]?.comision_porcentaje ?? pctDefault,
+        usa_override: pres.comision_porcentaje != null,
+        detalle_sesiones: t.detalle_sesiones,
+        compartido_con: t.compartido_con,        // otros especialistas del mismo presupuesto
+        comision_total_presupuesto: t.comision_total_presupuesto,
+        overrides: ov || null,
+      };
+
+      presupuestos.push(fila);
 
       // Si está oculto, no sumar a los totales
       if (ov && ov.oculto) continue;
 
-      baseTotal += base;
-      comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : comision;
-      pagadoTotal += (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : pres.monto_pagado_real;
+      baseTotal += fila.base_comision;
+      comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : fila.comision_estimada;
+      pagadoTotal += (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : montoPagadoReal;
     }
 
-    const ticketPromedio = presupuestos.length > 0 ? baseTotal / presupuestos.length : 0;
+    baseTotal = redondear(baseTotal);
+    comisionTotal = redondear(comisionTotal);
+    pagadoTotal = redondear(pagadoTotal);
+
+    const ticketPromedio = presupuestos.length > 0 ? redondear(baseTotal / presupuestos.length) : 0;
 
     // KPI overrides por periodo
     const periodoKey = `${fecha_inicio || "all"}_${fecha_fin || "all"}`;
@@ -841,7 +904,13 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
         base_total: baseTotal,
         comision_total: comisionTotal,
         pagado_total: pagadoTotal,
-        ticket_promedio: ticketPromedio
+        ticket_promedio: ticketPromedio,
+        // Métricas de trabajo realizado
+        sesiones_realizadas: trabajo.resumen.sesiones_realizadas,
+        num_pacientes: trabajo.resumen.num_pacientes,
+        valor_promedio_sesion: trabajo.resumen.valor_promedio_sesion,
+        pago_fijo: Number(especialista.pago_fijo) || 0,
+        total_a_pagar: redondear(comisionTotal + (Number(especialista.pago_fijo) || 0)),
       },
       kpi_overrides: kpiOv || null,
       presupuestos
@@ -849,6 +918,109 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
   } catch (err) {
     console.error("❌ Error perfil especialista:", err.message);
     res.status(500).json({ message: "Error al obtener perfil", error: err.message });
+  }
+});
+
+/* ======================================================================
+   🧾 DETALLE DE SESIONES REALIZADAS POR UN ESPECIALISTA
+   Lista plana, ideal para revisar/exportar antes de pagarle.
+====================================================================== */
+router.get("/especialistas/:id/sesiones", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fecha_inicio, fecha_fin } = req.query;
+
+    const especialista = await dbGet("SELECT * FROM especialistas WHERE id = ?", [id]);
+    if (!especialista) {
+      return res.status(404).json({ message: "Especialista no encontrado" });
+    }
+
+    const trabajo = await trabajoDeEspecialista(id, { fecha_inicio, fecha_fin });
+
+    // Aplanar todas las sesiones con el contexto de su paciente
+    const sesiones = [];
+    for (const p of trabajo.presupuestos) {
+      for (const s of p.detalle_sesiones) {
+        sesiones.push({
+          ...s,
+          presupuesto_id: p.presupuesto_id,
+          paciente_id: p.paciente_id,
+          paciente_nombre: `${p.paciente_nombre || ""} ${p.paciente_apellido || ""}`.trim(),
+          paciente_dni: p.paciente_dni,
+        });
+      }
+    }
+    sesiones.sort((a, b) => String(b.fecha_realizada).localeCompare(String(a.fecha_realizada)));
+
+    res.json({
+      especialista: {
+        id: especialista.id,
+        nombre: especialista.nombre,
+        especialidad: especialista.especialidad,
+        comision_porcentaje: especialista.comision_porcentaje ?? 20,
+        pago_fijo: Number(especialista.pago_fijo) || 0,
+      },
+      resumen: {
+        ...trabajo.resumen,
+        pago_fijo: Number(especialista.pago_fijo) || 0,
+        total_a_pagar: redondear(trabajo.resumen.comision_total + (Number(especialista.pago_fijo) || 0)),
+      },
+      sesiones,
+    });
+  } catch (err) {
+    console.error("❌ Error detalle sesiones especialista:", err.message);
+    res.status(500).json({ message: "Error al obtener sesiones", error: err.message });
+  }
+});
+
+/* ======================================================================
+   ⚠️ SESIONES REALIZADAS SIN ESPECIALISTA — y corrección
+   Trabajo que se hizo pero que nadie puede cobrar porque no se registró
+   quién lo realizó. El dueño puede asignarlo aquí.
+====================================================================== */
+router.get("/sesiones-sin-especialista", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    const { fecha_inicio, fecha_fin } = req.query;
+    const sesiones = await sesionesHuerfanas({ fecha_inicio, fecha_fin });
+    res.json({ total: sesiones.length, sesiones });
+  } catch (err) {
+    console.error("❌ Error sesiones sin especialista:", err.message);
+    res.status(500).json({ message: "Error al obtener sesiones", error: err.message });
+  }
+});
+
+router.put("/sesiones/:sesion_id/especialista", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    const { sesion_id } = req.params;
+    const { especialista_id } = req.body;
+
+    if (!especialista_id) {
+      return res.status(400).json({ message: "especialista_id es requerido" });
+    }
+
+    const especialista = await dbGet("SELECT id, nombre FROM especialistas WHERE id = ?", [especialista_id]);
+    if (!especialista) {
+      return res.status(404).json({ message: "Especialista no encontrado" });
+    }
+
+    const sesion = await dbGet("SELECT id, estado FROM presupuestos_sesiones WHERE id = ?", [sesion_id]);
+    if (!sesion) {
+      return res.status(404).json({ message: "Sesión no encontrada" });
+    }
+
+    await dbRun(
+      `UPDATE presupuestos_sesiones SET especialista_id = ?, especialista = ? WHERE id = ?`,
+      [especialista.id, especialista.nombre, sesion_id]
+    );
+
+    res.json({
+      message: "✅ Especialista asignado a la sesión",
+      especialista_id: especialista.id,
+      especialista_nombre: especialista.nombre,
+    });
+  } catch (err) {
+    console.error("❌ Error asignando especialista a sesión:", err.message);
+    res.status(500).json({ message: "Error al asignar especialista", error: err.message });
   }
 });
 
@@ -914,30 +1086,37 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
     if (!especialista) return res.status(404).json({ message: "Especialista no encontrado" });
     const pctDefault = especialista.comision_porcentaje != null ? Number(especialista.comision_porcentaje) : 20;
 
-    let cond = "pa.especialista_id = ?";
-    const params = [id];
-    if (fecha_inicio) { cond += " AND DATE(pa.creado_en) >= ?"; params.push(fecha_inicio); }
-    if (fecha_fin) { cond += " AND DATE(pa.creado_en) <= ?"; params.push(fecha_fin); }
+    // Mismo cálculo por sesión realizada que usa la pantalla, para que el PDF
+    // y la vista de Gestión Dueño nunca muestren cifras distintas.
+    const trabajo = await trabajoDeEspecialista(id, { fecha_inicio, fecha_fin });
 
-    const presupuestos = await dbAll(`
-      SELECT pa.id, pa.precio_total, pa.descuento, pa.estado_pago, pa.comision_porcentaje, pa.creado_en,
-             p.nombre as paciente_nombre, p.apellido as paciente_apellido,
-             (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id AND ps.estado = 'completada') as sesiones_completadas,
-             (SELECT COUNT(*) FROM presupuestos_sesiones ps WHERE ps.presupuesto_asignado_id = pa.id) as sesiones_totales
-      FROM presupuestos_asignados pa
-      JOIN patients p ON pa.paciente_id = p.id
-      WHERE ${cond}
-      ORDER BY pa.creado_en DESC
-    `, params);
+    const presupuestos = [];
+    for (const t of trabajo.presupuestos) {
+      const cab = await dbGet(
+        `SELECT pa.id, pa.precio_total, pa.descuento, pa.estado_pago, pa.comision_porcentaje, pa.creado_en
+         FROM presupuestos_asignados pa WHERE pa.id = ?`,
+        [t.presupuesto_id]
+      );
+      presupuestos.push({
+        ...cab,
+        paciente_nombre: t.paciente_nombre,
+        paciente_apellido: t.paciente_apellido,
+        sesiones_completadas: t.mis_sesiones,
+        sesiones_totales: t.sesiones_totales,
+        _base: t.mi_valor_generado,
+        _comision: t.mi_comision,
+        _pct: t.detalle_sesiones[0]?.comision_porcentaje ?? pctDefault,
+      });
+    }
 
     let totalComision = 0;
     let totalPagado = 0;
     const rows = [];
 
     for (const pres of presupuestos) {
-      const base = baseComisionPresupuesto(pres);
-      const pct = pctComisionPresupuesto(pres, pctDefault);
-      const comision = base * (pct / 100);
+      const base = pres._base;
+      const pct = pres._pct;
+      const comision = pres._comision;
 
       const sumaPagos = await dbGet(
         `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas WHERE referencia_id = ? AND referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta') AND tipo = 'ingreso'`,
@@ -1375,30 +1554,51 @@ router.get("/especialistas", authMiddleware, requireOwner, async (req, res) => {
   try {
     const { fecha_inicio, fecha_fin } = req.query;
 
-    // Filtro de fechas sobre la fecha de creación del presupuesto
-    let joinCond = "pa.especialista_id = e.id";
-    const params = [];
-    if (fecha_inicio) { joinCond += " AND DATE(pa.creado_en) >= ?"; params.push(fecha_inicio); }
-    if (fecha_fin) { joinCond += " AND DATE(pa.creado_en) <= ?"; params.push(fecha_fin); }
+    // El pago se calcula sobre las SESIONES que cada especialista realizó,
+    // no sobre el presupuesto completo. Ver services/comisiones.js.
+    const rendimiento = await calcularRendimientoEspecialistas({ fecha_inicio, fecha_fin });
 
-    // Comisión = % efectivo (override del presupuesto o default del especialista) sobre el precio final (precio_total - descuento)
-    const especialistas = await dbAll(`
-      SELECT e.id, e.nombre, e.tipo, e.especialidad, e.cuenta_bancaria,
-        COALESCE(e.comision_porcentaje, 20) as comision_porcentaje,
-        COUNT(pa.id) as num_presupuestos,
-        COALESCE(SUM(MAX(pa.precio_total - COALESCE(pa.descuento, 0), 0)), 0) as base_total,
-        COALESCE(SUM(
-          MAX(pa.precio_total - COALESCE(pa.descuento, 0), 0)
-          * (COALESCE(pa.comision_porcentaje, e.comision_porcentaje, 20) / 100.0)
-        ), 0) as comision_total,
-        (SELECT COALESCE(SUM(c.monto), 0) FROM comisiones_especialistas c WHERE c.especialista_id = e.id AND c.estado = 'pendiente' AND c.revertido = 0) as comision_pendiente,
-        (SELECT COALESCE(SUM(c.monto), 0) FROM comisiones_especialistas c WHERE c.especialista_id = e.id AND c.estado = 'liquidado' AND c.revertido = 0) as comision_liquidada
-      FROM especialistas e
-      LEFT JOIN presupuestos_asignados pa ON ${joinCond}
-      GROUP BY e.id
-      ORDER BY e.nombre ASC
-    `, params);
+    const datosBase = await dbAll(
+      `SELECT id, nombre, tipo, especialidad, cuenta_bancaria FROM especialistas`
+    );
+    const infoPorId = new Map(datosBase.map((e) => [e.id, e]));
 
+    const especialistas = [];
+    for (const r of rendimiento) {
+      const base = infoPorId.get(r.id) || {};
+      const pendiente = await dbGet(
+        `SELECT COALESCE(SUM(monto), 0) as t FROM comisiones_especialistas
+         WHERE especialista_id = ? AND estado = 'pendiente' AND revertido = 0`,
+        [r.id]
+      );
+      const liquidada = await dbGet(
+        `SELECT COALESCE(SUM(monto), 0) as t FROM comisiones_especialistas
+         WHERE especialista_id = ? AND estado = 'liquidado' AND revertido = 0`,
+        [r.id]
+      );
+
+      especialistas.push({
+        id: r.id,
+        nombre: r.nombre,
+        tipo: base.tipo,
+        especialidad: r.especialidad,
+        cuenta_bancaria: base.cuenta_bancaria,
+        comision_porcentaje: r.comision_porcentaje,
+        // Nombres conservados para compatibilidad con la vista actual
+        num_presupuestos: r.pacientes_atendidos,
+        base_total: r.ingresos_generados,
+        comision_total: r.comision_a_pagar,
+        // Métricas nuevas basadas en trabajo realizado
+        sesiones_realizadas: r.sesiones_realizadas,
+        pacientes_atendidos: r.pacientes_atendidos,
+        pago_fijo: r.pago_fijo,
+        total_a_pagar: r.total_a_pagar,
+        comision_pendiente: Number(pendiente?.t) || 0,
+        comision_liquidada: Number(liquidada?.t) || 0,
+      });
+    }
+
+    especialistas.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre)));
     res.json(especialistas);
   } catch (err) {
     console.error("❌ Error listando especialistas:", err.message);

@@ -8,6 +8,24 @@ const router = express.Router();
 const fechaLima = () =>
   new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
 
+/**
+ * Especialista PREVISTO por sesión (quién se espera que la realice).
+ * Es distinto de `especialista_id`, que registra quién la realizó de verdad
+ * y es el único que cuenta para comisiones.
+ */
+let presupuestoSchemaReady = false;
+async function ensurePresupuestoSchema() {
+  if (presupuestoSchemaReady) return;
+  try {
+    await dbRun(`ALTER TABLE presupuestos_sesiones ADD COLUMN especialista_previsto_id INTEGER`);
+  } catch (err) {
+    if (!String(err.message).includes("duplicate column")) {
+      console.error("❌ Error agregando especialista_previsto_id:", err.message);
+    }
+  }
+  presupuestoSchemaReady = true;
+}
+
 // Middleware para verificar permisos
 // Todos los roles pueden crear/editar/eliminar paquetes base
 const requirePaquetesWrite = [authMiddleware, requireRole("doctor", "master", "asistente", "admin", "logistica", "doctora")];
@@ -932,13 +950,17 @@ router.post("/paquete-paciente/:paquete_paciente_id/consulta", requirePaquetesAs
    🎁 ASIGNAR PRESUPUESTO A PACIENTE
 ============================== */
 router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => {
-  const { paciente_id, oferta_id, notas, marcas, especialista_id } = req.body;
+  // `asignaciones` permite un especialista distinto por tratamiento:
+  //   { "Botox": 3, "Limpieza facial": 8 }
+  // `especialista_id` sigue funcionando como valor por defecto para todos.
+  const { paciente_id, oferta_id, notas, marcas, especialista_id, asignaciones } = req.body;
 
   if (!paciente_id || !oferta_id) {
     return res.status(400).json({ message: "paciente_id y oferta_id son requeridos" });
   }
 
   try {
+    await ensurePresupuestoSchema();
     // Obtener la oferta/presupuesto (incluyendo descuento)
     const oferta = await dbGet(
       `SELECT * FROM patient_ofertas WHERE id = ?`,
@@ -997,12 +1019,29 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
 
     const presupuestoAsignadoId = result.lastID;
 
+    // Especialista previsto por tratamiento. `asignaciones` es opcional:
+    // { "Nombre del tratamiento": especialistaId }. Si no viene, se usa
+    // especialista_id para todos (comportamiento anterior).
+    const asignacionPorTratamiento = (nombre) => {
+      if (asignaciones && typeof asignaciones === "object" && asignaciones[nombre]) {
+        return asignaciones[nombre];
+      }
+      return especialista_id || null;
+    };
+
+    // Nombres de especialistas para guardarlos junto al id (histórico legible)
+    const nombresEsp = new Map();
+    for (const e of await dbAll(`SELECT id, nombre FROM especialistas`)) {
+      nombresEsp.set(e.id, e.nombre);
+    }
+
     // Crear las sesiones individuales (N sesiones por tratamiento según lo configurado)
     // El precio NO se divide — cada sesión guarda el precio total del tratamiento
     // y sesion_numero indica cuál sesión es (1/4, 2/4, etc.)
     for (const item of itemsConMarca) {
       const numSesiones = Number(item.sesiones) >= 1 ? Number(item.sesiones) : 1;
       const precioItem = Number(item.precio) || 0;
+      const espPrevisto = asignacionPorTratamiento(item.nombre);
 
       for (let s = 1; s <= numSesiones; s++) {
         // Solo la primera sesión lleva el precio completo; las demás llevan 0
@@ -1011,8 +1050,9 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
         await dbRun(
           `INSERT INTO presupuestos_sesiones (
             presupuesto_asignado_id, tratamiento_id, tratamiento_nombre,
-            sesion_numero, precio_sesion, total_sesiones, estado, creado_en
-          ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)`,
+            sesion_numero, precio_sesion, total_sesiones, estado,
+            especialista_previsto_id, creado_en
+          ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?, ?)`,
           [
             presupuestoAsignadoId,
             item.tratamientoId || item.tratamiento_id || null,
@@ -1020,6 +1060,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
             s,
             precioSesion,
             numSesiones,
+            espPrevisto,
             ahora
           ]
         );
@@ -1041,7 +1082,7 @@ router.post("/presupuesto/asignar", requirePaquetesAsignar, async (req, res) => 
             presupuestoAsignadoId,
             item.nombre,
             item.tratamientoId || item.tratamiento_id || null,
-            especialista_id || null,
+            asignacionPorTratamiento(item.nombre),
             numSesiones,
             precioItem,
             ahora
@@ -1069,8 +1110,10 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
   const { paciente_id } = req.params;
 
   try {
+    await ensurePresupuestoSchema();
+
     const presupuestos = await dbAll(
-      `SELECT pa.*, e.nombre as especialista_nombre 
+      `SELECT pa.*, e.nombre as especialista_nombre
        FROM presupuestos_asignados pa
        LEFT JOIN especialistas e ON pa.especialista_id = e.id
        WHERE pa.paciente_id = ? ORDER BY pa.creado_en DESC`,
@@ -1080,10 +1123,14 @@ router.get("/presupuestos/paciente/:paciente_id", requirePaquetesRead, async (re
     // Para cada presupuesto, obtener sus sesiones y calcular saldo correctamente
     for (const p of presupuestos) {
       const sesiones = await dbAll(
-        `SELECT ps.*, t.procedimiento as tratamiento_procedimiento 
+        `SELECT ps.*, t.procedimiento as tratamiento_procedimiento,
+                ep.nombre as especialista_previsto_nombre,
+                er.nombre as especialista_real_nombre
          FROM presupuestos_sesiones ps
          LEFT JOIN tratamientos t ON ps.tratamiento_id = t.id
-         WHERE ps.presupuesto_asignado_id = ? 
+         LEFT JOIN especialistas ep ON ps.especialista_previsto_id = ep.id
+         LEFT JOIN especialistas er ON ps.especialista_id = er.id
+         WHERE ps.presupuesto_asignado_id = ?
          ORDER BY ps.id ASC`,
         [p.id]
       );
@@ -1154,9 +1201,17 @@ router.patch("/presupuesto/sesion/:sesion_id/completar", requirePaquetesAsignar,
 
     const ahora = fechaLima();
 
+    // Se guarda el id y también el nombre, para que el histórico siga siendo
+    // legible aunque el especialista se renombre o se elimine.
+    let nombreEspecialista = null;
+    if (especialista_id) {
+      const esp = await dbGet(`SELECT nombre FROM especialistas WHERE id = ?`, [especialista_id]);
+      nombreEspecialista = esp?.nombre || null;
+    }
+
     await dbRun(
-      `UPDATE presupuestos_sesiones SET estado = 'completada', fecha_realizada = ?, especialista_id = ? WHERE id = ?`,
-      [ahora, especialista_id || null, sesion_id]
+      `UPDATE presupuestos_sesiones SET estado = 'completada', fecha_realizada = ?, especialista_id = ?, especialista = ? WHERE id = ?`,
+      [ahora, especialista_id || null, nombreEspecialista, sesion_id]
     );
 
     // Verificar si todas las sesiones están completadas
@@ -1218,8 +1273,10 @@ router.patch("/presupuesto/sesion/:sesion_id/desmarcar", requirePaquetesAsignar,
       return res.status(404).json({ message: "Sesión no encontrada" });
     }
 
+    // Se limpia también especialista_id: si la sesión no se realizó, nadie
+    // debe quedar acreditado por ella en el cálculo de comisiones.
     await dbRun(
-      `UPDATE presupuestos_sesiones SET estado = 'pendiente', fecha_realizada = NULL, especialista = NULL WHERE id = ?`,
+      `UPDATE presupuestos_sesiones SET estado = 'pendiente', fecha_realizada = NULL, especialista = NULL, especialista_id = NULL WHERE id = ?`,
       [sesion_id]
     );
 
@@ -1328,6 +1385,54 @@ router.put("/presupuesto/:presupuesto_asignado_id/especialista", requirePaquetes
   } catch (err) {
     console.error("❌ Error al asignar especialista al presupuesto:", err.message);
     res.status(500).json({ message: "Error al asignar especialista" });
+  }
+});
+
+/* ==============================
+   👩‍⚕️ ESPECIALISTA PREVISTO POR TRATAMIENTO
+   Define quién se espera que realice las sesiones pendientes de un
+   tratamiento dentro de un presupuesto. No toca las sesiones ya realizadas
+   (su especialista real es histórico y define la comisión ya ganada).
+============================== */
+router.put("/presupuesto/:presupuesto_asignado_id/tratamiento-especialista", requirePaquetesAsignar, async (req, res) => {
+  const { presupuesto_asignado_id } = req.params;
+  const { tratamiento_nombre, especialista_id } = req.body;
+
+  if (!tratamiento_nombre) {
+    return res.status(400).json({ message: "tratamiento_nombre es requerido" });
+  }
+
+  try {
+    await ensurePresupuestoSchema();
+
+    const presupuesto = await dbGet(`SELECT id FROM presupuestos_asignados WHERE id = ?`, [presupuesto_asignado_id]);
+    if (!presupuesto) {
+      return res.status(404).json({ message: "Presupuesto no encontrado" });
+    }
+
+    if (especialista_id) {
+      const esp = await dbGet(`SELECT id FROM especialistas WHERE id = ?`, [especialista_id]);
+      if (!esp) return res.status(404).json({ message: "Especialista no encontrado" });
+    }
+
+    const r = await dbRun(
+      `UPDATE presupuestos_sesiones
+       SET especialista_previsto_id = ?
+       WHERE presupuesto_asignado_id = ? AND tratamiento_nombre = ? AND estado = 'pendiente'`,
+      [especialista_id || null, presupuesto_asignado_id, tratamiento_nombre]
+    );
+
+    // Mantener alineada la línea del módulo dueño
+    await dbRun(
+      `UPDATE lineas_presupuesto SET especialista_id = ?
+       WHERE presupuesto_asignado_id = ? AND tratamiento_nombre = ?`,
+      [especialista_id || null, presupuesto_asignado_id, tratamiento_nombre]
+    );
+
+    res.json({ message: "✅ Especialista previsto actualizado", sesiones_actualizadas: r.changes });
+  } catch (err) {
+    console.error("❌ Error asignando especialista al tratamiento:", err.message);
+    res.status(500).json({ message: "Error al asignar especialista al tratamiento" });
   }
 });
 

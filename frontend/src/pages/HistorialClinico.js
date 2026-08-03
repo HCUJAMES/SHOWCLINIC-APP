@@ -51,6 +51,8 @@ import FacialMapMini from "../components/FacialMapMini";
 import PatientJourneyChart from "../components/PatientJourneyChart";
 import TreatmentCalendar from "../components/TreatmentCalendar";
 import TreatmentTimelineMatrix from "../components/TreatmentTimelineMatrix";
+import AsignacionEspecialistas from "../components/AsignacionEspecialistas";
+import DescuentoDual from "../components/DescuentoDual";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -334,6 +336,9 @@ const HistorialClinico = () => {
   const [especialistas, setEspecialistas] = useState([]);
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
   const [especialistaPorPresupuesto, setEspecialistaPorPresupuesto] = useState({});
+  // Especialista previsto por tratamiento: { [ofertaId]: { [nombreTratamiento]: especialistaId } }
+  // Permite que un presupuesto con varios tratamientos se reparta entre especialistas.
+  const [especialistaPorTratamiento, setEspecialistaPorTratamiento] = useState({});
   const [extraWeeks, setExtraWeeks] = useState({});
   const [hiddenTimelines, setHiddenTimelines] = useState({});
 
@@ -1100,11 +1105,15 @@ const HistorialClinico = () => {
     if (!pacienteSeleccionado?.id) return;
     
     const espId = especialistaPorPresupuesto[oferta.id];
-    if (!espId) {
-      showToast({ severity: "warning", message: "Por favor selecciona un especialista para este presupuesto" });
+    const asignaciones = especialistaPorTratamiento[oferta.id] || {};
+    const hayPorTratamiento = Object.values(asignaciones).some(Boolean);
+
+    // Basta con un especialista general o con asignaciones por tratamiento.
+    if (!espId && !hayPorTratamiento) {
+      showToast({ severity: "warning", message: "Selecciona el especialista que realizará los tratamientos" });
       return;
     }
-    
+
     setAsignandoPresupuesto(true);
     try {
       await axios.post(
@@ -1113,7 +1122,8 @@ const HistorialClinico = () => {
           paciente_id: pacienteSeleccionado.id,
           oferta_id: oferta.id,
           marcas: marcas || {},
-          especialista_id: espId,
+          especialista_id: espId || null,
+          asignaciones,
         },
         { headers: authHeaders }
       );
@@ -1164,10 +1174,17 @@ const HistorialClinico = () => {
 
   // Completar sesión de presupuesto
   const completarSesionPresupuesto = async (sesionId) => {
-    const especialistaId = especialistasPorSesion[`presupuesto_${sesionId}`];
-    
+    // Si el usuario no tocó el selector, se usa el especialista previsto del tratamiento.
+    let especialistaId = especialistasPorSesion[`presupuesto_${sesionId}`];
     if (!especialistaId) {
-      showToast({ severity: "warning", message: "Por favor selecciona un especialista" });
+      for (const p of presupuestosAsignados) {
+        const s = (p.sesiones || []).find((x) => x.id === sesionId);
+        if (s) { especialistaId = s.especialista_previsto_id; break; }
+      }
+    }
+
+    if (!especialistaId) {
+      showToast({ severity: "warning", message: "Por favor selecciona quién realizó la sesión" });
       return;
     }
 
@@ -2891,9 +2908,11 @@ const HistorialClinico = () => {
             p: 6,
             borderRadius: "15px",
             background:
-              "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
+              "linear-gradient(180deg, rgba(255,249,236,0.99) 0%, rgba(255,255,255,0.97) 52%, rgba(247,234,193,0.80) 100%)",
             border: "1px solid rgba(212,175,55,0.22)",
-            backdropFilter: "blur(10px)",
+            // Sin backdropFilter: esta hoja llega a medir >3000px y el blur
+            // obliga a recomponer toda la capa en cada scroll. El degradado ya
+            // es casi opaco, así que el efecto no se nota y el scroll va fluido.
             boxShadow:
               "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(212,175,55,0.10)",
           }}
@@ -4950,26 +4969,15 @@ const HistorialClinico = () => {
                         <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#a36920", mb: 0.5 }}>
                           Subtotal: S/ {totalOferta.toFixed(2)}
                         </Typography>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                          <Typography sx={{ fontSize: "0.85rem", color: "#666", whiteSpace: "nowrap" }}>
-                            Descuento S/:
+                        <Box sx={{ mb: 1 }}>
+                          <Typography sx={{ fontSize: "0.8rem", color: "#666", mb: 0.6 }}>
+                            Descuento
                           </Typography>
-                          <TextField
-                            size="small"
-                            type="number"
-                            placeholder="0.00"
-                            value={descuentoOferta}
-                            onChange={(e) => setDescuentoOferta(e.target.value)}
-                            inputProps={{ min: 0, step: 0.01 }}
-                            sx={{
-                              width: 100,
-                              "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.8rem", height: 32 },
-                              "& .MuiOutlinedInput-root": {
-                                "& fieldset": { borderColor: "rgba(163,105,32,0.25)" },
-                                "&:hover fieldset": { borderColor: "#ba9a63" },
-                                "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                              },
-                            }}
+                          <DescuentoDual
+                            compact
+                            base={totalOferta}
+                            value={Number(descuentoOferta) || 0}
+                            onChange={(monto) => setDescuentoOferta(monto ? String(monto) : "")}
                           />
                         </Box>
                         {Number(descuentoOferta) > 0 && (
@@ -4977,7 +4985,6 @@ const HistorialClinico = () => {
                             Total: S/ {(totalOferta - Number(descuentoOferta)).toFixed(2)}
                           </Typography>
                         )}
-                        {!(Number(descuentoOferta) > 0) && <Box sx={{ mb: 1 }} />}
                         
                         <Box sx={{ display: "flex", gap: 1 }}>
                           {ofertaEditId && (
@@ -5182,37 +5189,23 @@ const HistorialClinico = () => {
                             </Box>
                           </Box>
                           
-                          {/* Selector de Especialista */}
+                          {/* Asignación de especialistas (por lotes, no uno por uno) */}
                           {!yaAsignado && (
-                            <Box sx={{ mt: 1, mb: 1 }}>
-                              <FormControl size="small" sx={{ minWidth: 220 }}>
-                                <InputLabel sx={{ fontSize: "0.8rem" }}>Especialista asignado</InputLabel>
-                                <Select
-                                  value={especialistaPorPresupuesto[o.id] || ''}
-                                  onChange={(e) => setEspecialistaPorPresupuesto(prev => ({
-                                    ...prev,
-                                    [o.id]: e.target.value
-                                  }))}
-                                  label="Especialista asignado"
-                                  sx={{ 
-                                    fontSize: "0.8rem",
-                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#ba9a63' },
-                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#a36920' },
-                                  }}
-                                >
-                                  {especialistas.map((esp) => (
-                                    <MenuItem key={esp.id} value={esp.id} sx={{ fontSize: "0.85rem" }}>
-                                      {esp.nombre}
-                                    </MenuItem>
-                                  ))}
-                                </Select>
-                              </FormControl>
-                              {!especialistaPorPresupuesto[o.id] && (
-                                <Typography variant="caption" sx={{ color: "#ff9800", display: "block", mt: 0.5 }}>
-                                  Selecciona un especialista antes de asignar
-                                </Typography>
-                              )}
-                            </Box>
+                            <AsignacionEspecialistas
+                              items={items}
+                              especialistas={especialistas}
+                              value={especialistaPorTratamiento[o.id] || {}}
+                              onChange={(next) => {
+                                setEspecialistaPorTratamiento(prev => ({ ...prev, [o.id]: next }));
+                                // Si todos quedaron con el mismo especialista, se usa también
+                                // como especialista general del presupuesto.
+                                const vals = items.map((it) => next[it.nombre]).filter(Boolean);
+                                const unico = vals.length === items.length && new Set(vals).size === 1
+                                  ? vals[0]
+                                  : '';
+                                setEspecialistaPorPresupuesto(prev => ({ ...prev, [o.id]: unico }));
+                              }}
+                            />
                           )}
                           {yaAsignado && (() => {
                             const presAsig = presupuestosAsignados.find(p => p.oferta_id === o.id);
@@ -6284,7 +6277,13 @@ const HistorialClinico = () => {
                                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                         <Select
                                           size="small"
-                                          value={especialistasPorSesion[`presupuesto_${sesion.id}`] || ''}
+                                          // Viene preseleccionado con el especialista previsto del
+                                          // tratamiento; se puede cambiar si lo atendió otra persona.
+                                          value={
+                                            especialistasPorSesion[`presupuesto_${sesion.id}`]
+                                            ?? sesion.especialista_previsto_id
+                                            ?? ''
+                                          }
                                           onChange={(e) => setEspecialistasPorSesion(prev => ({
                                             ...prev,
                                             [`presupuesto_${sesion.id}`]: e.target.value
@@ -6324,6 +6323,21 @@ const HistorialClinico = () => {
                                     )}
                                     {sesion.estado === 'completada' && (
                                       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        {(sesion.especialista_real_nombre || sesion.especialista) && (
+                                          <Chip
+                                            icon={<Person sx={{ fontSize: 13 }} />}
+                                            label={sesion.especialista_real_nombre || sesion.especialista}
+                                            size="small"
+                                            sx={{
+                                              height: 20,
+                                              fontSize: "0.65rem",
+                                              fontWeight: 600,
+                                              backgroundColor: "rgba(163,105,32,0.12)",
+                                              color: "#8a5a1a",
+                                              '& .MuiChip-icon': { color: '#8a5a1a' }
+                                            }}
+                                          />
+                                        )}
                                         <Typography variant="caption" color="success.main">
                                           {sesion.fecha_realizada?.split(' ')[0]}
                                         </Typography>
@@ -8120,18 +8134,17 @@ const HistorialClinico = () => {
                 Presupuesto #{presupuestoParaDescuento.id} - Subtotal: S/ {Number(presupuestoParaDescuento.total || 0).toFixed(2)}
               </Typography>
               
-              <TextField
-                fullWidth
-                label="Monto de Descuento (S/)"
-                type="number"
-                value={nuevoDescuento}
-                onChange={(e) => setNuevoDescuento(e.target.value)}
-                inputProps={{ min: 0, step: 0.01, max: presupuestoParaDescuento.total }}
-                sx={{ mb: 2 }}
-                helperText={`Máximo: S/ ${Number(presupuestoParaDescuento.total || 0).toFixed(2)}`}
+              <Typography sx={{ fontSize: "0.8rem", color: "#666", mb: 1 }}>
+                Escribe el monto o el porcentaje: el otro se calcula solo.
+              </Typography>
+              <DescuentoDual
+                autoFocus
+                base={Number(presupuestoParaDescuento.total) || 0}
+                value={Number(nuevoDescuento) || 0}
+                onChange={(monto) => setNuevoDescuento(monto ? String(monto) : "")}
               />
-              
-              <Box sx={{ p: 2, backgroundColor: "#fff3e0", borderRadius: 2 }}>
+
+              <Box sx={{ mt: 2.5, p: 2, backgroundColor: "#fff3e0", borderRadius: 2 }}>
                 <Typography variant="body2" color="text.secondary">
                   Total con descuento:
                 </Typography>
