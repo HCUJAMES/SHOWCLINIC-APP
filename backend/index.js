@@ -24,6 +24,7 @@ import n8nIntegrationRoutes from "./routes/n8nIntegrationRoutes.js";
 import gestionClinicaRoutes from "./routes/gestionClinicaRoutes.js";
 import gestionDuenoRoutes from "./routes/gestionDuenoRoutes.js";
 import barcodeRoutes from "./routes/barcodeRoutes.js";
+import consultasRoutes from "./routes/consultasRoutes.js";
 import bcrypt from "bcryptjs";
 import { autoEmitMiddleware } from "./utils/socketEmitter.js";
 
@@ -1454,6 +1455,7 @@ app.use("/api/n8n", n8nIntegrationRoutes);
 app.use("/api/gestion-clinica", gestionClinicaRoutes);
 app.use("/api/gestion-dueno", gestionDuenoRoutes);
 app.use("/api/barcodes", barcodeRoutes);
+app.use("/api/consultas", consultasRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
 app.use("/uploads/especialistas", express.static("uploads/especialistas"));
 

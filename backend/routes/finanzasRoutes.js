@@ -1,6 +1,7 @@
 import express from "express";
 import db from "../db/database.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
+import { registrarConsulta } from "../services/consultas.js";
 
 const router = express.Router();
 
@@ -606,8 +607,10 @@ router.post("/pagar", (req, res) => {
   res.status(400).json({ message: "Datos insuficientes para registrar pago" });
 });
 
-// � REGISTRAR PAGO DE CONSULTA DIRECTO (sin paquete/presupuesto)
-router.post("/consulta-directa", (req, res) => {
+// 💊 REGISTRAR PAGO DE CONSULTA DIRECTO (sin paquete/presupuesto)
+//    Además del ingreso, deja el monto como SALDO A FAVOR del paciente para
+//    poder descontarlo del presupuesto que se le arme después.
+router.post("/consulta-directa", async (req, res) => {
   const { paciente_id, monto, metodo_pago } = req.body;
 
   if (!paciente_id || !monto || !metodo_pago) {
@@ -622,15 +625,35 @@ router.post("/consulta-directa", (req, res) => {
   const fechaAhora = new Date().toISOString().slice(0, 19).replace("T", " ");
 
   db.run(
-    `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_tipo)
-     VALUES ('ingreso', 'consulta', ?, 'Pago de consulta', ?, ?, ?, 'consulta_directa')`,
-    [montoNum, fechaAhora, metodo_pago, paciente_id],
-    function (err) {
+    `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_tipo, creado_por)
+     VALUES ('ingreso', 'consulta', ?, 'Pago de consulta', ?, ?, ?, 'consulta_directa', ?)`,
+    [montoNum, fechaAhora, metodo_pago, paciente_id, req.user?.username || "sistema"],
+    async function (err) {
       if (err) {
         console.error("❌ Error registrando consulta directa:", err.message);
         return res.status(500).json({ message: "Error al registrar pago de consulta" });
       }
-      res.json({ message: "✅ Pago de consulta registrado", id: this.lastID });
+
+      const finanzaId = this.lastID;
+      try {
+        await registrarConsulta({
+          paciente_id,
+          monto: montoNum,
+          metodo_pago,
+          fecha: fechaAhora,
+          finanza_id: finanzaId,
+          creado_por: req.user?.username || "sistema",
+        });
+      } catch (e) {
+        // El ingreso ya quedó registrado; el crédito se puede recuperar luego
+        // con la migración de consultas históricas.
+        console.error("⚠️ Consulta registrada en caja pero no como saldo a favor:", e.message);
+      }
+
+      res.json({
+        message: "✅ Pago de consulta registrado como saldo a favor del paciente",
+        id: finanzaId,
+      });
     }
   );
 });

@@ -225,20 +225,27 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
       paramsFin
     );
 
-    // Tratamientos realizados (sesiones completadas en presupuestos)
+    // ⚠️ El periodo de una sesión es la fecha en que SE REALIZÓ, no la fecha
+    // en que se creó el presupuesto. Un presupuesto del 28 de julio cuyas
+    // sesiones continúan en agosto debe contar cada sesión en su propio mes.
+    let condSesion = "";
+    const paramsSesion = [];
+    if (fecha_inicio) { condSesion += " AND DATE(ps.fecha_realizada) >= ?"; paramsSesion.push(fecha_inicio); }
+    if (fecha_fin) { condSesion += " AND DATE(ps.fecha_realizada) <= ?"; paramsSesion.push(fecha_fin); }
+
+    // Tratamientos realizados (sesiones completadas en el periodo)
     const tratRealizados = await dbGet(
       `SELECT COUNT(*) as total FROM presupuestos_sesiones ps
-       JOIN presupuestos_asignados pa ON ps.presupuesto_asignado_id = pa.id
-       WHERE ps.estado = 'completada' ${condFecha}`,
-      params
+       WHERE ps.estado = 'completada' ${condSesion}`,
+      paramsSesion
     );
 
-    // Pacientes atendidos (únicos con sesiones completadas)
+    // Pacientes atendidos (únicos con sesiones realizadas en el periodo)
     const pacientesAtendidos = await dbGet(
       `SELECT COUNT(DISTINCT pa.paciente_id) as total FROM presupuestos_sesiones ps
        JOIN presupuestos_asignados pa ON ps.presupuesto_asignado_id = pa.id
-       WHERE ps.estado = 'completada' ${condFecha}`,
-      params
+       WHERE ps.estado = 'completada' ${condSesion}`,
+      paramsSesion
     );
 
     // Ticket promedio
@@ -252,13 +259,18 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
       GROUP BY mes ORDER BY mes DESC LIMIT 12
     `);
 
-    // Tratamientos más vendidos (por líneas de presupuesto)
+    // Tratamientos más realizados en el periodo (por sesiones ejecutadas,
+    // no por líneas creadas: así respeta el filtro de fechas igual que el KPI).
+    // Sin LIMIT: la suma del gráfico debe cuadrar exactamente con el KPI de
+    // "tratamientos realizados"; el frontend ya agrupa la cola en "Otros".
     const tratamientosMasVendidos = await dbAll(`
-      SELECT tratamiento_nombre, COUNT(*) as cantidad, SUM(precio) as ingresos
-      FROM lineas_presupuesto
-      GROUP BY tratamiento_nombre
-      ORDER BY cantidad DESC LIMIT 10
-    `);
+      SELECT ps.tratamiento_nombre, COUNT(*) as cantidad,
+             COALESCE(SUM(ps.precio_sesion), 0) as ingresos
+      FROM presupuestos_sesiones ps
+      WHERE ps.estado = 'completada' ${condSesion}
+      GROUP BY ps.tratamiento_nombre
+      ORDER BY cantidad DESC
+    `, paramsSesion);
 
     // Pagos pendientes a especialistas (comisiones no liquidadas)
     const pagosPendientes = await dbAll(`
@@ -270,17 +282,18 @@ router.get("/dashboard", authMiddleware, requireOwner, async (req, res) => {
       ORDER BY monto_pendiente DESC
     `);
 
-    // Últimos tratamientos realizados
+    // Últimos tratamientos realizados dentro del periodo seleccionado
     const ultimosTratamientos = await dbAll(`
       SELECT ps.tratamiento_nombre, ps.fecha_realizada, ps.precio_sesion,
              pa.paciente_id, p.nombre as paciente_nombre, p.apellido as paciente_apellido,
-             ps.especialista
+             COALESCE(e.nombre, ps.especialista) as especialista
       FROM presupuestos_sesiones ps
       JOIN presupuestos_asignados pa ON ps.presupuesto_asignado_id = pa.id
       JOIN patients p ON pa.paciente_id = p.id
-      WHERE ps.estado = 'completada'
+      LEFT JOIN especialistas e ON e.id = ps.especialista_id
+      WHERE ps.estado = 'completada' ${condSesion}
       ORDER BY ps.fecha_realizada DESC LIMIT 20
-    `);
+    `, paramsSesion);
 
     // Rendimiento por especialista — calculado sobre las SESIONES realizadas
     // en el periodo (quién hizo el trabajo), no sobre a quién se le asignó el
@@ -792,9 +805,11 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
     // presupuesto lo atienden varios especialistas, cada uno cobra solo lo suyo.
     const trabajo = await trabajoDeEspecialista(id, { fecha_inicio, fecha_fin });
 
-    let baseTotal = 0;        // valor de las sesiones que hizo
-    let comisionTotal = 0;    // pago que le corresponde
-    let pagadoTotal = 0;      // lo que el paciente ya pagó de esos presupuestos
+    let baseTotal = 0;        // valor de las sesiones que hizo EN EL PERIODO
+    let comisionTotal = 0;    // pago que le corresponde POR ESE TRABAJO
+    // Nota: no se acumula "lo pagado por el paciente" como total del periodo.
+    // Un presupuesto cobrado en julio cuyas sesiones siguen en agosto metería
+    // dinero de otro mes en este. El cobro se ve en Finanzas, por fecha de pago.
 
     const presupuestos = [];
 
@@ -862,6 +877,13 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
         sesiones_totales: t.sesiones_totales,
         sesiones_completadas: t.sesiones_realizadas,
 
+        // Rango de fechas de SUS sesiones dentro del periodo consultado:
+        // deja claro qué trabajo concreto se está pagando en este corte.
+        periodo_desde: t.detalle_sesiones.reduce(
+          (min, s) => (!min || (s.fecha_realizada || "") < min ? (s.fecha_realizada || "").slice(0, 10) : min), null),
+        periodo_hasta: t.detalle_sesiones.reduce(
+          (max, s) => (!max || (s.fecha_realizada || "") > max ? (s.fecha_realizada || "").slice(0, 10) : max), null),
+
         // 👇 Lo que corresponde a ESTE especialista
         mis_sesiones: t.mis_sesiones,
         base_comision: t.mi_valor_generado,      // valor de SUS sesiones
@@ -881,12 +903,10 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
 
       baseTotal += fila.base_comision;
       comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : fila.comision_estimada;
-      pagadoTotal += (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : montoPagadoReal;
     }
 
     baseTotal = redondear(baseTotal);
     comisionTotal = redondear(comisionTotal);
-    pagadoTotal = redondear(pagadoTotal);
 
     const ticketPromedio = presupuestos.length > 0 ? redondear(baseTotal / presupuestos.length) : 0;
 
@@ -903,7 +923,6 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
         num_presupuestos: presupuestos.length,
         base_total: baseTotal,
         comision_total: comisionTotal,
-        pagado_total: pagadoTotal,
         ticket_promedio: ticketPromedio,
         // Métricas de trabajo realizado
         sesiones_realizadas: trabajo.resumen.sesiones_realizadas,

@@ -157,6 +157,8 @@ const HistorialClinico = () => {
   const [paquetesPaciente, setPaquetesPaciente] = useState([]);
   const [asignandoPaquete, setAsignandoPaquete] = useState(false);
   const [presupuestosAsignados, setPresupuestosAsignados] = useState([]);
+  // Consultas ya pagadas que aún no se descuentan de ningún presupuesto
+  const [saldoConsultas, setSaldoConsultas] = useState({ saldo_disponible: 0, disponibles: [], historial: [] });
   const [editandoSesiones, setEditandoSesiones] = useState(null); // { ofertaId, itemIdx, sesiones }
   const [asignandoPresupuesto, setAsignandoPresupuesto] = useState(false);
   const [showOferta, setShowOferta] = useState(false);
@@ -640,6 +642,17 @@ const HistorialClinico = () => {
       } catch (e) {
         console.error("Error al obtener presupuestos asignados:", e);
         setPresupuestosAsignados([]);
+      }
+
+      // Consultas pagadas por adelantado que aún no se han descontado
+      try {
+        const consultasRes = await axios.get(`${API_BASE_URL}/api/consultas/paciente/${id}`, {
+          headers: authHeaders,
+        });
+        setSaldoConsultas(consultasRes.data || { saldo_disponible: 0, disponibles: [], historial: [] });
+      } catch (e) {
+        console.error("Error al obtener saldo de consultas:", e);
+        setSaldoConsultas({ saldo_disponible: 0, disponibles: [], historial: [] });
       }
 
       // Cargar fotos del paciente
@@ -1169,6 +1182,61 @@ const HistorialClinico = () => {
     } catch (error) {
       console.error("Error al asignar especialista al presupuesto:", error);
       showToast({ severity: "error", message: error.response?.data?.message || "Error al asignar especialista" });
+    }
+  };
+
+  // Recarga presupuestos + saldo de consultas (van siempre de la mano)
+  const recargarPresupuestosYConsultas = async () => {
+    if (!pacienteSeleccionado?.id) return;
+    const [pres, cons] = await Promise.allSettled([
+      axios.get(`${API_BASE_URL}/api/paquetes/presupuestos/paciente/${pacienteSeleccionado.id}`, { headers: authHeaders }),
+      axios.get(`${API_BASE_URL}/api/consultas/paciente/${pacienteSeleccionado.id}`, { headers: authHeaders }),
+    ]);
+    if (pres.status === "fulfilled") {
+      setPresupuestosAsignados(Array.isArray(pres.value.data) ? pres.value.data : []);
+    }
+    if (cons.status === "fulfilled") {
+      setSaldoConsultas(cons.value.data || { saldo_disponible: 0, disponibles: [], historial: [] });
+    }
+  };
+
+  // Descontar del presupuesto las consultas que el paciente ya pagó
+  const aplicarSaldoConsulta = async (presupuestoId) => {
+    const ids = (saldoConsultas.disponibles || []).map((c) => c.id);
+    if (ids.length === 0) return;
+    try {
+      const { data } = await axios.post(
+        `${API_BASE_URL}/api/consultas/aplicar`,
+        { presupuesto_id: presupuestoId, consulta_ids: ids },
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: data.message });
+      await recargarPresupuestosYConsultas();
+      if (pacienteSeleccionado?.id) cargarHistorial(pacienteSeleccionado.id);
+    } catch (error) {
+      showToast({
+        severity: "error",
+        message: error.response?.data?.message || "No se pudo aplicar el saldo de consulta",
+      });
+    }
+  };
+
+  // Devolver una consulta aplicada al saldo disponible
+  const revertirSaldoConsulta = async (consultaId) => {
+    try {
+      const { data } = await axios.post(
+        `${API_BASE_URL}/api/consultas/${consultaId}/revertir`,
+        {},
+        { headers: authHeaders }
+      );
+      showToast({ severity: "success", message: data.message });
+      await recargarPresupuestosYConsultas();
+      if (pacienteSeleccionado?.id) cargarHistorial(pacienteSeleccionado.id);
+    } catch (error) {
+      showToast({
+        severity: "error",
+        message: error.response?.data?.message || "No se pudo revertir la consulta",
+      });
     }
   };
 
@@ -6387,8 +6455,62 @@ const HistorialClinico = () => {
                             }
                             const descuentoP = Number(presupuesto.descuento || 0);
                             const totalFinalP = totalMarcado - descuentoP;
+                            // Consultas ya cobradas al paciente que aún no se han descontado
+                            const saldoDisp = Number(saldoConsultas.saldo_disponible) || 0;
+                            const consultasAplicadas = (saldoConsultas.historial || []).filter(
+                              (c) => c.estado === "aplicada" && c.presupuesto_aplicado_id === presupuesto.id
+                            );
                             return (
                           <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0" }}>
+                            {/* Saldo a favor por consultas prepagadas */}
+                            {saldoDisp > 0 && (
+                              <Box sx={{
+                                mb: 1.5, p: 1.25, borderRadius: 2,
+                                backgroundColor: "rgba(156,39,176,0.07)",
+                                border: "1px solid rgba(156,39,176,0.3)",
+                                display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap"
+                              }}>
+                                <Typography sx={{ fontSize: "0.82rem", color: "#7b1fa2", flex: 1, minWidth: 200 }}>
+                                  💊 Este paciente ya pagó <strong>S/ {saldoDisp.toFixed(2)}</strong> de consulta
+                                  {(saldoConsultas.disponibles || []).length > 1
+                                    ? ` en ${saldoConsultas.disponibles.length} pagos`
+                                    : ""}. Se puede descontar de este presupuesto.
+                                </Typography>
+                                <Button
+                                  size="small"
+                                  variant="contained"
+                                  onClick={() => aplicarSaldoConsulta(presupuesto.id)}
+                                  sx={{
+                                    backgroundColor: "#7b1fa2", textTransform: "none",
+                                    fontSize: "0.75rem", fontWeight: 600,
+                                    "&:hover": { backgroundColor: "#6a1b9a" }
+                                  }}
+                                >
+                                  Descontar S/ {saldoDisp.toFixed(2)}
+                                </Button>
+                              </Box>
+                            )}
+
+                            {/* Consultas ya descontadas de este presupuesto */}
+                            {consultasAplicadas.length > 0 && (
+                              <Box sx={{ mb: 1.5, display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
+                                {consultasAplicadas.map((c) => (
+                                  <Chip
+                                    key={c.id}
+                                    size="small"
+                                    label={`Consulta S/ ${Number(c.monto).toFixed(2)} · ${String(c.fecha).slice(0, 10)}`}
+                                    onDelete={() => revertirSaldoConsulta(c.id)}
+                                    deleteIcon={<Close sx={{ fontSize: 14 }} />}
+                                    title="Quitar este descuento y devolverlo a saldo disponible"
+                                    sx={{
+                                      height: 22, fontSize: "0.7rem", fontWeight: 600,
+                                      backgroundColor: "rgba(156,39,176,0.12)", color: "#7b1fa2",
+                                      "& .MuiChip-deleteIcon": { color: "#7b1fa2", "&:hover": { color: "#4a148c" } }
+                                    }}
+                                  />
+                                ))}
+                              </Box>
+                            )}
                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1 }}>
                               <Box>
                                 {hayMarcas && totalGoldP > 0 && (
@@ -6410,6 +6532,11 @@ const HistorialClinico = () => {
                                 {descuentoP > 0 && (
                                   <Typography variant="body2" color="error" sx={{ fontSize: "0.85rem" }}>
                                     Descuento: -S/ {descuentoP.toFixed(2)}
+                                  </Typography>
+                                )}
+                                {Number(presupuesto.monto_consulta) > 0 && (
+                                  <Typography variant="body2" sx={{ fontSize: "0.85rem", color: "#7b1fa2" }}>
+                                    (incluye consulta pagada: S/ {Number(presupuesto.monto_consulta).toFixed(2)})
                                   </Typography>
                                 )}
                                 <Typography sx={{ fontWeight: "bold", color: "#a36920", fontSize: "1.1rem" }}>

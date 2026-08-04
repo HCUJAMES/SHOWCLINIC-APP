@@ -2183,7 +2183,6 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
   const [filtros, setFiltros] = useState([]);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [editingKpis, setEditingKpis] = useState(false);
-  const [kpiPagado, setKpiPagado] = useState("");
   const [kpiComision, setKpiComision] = useState("");
   const [savingKpis, setSavingKpis] = useState(false);
   const isMaster = rol === "master";
@@ -2202,18 +2201,19 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
 
   const kpisCalc = useMemo(() => {
     const list = filtros.length === 0 ? presupuestos : filteredPresupuestos;
-    let comisionTotal = 0, pagadoTotal = 0, visibles = 0;
+    // Solo se acumula lo que pertenece al periodo: comisión por sesiones
+    // realizadas y sesiones contadas. Los cobros del paciente NO se suman aquí
+    // porque pueden ser de otro mes que el del trabajo.
+    let comisionTotal = 0, sesionesTotal = 0, visibles = 0;
     for (const p of list) {
       const ov = p.overrides;
       if (ov && ov.oculto) continue; // no sumar ocultos
       visibles++;
       comisionTotal += (ov && ov.comision_override != null) ? Number(ov.comision_override) : (Number(p.comision_estimada) || 0);
-      pagadoTotal += (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : (Number(p.monto_pagado_real) || 0);
+      sesionesTotal += (ov && ov.sesiones_override != null) ? Number(ov.sesiones_override) : (Number(p.mis_sesiones) || 0);
     }
-    // Si hay KPI overrides globales, usarlos en vez de la suma
-    const finalPagado = (kpi_overrides && kpi_overrides.pagado_total_override != null) ? Number(kpi_overrides.pagado_total_override) : pagadoTotal;
     const finalComision = (kpi_overrides && kpi_overrides.comision_total_override != null) ? Number(kpi_overrides.comision_total_override) : comisionTotal;
-    return { num: visibles, comisionTotal: finalComision, pagadoTotal: finalPagado, comisionCalc: comisionTotal, pagadoCalc: pagadoTotal };
+    return { num: visibles, comisionTotal: finalComision, sesiones: sesionesTotal, comisionCalc: comisionTotal };
   }, [presupuestos, filteredPresupuestos, filtros, kpi_overrides]);
 
   const handleSaveOverride = async (presId, data) => {
@@ -2251,7 +2251,6 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
   };
 
   const handleStartEditKpis = () => {
-    setKpiPagado(String(kpisCalc.pagadoTotal));
     setKpiComision(String(kpisCalc.comisionTotal));
     setEditingKpis(true);
   };
@@ -2262,7 +2261,6 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
       await apiFetch(`/especialistas/${especialista.id}/kpi-override`, {
         method: "PUT",
         body: JSON.stringify({
-          pagado_total_override: kpiPagado !== "" ? parseFloat(kpiPagado) : null,
           comision_total_override: kpiComision !== "" ? parseFloat(kpiComision) : null,
           fecha_inicio: fechaInicio,
           fecha_fin: fechaFin
@@ -2333,16 +2331,18 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
             {/* Sesiones realizadas KPI */}
             <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.creamPanel, borderRadius: "14px" }}>
               <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Sesiones realizadas</Typography>
-              <Typography sx={{ fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{resumen?.sesiones_realizadas ?? 0}</Typography>
+              <Typography sx={{ fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{kpisCalc.sesiones}</Typography>
               <Typography sx={{ color: colors.textMuted, fontSize: "10px", fontFamily: fonts.body }}>
                 en {kpisCalc.num} presupuesto{kpisCalc.num === 1 ? "" : "s"}
               </Typography>
             </Box>
-            {/* Pagado por pacientes KPI */}
-            <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.successBg, borderRadius: "14px", position: "relative", ...(kpi_overrides?.pagado_total_override != null ? { border: `1.5px solid ${colors.gold}` } : {}) }}>
-              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Pagado por pacientes</Typography>
-              <Typography sx={{ fontWeight: 700, color: colors.successText, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{formatMoney(kpisCalc.pagadoTotal)}</Typography>
-              {kpi_overrides?.pagado_total_override != null && <Chip label="editado" size="small" sx={{ height: 14, fontSize: "0.55rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, position: "absolute", top: 6, right: 6, "& .MuiChip-label": { px: "4px" } }} />}
+            {/* Valor generado en el periodo */}
+            <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.successBg, borderRadius: "14px" }}>
+              <Typography sx={{ color: colors.textMuted, fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Valor generado</Typography>
+              <Typography sx={{ fontWeight: 700, color: colors.successText, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{formatMoney(resumen?.base_total || 0)}</Typography>
+              <Typography sx={{ color: colors.textMuted, fontSize: "10px", fontFamily: fonts.body }}>
+                por sus sesiones
+              </Typography>
             </Box>
             {/* Pago al especialista KPI */}
             <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.goldSoft, borderRadius: "14px", position: "relative", ...(kpi_overrides?.comision_total_override != null ? { border: `1.5px solid ${colors.gold}` } : {}) }}>
@@ -2381,12 +2381,8 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
           {isMaster && editingKpis && (
             <Box sx={{ mt: "12px", p: "14px", borderRadius: "14px", bgcolor: "#FFFDF8", border: `1.5px solid ${colors.gold}` }}>
               <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "12px", color: colors.primaryDark, mb: "10px" }}>Editar totales (no afecta datos originales)</Typography>
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <TextField label="Pagado por pacientes (S/)" size="small" value={kpiPagado} onChange={(e) => setKpiPagado(e.target.value)} type="number"
-                  sx={{ "& .MuiInputBase-input": { fontSize: "13px", fontFamily: fonts.body, p: "8px 10px", fontWeight: 600 }, "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
-                <TextField label="Pago al especialista (S/)" size="small" value={kpiComision} onChange={(e) => setKpiComision(e.target.value)} type="number"
-                  sx={{ "& .MuiInputBase-input": { fontSize: "13px", fontFamily: fonts.body, p: "8px 10px", fontWeight: 600 }, "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
-              </Box>
+              <TextField label="Comisión del periodo (S/)" size="small" fullWidth value={kpiComision} onChange={(e) => setKpiComision(e.target.value)} type="number"
+                sx={{ "& .MuiInputBase-input": { fontSize: "13px", fontFamily: fonts.body, p: "8px 10px", fontWeight: 600 }, "& .MuiOutlinedInput-root": { borderRadius: "8px" } }} />
               <Box sx={{ display: "flex", justifyContent: "flex-end", gap: "8px", mt: "10px" }}>
                 <Button size="small" onClick={() => setEditingKpis(false)} startIcon={<CloseRounded sx={{ fontSize: 14 }} />} sx={{ fontFamily: fonts.body, textTransform: "none", fontSize: "11px", color: colors.textMuted }}>Cancelar</Button>
                 <Button size="small" onClick={handleSaveKpis} disabled={savingKpis} startIcon={<SaveRounded sx={{ fontSize: 14 }} />}
@@ -2542,8 +2538,23 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
             <Box sx={{ flex: 1, minWidth: 140 }}>
               <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "14.5px", color: colors.primaryDark }}>{paciente}</Typography>
               <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mt: "2px", flexWrap: "wrap" }}>
-                <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted }}>#{pres.id} · {fecha}</Typography>
-                <Chip label={estadoPagoStyle.label} size="small" sx={{ bgcolor: estadoPagoStyle.bg, color: estadoPagoStyle.text, fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
+                <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted }}>
+                  #{pres.id} · presup. {fecha}
+                </Typography>
+                {/* Cuándo se hizo el trabajo que se paga en este corte */}
+                {pres.periodo_desde && (
+                  <Chip
+                    label={
+                      pres.periodo_desde === pres.periodo_hasta
+                        ? `atendido ${pres.periodo_desde}`
+                        : `atendido ${pres.periodo_desde} → ${pres.periodo_hasta}`
+                    }
+                    size="small"
+                    title="Fechas en que este especialista realizó las sesiones contadas en el periodo"
+                    sx={{ bgcolor: colors.creamPanel, color: colors.textBody, border: `1px solid ${colors.border}`, fontWeight: 600, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }}
+                  />
+                )}
+                <Chip label={estadoPagoStyle.label} size="small" title="Estado de cobro del presupuesto completo (no del periodo)" sx={{ bgcolor: estadoPagoStyle.bg, color: estadoPagoStyle.text, fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
                 <Chip
                   label={`${sesionesDisplay} de ${pres.sesiones_totales || 0} sesiones`}
                   size="small"
@@ -2615,7 +2626,9 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
                 <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.primary }}>{formatMoney(base)}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }}>Pagado</Typography>
+                <Typography sx={{ fontSize: "10.5px", color: colors.textMuted, fontFamily: fonts.body }} title="Cobrado del presupuesto completo, sin importar el periodo">
+                  Cobrado (total)
+                </Typography>
                 <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.successText }}>{formatMoney(pagadoDisplay)}</Typography>
               </Box>
               <Box>
