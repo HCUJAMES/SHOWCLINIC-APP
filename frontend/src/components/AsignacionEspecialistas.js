@@ -1,6 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Box, Typography, Avatar, Tooltip, Chip, Button, Collapse } from "@mui/material";
-import { CheckRounded, CloseRounded, GroupsRounded } from "@mui/icons-material";
+import { Box, Typography, Tooltip, Chip, Button, Collapse } from "@mui/material";
+import {
+  CheckRounded,
+  CheckCircleRounded,
+  RadioButtonUncheckedRounded,
+  CloseRounded,
+  GroupsRounded,
+} from "@mui/icons-material";
 
 /**
  * Asignación de especialistas a los tratamientos de un presupuesto.
@@ -23,47 +29,70 @@ import { CheckRounded, CloseRounded, GroupsRounded } from "@mui/icons-material";
 // para que dos especialistas nunca compartan color.
 const TONOS = ["#8A5A1A", "#C4944A", "#4E342E", "#B8823C", "#6D4C41", "#A36920", "#8D6E63", "#D4AF37"];
 
-const iniciales = (nombre = "") =>
-  nombre
-    .replace(/^(Dr|Dra|Lic)\.?\s+/i, "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0])
-    .join("")
-    .toUpperCase();
+// Quita el tratamiento ("Dr.", "Dra.", "Lic.") para quedarnos con el nombre
+const sinTratamiento = (nombre = "") => nombre.replace(/^(Dr|Dra|Lic)\.?\s+/i, "").trim();
 
-// Nombre corto para no romper el layout: "Dr. Erick Espetia" → "Erick E."
-const nombreCorto = (nombre = "") => {
-  const limpio = nombre.replace(/^(Dr|Dra|Lic)\.?\s+/i, "");
-  const partes = limpio.split(/\s+/).filter(Boolean);
-  if (partes.length <= 1) return limpio;
-  return `${partes[0]} ${partes[1][0]}.`;
-};
+// Primer nombre: "Dr. Erick Espetia" → "Erick"
+const primerNombre = (nombre = "") => sinTratamiento(nombre).split(/\s+/).filter(Boolean)[0] || nombre;
 
-function AvatarEspecialista({ esp, tono, size = 34, activo, onClick, title }) {
+/**
+ * Etiqueta legible de cada especialista. Se usa el primer nombre; si dos
+ * comparten primer nombre, se añade la inicial del apellido para distinguirlos.
+ */
+function construirEtiquetas(especialistas) {
+  const conteo = new Map();
+  especialistas.forEach((e) => {
+    const p = primerNombre(e.nombre).toLowerCase();
+    conteo.set(p, (conteo.get(p) || 0) + 1);
+  });
+
+  const m = new Map();
+  especialistas.forEach((e) => {
+    const partes = sinTratamiento(e.nombre).split(/\s+/).filter(Boolean);
+    const nombre = partes[0] || e.nombre;
+    const repetido = conteo.get(nombre.toLowerCase()) > 1;
+    m.set(String(e.id), repetido && partes[1] ? `${nombre} ${partes[1][0]}.` : nombre);
+  });
+  return m;
+}
+
+/** Botón con punto de color + primer nombre, legible de un vistazo. */
+function BotonEspecialista({ esp, tono, etiqueta, compacto, onClick, title }) {
   return (
     <Tooltip title={title || esp.nombre} arrow>
-      <Avatar
+      <Box
         onClick={onClick}
         sx={{
-          width: size,
-          height: size,
-          bgcolor: tono,
-          color: "#fff",
-          fontSize: size * 0.36,
-          fontWeight: 700,
-          fontFamily: "'Poppins', sans-serif",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 0.7,
+          px: compacto ? 1 : 1.25,
+          py: compacto ? 0.35 : 0.55,
+          borderRadius: 999,
           cursor: onClick ? "pointer" : "default",
-          border: activo ? "2.5px solid #1A1A1A" : "2.5px solid transparent",
-          transition: "transform .15s ease, box-shadow .15s ease",
-          "&:hover": onClick
-            ? { transform: "scale(1.12)", boxShadow: "0 4px 12px rgba(163,105,32,0.4)" }
-            : {},
+          backgroundColor: "#fff",
+          border: `1.5px solid ${tono}`,
+          transition: "background-color .15s ease, transform .15s ease",
+          userSelect: "none",
+          "&:hover": onClick ? { backgroundColor: tono, transform: "translateY(-1px)", "& .etq": { color: "#fff" } } : {},
         }}
       >
-        {iniciales(esp.nombre)}
-      </Avatar>
+        <Box sx={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: tono, flexShrink: 0 }} />
+        {/* El nombre va en un marrón oscuro fijo: los tonos claros de la paleta
+            no dan contraste suficiente sobre blanco. El color va en el punto. */}
+        <Typography
+          className="etq"
+          sx={{
+            fontSize: compacto ? "0.72rem" : "0.78rem",
+            fontWeight: 700,
+            color: "#3E2723",
+            whiteSpace: "nowrap",
+            transition: "color .15s ease",
+          }}
+        >
+          {etiqueta}
+        </Typography>
+      </Box>
     </Tooltip>
   );
 }
@@ -90,6 +119,10 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
     return m;
   }, [especialistas]);
   const tonoDe = (id) => tonoPorId.get(String(id)) || TONOS[0];
+
+  // Nombre legible de cada especialista (primer nombre, desambiguado si hace falta)
+  const etiquetaPorId = useMemo(() => construirEtiquetas(especialistas), [especialistas]);
+  const etiquetaDe = (id) => etiquetaPorId.get(String(id)) || "";
 
   const aplicar = (nombres, espId) => {
     const next = { ...value };
@@ -171,11 +204,11 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
           Todos a:
         </Typography>
         {especialistas.map((esp) => (
-          <AvatarEspecialista
+          <BotonEspecialista
             key={esp.id}
             esp={esp}
             tono={tonoDe(esp.id)}
-            size={34}
+            etiqueta={etiquetaDe(esp.id)}
             title={`Asignar los ${items.length} tratamientos a ${esp.nombre}`}
             onClick={() => asignarATodos(esp.id)}
           />
@@ -202,6 +235,7 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
             const espId = value[it.nombre];
             const esp = espId != null ? espPorId.get(String(espId)) : null;
             const marcado = seleccion.includes(it.nombre);
+            const asignado = !!esp;
 
             return (
               <Box
@@ -216,14 +250,24 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                   borderRadius: 2,
                   cursor: "pointer",
                   userSelect: "none",
-                  border: marcado ? "1.5px solid #A36920" : "1.5px solid transparent",
-                  backgroundColor: marcado ? "rgba(163,105,32,0.10)" : "rgba(0,0,0,0.02)",
+                  // Al seleccionar manda el dorado; si no, el verde indica "ya asignado"
+                  border: marcado
+                    ? "1.5px solid #A36920"
+                    : asignado
+                      ? "1.5px solid rgba(76,175,80,0.35)"
+                      : "1.5px solid transparent",
+                  backgroundColor: marcado
+                    ? "rgba(163,105,32,0.10)"
+                    : asignado
+                      ? "rgba(76,175,80,0.07)"
+                      : "rgba(255,152,0,0.06)",
                   transition: "background-color .15s ease, border-color .15s ease",
                   "&:hover": { backgroundColor: "rgba(163,105,32,0.07)" },
                 }}
               >
-                {/* Casilla */}
+                {/* Casilla de selección (para reasignar en bloque) */}
                 <Box
+                  title={marcado ? "Quitar de la selección" : "Seleccionar para reasignar"}
                   sx={{
                     width: 17,
                     height: 17,
@@ -239,7 +283,16 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                   {marcado && <CheckRounded sx={{ fontSize: 13, color: "#fff" }} />}
                 </Box>
 
-                <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: "#3E2723" }} noWrap>
+                <Typography
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: "0.78rem",
+                    color: asignado ? "#2e7d32" : "#3E2723",
+                    fontWeight: asignado ? 600 : 400,
+                  }}
+                  noWrap
+                >
                   {it.nombre}
                   {Number(it.sesiones) > 1 && (
                     <Typography component="span" sx={{ fontSize: "0.7rem", color: "#9e9e9e", ml: 0.6 }}>
@@ -254,9 +307,11 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                     sx={{ display: "flex", alignItems: "center", gap: 0.6, flexShrink: 0 }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <AvatarEspecialista esp={esp} tono={tonoDe(esp.id)} size={24} />
-                    <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, color: "#5D4037" }}>
-                      {nombreCorto(esp.nombre)}
+                    {/* Check verde: este tratamiento ya tiene responsable */}
+                    <CheckCircleRounded sx={{ fontSize: 16, color: "#4caf50" }} titleAccess="Ya asignado" />
+                    <Box sx={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: tonoDe(esp.id), flexShrink: 0 }} />
+                    <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#3E2723" }} title={esp.nombre}>
+                      {etiquetaDe(esp.id)}
                     </Typography>
                     <Tooltip title="Quitar" arrow>
                       <CloseRounded
@@ -271,9 +326,12 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                     </Tooltip>
                   </Box>
                 ) : (
-                  <Typography sx={{ fontSize: "0.7rem", color: "#ff9800", fontWeight: 600, flexShrink: 0 }}>
-                    sin asignar
-                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
+                    <RadioButtonUncheckedRounded sx={{ fontSize: 15, color: "#ffb74d" }} />
+                    <Typography sx={{ fontSize: "0.7rem", color: "#e65100", fontWeight: 600 }}>
+                      sin asignar
+                    </Typography>
+                  </Box>
                 )}
               </Box>
             );
@@ -298,11 +356,12 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
             {seleccion.length} seleccionado{seleccion.length === 1 ? "" : "s"} →
           </Typography>
           {especialistas.map((esp) => (
-            <AvatarEspecialista
+            <BotonEspecialista
               key={esp.id}
               esp={esp}
               tono={tonoDe(esp.id)}
-              size={31}
+              etiqueta={etiquetaDe(esp.id)}
+              compacto
               title={`Asignar a ${esp.nombre}`}
               onClick={() => asignarASeleccion(esp.id)}
             />
