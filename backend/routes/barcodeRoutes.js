@@ -360,6 +360,54 @@ router.post("/scan", requireBarcodeAccess, async (req, res) => {
   }
 });
 
+/**
+ * Stock real por variante, calculado desde los CÓDIGOS ACTIVOS.
+ *
+ * Los códigos de barras son la fuente de verdad del inventario: cada uno lleva
+ * sus `unidades_restantes`, que bajan al escanearlo en un tratamiento. Un
+ * código cuenta mientras esté 'active' o le queden unidades.
+ *
+ * Devuelve además `tiene_codigos` para poder distinguir "0 porque se consumió
+ * todo" de "0 porque a ese producto todavía no se le generaron códigos".
+ */
+router.get("/stock-por-variante", requireBarcodeAccess, async (req, res) => {
+  try {
+    const filas = await dbAll(`
+      SELECT
+        sl.variante_id,
+        COUNT(bu.id) AS codigos_totales,
+        SUM(CASE WHEN bu.status = 'active' OR COALESCE(bu.unidades_restantes, 0) > 0 THEN 1 ELSE 0 END) AS codigos_activos,
+        SUM(CASE WHEN bu.status = 'scanned' AND COALESCE(bu.unidades_restantes, 0) <= 0 THEN 1 ELSE 0 END) AS codigos_usados,
+        COALESCE(SUM(
+          CASE WHEN bu.status = 'active' OR COALESCE(bu.unidades_restantes, 0) > 0
+               THEN COALESCE(bu.unidades_restantes, 0) ELSE 0 END
+        ), 0) AS unidades_disponibles,
+        COALESCE(SUM(COALESCE(bu.unidades_totales, 0)), 0) AS unidades_registradas
+      FROM barcode_units bu
+      JOIN stock_lotes sl ON sl.id = bu.lote_id
+      GROUP BY sl.variante_id
+    `);
+
+    const porVariante = {};
+    for (const f of filas) {
+      porVariante[f.variante_id] = {
+        variante_id: f.variante_id,
+        codigos_totales: Number(f.codigos_totales) || 0,
+        codigos_activos: Number(f.codigos_activos) || 0,
+        codigos_usados: Number(f.codigos_usados) || 0,
+        unidades_disponibles: Number(f.unidades_disponibles) || 0,
+        unidades_registradas: Number(f.unidades_registradas) || 0,
+        tiene_codigos: true,
+      };
+    }
+
+    res.json(porVariante);
+  } catch (err) {
+    console.error("Error calculando stock por códigos:", err.message);
+    res.status(500).json({ message: "Error al calcular stock por códigos" });
+  }
+});
+
 // Obtener códigos de barras disponibles para una variante específica
 router.get("/variant/:varianteId/codes", requireBarcodeAccess, async (req, res) => {
   const { varianteId } = req.params;

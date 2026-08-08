@@ -331,6 +331,8 @@ export default function Inventario() {
   // Estados para códigos de barras
   const [openCodigosModal, setOpenCodigosModal] = useState(false);
   const [codigosProducto, setCodigosProducto] = useState([]);
+  // Stock calculado desde los códigos activos: { [variante_id]: {...} }
+  const [stockPorCodigos, setStockPorCodigos] = useState({});
   const [loadingCodigos, setLoadingCodigos] = useState(false);
   const [openEditarCantidadModal, setOpenEditarCantidadModal] = useState(false);
   const [codigoEditando, setCodigoEditando] = useState(null);
@@ -387,10 +389,15 @@ export default function Inventario() {
       fetch(`${API_BASE}/api/inventario/variantes`, { headers }).then(r => r.json()),
       fetch(`${API_BASE}/api/inventario/stock-lotes`, { headers }).then(r => r.json()),
       fetch(`${API_BASE}/api/inventario/productos-base`, { headers }).then(r => r.json()),
-    ]).then(([vars, lotes, prods]) => {
+      // Fuente de verdad del stock: los códigos activos de cada producto
+      fetch(`${API_BASE}/api/barcodes/stock-por-variante`, { headers })
+        .then(r => (r.ok ? r.json() : {}))
+        .catch(() => ({})),
+    ]).then(([vars, lotes, prods, stockCodigos]) => {
       setVariantes(Array.isArray(vars) ? vars : []);
       setStockLotes(Array.isArray(lotes) ? lotes : []);
       setProductosBase(Array.isArray(prods) ? prods : []);
+      setStockPorCodigos(stockCodigos && typeof stockCodigos === "object" ? stockCodigos : {});
     }).catch(err => console.error("Error cargando datos:", err));
   };
 
@@ -438,13 +445,29 @@ export default function Inventario() {
       variantes.map((v) => [String(v.id), parseFloat(v.contenido_por_presentacion) || 1])
     );
 
-    return Array.from(map.values()).map((p) => ({
-      ...p,
-      contenido_por_presentacion: contenidoPorVariante.get(String(p.variante_id)) || 1,
-      categoria: inferirCategoria(p.marca, p.variante),
-      estado: getEstadoInfo(p.stock, p.vencimiento_proximo),
-    }));
-  }, [stockLotes, variantes]);
+    return Array.from(map.values()).map((p) => {
+      // ── STOCK REAL: sale de los CÓDIGOS ACTIVOS del producto ──
+      // Es la misma cifra que se ve en "Ver códigos": cada código lleva sus
+      // unidades restantes y bajan al escanearlo. El total de los lotes solo
+      // se usa como referencia cuando el producto aún no tiene códigos.
+      const cod = stockPorCodigos[p.variante_id] || stockPorCodigos[String(p.variante_id)];
+      const tieneCodigos = !!(cod && cod.codigos_totales > 0);
+      const stockReal = tieneCodigos ? cod.unidades_disponibles : p.stock;
+
+      return {
+        ...p,
+        stock_lotes_ref: p.stock,           // lo que suman los lotes (referencia)
+        stock: stockReal,                   // lo que mandan los códigos
+        tiene_codigos: tieneCodigos,
+        codigos_activos: tieneCodigos ? cod.codigos_activos : 0,
+        codigos_usados: tieneCodigos ? cod.codigos_usados : 0,
+        codigos_totales: tieneCodigos ? cod.codigos_totales : 0,
+        contenido_por_presentacion: contenidoPorVariante.get(String(p.variante_id)) || 1,
+        categoria: inferirCategoria(p.marca, p.variante),
+        estado: getEstadoInfo(stockReal, p.vencimiento_proximo),
+      };
+    });
+  }, [stockLotes, variantes, stockPorCodigos]);
 
   const categorias = useMemo(() => {
     const counts = {};
@@ -1523,6 +1546,36 @@ export default function Inventario() {
           );
         })()}
 
+        {/* Aviso: productos cuyo stock aún no está respaldado por códigos */}
+        {(() => {
+          const sinCodigos = productos.filter((p) => !p.tiene_codigos && p.stock_lotes_ref > 0);
+          if (sinCodigos.length === 0) return null;
+          return (
+            <MotionBox
+              custom={0.5} variants={aparecer} initial="hidden" animate="show"
+              sx={{
+                mb: 3, p: 2, borderRadius: "14px",
+                background: semantic.amber.bg, border: `1px solid ${T.border}`,
+                display: "flex", alignItems: "flex-start", gap: 1.2, flexWrap: "wrap",
+              }}
+            >
+              <WarningAmberOutlined sx={{ fontSize: 20, color: semantic.amber.text, mt: 0.2 }} />
+              <Box sx={{ flex: 1, minWidth: 240 }}>
+                <Typography sx={{ fontFamily: T.font, fontWeight: 700, fontSize: 13, color: semantic.amber.num }}>
+                  {sinCodigos.length} producto{sinCodigos.length === 1 ? "" : "s"} sin códigos generados
+                </Typography>
+                <Typography sx={{ fontFamily: T.font, fontSize: 12, color: semantic.amber.text, mt: 0.3, lineHeight: 1.5 }}>
+                  El inventario se calcula desde los códigos activos de cada producto. Estos todavía no
+                  tienen códigos, así que se muestra la cantidad de sus lotes como referencia:{" "}
+                  <strong>{sinCodigos.slice(0, 6).map((p) => p.variante).join(", ")}</strong>
+                  {sinCodigos.length > 6 ? ` y ${sinCodigos.length - 6} más` : ""}.
+                  Genéralos desde cada producto → <em>Ver códigos</em>.
+                </Typography>
+              </Box>
+            </MotionBox>
+          );
+        })()}
+
         {/* ===== Gráficos por PRODUCTO (nombre + cantidad) ===== */}
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.05fr 1fr" }, gap: 2.5, mb: 3 }}>
 
@@ -1542,7 +1595,7 @@ export default function Inventario() {
                     Distribución del stock
                   </Typography>
                   <Typography sx={{ fontFamily: T.font, color: T.text3, fontSize: 12.5 }}>
-                    Cuánto pesa cada producto sobre el total
+                    Según los códigos activos de cada producto
                   </Typography>
                 </Box>
                 <Button size="small" onClick={(e) => setAnchorTopMenu(e.currentTarget)}
@@ -1746,7 +1799,7 @@ export default function Inventario() {
                     Stock por producto
                   </Typography>
                   <Typography sx={{ fontFamily: T.font, color: T.text3, fontSize: 12.5 }}>
-                    Unidades disponibles · barra en escala logarítmica
+                    Según códigos activos · escala logarítmica
                   </Typography>
                 </Box>
                 <Button size="small" onClick={(e) => setAnchorTopMenu(e.currentTarget)}
@@ -1827,8 +1880,20 @@ export default function Inventario() {
                           </Box>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, mt: 0.35, flexWrap: "wrap" }}>
                             <Typography sx={{ fontFamily: T.font, fontSize: 10.5, color: T.text3 }}>
-                              {p.marca || "—"} · {p.lotes_count} lote{p.lotes_count === 1 ? "" : "s"}
+                              {p.marca || "—"} · {p.tiene_codigos
+                                ? `${p.codigos_activos} código${p.codigos_activos === 1 ? "" : "s"} activo${p.codigos_activos === 1 ? "" : "s"}`
+                                : `${p.lotes_count} lote${p.lotes_count === 1 ? "" : "s"}`}
                             </Typography>
+                            {!p.tiene_codigos && (
+                              <Chip
+                                size="small"
+                                label="sin códigos"
+                                title="Este producto aún no tiene códigos generados. La cifra viene del lote."
+                                sx={{ height: 17, fontSize: 9.5, fontWeight: 700, fontFamily: T.font,
+                                  background: "#FBF0DC", color: "#8A5A1A", border: "1px solid rgba(163,105,32,0.25)",
+                                  "& .MuiChip-label": { px: 0.6 } }}
+                              />
+                            )}
                             {(() => {
                               const f = enFrascos(p.stock, p.contenido_por_presentacion, p.unidad_base);
                               if (!f) return null;
@@ -1996,7 +2061,25 @@ export default function Inventario() {
                         );
                       })()}
                     </Box>
-                    <Typography variant="body2" sx={{ color: "#666" }}>{p.lotes_count}</Typography>
+                    <Box>
+                      {p.tiene_codigos ? (
+                        <>
+                          <Typography sx={{ fontFamily: T.font, fontSize: 13.5, fontWeight: 600, color: T.text1 }}>
+                            {p.codigos_activos.toLocaleString()}
+                          </Typography>
+                          <Typography sx={{ fontFamily: T.font, fontSize: 10, color: T.text3 }}>
+                            de {p.codigos_totales.toLocaleString()} · {p.lotes_count} lote{p.lotes_count === 1 ? "" : "s"}
+                          </Typography>
+                        </>
+                      ) : (
+                        <>
+                          <Typography sx={{ fontFamily: T.font, fontSize: 13.5, color: T.text3 }}>—</Typography>
+                          <Typography sx={{ fontFamily: T.font, fontSize: 10, color: "#8A5A1A", fontWeight: 600 }}>
+                            sin códigos
+                          </Typography>
+                        </>
+                      )}
+                    </Box>
                     <Typography variant="body2" sx={{ color: "#666" }}>{formatVencimiento(p.vencimiento_proximo)}</Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: p.estado.dot }} />
@@ -2019,7 +2102,7 @@ export default function Inventario() {
 
               const TableHeader = () => (
                 <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr 1.2fr 0.8fr", px: 2, py: 1.2, borderBottom: `1px solid ${T.border}`, mb: 1 }}>
-                  {["PRODUCTO", "CATEGORÍA", "STOCK", "LOTES", "VENCE", "ESTADO", "ACCIONES"].map((h) => (
+                  {["PRODUCTO", "CATEGORÍA", "STOCK", "CÓDIGOS ACTIVOS", "VENCE", "ESTADO", "ACCIONES"].map((h) => (
                     <Typography key={h} sx={{ fontFamily: T.font, fontSize: 10.5, fontWeight: 700, color: T.text3, letterSpacing: 0.8 }}>{h}</Typography>
                   ))}
                 </Box>
