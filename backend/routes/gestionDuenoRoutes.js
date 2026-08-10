@@ -158,7 +158,41 @@ async function ensureComisionSchema() {
     creado_en TEXT DEFAULT (datetime('now')),
     UNIQUE(especialista_id, periodo_key)
   )`);
+  // Pagos extra al especialista: deudas pendientes, bonos, adelantos, etc.
+  // Se suman al pago del periodo en que caiga su fecha.
+  await dbRun(`CREATE TABLE IF NOT EXISTS pagos_extra_especialista (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    especialista_id INTEGER NOT NULL,
+    monto REAL NOT NULL,
+    concepto TEXT NOT NULL,
+    tipo TEXT DEFAULT 'extra',
+    fecha TEXT NOT NULL,
+    notas TEXT,
+    creado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+    creado_por TEXT,
+    FOREIGN KEY(especialista_id) REFERENCES especialistas(id)
+  )`);
+  await dbRun(
+    `CREATE INDEX IF NOT EXISTS idx_pagos_extra_esp_fecha
+     ON pagos_extra_especialista(especialista_id, fecha)`
+  );
+
   comisionSchemaReady = true;
+}
+
+/** Pagos extra de un especialista dentro de un periodo (por fecha del pago). */
+async function pagosExtraDe(especialistaId, { fecha_inicio, fecha_fin } = {}) {
+  let cond = "especialista_id = ?";
+  const params = [especialistaId];
+  if (fecha_inicio) { cond += " AND DATE(fecha) >= ?"; params.push(fecha_inicio); }
+  if (fecha_fin) { cond += " AND DATE(fecha) <= ?"; params.push(fecha_fin); }
+  return dbAll(
+    `SELECT id, monto, concepto, tipo, fecha, notas, creado_por, creado_en
+     FROM pagos_extra_especialista
+     WHERE ${cond}
+     ORDER BY fecha DESC, id DESC`,
+    params
+  );
 }
 
 // Calcula el monto de comisión de una línea (fijo tiene prioridad si está configurado)
@@ -910,6 +944,10 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
 
     const ticketPromedio = presupuestos.length > 0 ? redondear(baseTotal / presupuestos.length) : 0;
 
+    // Pagos extra del periodo (deudas, bonos, adelantos…)
+    const extras = await pagosExtraDe(id, { fecha_inicio, fecha_fin });
+    const totalExtras = redondear(extras.reduce((a, e) => a + (Number(e.monto) || 0), 0));
+
     // KPI overrides por periodo
     const periodoKey = `${fecha_inicio || "all"}_${fecha_fin || "all"}`;
     const kpiOv = await dbGet(
@@ -929,14 +967,100 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
         num_pacientes: trabajo.resumen.num_pacientes,
         valor_promedio_sesion: trabajo.resumen.valor_promedio_sesion,
         pago_fijo: Number(especialista.pago_fijo) || 0,
-        total_a_pagar: redondear(comisionTotal + (Number(especialista.pago_fijo) || 0)),
+        pagos_extra_total: totalExtras,
+        pagos_extra_cantidad: extras.length,
+        total_a_pagar: redondear(comisionTotal + (Number(especialista.pago_fijo) || 0) + totalExtras),
       },
       kpi_overrides: kpiOv || null,
+      pagos_extra: extras,
       presupuestos
     });
   } catch (err) {
     console.error("❌ Error perfil especialista:", err.message);
     res.status(500).json({ message: "Error al obtener perfil", error: err.message });
+  }
+});
+
+/* ======================================================================
+   💵 PAGOS EXTRA A UN ESPECIALISTA
+   Para lo que no sale de las sesiones: una deuda pendiente, un bono,
+   un adelanto, horas de apoyo… Suma al pago del periodo en que caiga.
+====================================================================== */
+router.get("/especialistas/:id/pagos-extra", authMiddleware, requireOwner, async (req, res) => {
+  await ensureComisionSchema();
+  try {
+    const { id } = req.params;
+    const { fecha_inicio, fecha_fin } = req.query;
+    const pagos = await pagosExtraDe(id, { fecha_inicio, fecha_fin });
+    res.json({
+      total: redondear(pagos.reduce((a, p) => a + (Number(p.monto) || 0), 0)),
+      cantidad: pagos.length,
+      pagos,
+    });
+  } catch (err) {
+    console.error("❌ Error listando pagos extra:", err.message);
+    res.status(500).json({ message: "Error al listar pagos extra" });
+  }
+});
+
+router.post("/especialistas/:id/pagos-extra", authMiddleware, requireOwner, async (req, res) => {
+  await ensureComisionSchema();
+  try {
+    const { id } = req.params;
+    const { monto, concepto, tipo, fecha, notas } = req.body;
+
+    const montoNum = Number(monto);
+    if (!montoNum || isNaN(montoNum) || montoNum === 0) {
+      return res.status(400).json({ message: "El monto debe ser distinto de cero" });
+    }
+    if (!concepto || !String(concepto).trim()) {
+      return res.status(400).json({ message: "El concepto es obligatorio" });
+    }
+
+    const especialista = await dbGet("SELECT id FROM especialistas WHERE id = ?", [id]);
+    if (!especialista) {
+      return res.status(404).json({ message: "Especialista no encontrado" });
+    }
+
+    const fechaPago = (fecha && String(fecha).slice(0, 10)) || fechaLima().slice(0, 10);
+
+    const r = await dbRun(
+      `INSERT INTO pagos_extra_especialista
+        (especialista_id, monto, concepto, tipo, fecha, notas, creado_en, creado_por)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        redondear(montoNum),
+        String(concepto).trim(),
+        tipo || "extra",
+        fechaPago,
+        notas || null,
+        fechaLima(),
+        req.user?.username || "sistema",
+      ]
+    );
+
+    res.json({
+      message: `✅ Pago extra de S/ ${Math.abs(redondear(montoNum)).toFixed(2)} registrado`,
+      id: r.lastID,
+    });
+  } catch (err) {
+    console.error("❌ Error registrando pago extra:", err.message);
+    res.status(500).json({ message: "Error al registrar el pago extra" });
+  }
+});
+
+router.delete("/pagos-extra/:pago_id", authMiddleware, requireOwner, async (req, res) => {
+  await ensureComisionSchema();
+  try {
+    const r = await dbRun("DELETE FROM pagos_extra_especialista WHERE id = ?", [req.params.pago_id]);
+    if (r.changes === 0) {
+      return res.status(404).json({ message: "Pago extra no encontrado" });
+    }
+    res.json({ message: "✅ Pago extra eliminado" });
+  } catch (err) {
+    console.error("❌ Error eliminando pago extra:", err.message);
+    res.status(500).json({ message: "Error al eliminar el pago extra" });
   }
 });
 

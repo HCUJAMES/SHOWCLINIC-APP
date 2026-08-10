@@ -236,6 +236,98 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
   );
 });
 
+/**
+ * 🔔 RECORDATORIOS DE RETOQUE
+ *
+ * Cada tratamiento tiene su ciclo: la toxina botulínica (botox, modulaciones)
+ * se repite cada 6 meses y el resto una vez al año. Este endpoint calcula,
+ * para cada paciente y tratamiento, cuándo toca repetirlo y devuelve los que
+ * ya vencieron o están por vencer, para avisar en el dashboard.
+ *
+ * Query: ?dias=45 (ventana de aviso) & ?limite=20
+ */
+router.get("/recordatorios", async (req, res) => {
+  try {
+    const ventanaDias = Math.max(1, parseInt(req.query.dias, 10) || 45);
+    const limite = Math.max(1, parseInt(req.query.limite, 10) || 25);
+
+    // Última vez que se hizo cada tratamiento, por paciente
+    const filas = await dbAll(`
+      SELECT
+        pa.paciente_id,
+        p.nombre, p.apellido, p.dni, p.celular,
+        ps.tratamiento_nombre,
+        MAX(DATE(ps.fecha_realizada)) AS ultima_fecha
+      FROM presupuestos_sesiones ps
+      JOIN presupuestos_asignados pa ON pa.id = ps.presupuesto_asignado_id
+      JOIN patients p ON p.id = pa.paciente_id
+      WHERE ps.estado = 'completada' AND ps.fecha_realizada IS NOT NULL
+      GROUP BY pa.paciente_id, ps.tratamiento_nombre
+    `);
+
+    // La toxina se repite cada 6 meses; en la clínica se registra como
+    // "botox", "toxina" o "modulación".
+    const esToxina = (nombre = "") => {
+      const t = String(nombre).toLowerCase();
+      return t.includes("botox") || t.includes("toxina") || t.includes("modulaci");
+    };
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const candidatos = [];
+    for (const f of filas) {
+      if (!f.ultima_fecha) continue;
+      const meses = esToxina(f.tratamiento_nombre) ? 6 : 12;
+
+      const ultima = new Date(`${f.ultima_fecha}T00:00:00`);
+      if (isNaN(ultima)) continue;
+      const proxima = new Date(ultima);
+      proxima.setMonth(proxima.getMonth() + meses);
+
+      const diasRestantes = Math.round((proxima - hoy) / 86400000);
+      if (diasRestantes > ventanaDias) continue; // todavía falta mucho
+
+      candidatos.push({
+        paciente_id: f.paciente_id,
+        nombre: f.nombre,
+        apellido: f.apellido,
+        dni: f.dni,
+        celular: f.celular,
+        tratamiento: f.tratamiento_nombre,
+        tipo: esToxina(f.tratamiento_nombre) ? "toxina" : "general",
+        ciclo_meses: meses,
+        ultima_fecha: f.ultima_fecha,
+        proxima_fecha: proxima.toISOString().slice(0, 10),
+        dias_restantes: diasRestantes,          // negativo = ya venció
+        vencido: diasRestantes < 0,
+      });
+    }
+
+    // Un aviso por paciente: el tratamiento más urgente
+    const porPaciente = new Map();
+    for (const c of candidatos) {
+      const prev = porPaciente.get(c.paciente_id);
+      if (!prev || c.dias_restantes < prev.dias_restantes) porPaciente.set(c.paciente_id, c);
+    }
+
+    const lista = Array.from(porPaciente.values())
+      .sort((a, b) => a.dias_restantes - b.dias_restantes)
+      .slice(0, limite);
+
+    res.json({
+      total: lista.length,
+      vencidos: lista.filter((r) => r.vencido).length,
+      proximos: lista.filter((r) => !r.vencido).length,
+      ventana_dias: ventanaDias,
+      recordatorios: lista,
+    });
+  } catch (err) {
+    console.error("❌ Error calculando recordatorios:", err.message);
+    res.status(500).json({ message: "Error al calcular recordatorios" });
+  }
+});
+
 // 📊 Seguimiento de pacientes - último tratamiento y tiempo sin venir
 router.get("/seguimiento", async (req, res) => {
   try {

@@ -7,9 +7,12 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Table, TableBody, TableCell, TableHead, TableRow,
   LinearProgress, Select, MenuItem, FormControl,
-  InputLabel, Collapse, Alert, Tooltip, TextField
+  InputLabel, Collapse, Alert, Tooltip, TextField,
+  Checkbox, FormControlLabel
 } from "@mui/material";
 import {
+  AddRounded,
+  DeleteOutlineRounded,
   TrendingUp, TrendingDown, People, AttachMoney,
   CheckCircle, ExpandMore, ExpandLess,
   ArrowBack, Refresh, FilterList,
@@ -320,6 +323,31 @@ export default function GestionDueno() {
     if (especialistaDetalle) loadEspecialistaDetalle(especialistaDetalle.especialista.id);
   };
 
+  /* ── Pagos extra al especialista (deudas, bonos, adelantos) ── */
+  const handleAgregarPagoExtra = async (datos) => {
+    if (!especialistaDetalle) return;
+    const espId = especialistaDetalle.especialista.id;
+    try {
+      await apiFetch(`/especialistas/${espId}/pagos-extra`, { method: "POST", body: JSON.stringify(datos) });
+      loadEspecialistaDetalle(espId);
+      loadEspecialistas();
+    } catch (e) {
+      setError(e.message || "No se pudo registrar el pago extra");
+    }
+  };
+
+  const handleEliminarPagoExtra = async (pagoId) => {
+    if (!especialistaDetalle) return;
+    const espId = especialistaDetalle.especialista.id;
+    try {
+      await apiFetch(`/pagos-extra/${pagoId}`, { method: "DELETE" });
+      loadEspecialistaDetalle(espId);
+      loadEspecialistas();
+    } catch (e) {
+      setError(e.message || "No se pudo eliminar el pago extra");
+    }
+  };
+
   /* ── HELPERS DE UI ── */
   const username = localStorage.getItem("username") || "Dueño";
   const rol = (localStorage.getItem("role") || "").toLowerCase();
@@ -447,6 +475,8 @@ export default function GestionDueno() {
               onReloadDetalle={() => { if (especialistaDetalle) loadEspecialistaDetalle(especialistaDetalle.especialista.id); }}
               onEditEspecialistaComision={handleEditEspecialistaComision}
               onEditPresupuestoComision={handleEditPresupuestoComision}
+              onAgregarPagoExtra={handleAgregarPagoExtra}
+              onEliminarPagoExtra={handleEliminarPagoExtra}
               fechaInicio={fechaInicio}
               fechaFin={fechaFin}
               rol={rol}
@@ -1763,7 +1793,7 @@ function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
 /* ======================================================================
    VISTA ESPECIALISTAS
 ====================================================================== */
-function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onReloadDetalle, onEditEspecialistaComision, onEditPresupuestoComision, fechaInicio, fechaFin, rol }) {
+function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onReloadDetalle, onEditEspecialistaComision, onEditPresupuestoComision, onAgregarPagoExtra, onEliminarPagoExtra, fechaInicio, fechaFin, rol }) {
   const [pctEsp, setPctEsp] = useState(null); // especialista en edición de %
   const [reconOpen, setReconOpen] = useState(false);
 
@@ -1774,6 +1804,8 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
         onBack={onBack}
         onEditEspecialistaComision={onEditEspecialistaComision}
         onEditPresupuestoComision={onEditPresupuestoComision}
+        onAgregarPagoExtra={onAgregarPagoExtra}
+        onEliminarPagoExtra={onEliminarPagoExtra}
         onReload={onReloadDetalle}
         fechaInicio={fechaInicio}
         fechaFin={fechaFin}
@@ -2176,8 +2208,13 @@ function TratamientosComisionDialog({ open, onClose, onSaved }) {
   );
 }
 
-function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision, onReload, fechaInicio, fechaFin, rol }) {
-  const { especialista, resumen, presupuestos = [], kpi_overrides } = detalle;
+function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision, onAgregarPagoExtra, onEliminarPagoExtra, onReload, fechaInicio, fechaFin, rol }) {
+  const { especialista, resumen, presupuestos = [], kpi_overrides, pagos_extra = [] } = detalle;
+  const [extraOpen, setExtraOpen] = useState(false);
+  const totalExtras = useMemo(
+    () => pagos_extra.reduce((a, p) => a + (Number(p.monto) || 0), 0),
+    [pagos_extra]
+  );
   const [pctEspOpen, setPctEspOpen] = useState(false);
   const [presEdit, setPresEdit] = useState(null);
   const [filtros, setFiltros] = useState([]);
@@ -2350,15 +2387,18 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
               <Typography sx={{ fontWeight: 700, color: colors.primaryDark, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>{formatMoney(kpisCalc.comisionTotal)}</Typography>
               {kpi_overrides?.comision_total_override != null && <Chip label="editado" size="small" sx={{ height: 14, fontSize: "0.55rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, position: "absolute", top: 6, right: 6, "& .MuiChip-label": { px: "4px" } }} />}
             </Box>
-            {/* Total a pagar (comisión + pago fijo) */}
+            {/* Total a pagar (comisión + pago fijo + extras) */}
             <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.primaryDark, borderRadius: "14px" }}>
               <Typography sx={{ color: "rgba(255,255,255,0.75)", fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Total a pagar</Typography>
               <Typography sx={{ fontWeight: 700, color: colors.white, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>
-                {formatMoney(kpisCalc.comisionTotal + (Number(resumen?.pago_fijo) || 0))}
+                {formatMoney(kpisCalc.comisionTotal + (Number(resumen?.pago_fijo) || 0) + totalExtras)}
               </Typography>
-              {Number(resumen?.pago_fijo) > 0 && (
+              {(Number(resumen?.pago_fijo) > 0 || totalExtras !== 0) && (
                 <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: "10px", fontFamily: fonts.body }}>
-                  incl. fijo {formatMoney(resumen.pago_fijo)}
+                  {[
+                    Number(resumen?.pago_fijo) > 0 ? `fijo ${formatMoney(resumen.pago_fijo)}` : null,
+                    totalExtras !== 0 ? `extras ${formatMoney(totalExtras)}` : null,
+                  ].filter(Boolean).join(" · ")}
                 </Typography>
               )}
             </Box>
@@ -2390,6 +2430,82 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
                   {savingKpis ? "Guardando..." : "Guardar"}
                 </Button>
               </Box>
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ===== Pagos extra: deudas, bonos, adelantos ===== */}
+      <Card sx={{ ...cardSx, mb: "20px", p: 0 }}>
+        <CardContent sx={{ p: "20px" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", mb: pagos_extra.length ? "14px" : 0 }}>
+            <Box sx={{ flex: 1, minWidth: 200 }}>
+              <Typography sx={{ fontFamily: fonts.title, fontSize: "18px", fontWeight: 600, color: colors.primaryDark }}>
+                Pagos extra
+              </Typography>
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>
+                Deudas pendientes, bonos o descuentos que no salen de las sesiones
+              </Typography>
+            </Box>
+            {totalExtras !== 0 && (
+              <Box sx={{ textAlign: "right", mr: "6px" }}>
+                <Typography sx={{ fontFamily: fonts.body, fontSize: "10.5px", color: colors.textMuted, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Total extras
+                </Typography>
+                <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "18px", color: totalExtras < 0 ? colors.error : colors.primaryDark }}>
+                  {formatMoney(totalExtras)}
+                </Typography>
+              </Box>
+            )}
+            <Button
+              onClick={() => setExtraOpen(true)}
+              startIcon={<AddRounded sx={{ fontSize: 18 }} />}
+              sx={{ fontFamily: fonts.body, textTransform: "none", fontWeight: 700, borderRadius: "12px",
+                color: colors.white, bgcolor: colors.primaryDark, px: "16px", py: "8px",
+                "&:hover": { bgcolor: colors.primary } }}
+            >
+              Agregar pago
+            </Button>
+          </Box>
+
+          {pagos_extra.length === 0 ? (
+            <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textMuted, mt: "10px" }}>
+              Sin pagos extra en este periodo.
+            </Typography>
+          ) : (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {pagos_extra.map((pg) => {
+                const negativo = Number(pg.monto) < 0;
+                return (
+                  <Box key={pg.id}
+                    sx={{ display: "flex", alignItems: "center", gap: "12px", p: "10px 14px", borderRadius: "12px",
+                      bgcolor: colors.creamPanel, border: `1px solid ${colors.border}`, flexWrap: "wrap" }}>
+                    <Box sx={{ flex: 1, minWidth: 160 }}>
+                      <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "13.5px", color: colors.primaryDark }}>
+                        {pg.concepto}
+                      </Typography>
+                      <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted }}>
+                        {String(pg.fecha).slice(0, 10)}
+                        {pg.creado_por ? ` · registrado por ${pg.creado_por}` : ""}
+                      </Typography>
+                      {pg.notas && (
+                        <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textBody, mt: "2px" }}>
+                          {pg.notas}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "17px",
+                      color: negativo ? colors.error : colors.successText, whiteSpace: "nowrap" }}>
+                      {negativo ? "−" : "+"} {formatMoney(Math.abs(Number(pg.monto)))}
+                    </Typography>
+                    <IconButton size="small" onClick={() => onEliminarPagoExtra(pg.id)}
+                      title="Eliminar este pago extra"
+                      sx={{ color: colors.textMuted, "&:hover": { color: colors.error, bgcolor: "rgba(211,47,47,0.08)" } }}>
+                      <DeleteOutlineRounded sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Box>
+                );
+              })}
             </Box>
           )}
         </CardContent>
@@ -2438,6 +2554,13 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
         especialista={pctEspOpen ? especialista : null}
         onClose={() => setPctEspOpen(false)}
         onSave={async (pct) => { await onEditEspecialistaComision(especialista.id, pct); setPctEspOpen(false); }}
+      />
+
+      <PagoExtraDialog
+        open={extraOpen}
+        especialista={especialista}
+        onClose={() => setExtraOpen(false)}
+        onSave={async (datos) => { await onAgregarPagoExtra(datos); setExtraOpen(false); }}
       />
 
       <PorcentajePresupuestoDialog
@@ -2717,6 +2840,126 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
         </CardContent>
       </Card>
     </MotionBox>
+  );
+}
+
+/* ======================================================================
+   DIALOG: PAGO EXTRA A UN ESPECIALISTA
+====================================================================== */
+function PagoExtraDialog({ open, especialista, onClose, onSave }) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const [monto, setMonto] = useState("");
+  const [concepto, setConcepto] = useState("");
+  const [fecha, setFecha] = useState(hoy);
+  const [notas, setNotas] = useState("");
+  const [descuenta, setDescuenta] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMonto(""); setConcepto(""); setFecha(new Date().toISOString().slice(0, 10));
+      setNotas(""); setDescuenta(false);
+    }
+  }, [open]);
+
+  const montoNum = parseFloat(monto) || 0;
+  const valido = montoNum > 0 && concepto.trim().length > 0;
+
+  const atajos = ["Deuda pendiente", "Bono por desempeño", "Adelanto", "Horas de apoyo", "Reembolso"];
+
+  const campoSx = {
+    "& .MuiInputBase-input": { fontFamily: fonts.body, fontSize: "14px" },
+    "& .MuiOutlinedInput-root": { borderRadius: "10px" },
+    "& .MuiInputLabel-root": { fontFamily: fonts.body },
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: "18px" } }}>
+      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, pb: "6px" }}>
+        Pago extra
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textMuted, fontWeight: 400 }}>
+          Para {especialista?.nombre}
+        </Typography>
+      </DialogTitle>
+      <DialogContent sx={{ pt: "8px !important" }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px", mb: "14px" }}>
+          {atajos.map((a) => (
+            <Chip key={a} label={a} size="small" onClick={() => setConcepto(a)}
+              sx={{ fontFamily: fonts.body, fontSize: "11px", fontWeight: 600, cursor: "pointer",
+                bgcolor: concepto === a ? colors.primaryDark : colors.goldSoft,
+                color: concepto === a ? colors.white : colors.primaryDark,
+                "&:hover": { bgcolor: concepto === a ? colors.primary : colors.gold } }} />
+          ))}
+        </Box>
+
+        <TextField label="Concepto" fullWidth size="small" value={concepto}
+          onChange={(e) => setConcepto(e.target.value)}
+          placeholder="Ej: Deuda de la quincena pasada"
+          sx={{ ...campoSx, mb: "14px" }} />
+
+        <TextField label="Monto (S/)" type="number" fullWidth size="small" value={monto}
+          onChange={(e) => setMonto(e.target.value)}
+          inputProps={{ min: 0, step: 0.01 }}
+          sx={{ ...campoSx, mb: "10px" }} />
+
+        <FormControlLabel
+          sx={{ mb: "6px" }}
+          control={<Checkbox size="small" checked={descuenta} onChange={(e) => setDescuenta(e.target.checked)}
+            sx={{ color: colors.textMuted, "&.Mui-checked": { color: colors.error } }} />}
+          label={<Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textBody }}>
+            Es un descuento (se resta del pago)
+          </Typography>}
+        />
+
+        <TextField label="Fecha" type="date" fullWidth size="small" value={fecha}
+          onChange={(e) => setFecha(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          helperText="Suma al pago del periodo en que caiga esta fecha"
+          sx={{ ...campoSx, mb: "12px" }} />
+
+        <TextField label="Notas (opcional)" fullWidth size="small" multiline minRows={2}
+          value={notas} onChange={(e) => setNotas(e.target.value)} sx={campoSx} />
+
+        {valido && (
+          <Box sx={{ mt: "14px", p: "12px", borderRadius: "12px",
+            bgcolor: descuenta ? "rgba(211,47,47,0.07)" : colors.successBg,
+            border: `1px solid ${descuenta ? "rgba(211,47,47,0.25)" : colors.border}` }}>
+            <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>
+              {descuenta ? "Se restará del pago del mes:" : "Se sumará al pago del mes:"}
+            </Typography>
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "20px",
+              color: descuenta ? colors.error : colors.successText }}>
+              {descuenta ? "−" : "+"} {formatMoney(montoNum)}
+            </Typography>
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ p: "16px" }}>
+        <Button onClick={onClose} sx={{ fontFamily: fonts.body, textTransform: "none", color: colors.textMuted }}>
+          Cancelar
+        </Button>
+        <Button
+          disabled={!valido || guardando}
+          onClick={async () => {
+            setGuardando(true);
+            await onSave({
+              monto: descuenta ? -Math.abs(montoNum) : Math.abs(montoNum),
+              concepto: concepto.trim(),
+              tipo: descuenta ? "descuento" : "extra",
+              fecha,
+              notas: notas.trim() || null,
+            });
+            setGuardando(false);
+          }}
+          sx={{ fontFamily: fonts.body, textTransform: "none", fontWeight: 700, borderRadius: "10px",
+            color: colors.white, bgcolor: colors.primaryDark, px: "18px",
+            "&:hover": { bgcolor: colors.primary }, "&:disabled": { opacity: 0.5 } }}
+        >
+          {guardando ? "Guardando..." : "Registrar"}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

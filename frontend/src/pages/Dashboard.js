@@ -42,6 +42,7 @@ import {
   MonetizationOn,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import PanelRecordatorios from "../components/PanelRecordatorios";
 
 // Iconos para cada módulo
 const moduleIcons = {
@@ -427,6 +428,12 @@ export default function Dashboard() {
           </Typography>
         </Paper>
       )}
+
+      {/* Avisos de retoque: pacientes que ya deben volver */}
+      <PanelRecordatorios
+        apiBase={API_BASE}
+        onVerPaciente={(r) => navigate("/historial-clinico", { state: { pacienteId: r.paciente_id } })}
+      />
 
       {/* Decorative model images */}
       <Box
