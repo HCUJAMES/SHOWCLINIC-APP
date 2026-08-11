@@ -4,8 +4,8 @@ import {
   NotificationsActiveRounded,
   CloseRounded,
   PhoneRounded,
-  ChevronRightRounded,
   EventRepeatRounded,
+  CheckRounded,
 } from "@mui/icons-material";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -59,6 +59,45 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
       .catch(() => {})
       .finally(() => setCargando(false));
   }, [apiBase]);
+
+  // Marca "ya lo contacté": la fila sale y las de abajo suben solas
+  const [marcando, setMarcando] = useState(null);
+
+  const marcarContactado = async (r, e) => {
+    if (e) e.stopPropagation();
+    if (marcando) return;
+    setMarcando(`${r.paciente_id}-${r.tratamiento}`);
+
+    const token = localStorage.getItem("token");
+    try {
+      await fetch(`${apiBase}/api/pacientes/recordatorios/contactado`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          paciente_id: r.paciente_id,
+          tratamiento: r.tratamiento,
+          proxima_fecha: r.proxima_fecha,
+        }),
+      });
+    } catch { /* si falla la red igual se quita en pantalla */ }
+
+    // Deja ver el check un instante antes de que la fila salga
+    setTimeout(() => {
+      setDatos((prev) => {
+        const quedan = prev.recordatorios.filter(
+          (x) => !(x.paciente_id === r.paciente_id && x.tratamiento === r.tratamiento)
+        );
+        return {
+          ...prev,
+          recordatorios: quedan,
+          total: quedan.length,
+          vencidos: quedan.filter((x) => x.vencido).length,
+          proximos: quedan.filter((x) => !x.vencido).length,
+        };
+      });
+      setMarcando(null);
+    }, 420);
+  };
 
   const total = datos.total || 0;
 
@@ -192,22 +231,35 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                   </Typography>
                 </Box>
               ) : (
-                datos.recordatorios.map((r, i) => (
+                <AnimatePresence initial={false}>
+                {datos.recordatorios.map((r, i) => {
+                  const clave = `${r.paciente_id}-${r.tratamiento}`;
+                  const hecho = marcando === clave;
+                  return (
                   <MotionBox
-                    key={`${r.paciente_id}-${r.tratamiento}`}
+                    key={clave}
+                    layout
                     initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 + i * 0.045, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                    whileHover={{ x: 3 }}
-                    onClick={() => onVerPaciente && onVerPaciente(r)}
+                    animate={hecho
+                      ? { opacity: 1, y: 0, scale: 0.985 }
+                      : { opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, x: 60, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
+                    transition={{
+                      layout: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
+                      delay: hecho ? 0 : 0.05 + i * 0.045,
+                      duration: 0.3,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    whileHover={hecho ? {} : { x: 3 }}
+                    onClick={() => !hecho && onVerPaciente && onVerPaciente(r)}
                     sx={{
                       display: "flex", alignItems: "center", gap: 1.2,
                       p: 1.3, mb: 0.9, borderRadius: "14px", cursor: "pointer",
-                      background: "#fff",
-                      border: `1px solid ${r.vencido ? "rgba(211,47,47,0.22)" : "rgba(163,105,32,0.14)"}`,
-                      borderLeft: `3px solid ${r.vencido ? "#D32F2F" : ORO}`,
-                      transition: "box-shadow .2s ease, border-color .2s ease",
-                      "&:hover": { boxShadow: "0 6px 18px rgba(163,105,32,0.16)" },
+                      background: hecho ? "#EDF7EE" : "#fff",
+                      border: `1px solid ${hecho ? "rgba(46,125,50,0.35)" : r.vencido ? "rgba(211,47,47,0.22)" : "rgba(163,105,32,0.14)"}`,
+                      borderLeft: `3px solid ${hecho ? "#2E7D32" : r.vencido ? "#D32F2F" : ORO}`,
+                      transition: "background .25s ease, border-color .25s ease, box-shadow .2s ease",
+                      "&:hover": { boxShadow: hecho ? "none" : "0 6px 18px rgba(163,105,32,0.16)" },
                     }}
                   >
                     {/* Avatar */}
@@ -257,16 +309,44 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                       </Box>
                     </Box>
 
-                    <ChevronRightRounded sx={{ fontSize: 20, color: "rgba(163,105,32,0.45)", flexShrink: 0 }} />
+                    {/* Check: ya se contactó a esta persona */}
+                    <Tooltip title={hecho ? "Contactado" : "Marcar como contactado"} arrow placement="left">
+                      <MotionBox
+                        component="button"
+                        aria-label="Marcar como contactado"
+                        onClick={(e) => marcarContactado(r, e)}
+                        whileTap={{ scale: 0.85 }}
+                        animate={hecho ? { scale: [1, 1.25, 1] } : { scale: 1 }}
+                        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                        sx={{
+                          flexShrink: 0, width: 30, height: 30, p: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          borderRadius: "50%", cursor: "pointer",
+                          border: `1.5px solid ${hecho ? "#2E7D32" : "rgba(163,105,32,0.30)"}`,
+                          background: hecho ? "#2E7D32" : "transparent",
+                          color: hecho ? "#fff" : "rgba(163,105,32,0.55)",
+                          transition: "background .2s ease, border-color .2s ease, color .2s ease",
+                          "&:hover": {
+                            background: hecho ? "#2E7D32" : "rgba(46,125,50,0.12)",
+                            borderColor: "#2E7D32",
+                            color: hecho ? "#fff" : "#2E7D32",
+                          },
+                        }}
+                      >
+                        <CheckRounded sx={{ fontSize: 17 }} />
+                      </MotionBox>
+                    </Tooltip>
                   </MotionBox>
-                ))
+                  );
+                })}
+                </AnimatePresence>
               )}
             </Box>
 
             {total > 0 && (
               <Box sx={{ px: 2, py: 1.1, borderTop: "1px solid rgba(163,105,32,0.14)", background: "#fff" }}>
                 <Typography sx={{ fontSize: 10.8, color: "#8D7B70", textAlign: "center" }}>
-                  Toca un paciente para abrir su historial
+                  Toca el nombre para abrir su historial · el ✓ marca que ya lo contactaste
                 </Typography>
               </Box>
             )}

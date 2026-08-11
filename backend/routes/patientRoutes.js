@@ -237,6 +237,64 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
 });
 
 /**
+ * Marca de "ya se contactó" para un recordatorio.
+ * Se guarda junto a la fecha de vencimiento, así el aviso desaparece hasta que
+ * llegue el SIGUIENTE ciclo del paciente (no lo silencia para siempre).
+ */
+let recordatoriosSchemaReady = false;
+async function ensureRecordatoriosSchema() {
+  if (recordatoriosSchemaReady) return;
+  await dbRun(`CREATE TABLE IF NOT EXISTS recordatorios_contactados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    paciente_id INTEGER NOT NULL,
+    tratamiento TEXT NOT NULL,
+    proxima_fecha TEXT NOT NULL,
+    contactado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+    contactado_por TEXT,
+    UNIQUE(paciente_id, tratamiento, proxima_fecha)
+  )`);
+  recordatoriosSchemaReady = true;
+}
+
+// ✅ Marcar un recordatorio como contactado
+router.post("/recordatorios/contactado", async (req, res) => {
+  try {
+    await ensureRecordatoriosSchema();
+    const { paciente_id, tratamiento, proxima_fecha } = req.body;
+    if (!paciente_id || !tratamiento || !proxima_fecha) {
+      return res.status(400).json({ message: "paciente_id, tratamiento y proxima_fecha son requeridos" });
+    }
+    await dbRun(
+      `INSERT OR IGNORE INTO recordatorios_contactados
+        (paciente_id, tratamiento, proxima_fecha, contactado_por)
+       VALUES (?, ?, ?, ?)`,
+      [paciente_id, tratamiento, String(proxima_fecha).slice(0, 10), req.user?.username || "sistema"]
+    );
+    res.json({ message: "✅ Contacto registrado" });
+  } catch (err) {
+    console.error("❌ Error marcando contacto:", err.message);
+    res.status(500).json({ message: "Error al marcar el contacto" });
+  }
+});
+
+// ↩️ Deshacer la marca de contactado
+router.delete("/recordatorios/contactado", async (req, res) => {
+  try {
+    await ensureRecordatoriosSchema();
+    const { paciente_id, tratamiento, proxima_fecha } = req.body;
+    await dbRun(
+      `DELETE FROM recordatorios_contactados
+       WHERE paciente_id = ? AND tratamiento = ? AND proxima_fecha = ?`,
+      [paciente_id, tratamiento, String(proxima_fecha || "").slice(0, 10)]
+    );
+    res.json({ message: "✅ Marca de contacto retirada" });
+  } catch (err) {
+    console.error("❌ Error deshaciendo contacto:", err.message);
+    res.status(500).json({ message: "Error al deshacer el contacto" });
+  }
+});
+
+/**
  * 🔔 RECORDATORIOS DE RETOQUE
  *
  * Cada tratamiento tiene su ciclo: la toxina botulínica (botox, modulaciones)
@@ -248,6 +306,7 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
  */
 router.get("/recordatorios", async (req, res) => {
   try {
+    await ensureRecordatoriosSchema();
     const ventanaDias = Math.max(1, parseInt(req.query.dias, 10) || 45);
     const limite = Math.max(1, parseInt(req.query.limite, 10) || 25);
 
@@ -304,9 +363,18 @@ router.get("/recordatorios", async (req, res) => {
       });
     }
 
+    // Quitar los que ya se contactaron para ese mismo vencimiento
+    const contactados = await dbAll(
+      `SELECT paciente_id, tratamiento, proxima_fecha FROM recordatorios_contactados`
+    );
+    const yaContactado = new Set(
+      contactados.map((c) => `${c.paciente_id}|${c.tratamiento}|${c.proxima_fecha}`)
+    );
+
     // Un aviso por paciente: el tratamiento más urgente
     const porPaciente = new Map();
     for (const c of candidatos) {
+      if (yaContactado.has(`${c.paciente_id}|${c.tratamiento}|${c.proxima_fecha}`)) continue;
       const prev = porPaciente.get(c.paciente_id);
       if (!prev || c.dias_restantes < prev.dias_restantes) porPaciente.set(c.paciente_id, c);
     }
