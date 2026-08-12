@@ -3412,12 +3412,34 @@ const HistorialClinico = () => {
                           >
                             {pac.nombre} {pac.apellido}
                           </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "#999", fontSize: "0.85rem" }}
-                          >
-                            {pac.tipoDocumento || "DNI"} {pac.dni}
-                          </Typography>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                            <Typography
+                              variant="caption"
+                              sx={{ color: "#999", fontSize: "0.85rem" }}
+                            >
+                              {pac.tipoDocumento || "DNI"} {pac.dni}
+                            </Typography>
+                            {pac.celular && (
+                              <>
+                                <Box sx={{ width: 3, height: 3, borderRadius: "50%", backgroundColor: "#d6c6ac", flexShrink: 0 }} />
+                                <Box
+                                  component="a"
+                                  href={`tel:${pac.celular}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  title="Llamar"
+                                  sx={{
+                                    display: "inline-flex", alignItems: "center", gap: 0.4,
+                                    color: "#a36920", fontSize: "0.85rem", fontWeight: 600,
+                                    textDecoration: "none",
+                                    "&:hover": { textDecoration: "underline" },
+                                  }}
+                                >
+                                  <Phone sx={{ fontSize: 14 }} />
+                                  {pac.celular}
+                                </Box>
+                              </>
+                            )}
+                          </Box>
                         </Box>
                       </Box>
                       <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexShrink: 0 }}>
