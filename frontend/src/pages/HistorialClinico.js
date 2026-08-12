@@ -34,7 +34,7 @@ import {
   Tooltip,
   Menu,
 } from "@mui/material";
-import { ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star } from "@mui/icons-material";
+import { Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -159,6 +159,9 @@ const HistorialClinico = () => {
   const [presupuestosAsignados, setPresupuestosAsignados] = useState([]);
   // Consultas ya pagadas que aún no se descuentan de ningún presupuesto
   const [saldoConsultas, setSaldoConsultas] = useState({ saldo_disponible: 0, disponibles: [], historial: [] });
+  // Hay roles sin acceso al teléfono de las pacientes (el backend ya lo omite);
+  // esto solo sirve para explicarlo en pantalla en vez de dejarlo en blanco.
+  const contactoRestringido = (localStorage.getItem("role") || "").toLowerCase() === "doctora";
   const [editandoSesiones, setEditandoSesiones] = useState(null); // { ofertaId, itemIdx, sesiones }
   const [asignandoPresupuesto, setAsignandoPresupuesto] = useState(false);
   const [showOferta, setShowOferta] = useState(false);
@@ -4016,7 +4019,16 @@ const HistorialClinico = () => {
                       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 2 }}>
                         <Box>
                           <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Celular</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.celular ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.celular || "—"}</Typography>
+                          {contactoRestringido ? (
+                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }} title="Tu rol no tiene acceso al teléfono de las pacientes">
+                              <Lock sx={{ fontSize: 14, color: "#bbb" }} />
+                              <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: "#bbb", fontSize: "0.9rem" }}>
+                                Restringido
+                              </Typography>
+                            </Box>
+                          ) : (
+                            <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.celular ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.celular || "—"}</Typography>
+                          )}
                         </Box>
                         <Box>
                           <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Correo</Typography>

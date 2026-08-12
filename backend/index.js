@@ -25,6 +25,7 @@ import gestionClinicaRoutes from "./routes/gestionClinicaRoutes.js";
 import gestionDuenoRoutes from "./routes/gestionDuenoRoutes.js";
 import barcodeRoutes from "./routes/barcodeRoutes.js";
 import consultasRoutes from "./routes/consultasRoutes.js";
+import { ocultarContactoSegunRol } from "./middleware/privacidad.js";
 import bcrypt from "bcryptjs";
 import { autoEmitMiddleware } from "./utils/socketEmitter.js";
 
@@ -1439,6 +1440,10 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
 app.use(autoEmitMiddleware);
 
 // ✅ Rutas de la API
+// Privacidad: el rol "doctora" no recibe el teléfono de las pacientes.
+// Va antes de las rutas para limpiar cualquier respuesta que lo incluya.
+app.use("/api", ocultarContactoSegunRol);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/pacientes", patientRoutes);
 app.use("/api/tratamientos", treatmentRoutes);
