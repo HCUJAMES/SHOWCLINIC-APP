@@ -363,18 +363,25 @@ router.get("/recordatorios", async (req, res) => {
       });
     }
 
-    // Quitar los que ya se contactaron para ese mismo vencimiento
+    // Quitar a los pacientes ya contactados hace poco.
+    // El aviso es sobre la PERSONA: si ya se le llamó, no debe reaparecer por
+    // otro de sus tratamientos. Vuelve a la lista pasados 60 días.
+    const DIAS_SILENCIO = 60;
     const contactados = await dbAll(
-      `SELECT paciente_id, tratamiento, proxima_fecha FROM recordatorios_contactados`
+      `SELECT paciente_id, MAX(DATE(contactado_en)) AS ultimo
+       FROM recordatorios_contactados GROUP BY paciente_id`
     );
-    const yaContactado = new Set(
-      contactados.map((c) => `${c.paciente_id}|${c.tratamiento}|${c.proxima_fecha}`)
-    );
+    const silenciados = new Set();
+    for (const c of contactados) {
+      if (!c.ultimo) continue;
+      const dias = Math.round((hoy - new Date(`${c.ultimo}T00:00:00`)) / 86400000);
+      if (dias <= DIAS_SILENCIO) silenciados.add(c.paciente_id);
+    }
 
     // Un aviso por paciente: el tratamiento más urgente
     const porPaciente = new Map();
     for (const c of candidatos) {
-      if (yaContactado.has(`${c.paciente_id}|${c.tratamiento}|${c.proxima_fecha}`)) continue;
+      if (silenciados.has(c.paciente_id)) continue;
       const prev = porPaciente.get(c.paciente_id);
       if (!prev || c.dias_restantes < prev.dias_restantes) porPaciente.set(c.paciente_id, c);
     }

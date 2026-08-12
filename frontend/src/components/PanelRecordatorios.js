@@ -96,7 +96,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
         };
       });
       setMarcando(null);
-    }, 420);
+    }, 620);
   };
 
   const total = datos.total || 0;
@@ -231,7 +231,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                   </Typography>
                 </Box>
               ) : (
-                <AnimatePresence initial={false}>
+                <>
                 {datos.recordatorios.map((r, i) => {
                   const clave = `${r.paciente_id}-${r.tratamiento}`;
                   const hecho = marcando === clave;
@@ -240,15 +240,16 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                     key={clave}
                     layout
                     initial={{ opacity: 0, y: 12 }}
+                    // Al marcarla, la fila se desvanece hacia la derecha; cuando
+                    // termina se quita del estado y `layout` sube a las demás.
                     animate={hecho
-                      ? { opacity: 1, y: 0, scale: 0.985 }
-                      : { opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, x: 60, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0 }}
+                      ? { opacity: 0, x: 70, scale: 0.92 }
+                      : { opacity: 1, x: 0, y: 0, scale: 1 }}
                     transition={{
                       layout: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
-                      delay: hecho ? 0 : 0.05 + i * 0.045,
-                      duration: 0.3,
-                      ease: [0.22, 1, 0.36, 1],
+                      delay: hecho ? 0.16 : 0.05 + i * 0.045,
+                      duration: hecho ? 0.26 : 0.3,
+                      ease: hecho ? "easeIn" : [0.22, 1, 0.36, 1],
                     }}
                     whileHover={hecho ? {} : { x: 3 }}
                     onClick={() => !hecho && onVerPaciente && onVerPaciente(r)}
@@ -339,7 +340,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                   </MotionBox>
                   );
                 })}
-                </AnimatePresence>
+                </>
               )}
             </Box>
 
