@@ -5,6 +5,14 @@ import { registrarConsulta } from "../services/consultas.js";
 
 const router = express.Router();
 
+/**
+ * Fecha y hora de Lima (UTC−5).
+ * Importante: NO usar new Date().toISOString(), que devuelve UTC — un pago
+ * hecho a las 7pm en Perú quedaría registrado con la fecha del día siguiente.
+ */
+const fechaLima = () =>
+  new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
+
 const normalizarMetodo = (metodo) => String(metodo || "").trim().toLowerCase();
 
 const aplicarComisionPOS = (monto, metodo) => {
@@ -562,7 +570,7 @@ router.post("/pagar", (req, res) => {
           );
         } else {
           // No tiene deuda registrada, crear registro en finanzas como pago directo
-          const fechaAhora = new Date().toISOString().slice(0, 19).replace("T", " ");
+          const fechaAhora = fechaLima();
           db.get(`SELECT paciente_id FROM tratamientos_realizados WHERE id = ?`, [tratamiento_realizado_id], (errTr, tr) => {
             if (errTr || !tr) {
               return res.status(404).json({ message: "Tratamiento no encontrado" });
@@ -588,7 +596,7 @@ router.post("/pagar", (req, res) => {
 
   // Si es un registro de finanzas (presupuesto, paquete, etc.)
   if (finanza_id) {
-    const fechaAhora = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const fechaAhora = fechaLima();
     db.run(
       `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_id, referencia_tipo)
        VALUES ('ingreso', 'abono_deuda', ?, 'Pago adicional', ?, ?, (SELECT paciente_id FROM finanzas WHERE id = ?), ?, 'finanza')`,
@@ -622,7 +630,7 @@ router.post("/consulta-directa", async (req, res) => {
     return res.status(400).json({ message: "Monto inválido" });
   }
 
-  const fechaAhora = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const fechaAhora = fechaLima();
 
   db.run(
     `INSERT INTO finanzas (tipo, categoria, monto, descripcion, fecha, metodo_pago, paciente_id, referencia_tipo, creado_por)

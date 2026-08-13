@@ -692,7 +692,9 @@ router.post("/cargos-extra", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "El monto debe ser mayor a 0" });
     }
 
-    const fechaFinal = fecha || new Date().toISOString().split("T")[0];
+    // Hora Lima: con toISOString() un registro de la tarde quedaba con la fecha de mañana
+    const fechaFinal =
+      fecha || new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).slice(0, 10);
     const mesFinal = mes || (new Date(fechaFinal).getMonth() + 1);
     const anioFinal = anio || new Date(fechaFinal).getFullYear();
 

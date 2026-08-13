@@ -336,6 +336,18 @@ export default function GestionDueno() {
     }
   };
 
+  const handleEditarPagoExtra = async (pagoId, datos) => {
+    if (!especialistaDetalle) return;
+    const espId = especialistaDetalle.especialista.id;
+    try {
+      await apiFetch(`/pagos-extra/${pagoId}`, { method: "PUT", body: JSON.stringify(datos) });
+      loadEspecialistaDetalle(espId);
+      loadEspecialistas();
+    } catch (e) {
+      setError(e.message || "No se pudo editar el pago extra");
+    }
+  };
+
   const handleEliminarPagoExtra = async (pagoId) => {
     if (!especialistaDetalle) return;
     const espId = especialistaDetalle.especialista.id;
@@ -476,6 +488,7 @@ export default function GestionDueno() {
               onEditEspecialistaComision={handleEditEspecialistaComision}
               onEditPresupuestoComision={handleEditPresupuestoComision}
               onAgregarPagoExtra={handleAgregarPagoExtra}
+              onEditarPagoExtra={handleEditarPagoExtra}
               onEliminarPagoExtra={handleEliminarPagoExtra}
               fechaInicio={fechaInicio}
               fechaFin={fechaFin}
@@ -1793,7 +1806,7 @@ function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
 /* ======================================================================
    VISTA ESPECIALISTAS
 ====================================================================== */
-function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onReloadDetalle, onEditEspecialistaComision, onEditPresupuestoComision, onAgregarPagoExtra, onEliminarPagoExtra, fechaInicio, fechaFin, rol }) {
+function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadEspecialistas, onReloadDetalle, onEditEspecialistaComision, onEditPresupuestoComision, onAgregarPagoExtra, onEditarPagoExtra, onEliminarPagoExtra, fechaInicio, fechaFin, rol }) {
   const [pctEsp, setPctEsp] = useState(null); // especialista en edición de %
   const [reconOpen, setReconOpen] = useState(false);
 
@@ -1805,6 +1818,7 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
         onEditEspecialistaComision={onEditEspecialistaComision}
         onEditPresupuestoComision={onEditPresupuestoComision}
         onAgregarPagoExtra={onAgregarPagoExtra}
+        onEditarPagoExtra={onEditarPagoExtra}
         onEliminarPagoExtra={onEliminarPagoExtra}
         onReload={onReloadDetalle}
         fechaInicio={fechaInicio}
@@ -2208,9 +2222,10 @@ function TratamientosComisionDialog({ open, onClose, onSaved }) {
   );
 }
 
-function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision, onAgregarPagoExtra, onEliminarPagoExtra, onReload, fechaInicio, fechaFin, rol }) {
+function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, onEditPresupuestoComision, onAgregarPagoExtra, onEditarPagoExtra, onEliminarPagoExtra, onReload, fechaInicio, fechaFin, rol }) {
   const { especialista, resumen, presupuestos = [], kpi_overrides, pagos_extra = [] } = detalle;
   const [extraOpen, setExtraOpen] = useState(false);
+  const [pagoEditar, setPagoEditar] = useState(null);   // solo master puede editar
   const totalExtras = useMemo(
     () => pagos_extra.reduce((a, p) => a + (Number(p.monto) || 0), 0),
     [pagos_extra]
@@ -2458,7 +2473,7 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
               </Box>
             )}
             <Button
-              onClick={() => setExtraOpen(true)}
+              onClick={() => { setPagoEditar(null); setExtraOpen(true); }}
               startIcon={<AddRounded sx={{ fontSize: 18 }} />}
               sx={{ fontFamily: fonts.body, textTransform: "none", fontWeight: 700, borderRadius: "12px",
                 color: colors.white, bgcolor: colors.primaryDark, px: "16px", py: "8px",
@@ -2498,11 +2513,20 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
                       color: negativo ? colors.error : colors.successText, whiteSpace: "nowrap" }}>
                       {negativo ? "−" : "+"} {formatMoney(Math.abs(Number(pg.monto)))}
                     </Typography>
-                    <IconButton size="small" onClick={() => onEliminarPagoExtra(pg.id)}
-                      title="Eliminar este pago extra"
-                      sx={{ color: colors.textMuted, "&:hover": { color: colors.error, bgcolor: "rgba(211,47,47,0.08)" } }}>
-                      <DeleteOutlineRounded sx={{ fontSize: 18 }} />
-                    </IconButton>
+                    <Box sx={{ display: "flex", gap: "2px", flexShrink: 0 }}>
+                      {isMaster && (
+                        <IconButton size="small" onClick={() => { setPagoEditar(pg); setExtraOpen(true); }}
+                          title="Editar este pago extra"
+                          sx={{ color: colors.textMuted, "&:hover": { color: colors.gold, bgcolor: colors.goldSoft } }}>
+                          <EditRounded sx={{ fontSize: 17 }} />
+                        </IconButton>
+                      )}
+                      <IconButton size="small" onClick={() => onEliminarPagoExtra(pg.id)}
+                        title="Eliminar este pago extra"
+                        sx={{ color: colors.textMuted, "&:hover": { color: colors.error, bgcolor: "rgba(211,47,47,0.08)" } }}>
+                        <DeleteOutlineRounded sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Box>
                   </Box>
                 );
               })}
@@ -2559,8 +2583,14 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
       <PagoExtraDialog
         open={extraOpen}
         especialista={especialista}
-        onClose={() => setExtraOpen(false)}
-        onSave={async (datos) => { await onAgregarPagoExtra(datos); setExtraOpen(false); }}
+        pagoEditar={pagoEditar}
+        onClose={() => { setExtraOpen(false); setPagoEditar(null); }}
+        onSave={async (datos) => {
+          if (pagoEditar) await onEditarPagoExtra(pagoEditar.id, datos);
+          else await onAgregarPagoExtra(datos);
+          setExtraOpen(false);
+          setPagoEditar(null);
+        }}
       />
 
       <PorcentajePresupuestoDialog
@@ -2846,21 +2876,35 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
 /* ======================================================================
    DIALOG: PAGO EXTRA A UN ESPECIALISTA
 ====================================================================== */
-function PagoExtraDialog({ open, especialista, onClose, onSave }) {
-  const hoy = new Date().toISOString().slice(0, 10);
+function PagoExtraDialog({ open, especialista, pagoEditar, onClose, onSave }) {
+  // Fecha de hoy en hora local, no UTC (evita registrar el día siguiente)
+  const hoyLocal = () => {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  };
+  const editando = !!pagoEditar;
+
   const [monto, setMonto] = useState("");
   const [concepto, setConcepto] = useState("");
-  const [fecha, setFecha] = useState(hoy);
+  const [fecha, setFecha] = useState(hoyLocal());
   const [notas, setNotas] = useState("");
   const [descuenta, setDescuenta] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setMonto(""); setConcepto(""); setFecha(new Date().toISOString().slice(0, 10));
+    if (!open) return;
+    if (pagoEditar) {
+      const m = Number(pagoEditar.monto) || 0;
+      setMonto(String(Math.abs(m)));
+      setConcepto(pagoEditar.concepto || "");
+      setFecha(String(pagoEditar.fecha || "").slice(0, 10) || hoyLocal());
+      setNotas(pagoEditar.notas || "");
+      setDescuenta(m < 0);
+    } else {
+      setMonto(""); setConcepto(""); setFecha(hoyLocal());
       setNotas(""); setDescuenta(false);
     }
-  }, [open]);
+  }, [open, pagoEditar]);
 
   const montoNum = parseFloat(monto) || 0;
   const valido = montoNum > 0 && concepto.trim().length > 0;
@@ -2877,7 +2921,7 @@ function PagoExtraDialog({ open, especialista, onClose, onSave }) {
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth
       PaperProps={{ sx: { borderRadius: "18px" } }}>
       <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, pb: "6px" }}>
-        Pago extra
+        {editando ? "Editar pago extra" : "Pago extra"}
         <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textMuted, fontWeight: 400 }}>
           Para {especialista?.nombre}
         </Typography>
@@ -2956,7 +3000,7 @@ function PagoExtraDialog({ open, especialista, onClose, onSave }) {
             color: colors.white, bgcolor: colors.primaryDark, px: "18px",
             "&:hover": { bgcolor: colors.primary }, "&:disabled": { opacity: 0.5 } }}
         >
-          {guardando ? "Guardando..." : "Registrar"}
+          {guardando ? "Guardando..." : editando ? "Guardar cambios" : "Registrar"}
         </Button>
       </DialogActions>
     </Dialog>

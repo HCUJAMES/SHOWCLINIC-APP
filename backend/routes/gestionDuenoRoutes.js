@@ -1050,6 +1050,51 @@ router.post("/especialistas/:id/pagos-extra", authMiddleware, requireOwner, asyn
   }
 });
 
+// ✏️ Editar un pago extra — solo master
+router.put("/pagos-extra/:pago_id", authMiddleware, requireRole("master"), async (req, res) => {
+  await ensureComisionSchema();
+  try {
+    const { pago_id } = req.params;
+    const { monto, concepto, fecha, notas } = req.body;
+
+    const actual = await dbGet("SELECT * FROM pagos_extra_especialista WHERE id = ?", [pago_id]);
+    if (!actual) {
+      return res.status(404).json({ message: "Pago extra no encontrado" });
+    }
+
+    const montoNum = monto !== undefined ? Number(monto) : Number(actual.monto);
+    if (isNaN(montoNum) || montoNum === 0) {
+      return res.status(400).json({ message: "El monto debe ser distinto de cero" });
+    }
+
+    const conceptoFinal = concepto !== undefined ? String(concepto).trim() : actual.concepto;
+    if (!conceptoFinal) {
+      return res.status(400).json({ message: "El concepto es obligatorio" });
+    }
+
+    const fechaFinal = fecha ? String(fecha).slice(0, 10) : actual.fecha;
+
+    await dbRun(
+      `UPDATE pagos_extra_especialista
+       SET monto = ?, concepto = ?, tipo = ?, fecha = ?, notas = ?
+       WHERE id = ?`,
+      [
+        redondear(montoNum),
+        conceptoFinal,
+        montoNum < 0 ? "descuento" : "extra",
+        fechaFinal,
+        notas !== undefined ? (notas || null) : actual.notas,
+        pago_id,
+      ]
+    );
+
+    res.json({ message: "✅ Pago extra actualizado" });
+  } catch (err) {
+    console.error("❌ Error editando pago extra:", err.message);
+    res.status(500).json({ message: "Error al editar el pago extra" });
+  }
+});
+
 router.delete("/pagos-extra/:pago_id", authMiddleware, requireOwner, async (req, res) => {
   await ensureComisionSchema();
   try {
