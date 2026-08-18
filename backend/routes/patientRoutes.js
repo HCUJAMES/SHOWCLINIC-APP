@@ -237,6 +237,72 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
 });
 
 /**
+ * 🎂 CUMPLEAÑOS DEL MES
+ *
+ * Lista los pacientes que cumplen años en el mes indicado (por defecto el
+ * actual), ordenados por día. Marca cuál es hoy y cuáles ya pasaron, para
+ * poder saludar sin revisar fichas una por una.
+ *
+ * Query: ?mes=1..12 (por defecto el mes en curso, hora Lima)
+ */
+router.get("/cumpleanos", async (req, res) => {
+  try {
+    // Hora de Lima: con UTC, de noche el "mes actual" podía saltar de mes
+    const hoyLima = new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).slice(0, 10);
+    const [anioHoy, mesHoy, diaHoy] = hoyLima.split("-").map(Number);
+
+    const mes = Math.min(12, Math.max(1, parseInt(req.query.mes, 10) || mesHoy));
+    const mesStr = String(mes).padStart(2, "0");
+
+    const filas = await dbAll(
+      `SELECT id, nombre, apellido, dni, celular, fechaNacimiento
+       FROM patients
+       WHERE fechaNacimiento IS NOT NULL AND fechaNacimiento <> ''
+         AND strftime('%m', fechaNacimiento) = ?
+       ORDER BY CAST(strftime('%d', fechaNacimiento) AS INTEGER) ASC`,
+      [mesStr]
+    );
+
+    const cumpleanos = filas.map((f) => {
+      const dia = Number(String(f.fechaNacimiento).slice(8, 10));
+      const anioNac = Number(String(f.fechaNacimiento).slice(0, 4));
+      // Edad que cumple este año
+      const edad = anioNac > 1900 ? anioHoy - anioNac : null;
+
+      const esHoy = mes === mesHoy && dia === diaHoy;
+      const yaPaso = mes < mesHoy || (mes === mesHoy && dia < diaHoy);
+
+      return {
+        paciente_id: f.id,
+        nombre: f.nombre,
+        apellido: f.apellido,
+        dni: f.dni,
+        celular: f.celular,
+        fecha_nacimiento: f.fechaNacimiento,
+        dia,
+        edad,
+        es_hoy: esHoy,
+        ya_paso: yaPaso && !esHoy,
+        dias_faltan: mes === mesHoy ? dia - diaHoy : null,
+      };
+    });
+
+    res.json({
+      mes,
+      mes_actual: mesHoy,
+      dia_actual: diaHoy,
+      total: cumpleanos.length,
+      hoy: cumpleanos.filter((c) => c.es_hoy).length,
+      proximos: cumpleanos.filter((c) => !c.es_hoy && !c.ya_paso).length,
+      cumpleanos,
+    });
+  } catch (err) {
+    console.error("❌ Error obteniendo cumpleaños:", err.message);
+    res.status(500).json({ message: "Error al obtener cumpleaños" });
+  }
+});
+
+/**
  * Marca de "ya se contactó" para un recordatorio.
  * Se guarda junto a la fecha de vencimiento, así el aviso desaparece hasta que
  * llegue el SIGUIENTE ciclo del paciente (no lo silencia para siempre).
