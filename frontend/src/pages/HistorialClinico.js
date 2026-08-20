@@ -53,6 +53,7 @@ import TreatmentCalendar from "../components/TreatmentCalendar";
 import TreatmentTimelineMatrix from "../components/TreatmentTimelineMatrix";
 import AsignacionEspecialistas from "../components/AsignacionEspecialistas";
 import DescuentoDual from "../components/DescuentoDual";
+import GaleriaTratamiento from "../components/GaleriaTratamiento";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -229,8 +230,8 @@ const HistorialClinico = () => {
 
   // Cache de primera imagen por tratamiento_id para cards del presupuesto
   const [tratamientoImagenCache, setTratamientoImagenCache] = useState({});
-  // Modal para agrandar imagen de tratamiento
-  const [imagenAgrandada, setImagenAgrandada] = useState(null);
+  // Galería ampliada del tratamiento (casos clínicos + productos)
+  const [galeriaTratamiento, setGaleriaTratamiento] = useState(null);
 
   // Estados para presupuesto corporal
   const [modalCorporal, setModalCorporal] = useState(false);
@@ -4707,16 +4708,24 @@ const HistorialClinico = () => {
                                 },
                               }}
                             >
-                              {/* Imagen del tratamiento */}
-                              <Box sx={{
-                                width: "100%",
-                                aspectRatio: "1 / 1",
-                                backgroundColor: "#f5f1e4",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                overflow: "hidden",
-                              }}>
+                              {/* Imagen del tratamiento — abre la galería */}
+                              <Box
+                                onClick={(e) => { e.stopPropagation(); setGaleriaTratamiento({ id: t.id, nombre: t.nombre }); }}
+                                title="Ver casos clínicos y productos"
+                                sx={{
+                                  width: "100%",
+                                  aspectRatio: "1 / 1",
+                                  backgroundColor: "#f5f1e4",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  overflow: "hidden",
+                                  cursor: "pointer",
+                                  position: "relative",
+                                  "&:hover img": { transform: "scale(1.06)" },
+                                  "& img": { transition: "transform .25s ease" },
+                                }}
+                              >
                                 {imgUrl ? (
                                   <img src={imgUrl} alt={t.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                 ) : (
@@ -5514,11 +5523,8 @@ const HistorialClinico = () => {
                                   {/* Imagen del tratamiento */}
                                   <Box 
                                     onClick={() => {
-                                      if (imgUrl) {
-                                        setImagenAgrandada({ url: imgUrl, nombre: it.nombre });
-                                      } else if (tId) {
-                                        abrirCarruselTratamiento(tId, it.nombre);
-                                      }
+                                      if (tId) setGaleriaTratamiento({ id: tId, nombre: it.nombre });
+                                      else if (imgUrl) window.open(imgUrl, "_blank");
                                     }}
                                     sx={{ 
                                       width: "100%", 
@@ -9697,55 +9703,23 @@ const HistorialClinico = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Modal para agrandar imagen de tratamiento */}
-      <Dialog
-        open={!!imagenAgrandada}
-        onClose={() => setImagenAgrandada(null)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 4,
-            overflow: "hidden",
-            backgroundColor: "#1a1a1a",
-          },
+      {/* Galería del tratamiento: casos clínicos + productos */}
+      <GaleriaTratamiento
+        abierto={!!galeriaTratamiento}
+        tratamiento={galeriaTratamiento}
+        apiBase={API_BASE_URL}
+        onCerrar={() => setGaleriaTratamiento(null)}
+        onCambio={() => {
+          // Refresca las miniaturas del catálogo tras subir o borrar
+          if (galeriaTratamiento?.id) {
+            setTratamientoImagenCache((prev) => {
+              const copia = { ...prev };
+              delete copia[galeriaTratamiento.id];
+              return copia;
+            });
+          }
         }}
-      >
-        <DialogTitle
-          sx={{
-            backgroundColor: "#a36920",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            py: 1.5,
-          }}
-        >
-          <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-            📸 {imagenAgrandada?.nombre || "Tratamiento"}
-          </Typography>
-          <IconButton onClick={() => setImagenAgrandada(null)} sx={{ color: "white" }}>
-            <Close />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0, backgroundColor: "#1a1a1a", display: "flex", justifyContent: "center", alignItems: "center", minHeight: 400 }}>
-          {imagenAgrandada && (
-            <Box sx={{ width: "100%", display: "flex", justifyContent: "center", py: 3, px: 3 }}>
-              <img
-                src={imagenAgrandada.url}
-                alt={imagenAgrandada.nombre}
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: "70vh",
-                  objectFit: "contain",
-                  borderRadius: 8,
-                  boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-                }}
-              />
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
+      />
 
       {/* 🛒 Modal Carrito — diseño limpio estilo app */}
       <Dialog

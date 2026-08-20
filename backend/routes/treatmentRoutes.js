@@ -1081,29 +1081,53 @@ const storageTratamientos = multer.diskStorage({
 });
 const uploadTratamientoImg = multer({ storage: storageTratamientos });
 
+/**
+ * Las imágenes de un tratamiento se separan en dos galerías:
+ *   'caso'     → fotos de antes/después de pacientes
+ *   'producto' → fotos del producto que se aplica
+ * Las que ya existían se quedan como 'caso', que es lo que se venía subiendo.
+ */
+let imagenesSchemaReady = false;
+async function ensureImagenesSchema() {
+  if (imagenesSchemaReady) return;
+  try {
+    await dbRun(`ALTER TABLE tratamiento_imagenes ADD COLUMN categoria TEXT DEFAULT 'caso'`);
+  } catch (err) {
+    if (!String(err.message).includes("duplicate column")) {
+      console.error("❌ Error agregando categoria a tratamiento_imagenes:", err.message);
+    }
+  }
+  imagenesSchemaReady = true;
+}
+
+const categoriaValida = (c) => (String(c || "").toLowerCase() === "producto" ? "producto" : "caso");
+
 // Subir imágenes a un tratamiento (máximo 6)
 router.post(
   "/protocolo/:tratamientoId/imagenes",
   requireTreatmentBaseCreate,
   uploadTratamientoImg.array("imagenes", 6),
   async (req, res) => {
+    await ensureImagenesSchema();
     const { tratamientoId } = req.params;
     const archivos = req.files || [];
+    const categoria = categoriaValida(req.body?.categoria);
 
     if (!archivos.length) {
       return res.status(400).json({ message: "No se han subido imágenes" });
     }
 
-    // Verificar cuántas imágenes ya tiene
+    // El tope de 6 es por galería, no entre las dos
     const existentes = await dbAll(
-      `SELECT COUNT(*) as count FROM tratamiento_imagenes WHERE tratamiento_id = ?`,
-      [tratamientoId]
+      `SELECT COUNT(*) as count FROM tratamiento_imagenes
+       WHERE tratamiento_id = ? AND COALESCE(categoria,'caso') = ?`,
+      [tratamientoId, categoria]
     );
     const actuales = existentes[0]?.count || 0;
 
     if (actuales + archivos.length > 6) {
       return res.status(400).json({
-        message: `Solo puedes tener hasta 6 imágenes. Actualmente tienes ${actuales}.`,
+        message: `Solo puedes tener hasta 6 imágenes en esta galería. Actualmente tienes ${actuales}.`,
       });
     }
 
@@ -1111,11 +1135,11 @@ router.post(
       for (let i = 0; i < archivos.length; i++) {
         const url = `/uploads/tratamientos/${archivos[i].filename}`;
         await dbRun(
-          `INSERT INTO tratamiento_imagenes (tratamiento_id, imagen_url, orden) VALUES (?, ?, ?)`,
-          [tratamientoId, url, actuales + i]
+          `INSERT INTO tratamiento_imagenes (tratamiento_id, imagen_url, orden, categoria) VALUES (?, ?, ?, ?)`,
+          [tratamientoId, url, actuales + i, categoria]
         );
       }
-      res.json({ message: `${archivos.length} imagen(es) subida(s) correctamente` });
+      res.json({ message: `${archivos.length} imagen(es) subida(s) correctamente`, categoria });
     } catch (err) {
       console.error("❌ Error al guardar imágenes de tratamiento:", err.message);
       res.status(500).json({ message: "Error al guardar imágenes" });
@@ -1127,9 +1151,16 @@ router.post(
 router.get("/protocolo/:tratamientoId/imagenes", async (req, res) => {
   const { tratamientoId } = req.params;
   try {
+    await ensureImagenesSchema();
+    // ?categoria=caso|producto filtra una galería; sin filtro devuelve todas
+    const filtro = req.query.categoria ? categoriaValida(req.query.categoria) : null;
     const imagenes = await dbAll(
-      `SELECT * FROM tratamiento_imagenes WHERE tratamiento_id = ? ORDER BY orden ASC`,
-      [tratamientoId]
+      `SELECT id, tratamiento_id, imagen_url, orden, creado_en,
+              COALESCE(categoria, 'caso') AS categoria
+       FROM tratamiento_imagenes
+       WHERE tratamiento_id = ? ${filtro ? "AND COALESCE(categoria,'caso') = ?" : ""}
+       ORDER BY orden ASC`,
+      filtro ? [tratamientoId, filtro] : [tratamientoId]
     );
     res.json(imagenes);
   } catch (err) {
