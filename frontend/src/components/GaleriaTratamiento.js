@@ -135,9 +135,17 @@ export default function GaleriaTratamiento({
     <Dialog
       open={!!abierto}
       onClose={onCerrar}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
-      PaperProps={{ sx: { borderRadius: "20px", overflow: "hidden", background: "#FAF8F5" } }}
+      PaperProps={{
+        sx: {
+          borderRadius: "20px", overflow: "hidden", background: "#FAF8F5",
+          width: "min(1200px, 94vw)",   // se acerca al ancho de pantalla sin pegarse al borde
+          height: "min(880px, 92vh)",
+          maxWidth: "94vw",
+          display: "flex", flexDirection: "column",
+        },
+      }}
     >
       {/* Cabecera */}
       <Box sx={{
@@ -200,7 +208,7 @@ export default function GaleriaTratamiento({
       </Box>
 
       {/* Contenido */}
-      <Box sx={{ p: 2.5 }}>
+      <Box sx={{ p: 2.5, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {aviso && (
           <Box sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: "10px", background: "rgba(211,47,47,0.08)", border: "1px solid rgba(211,47,47,0.25)" }}>
             <Typography sx={{ fontSize: 12.5, color: "#B71C1C" }}>{aviso}</Typography>
@@ -238,7 +246,7 @@ export default function GaleriaTratamiento({
             <Box sx={{
               position: "relative", borderRadius: "16px", overflow: "hidden",
               background: "#201915", display: "flex", alignItems: "center", justifyContent: "center",
-              minHeight: 340, maxHeight: "56vh",
+              flex: 1, minHeight: 0,
             }}>
               <AnimatePresence mode="wait">
                 <motion.img
@@ -249,7 +257,7 @@ export default function GaleriaTratamiento({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                  style={{ maxWidth: "100%", maxHeight: "56vh", objectFit: "contain", display: "block" }}
+                  style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }}
                 />
               </AnimatePresence>
 
@@ -284,7 +292,7 @@ export default function GaleriaTratamiento({
             </Box>
 
             {/* Miniaturas + acciones */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5, flexWrap: "wrap" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1.5, flexWrap: "wrap", flexShrink: 0 }}>
               {actuales.map((img, i) => (
                 <Box
                   key={img.id}
