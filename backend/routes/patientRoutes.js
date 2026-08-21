@@ -237,16 +237,41 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
 });
 
 /**
+ * Marca de "ya saludé por su cumpleaños".
+ *
+ * El cumpleaños se repite cada año, así que la marca se guarda por paciente y
+ * año: saludar en 2026 no oculta el aviso de 2027.
+ */
+let cumpleanosSchemaReady = false;
+async function ensureCumpleanosSchema() {
+  if (cumpleanosSchemaReady) return;
+  await dbRun(`CREATE TABLE IF NOT EXISTS cumpleanos_saludados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    paciente_id INTEGER NOT NULL,
+    anio INTEGER NOT NULL,
+    saludado_en TEXT DEFAULT CURRENT_TIMESTAMP,
+    saludado_por TEXT,
+    UNIQUE(paciente_id, anio)
+  )`);
+  cumpleanosSchemaReady = true;
+}
+
+/**
  * 🎂 CUMPLEAÑOS DEL MES
  *
  * Lista los pacientes que cumplen años en el mes indicado (por defecto el
  * actual), ordenados por día. Marca cuál es hoy y cuáles ya pasaron, para
  * poder saludar sin revisar fichas una por una.
  *
+ * Los ya saludados vienen con `saludado: true` en vez de desaparecer: así la
+ * pantalla puede esconderlos pero seguir ofreciendo deshacer la marca.
+ *
  * Query: ?mes=1..12 (por defecto el mes en curso, hora Lima)
  */
 router.get("/cumpleanos", async (req, res) => {
   try {
+    await ensureCumpleanosSchema();
+
     // Hora de Lima: con UTC, de noche el "mes actual" podía saltar de mes
     const hoyLima = new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).slice(0, 10);
     const [anioHoy, mesHoy, diaHoy] = hoyLima.split("-").map(Number);
@@ -263,6 +288,13 @@ router.get("/cumpleanos", async (req, res) => {
       [mesStr]
     );
 
+    // Saludos ya registrados de este año
+    const marcas = await dbAll(
+      `SELECT id, paciente_id, saludado_en FROM cumpleanos_saludados WHERE anio = ?`,
+      [anioHoy]
+    );
+    const porPaciente = new Map(marcas.map((m) => [m.paciente_id, m]));
+
     const cumpleanos = filas.map((f) => {
       const dia = Number(String(f.fechaNacimiento).slice(8, 10));
       const anioNac = Number(String(f.fechaNacimiento).slice(0, 4));
@@ -271,6 +303,7 @@ router.get("/cumpleanos", async (req, res) => {
 
       const esHoy = mes === mesHoy && dia === diaHoy;
       const yaPaso = mes < mesHoy || (mes === mesHoy && dia < diaHoy);
+      const marca = porPaciente.get(f.id);
 
       return {
         paciente_id: f.id,
@@ -284,21 +317,86 @@ router.get("/cumpleanos", async (req, res) => {
         es_hoy: esHoy,
         ya_paso: yaPaso && !esHoy,
         dias_faltan: mes === mesHoy ? dia - diaHoy : null,
+        saludado: !!marca,
+        saludado_id: marca?.id || null,
+        saludado_en: marca?.saludado_en || null,
       };
     });
 
+    const pendientes = cumpleanos.filter((c) => !c.saludado);
+
     res.json({
       mes,
+      anio: anioHoy,
       mes_actual: mesHoy,
       dia_actual: diaHoy,
-      total: cumpleanos.length,
-      hoy: cumpleanos.filter((c) => c.es_hoy).length,
-      proximos: cumpleanos.filter((c) => !c.es_hoy && !c.ya_paso).length,
+      // `total` cuenta solo los que faltan saludar: es lo que se muestra
+      total: pendientes.length,
+      total_mes: cumpleanos.length,
+      saludados: cumpleanos.length - pendientes.length,
+      hoy: pendientes.filter((c) => c.es_hoy).length,
+      proximos: pendientes.filter((c) => !c.es_hoy && !c.ya_paso).length,
       cumpleanos,
     });
   } catch (err) {
     console.error("❌ Error obteniendo cumpleaños:", err.message);
     res.status(500).json({ message: "Error al obtener cumpleaños" });
+  }
+});
+
+// ✅ Marcar un cumpleaños como saludado
+router.post("/cumpleanos/saludado", async (req, res) => {
+  try {
+    await ensureCumpleanosSchema();
+    const { paciente_id } = req.body;
+    if (!paciente_id) return res.status(400).json({ message: "paciente_id es requerido" });
+
+    const anio = Number(
+      new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).slice(0, 4)
+    );
+    const anioMarca = parseInt(req.body.anio, 10) || anio;
+
+    await dbRun(
+      `INSERT OR IGNORE INTO cumpleanos_saludados (paciente_id, anio, saludado_por)
+       VALUES (?, ?, ?)`,
+      [paciente_id, anioMarca, req.user?.username || "sistema"]
+    );
+    const fila = await dbGet(
+      `SELECT id FROM cumpleanos_saludados WHERE paciente_id = ? AND anio = ?`,
+      [paciente_id, anioMarca]
+    );
+    res.json({ message: "✅ Saludo registrado", id: fila?.id || null });
+  } catch (err) {
+    console.error("❌ Error marcando saludo:", err.message);
+    res.status(500).json({ message: "Error al marcar el saludo" });
+  }
+});
+
+// ↩️ Deshacer el saludo, por id de la marca
+router.delete("/cumpleanos/saludado/:id", async (req, res) => {
+  try {
+    await ensureCumpleanosSchema();
+    await dbRun(`DELETE FROM cumpleanos_saludados WHERE id = ?`, [req.params.id]);
+    res.json({ message: "✅ Saludo deshecho" });
+  } catch (err) {
+    console.error("❌ Error deshaciendo saludo:", err.message);
+    res.status(500).json({ message: "Error al deshacer el saludo" });
+  }
+});
+
+// ↩️ Deshacer el saludo, identificándolo por paciente + año
+router.delete("/cumpleanos/saludado", async (req, res) => {
+  try {
+    await ensureCumpleanosSchema();
+    const { paciente_id } = req.body || {};
+    if (!paciente_id) return res.status(400).json({ message: "Falta paciente_id" });
+    const anio = parseInt(req.body.anio, 10) ||
+      Number(new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).slice(0, 4));
+    await dbRun(`DELETE FROM cumpleanos_saludados WHERE paciente_id = ? AND anio = ?`, [paciente_id, anio]);
+    res.json({ message: "✅ Saludo deshecho" });
+  } catch (err) {
+    console.error("❌ Error deshaciendo saludo:", err.message);
+    res.status(500).json({ message: "Error al deshacer el saludo" });
   }
 });
 
@@ -336,18 +434,36 @@ router.post("/recordatorios/contactado", async (req, res) => {
        VALUES (?, ?, ?, ?)`,
       [paciente_id, tratamiento, String(proxima_fecha).slice(0, 10), req.user?.username || "sistema"]
     );
-    res.json({ message: "✅ Contacto registrado" });
+    // Se devuelve el id para poder deshacer la marca sin recargar la lista
+    const fila = await dbGet(
+      `SELECT id FROM recordatorios_contactados
+       WHERE paciente_id = ? AND tratamiento = ? AND proxima_fecha = ?`,
+      [paciente_id, tratamiento, String(proxima_fecha).slice(0, 10)]
+    );
+    res.json({ message: "✅ Contacto registrado", id: fila?.id || null });
   } catch (err) {
     console.error("❌ Error marcando contacto:", err.message);
     res.status(500).json({ message: "Error al marcar el contacto" });
   }
 });
 
-// ↩️ Deshacer la marca de contactado
+// ↩️ Deshacer la marca de contactado, por id de la marca
+router.delete("/recordatorios/contactado/:id", async (req, res) => {
+  try {
+    await ensureRecordatoriosSchema();
+    await dbRun(`DELETE FROM recordatorios_contactados WHERE id = ?`, [req.params.id]);
+    res.json({ message: "✅ Marca de contacto retirada" });
+  } catch (err) {
+    console.error("❌ Error deshaciendo contacto:", err.message);
+    res.status(500).json({ message: "Error al deshacer el contacto" });
+  }
+});
+
+// ↩️ Deshacer la marca de contactado, identificándola por sus tres campos
 router.delete("/recordatorios/contactado", async (req, res) => {
   try {
     await ensureRecordatoriosSchema();
-    const { paciente_id, tratamiento, proxima_fecha } = req.body;
+    const { paciente_id, tratamiento, proxima_fecha } = req.body || {};
     await dbRun(
       `DELETE FROM recordatorios_contactados
        WHERE paciente_id = ? AND tratamiento = ? AND proxima_fecha = ?`,
@@ -456,12 +572,28 @@ router.get("/recordatorios", async (req, res) => {
       .sort((a, b) => a.dias_restantes - b.dias_restantes)
       .slice(0, limite);
 
+    // Los contactados dentro del periodo de silencio se devuelven aparte, para
+    // que la pantalla pueda mostrarlos y permitir deshacer la marca.
+    const corte = new Date(hoy.getTime() - DIAS_SILENCIO * 86400000)
+      .toLocaleString("sv-SE", { timeZone: "America/Lima" }).slice(0, 10);
+    const contactadosDetalle = await dbAll(
+      `SELECT rc.id, rc.paciente_id, rc.tratamiento, rc.proxima_fecha, rc.contactado_en,
+              rc.contactado_por, p.nombre, p.apellido, p.dni, p.celular
+       FROM recordatorios_contactados rc
+       JOIN patients p ON p.id = rc.paciente_id
+       WHERE DATE(rc.contactado_en) >= ?
+       ORDER BY rc.contactado_en DESC
+       LIMIT 40`,
+      [corte]
+    );
+
     res.json({
       total: lista.length,
       vencidos: lista.filter((r) => r.vencido).length,
       proximos: lista.filter((r) => !r.vencido).length,
       ventana_dias: ventanaDias,
       recordatorios: lista,
+      contactados: contactadosDetalle,
     });
   } catch (err) {
     console.error("❌ Error calculando recordatorios:", err.message);
