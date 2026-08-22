@@ -756,7 +756,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                       );
                     })}
 
-                    <SeccionMarcados />
+                    <SeccionMarcados {...propsMarcados} />
                   </>
                 )
               ) : cargando ? (
@@ -865,7 +865,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                     );
                   })}
 
-                  <SeccionMarcados />
+                  <SeccionMarcados {...propsMarcados} />
                 </>
               )}
             </Box>

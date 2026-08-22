@@ -237,6 +237,15 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
 });
 
 /**
+ * Fecha y hora de Lima (UTC−5) en formato "YYYY-MM-DD HH:MM:SS".
+ *
+ * CURRENT_TIMESTAMP de SQLite guarda en UTC, así que una marca hecha por la
+ * tarde en la clínica quedaba registrada con la fecha del día siguiente.
+ */
+const ahoraLima = () =>
+  new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).replace("T", " ").slice(0, 19);
+
+/**
  * Marca de "ya saludé por su cumpleaños".
  *
  * El cumpleaños se repite cada año, así que la marca se guarda por paciente y
@@ -357,9 +366,9 @@ router.post("/cumpleanos/saludado", async (req, res) => {
     const anioMarca = parseInt(req.body.anio, 10) || anio;
 
     await dbRun(
-      `INSERT OR IGNORE INTO cumpleanos_saludados (paciente_id, anio, saludado_por)
-       VALUES (?, ?, ?)`,
-      [paciente_id, anioMarca, req.user?.username || "sistema"]
+      `INSERT OR IGNORE INTO cumpleanos_saludados (paciente_id, anio, saludado_en, saludado_por)
+       VALUES (?, ?, ?, ?)`,
+      [paciente_id, anioMarca, ahoraLima(), req.user?.username || "sistema"]
     );
     const fila = await dbGet(
       `SELECT id FROM cumpleanos_saludados WHERE paciente_id = ? AND anio = ?`,
@@ -430,9 +439,9 @@ router.post("/recordatorios/contactado", async (req, res) => {
     }
     await dbRun(
       `INSERT OR IGNORE INTO recordatorios_contactados
-        (paciente_id, tratamiento, proxima_fecha, contactado_por)
-       VALUES (?, ?, ?, ?)`,
-      [paciente_id, tratamiento, String(proxima_fecha).slice(0, 10), req.user?.username || "sistema"]
+        (paciente_id, tratamiento, proxima_fecha, contactado_en, contactado_por)
+       VALUES (?, ?, ?, ?, ?)`,
+      [paciente_id, tratamiento, String(proxima_fecha).slice(0, 10), ahoraLima(), req.user?.username || "sistema"]
     );
     // Se devuelve el id para poder deshacer la marca sin recargar la lista
     const fila = await dbGet(
