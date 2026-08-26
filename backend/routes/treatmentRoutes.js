@@ -846,44 +846,54 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           }
         }
 
-        // Actualizar unidades restantes de cada código de barras usado
+        // Dejar constancia del código usado y actualizar sus unidades
+        await ensureTratamientoCodigosSchema();
+
         for (const codigoItem of codigos) {
           const codigoIngresado = (codigoItem.codigo || "").trim();
           const unidadesUsadas = parseNum(codigoItem.unidades_usadas) || 0;
 
+          const codigoValido = await dbGet(
+            `SELECT bu.id, bu.unidades_restantes
+             FROM barcode_units bu
+             LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+             WHERE sl.variante_id = ?
+               AND bu.barcode = ?
+             LIMIT 1`,
+            [varianteIdElegida, codigoIngresado]
+          );
+
+          if (!codigoValido) continue;
+
+          // El enlace se guarda SIEMPRE, aunque no se descuenten unidades:
+          // hay productos (cajas, jeringas) donde solo se escanea el código.
+          await dbRun(
+            `INSERT OR IGNORE INTO tratamiento_codigos
+               (tratamiento_realizado_id, barcode_unit_id, barcode, variante_id, unidades_usadas, registrado_en)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [tratamientoRealizadoId, codigoValido.id, codigoIngresado, varianteIdElegida, unidadesUsadas, fechaLocal]
+          );
+
           if (unidadesUsadas > 0) {
-            // Obtener el código de barras para actualizar sus unidades
-            const codigoValido = await dbGet(
-              `SELECT bu.id, bu.unidades_restantes
-               FROM barcode_units bu
-               LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
-               WHERE sl.variante_id = ?
-                 AND bu.barcode = ?
-               LIMIT 1`,
-              [varianteIdElegida, codigoIngresado]
-            );
+            const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
+            const nuevasRestantes = Math.max(0, unidadesRestantes - unidadesUsadas);
 
-            if (codigoValido) {
-              const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
-              const nuevasRestantes = Math.max(0, unidadesRestantes - unidadesUsadas);
-
-              if (nuevasRestantes <= 0) {
-                // Agotado: marcar como escaneado/usado
-                await dbRun(
-                  `UPDATE barcode_units 
-                   SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?, unidades_restantes = 0
-                   WHERE id = ?`,
-                  [tratamientoRealizadoId, codigoValido.id]
-                );
-              } else {
-                // Aún tiene unidades: mantener activo con las restantes actualizadas
-                await dbRun(
-                  `UPDATE barcode_units 
-                   SET unidades_restantes = ?, treatment_id = ?
-                   WHERE id = ?`,
-                  [nuevasRestantes, tratamientoRealizadoId, codigoValido.id]
-                );
-              }
+            if (nuevasRestantes <= 0) {
+              // Agotado: marcar como escaneado/usado
+              await dbRun(
+                `UPDATE barcode_units
+                 SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?, unidades_restantes = 0
+                 WHERE id = ?`,
+                [tratamientoRealizadoId, codigoValido.id]
+              );
+            } else {
+              // Aún tiene unidades: mantener activo con las restantes actualizadas
+              await dbRun(
+                `UPDATE barcode_units
+                 SET unidades_restantes = ?, treatment_id = ?
+                 WHERE id = ?`,
+                [nuevasRestantes, tratamientoRealizadoId, codigoValido.id]
+              );
             }
           }
         }
@@ -1087,6 +1097,50 @@ const uploadTratamientoImg = multer({ storage: storageTratamientos });
  *   'producto' → fotos del producto que se aplica
  * Las que ya existían se quedan como 'caso', que es lo que se venía subiendo.
  */
+/**
+ * 🔗 QUÉ CÓDIGO SE USÓ EN QUÉ TRATAMIENTO
+ *
+ * Antes esto se guardaba en `barcode_units.treatment_id`, una sola columna
+ * sobre el frasco. Con productos de dosis única funcionaba, pero con el botox
+ * no: un frasco trae 100 U y se reparte entre varias pacientes, así que cada
+ * nueva aplicación pisaba a la anterior y solo quedaba registrada la última.
+ * El resto aparecía como "sin escanear" aunque sí se hubiera escrito el código.
+ *
+ * Esta tabla guarda la relación completa: un tratamiento puede llevar varios
+ * códigos, y un mismo código puede aparecer en varios tratamientos.
+ */
+let codigosSchemaReady = false;
+export async function ensureTratamientoCodigosSchema() {
+  if (codigosSchemaReady) return;
+  await dbRun(`CREATE TABLE IF NOT EXISTS tratamiento_codigos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tratamiento_realizado_id INTEGER NOT NULL,
+    barcode_unit_id INTEGER NOT NULL,
+    barcode TEXT NOT NULL,
+    variante_id INTEGER,
+    unidades_usadas REAL DEFAULT 0,
+    registrado_en TEXT,
+    UNIQUE(tratamiento_realizado_id, barcode_unit_id)
+  )`);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_tratamiento_codigos_tratamiento
+               ON tratamiento_codigos(tratamiento_realizado_id)`);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_tratamiento_codigos_barcode
+               ON tratamiento_codigos(barcode_unit_id)`);
+
+  // Rescatar lo que ya existía en la columna antigua, para no perder el
+  // historial de los tratamientos registrados antes de este cambio.
+  await dbRun(`
+    INSERT OR IGNORE INTO tratamiento_codigos
+      (tratamiento_realizado_id, barcode_unit_id, barcode, variante_id, unidades_usadas, registrado_en)
+    SELECT bu.treatment_id, bu.id, bu.barcode, sl.variante_id, 0, bu.scanned_at
+    FROM barcode_units bu
+    LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+    WHERE bu.treatment_id IS NOT NULL
+  `);
+
+  codigosSchemaReady = true;
+}
+
 let imagenesSchemaReady = false;
 async function ensureImagenesSchema() {
   if (imagenesSchemaReady) return;

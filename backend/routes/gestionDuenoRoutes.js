@@ -2,6 +2,7 @@ import express from "express";
 import db, { dbAll, dbGet, dbRun } from "../db/database.js";
 import { authMiddleware, requireRole } from "../middleware/auth.js";
 import { getReporteFinanciero } from "./finanzasRoutes.js";
+import { ensureTratamientoCodigosSchema } from "./treatmentRoutes.js";
 import {
   desglosarPresupuesto,
   cargarPctEspecialistas,
@@ -2088,6 +2089,10 @@ function nombreProducto(p) {
 
 router.get("/control", authMiddleware, requireOwner, async (req, res) => {
   try {
+    // Puede que Control se abra antes de registrar ningún tratamiento en esta
+    // sesión, así que aquí también se asegura la tabla de enlace.
+    await ensureTratamientoCodigosSchema();
+
     const { fecha_inicio, fecha_fin } = req.query;
     const filtro = String(req.query.filtro || "todos");   // todos | sin_producto | sin_codigo | incompletos
     const buscar = String(req.query.buscar || "").trim();
@@ -2137,12 +2142,19 @@ router.get("/control", authMiddleware, requireOwner, async (req, res) => {
       [...args, TOPE]
     );
 
-    // Qué tratamientos tienen al menos un código escaneado. Se consulta el
+    // Qué tratamientos tienen al menos un código registrado. Se consulta el
     // conjunto completo de una vez: es más barato que un IN con miles de ids.
-    const conCodigo = new Set(
-      (await dbAll(`SELECT DISTINCT treatment_id FROM barcode_units WHERE treatment_id IS NOT NULL`))
-        .map((r) => r.treatment_id)
-    );
+    //
+    // Se leen las DOS fuentes: la tabla de enlace (la buena, permite varios
+    // códigos por tratamiento y varios tratamientos por frasco) y la columna
+    // antigua de barcode_units, por si quedan registros sin migrar.
+    const conCodigo = new Set();
+    for (const r of await dbAll(`SELECT DISTINCT tratamiento_realizado_id AS id FROM tratamiento_codigos`)) {
+      conCodigo.add(r.id);
+    }
+    for (const r of await dbAll(`SELECT DISTINCT treatment_id AS id FROM barcode_units WHERE treatment_id IS NOT NULL`)) {
+      conCodigo.add(r.id);
+    }
 
     const productosDe = (crudoTexto) => {
       try {
@@ -2180,29 +2192,64 @@ router.get("/control", authMiddleware, requireOwner, async (req, res) => {
     if (filas.length) {
       const ids = filas.map((f) => f.id);
       const marcas = ids.map(() => "?").join(",");
+      // Se unen las dos fuentes; el UNION evita repetir un código que esté
+      // en la tabla nueva y además en la columna antigua.
       const codigos = await dbAll(
-        `SELECT
-           bu.treatment_id,
-           bu.barcode,
-           bu.status,
-           bu.scanned_at,
-           bu.unidades_totales,
-           bu.unidades_restantes,
-           v.nombre  AS variante_nombre,
-           pb.nombre AS producto_base_nombre
-         FROM barcode_units bu
-         LEFT JOIN stock_lotes sl    ON sl.id = bu.lote_id
-         LEFT JOIN variantes v       ON v.id = sl.variante_id
-         LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
-         WHERE bu.treatment_id IN (${marcas})`,
-        ids
+        `SELECT tratamiento_id, barcode, status, escaneado_en, unidades_usadas,
+                variante_nombre, producto_base_nombre
+         FROM (
+           SELECT
+             0                           AS prioridad,
+             tc.tratamiento_realizado_id AS tratamiento_id,
+             tc.barcode                  AS barcode,
+             bu.status                   AS status,
+             tc.registrado_en            AS escaneado_en,
+             tc.unidades_usadas          AS unidades_usadas,
+             v.nombre                    AS variante_nombre,
+             pb.nombre                   AS producto_base_nombre
+           FROM tratamiento_codigos tc
+           LEFT JOIN barcode_units bu    ON bu.id = tc.barcode_unit_id
+           LEFT JOIN variantes v         ON v.id = tc.variante_id
+           LEFT JOIN productos_base pb   ON pb.id = v.producto_base_id
+           WHERE tc.tratamiento_realizado_id IN (${marcas})
+
+           UNION
+
+           SELECT
+             1,
+             bu.treatment_id,
+             bu.barcode,
+             bu.status,
+             bu.scanned_at,
+             0,
+             v.nombre,
+             pb.nombre
+           FROM barcode_units bu
+           LEFT JOIN stock_lotes sl      ON sl.id = bu.lote_id
+           LEFT JOIN variantes v         ON v.id = sl.variante_id
+           LEFT JOIN productos_base pb   ON pb.id = v.producto_base_id
+           WHERE bu.treatment_id IN (${marcas})
+         )
+         -- prioridad 0 = tabla de enlace: trae las unidades reales, así que
+         -- va primero y el duplicado de la columna antigua se descarta.
+         ORDER BY tratamiento_id, barcode, prioridad`,
+        [...ids, ...ids]
       );
+
+      // Un mismo código puede llegar por las dos vías con distinto detalle:
+      // se queda el primero y se descarta el repetido.
+      const vistos = new Set();
       for (const c of codigos) {
-        if (!codigosPorTratamiento.has(c.treatment_id)) codigosPorTratamiento.set(c.treatment_id, []);
-        codigosPorTratamiento.get(c.treatment_id).push({
+        const clave = `${c.tratamiento_id}|${c.barcode}`;
+        if (vistos.has(clave)) continue;
+        vistos.add(clave);
+
+        if (!codigosPorTratamiento.has(c.tratamiento_id)) codigosPorTratamiento.set(c.tratamiento_id, []);
+        codigosPorTratamiento.get(c.tratamiento_id).push({
           barcode: c.barcode,
           status: c.status,
-          escaneado_en: c.scanned_at,
+          escaneado_en: c.escaneado_en,
+          unidades_usadas: Number(c.unidades_usadas) || 0,
           producto: [c.producto_base_nombre, c.variante_nombre].filter(Boolean).join(" - ") || null,
         });
       }
