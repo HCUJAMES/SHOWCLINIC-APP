@@ -2053,4 +2053,215 @@ router.put("/meta", authMiddleware, requireOwner, async (req, res) => {
   }
 });
 
+/* ======================================================================
+   🔍 CONTROL — Auditoría de registro de tratamientos
+
+   Cada vez que se atiende a un paciente se crea una fila en
+   `tratamientos_realizados`. En teoría esa fila debe llevar:
+     · el producto que se aplicó  (campo `productos`)
+     · el código del frasco/caja  (`barcode_units.treatment_id`)
+
+   En la práctica a veces se registra el tratamiento y se olvidan una de
+   las dos cosas. Esta vista lista TODO lo registrado y marca esos huecos
+   para poder reclamarlos el mismo día.
+====================================================================== */
+
+/**
+ * ¿La línea de producto es real o es el relleno que deja el formulario
+ * cuando no se eligió nada? El relleno llega como
+ * {nombre:"Producto", producto:"", variante_id:null}.
+ */
+function esProductoReal(p) {
+  if (!p || typeof p !== "object") return false;
+  if (Number(p.variante_id) > 0) return true;
+  const nombre = String(p.producto || p.nombre || "").trim().toLowerCase();
+  return nombre !== "" && nombre !== "producto";
+}
+
+/** Texto legible de una línea de producto. */
+function nombreProducto(p) {
+  const base = String(p.producto || p.nombre || "").trim();
+  const variante = String(p.variante_nombre || "").trim();
+  if (base) return base;
+  return variante || "Producto sin nombre";
+}
+
+router.get("/control", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    const { fecha_inicio, fecha_fin } = req.query;
+    const filtro = String(req.query.filtro || "todos");   // todos | sin_producto | sin_codigo | incompletos
+    const buscar = String(req.query.buscar || "").trim();
+    const limite = Math.min(2000, Math.max(1, parseInt(req.query.limite, 10) || 400));
+
+    const cond = [];
+    const args = [];
+    if (fecha_inicio) { cond.push("DATE(tr.fecha) >= DATE(?)"); args.push(fecha_inicio); }
+    if (fecha_fin) { cond.push("DATE(tr.fecha) <= DATE(?)"); args.push(fecha_fin); }
+    if (buscar) {
+      // Se busca también sobre "nombre apellido" concatenado: escribir el
+      // nombre completo no coincidía con ninguna de las dos columnas sueltas.
+      cond.push(`(
+        p.nombre LIKE ? OR p.apellido LIKE ?
+        OR (COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')) LIKE ?
+        OR p.dni LIKE ? OR t.nombre LIKE ?
+      )`);
+      const like = `%${buscar}%`;
+      args.push(like, like, like, like, like);
+    }
+    const where = cond.length ? `WHERE ${cond.join(" AND ")}` : "";
+
+    // Se leen TODAS las filas del periodo (con un tope de seguridad) para que
+    // los contadores del resumen sean del periodo completo y no solo de la
+    // página que se alcanza a mostrar. El recorte se hace más abajo.
+    const TOPE = 20000;
+    const filasTodas = await dbAll(
+      `SELECT
+         tr.id,
+         tr.fecha,
+         tr.sesion,
+         tr.especialista,
+         tr.tipoAtencion,
+         tr.productos,
+         tr.precio_total,
+         tr.paciente_id,
+         p.nombre     AS paciente_nombre,
+         p.apellido   AS paciente_apellido,
+         p.dni        AS paciente_dni,
+         t.nombre     AS tratamiento_nombre
+       FROM tratamientos_realizados tr
+       LEFT JOIN patients p     ON p.id = tr.paciente_id
+       LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
+       ${where}
+       ORDER BY datetime(tr.fecha) DESC, tr.id DESC
+       LIMIT ?`,
+      [...args, TOPE]
+    );
+
+    // Qué tratamientos tienen al menos un código escaneado. Se consulta el
+    // conjunto completo de una vez: es más barato que un IN con miles de ids.
+    const conCodigo = new Set(
+      (await dbAll(`SELECT DISTINCT treatment_id FROM barcode_units WHERE treatment_id IS NOT NULL`))
+        .map((r) => r.treatment_id)
+    );
+
+    const productosDe = (crudoTexto) => {
+      try {
+        const crudo = JSON.parse(crudoTexto || "[]");
+        return Array.isArray(crudo) ? crudo.filter(esProductoReal) : [];
+      } catch {
+        return [];   // JSON dañado = se trata como si no hubiera producto
+      }
+    };
+
+    // Resumen sobre el periodo completo
+    let nSinProducto = 0, nSinCodigo = 0, nIncompletos = 0;
+    for (const f of filasTodas) {
+      const sinP = productosDe(f.productos).length === 0;
+      const sinC = !conCodigo.has(f.id);
+      if (sinP) nSinProducto++;
+      if (sinC) nSinCodigo++;
+      if (sinP || sinC) nIncompletos++;
+    }
+
+    // Se aplica el filtro y recién ahí se recorta a lo que se va a mostrar
+    const filtradas = filasTodas.filter((f) => {
+      if (filtro === "todos") return true;
+      const sinP = productosDe(f.productos).length === 0;
+      const sinC = !conCodigo.has(f.id);
+      if (filtro === "sin_producto") return sinP;
+      if (filtro === "sin_codigo") return sinC;
+      if (filtro === "incompletos") return sinP || sinC;
+      return true;
+    });
+    const filas = filtradas.slice(0, limite);
+
+    // Códigos escaneados, agrupados por tratamiento realizado
+    const codigosPorTratamiento = new Map();
+    if (filas.length) {
+      const ids = filas.map((f) => f.id);
+      const marcas = ids.map(() => "?").join(",");
+      const codigos = await dbAll(
+        `SELECT
+           bu.treatment_id,
+           bu.barcode,
+           bu.status,
+           bu.scanned_at,
+           bu.unidades_totales,
+           bu.unidades_restantes,
+           v.nombre  AS variante_nombre,
+           pb.nombre AS producto_base_nombre
+         FROM barcode_units bu
+         LEFT JOIN stock_lotes sl    ON sl.id = bu.lote_id
+         LEFT JOIN variantes v       ON v.id = sl.variante_id
+         LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+         WHERE bu.treatment_id IN (${marcas})`,
+        ids
+      );
+      for (const c of codigos) {
+        if (!codigosPorTratamiento.has(c.treatment_id)) codigosPorTratamiento.set(c.treatment_id, []);
+        codigosPorTratamiento.get(c.treatment_id).push({
+          barcode: c.barcode,
+          status: c.status,
+          escaneado_en: c.scanned_at,
+          producto: [c.producto_base_nombre, c.variante_nombre].filter(Boolean).join(" - ") || null,
+        });
+      }
+    }
+
+    const registros = filas.map((f) => {
+      const productos = productosDe(f.productos);
+      const codigos = codigosPorTratamiento.get(f.id) || [];
+      const sinProducto = productos.length === 0;
+      const sinCodigo = codigos.length === 0;
+
+      // La fecha se guarda como "YYYY-MM-DD HH:MM:SS" en hora de Lima
+      const texto = String(f.fecha || "").replace("T", " ");
+      const fecha = texto.slice(0, 10);
+      const hora = texto.slice(11, 16);
+
+      return {
+        id: f.id,
+        paciente_id: f.paciente_id,
+        paciente: `${f.paciente_nombre || ""} ${f.paciente_apellido || ""}`.trim() || "Sin paciente",
+        paciente_dni: f.paciente_dni,
+        tratamiento: f.tratamiento_nombre || "Tratamiento eliminado",
+        sesion: f.sesion || 1,
+        especialista: f.especialista || "No especificado",
+        tipo_atencion: f.tipoAtencion,
+        productos: productos.map((p) => ({
+          nombre: nombreProducto(p),
+          cantidad: Number(p.cantidad) || 1,
+          variante_id: Number(p.variante_id) > 0 ? Number(p.variante_id) : null,
+        })),
+        codigos,
+        fecha_registro: fecha,
+        hora_registro: hora,
+        sin_producto: sinProducto,
+        sin_codigo: sinCodigo,
+        completo: !sinProducto && !sinCodigo,
+      };
+    });
+
+    res.json({
+      // Los totales son del periodo completo, no de lo que se alcanza a
+      // mostrar: así el contador no cambia al filtrar ni al pasar el límite.
+      total: filasTodas.length,
+      completos: filasTodas.length - nIncompletos,
+      sin_producto: nSinProducto,
+      sin_codigo: nSinCodigo,
+      incompletos: nIncompletos,
+      filtro,
+      limite,
+      mostrados: registros.length,
+      coincidencias: filtradas.length,
+      truncado: filtradas.length > registros.length,
+      tope_alcanzado: filasTodas.length >= TOPE,
+      registros,
+    });
+  } catch (err) {
+    console.error("❌ Error en control de registros:", err.message);
+    res.status(500).json({ message: "Error al obtener el control de registros", error: err.message });
+  }
+});
+
 export default router;

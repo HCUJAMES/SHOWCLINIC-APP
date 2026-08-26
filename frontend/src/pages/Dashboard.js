@@ -58,7 +58,7 @@ const moduleIcons = {
   "Productos Aplicados": CalendarToday,
   "Usuarios": SupervisorAccount,
   "Códigos de Barras": QrCode2,
-  "Gestión Dueño": MonetizationOn,
+  "Gestión CEO": MonetizationOn,
 };
 
 const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
@@ -84,7 +84,7 @@ export default function Dashboard() {
       { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "REPORTES" },
       { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO" },
       { title: "Gestión Clínica", path: "/gestion-clinica", description: "Gestión de atenciones diarias y control de citas", tag: "ACCEDER" },
-      { title: "Gestión Dueño", path: "/gestion-dueno", description: "Panel del dueño: presupuestos, comisiones, liquidaciones y rendimiento", tag: "OWNER" },
+      { title: "Gestión CEO", path: "/gestion-dueno", description: "Panel del CEO: presupuestos, comisiones, liquidaciones, control y rendimiento", tag: "CEO" },
       { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN" },
     ],
     admin: [
@@ -118,7 +118,7 @@ export default function Dashboard() {
       { title: "Finanzas", path: "/finanzas", description: "Ingresos, egresos, reportes financieros y flujo de caja", tag: "REPORTES" },
       { title: "Especialistas", path: "/especialistas", description: "Gestión del equipo médico y asignación de especialidades", tag: "EQUIPO" },
       { title: "Gestión Clínica", path: "/gestion-clinica", description: "Gestión de atenciones diarias y control de citas", tag: "ACCEDER" },
-      { title: "Gestión Dueño", path: "/gestion-dueno", description: "Panel del dueño: presupuestos, comisiones, liquidaciones y rendimiento", tag: "OWNER" },
+      { title: "Gestión CEO", path: "/gestion-dueno", description: "Panel del CEO: presupuestos, comisiones, liquidaciones, control y rendimiento", tag: "CEO" },
       { title: "Productos Aplicados", path: "/productos-aplicados", description: "Reporte de productos usados en tratamientos", tag: "REPORTE" },
       { title: "Estadísticas", path: "/estadisticas", description: "Métricas del negocio, reportes mensuales y análisis de rendimiento", tag: "RESUMEN" },
       { title: "Gestionar", path: "/gestion", description: "Administración del sistema, usuarios y configuración general", tag: "ADMIN" },

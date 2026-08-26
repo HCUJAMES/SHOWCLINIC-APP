@@ -22,7 +22,9 @@ import {
   FlagRounded, EditRounded, TuneRounded,
   PercentRounded, PaidRounded, CategoryRounded,
   PictureAsPdf, SaveRounded, CloseRounded,
-  VisibilityOffRounded, VisibilityRounded
+  VisibilityOffRounded, VisibilityRounded,
+  FactCheckRounded, SearchRounded, Inventory2Rounded,
+  QrCode2Rounded, ErrorOutlineRounded, AccessTimeRounded
 } from "@mui/icons-material";
 
 const MotionCard = motion(Card);
@@ -181,6 +183,11 @@ export default function GestionDueno() {
   const [pendientes, setPendientes] = useState([]);
   const [historialLiq, setHistorialLiq] = useState([]);
 
+  // Control (auditoría de registro de tratamientos)
+  const [control, setControl] = useState(null);
+  const [controlFiltro, setControlFiltro] = useState("todos");
+  const [controlBuscar, setControlBuscar] = useState("");
+
   // Dialogs
   const [dialogCulminar, setDialogCulminar] = useState(null);
   const [dialogLiquidar, setDialogLiquidar] = useState(null);
@@ -233,12 +240,29 @@ export default function GestionDueno() {
     setLoading(false);
   }, []);
 
+  const loadControl = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const p = new URLSearchParams();
+      if (fechaInicio) p.append("fecha_inicio", fechaInicio);
+      if (fechaFin) p.append("fecha_fin", fechaFin);
+      if (controlFiltro && controlFiltro !== "todos") p.append("filtro", controlFiltro);
+      if (controlBuscar.trim()) p.append("buscar", controlBuscar.trim());
+      const qs = p.toString();
+      const data = await apiFetch(`/control${qs ? `?${qs}` : ""}`);
+      setControl(data);
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  }, [fechaInicio, fechaFin, controlFiltro, controlBuscar]);
+
   useEffect(() => {
     if (tab === 0) loadDashboard();
     else if (tab === 1) loadPresupuestos();
     else if (tab === 2) loadEspecialistas();
     else if (tab === 3) loadPendientes();
-  }, [tab, loadDashboard, loadPresupuestos, loadEspecialistas, loadPendientes]);
+    else if (tab === 4) loadControl();
+  }, [tab, loadDashboard, loadPresupuestos, loadEspecialistas, loadPendientes, loadControl]);
 
   // Recargar el detalle del especialista al cambiar el periodo
   useEffect(() => {
@@ -376,6 +400,7 @@ export default function GestionDueno() {
     else if (tab === 1) loadPresupuestos();
     else if (tab === 2) loadEspecialistas();
     else if (tab === 3) loadPendientes();
+    else if (tab === 4) loadControl();
   };
 
   const applyPreset = (preset) => {
@@ -395,7 +420,8 @@ export default function GestionDueno() {
     { title: "Dashboard", subtitle: "Resumen general de tu clínica." },
     { title: "Presupuestos", subtitle: "Seguimiento de tratamientos y líneas." },
     { title: "Especialistas", subtitle: "Rendimiento y comisiones del equipo." },
-    { title: "Liquidaciones", subtitle: "Pagos y comisiones pendientes." }
+    { title: "Liquidaciones", subtitle: "Pagos y comisiones pendientes." },
+    { title: "Control", subtitle: "Tratamientos registrados sin producto o sin código." }
   ];
 
   /* ── RENDER ── */
@@ -443,7 +469,7 @@ export default function GestionDueno() {
           {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: "18px", borderRadius: "12px" }}>{error}</Alert>}
 
           {/* Filtro de periodo (Dashboard, Presupuestos y Especialistas) */}
-          {(tab === 0 || (tab === 1 && !presupuestoDetalle) || tab === 2) && (
+          {(tab === 0 || (tab === 1 && !presupuestoDetalle) || tab === 2 || tab === 4) && (
             <PeriodoFilter
               preset={periodoPreset}
               fechaInicio={fechaInicio}
@@ -502,6 +528,18 @@ export default function GestionDueno() {
               pendientes={pendientes}
               historial={historialLiq}
               onLiquidar={(esp) => setDialogLiquidar(esp)}
+            />
+          )}
+
+          {/* TAB 4: Control */}
+          {tab === 4 && (
+            <ControlView
+              data={control}
+              filtro={controlFiltro}
+              onFiltro={setControlFiltro}
+              buscar={controlBuscar}
+              onBuscar={setControlBuscar}
+              onVerPaciente={(pacienteId) => navigate("/historial-clinico", { state: { pacienteId } })}
             />
           )}
         </Box>
@@ -566,7 +604,8 @@ function SideBar({ tab, onTab, navigate }) {
     { icon: SpaceDashboardRounded, label: "Dashboard" },
     { icon: ReceiptLongRounded, label: "Presupuestos" },
     { icon: GroupsRounded, label: "Especialistas" },
-    { icon: PaymentsRounded, label: "Liquidaciones" }
+    { icon: PaymentsRounded, label: "Liquidaciones" },
+    { icon: FactCheckRounded, label: "Control" }
   ];
 
   const handleLogout = () => {
@@ -600,7 +639,7 @@ function SideBar({ tab, onTab, navigate }) {
       </Box>
 
       <Typography sx={{ display: { xs: "none", md: "block" }, color: colors.sideMuted, fontSize: 10.5, fontWeight: 700, letterSpacing: "1.5px", px: "10px", mb: "10px" }}>
-        MÓDULO DUEÑO
+        MÓDULO CEO
       </Typography>
 
       {/* Nav */}
@@ -3064,6 +3103,263 @@ function PorcentajePresupuestoDialog({ pres, pctDefault, onClose, onSave }) {
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+/* ======================================================================
+   VISTA CONTROL — auditoría de registro de tratamientos
+
+   Cruza lo que se registró como tratamiento contra lo que se registró
+   como producto y como código escaneado. Sirve para detectar el mismo
+   día a qué paciente se le atendió pero se olvidaron de anotar el
+   producto o de escanear el código del frasco.
+====================================================================== */
+function ControlView({ data, filtro, onFiltro, buscar, onBuscar, onVerPaciente }) {
+  // El texto se escribe aquí y se manda al servidor con una pausa, para no
+  // disparar una consulta por cada tecla.
+  const [texto, setTexto] = useState(buscar);
+  useEffect(() => {
+    const t = setTimeout(() => { if (texto !== buscar) onBuscar(texto); }, 400);
+    return () => clearTimeout(t);
+  }, [texto, buscar, onBuscar]);
+
+  const thSx = { fontWeight: 600, fontFamily: fonts.body, fontSize: "11px", textTransform: "uppercase", color: colors.textMuted, letterSpacing: "0.5px", borderBottom: `1px solid ${colors.border}`, py: "10px" };
+  const tdSx = { fontFamily: fonts.body, fontSize: "13px", color: colors.textBody, borderBottom: `1px solid ${colors.border}`, py: "10px", verticalAlign: "top" };
+
+  const registros = data?.registros || [];
+
+  const tarjetas = [
+    { id: "todos", label: "Registrados", valor: data?.total || 0, grad: grads.brown, Icono: FactCheckRounded, ayuda: "Tratamientos registrados en el periodo" },
+    { id: "sin_producto", label: "Sin producto", valor: data?.sin_producto || 0, grad: grads.amber, Icono: Inventory2Rounded, ayuda: "Se registró el tratamiento pero no qué producto se usó" },
+    { id: "sin_codigo", label: "Sin código", valor: data?.sin_codigo || 0, grad: grads.violet, Icono: QrCode2Rounded, ayuda: "No se escaneó el código del frasco o caja" },
+    { id: "incompletos", label: "Incompletos", valor: data?.incompletos || 0, grad: "linear-gradient(135deg, #E09A9A 0%, #C05B5B 100%)", Icono: ErrorOutlineRounded, ayuda: "Les falta el producto, el código, o ambos" },
+  ];
+
+  return (
+    <Box>
+      {/* Resumen — cada tarjeta es también el filtro */}
+      <Grid container spacing={2} sx={{ mb: "22px" }}>
+        {tarjetas.map((t, i) => {
+          const activa = filtro === t.id;
+          return (
+            <Grid item xs={6} md={3} key={t.id}>
+              <Tooltip title={t.ayuda} arrow placement="top">
+                <MotionCard
+                  custom={i}
+                  initial="hidden"
+                  animate="show"
+                  variants={fadeUp}
+                  whileHover={{ y: -3 }}
+                  onClick={() => onFiltro(t.id)}
+                  sx={{
+                    ...cardSx, cursor: "pointer", height: "100%",
+                    borderColor: activa ? colors.gold : colors.border,
+                    boxShadow: activa ? "0 6px 20px rgba(200,169,110,0.30)" : cardSx.boxShadow,
+                    transition: "border-color .2s ease, box-shadow .2s ease",
+                  }}
+                >
+                  <CardContent sx={{ p: "16px", "&:last-child": { pb: "16px" } }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "8px" }}>
+                      <Box sx={{ width: 34, height: 34, borderRadius: "10px", background: t.grad, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <t.Icono sx={{ fontSize: 18, color: "#fff" }} />
+                      </Box>
+                      <Typography sx={{ fontSize: "12px", fontFamily: fonts.body, fontWeight: 600, color: colors.textMuted, lineHeight: 1.2 }}>
+                        {t.label}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "30px", color: colors.primaryDark, lineHeight: 1 }}>
+                      {t.valor}
+                    </Typography>
+                    {activa && (
+                      <Typography sx={{ fontSize: "10.5px", fontFamily: fonts.body, color: colors.gold, fontWeight: 700, mt: "4px", letterSpacing: "0.4px" }}>
+                        ● MOSTRANDO
+                      </Typography>
+                    )}
+                  </CardContent>
+                </MotionCard>
+              </Tooltip>
+            </Grid>
+          );
+        })}
+      </Grid>
+
+      {/* Buscador */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: "12px", mb: "16px", flexWrap: "wrap" }}>
+        <TextField
+          size="small"
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Buscar por paciente, DNI o tratamiento…"
+          InputProps={{
+            startAdornment: <SearchRounded sx={{ fontSize: 18, color: colors.textMuted, mr: "8px" }} />,
+            sx: { fontFamily: fonts.body, fontSize: "13.5px", bgcolor: colors.white, borderRadius: "12px" },
+          }}
+          sx={{ flex: 1, minWidth: 260, "& fieldset": { borderColor: colors.border } }}
+        />
+        <Typography sx={{ fontSize: "12.5px", fontFamily: fonts.body, color: colors.textMuted }}>
+          {registros.length} {registros.length === 1 ? "registro" : "registros"} en pantalla
+          {data?.truncado && ` de ${data.coincidencias}`}
+        </Typography>
+      </Box>
+
+      {data?.truncado && (
+        <Alert severity="info" sx={{ mb: "14px", borderRadius: "12px", fontFamily: fonts.body, fontSize: "13px" }}>
+          Coinciden {data.coincidencias} registros; se muestran los {data.limite} más recientes.
+          Acota el periodo o busca por paciente para ver los anteriores.
+        </Alert>
+      )}
+
+      <Card sx={{ ...cardSx, p: 0, overflow: "hidden" }}>
+        <CardContent sx={{ p: 0, "&:last-child": { pb: 0 } }}>
+          <Box sx={{ overflowX: "auto" }}>
+            <Table size="small" sx={{ minWidth: 900 }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: colors.creamPanel }}>
+                  <TableCell sx={{ ...thSx, pl: "20px" }}>Paciente</TableCell>
+                  <TableCell sx={thSx}>Tratamiento realizado</TableCell>
+                  <TableCell sx={thSx}>Producto usado</TableCell>
+                  <TableCell sx={thSx}>Código de producto</TableCell>
+                  <TableCell sx={{ ...thSx, width: 120 }}>Registro</TableCell>
+                  <TableCell sx={{ ...thSx, width: 130, pr: "20px" }}>Estado</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {registros.map((r) => (
+                  <TableRow
+                    key={r.id}
+                    hover
+                    onClick={() => r.paciente_id && onVerPaciente(r.paciente_id)}
+                    sx={{
+                      cursor: r.paciente_id ? "pointer" : "default",
+                      // Franja de color a la izquierda según lo que falte
+                      borderLeft: `3px solid ${r.completo ? "transparent" : r.sin_producto && r.sin_codigo ? "#C05B5B" : colors.gold}`,
+                      "&:hover": { bgcolor: colors.creamPanel },
+                    }}
+                  >
+                    <TableCell sx={{ ...tdSx, pl: "17px" }}>
+                      <Typography sx={{ fontSize: "13px", fontWeight: 700, fontFamily: fonts.body, color: colors.primaryDark }}>
+                        {r.paciente}
+                      </Typography>
+                      <Typography sx={{ fontSize: "11px", fontFamily: fonts.body, color: colors.textMuted }}>
+                        DNI {r.paciente_dni || "—"}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell sx={tdSx}>
+                      <Typography sx={{ fontSize: "13px", fontFamily: fonts.body, color: colors.textBody }}>
+                        {r.tratamiento}
+                      </Typography>
+                      <Typography sx={{ fontSize: "11px", fontFamily: fonts.body, color: colors.textMuted }}>
+                        Sesión {r.sesion} · {r.especialista}
+                      </Typography>
+                    </TableCell>
+
+                    {/* Producto usado */}
+                    <TableCell sx={tdSx}>
+                      {r.sin_producto ? (
+                        <Chip
+                          size="small"
+                          icon={<Inventory2Rounded sx={{ fontSize: 13 }} />}
+                          label="Falta registrar"
+                          sx={{ height: 23, fontSize: "0.7rem", fontFamily: fonts.body, fontWeight: 700, bgcolor: colors.amberBg, color: colors.amberText, border: `1px solid ${colors.gold}`, "& .MuiChip-icon": { color: colors.amberText } }}
+                        />
+                      ) : (
+                        r.productos.map((p, i) => (
+                          <Typography key={i} sx={{ fontSize: "12.5px", fontFamily: fonts.body, color: colors.textBody, lineHeight: 1.5 }}>
+                            {p.nombre}
+                            {p.cantidad > 1 && (
+                              <Box component="span" sx={{ color: colors.textMuted, fontWeight: 700 }}> ×{p.cantidad}</Box>
+                            )}
+                          </Typography>
+                        ))
+                      )}
+                    </TableCell>
+
+                    {/* Código escaneado */}
+                    <TableCell sx={tdSx}>
+                      {r.sin_codigo ? (
+                        <Chip
+                          size="small"
+                          icon={<QrCode2Rounded sx={{ fontSize: 13 }} />}
+                          label="Sin escanear"
+                          sx={{ height: 23, fontSize: "0.7rem", fontFamily: fonts.body, fontWeight: 700, bgcolor: "#F3EDF7", color: "#6E4E92", border: "1px solid #C9B6DC", "& .MuiChip-icon": { color: "#6E4E92" } }}
+                        />
+                      ) : (
+                        r.codigos.map((c, i) => (
+                          <Box key={i} sx={{ mb: i < r.codigos.length - 1 ? "3px" : 0 }}>
+                            <Typography sx={{ fontSize: "12.5px", fontFamily: "monospace", color: colors.primaryDark, fontWeight: 600 }}>
+                              {c.barcode}
+                            </Typography>
+                            {c.producto && (
+                              <Typography sx={{ fontSize: "10.5px", fontFamily: fonts.body, color: colors.textMuted }}>
+                                {c.producto}
+                              </Typography>
+                            )}
+                          </Box>
+                        ))
+                      )}
+                    </TableCell>
+
+                    {/* Fecha y hora */}
+                    <TableCell sx={tdSx}>
+                      <Typography sx={{ fontSize: "12.5px", fontFamily: fonts.body, color: colors.textBody, fontWeight: 600 }}>
+                        {r.fecha_registro || "—"}
+                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: "3px", color: colors.textMuted }}>
+                        <AccessTimeRounded sx={{ fontSize: 11 }} />
+                        <Typography sx={{ fontSize: "11px", fontFamily: fonts.body }}>
+                          {r.hora_registro || "—"}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+
+                    {/* Estado */}
+                    <TableCell sx={{ ...tdSx, pr: "20px" }}>
+                      {r.completo ? (
+                        <Chip
+                          size="small"
+                          icon={<CheckCircle sx={{ fontSize: 13 }} />}
+                          label="Completo"
+                          sx={{ height: 23, fontSize: "0.7rem", fontFamily: fonts.body, fontWeight: 700, bgcolor: colors.successBg, color: colors.successText, border: `1px solid ${colors.successBorder}`, "& .MuiChip-icon": { color: colors.successText } }}
+                        />
+                      ) : (
+                        <Chip
+                          size="small"
+                          label={r.sin_producto && r.sin_codigo ? "Falta todo" : r.sin_producto ? "Falta producto" : "Falta código"}
+                          sx={{ height: 23, fontSize: "0.7rem", fontFamily: fonts.body, fontWeight: 700, bgcolor: r.sin_producto && r.sin_codigo ? "#FBEAEA" : colors.amberBg, color: r.sin_producto && r.sin_codigo ? "#B04A4A" : colors.amberText, border: `1px solid ${r.sin_producto && r.sin_codigo ? "#E4BEBE" : colors.gold}` }}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {registros.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} sx={{ ...tdSx, textAlign: "center", py: "42px", borderBottom: "none" }}>
+                      <FactCheckRounded sx={{ fontSize: 40, color: colors.border }} />
+                      <Typography sx={{ fontFamily: fonts.title, fontSize: "18px", color: colors.primaryDark, mt: "8px" }}>
+                        {data ? "Nada que revisar" : "Cargando…"}
+                      </Typography>
+                      {data && (
+                        <Typography sx={{ fontSize: "12.5px", fontFamily: fonts.body, color: colors.textMuted, mt: "2px" }}>
+                          {filtro === "todos"
+                            ? "No hay tratamientos registrados en este periodo."
+                            : "Ningún registro cae en este filtro. Todo está completo."}
+                        </Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Typography sx={{ fontSize: "11.5px", fontFamily: fonts.body, color: colors.textMuted, mt: "12px", textAlign: "center" }}>
+        Toca una fila para abrir el historial de esa paciente.
+      </Typography>
+    </Box>
   );
 }
 
