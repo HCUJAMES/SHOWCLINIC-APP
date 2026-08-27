@@ -2094,7 +2094,8 @@ router.get("/control", authMiddleware, requireOwner, async (req, res) => {
     await ensureTratamientoCodigosSchema();
 
     const { fecha_inicio, fecha_fin } = req.query;
-    const filtro = String(req.query.filtro || "todos");   // todos | sin_producto | sin_codigo | incompletos
+    // todos | sin_producto | sin_codigo | incompletos | sin_paciente
+    const filtro = String(req.query.filtro || "todos");
     const buscar = String(req.query.buscar || "").trim();
     const limite = Math.min(2000, Math.max(1, parseInt(req.query.limite, 10) || 400));
 
@@ -2165,19 +2166,25 @@ router.get("/control", authMiddleware, requireOwner, async (req, res) => {
       }
     };
 
+    // Un tratamiento sin paciente válido no sale en ningún historial: es el
+    // caso más grave, porque desaparece de la vista de la clínica.
+    const sinPacienteDe = (f) => !f.paciente_id || !f.paciente_nombre;
+
     // Resumen sobre el periodo completo
-    let nSinProducto = 0, nSinCodigo = 0, nIncompletos = 0;
+    let nSinProducto = 0, nSinCodigo = 0, nIncompletos = 0, nSinPaciente = 0;
     for (const f of filasTodas) {
       const sinP = productosDe(f.productos).length === 0;
       const sinC = !conCodigo.has(f.id);
       if (sinP) nSinProducto++;
       if (sinC) nSinCodigo++;
+      if (sinPacienteDe(f)) nSinPaciente++;
       if (sinP || sinC) nIncompletos++;
     }
 
     // Se aplica el filtro y recién ahí se recorta a lo que se va a mostrar
     const filtradas = filasTodas.filter((f) => {
       if (filtro === "todos") return true;
+      if (filtro === "sin_paciente") return sinPacienteDe(f);
       const sinP = productosDe(f.productos).length === 0;
       const sinC = !conCodigo.has(f.id);
       if (filtro === "sin_producto") return sinP;
@@ -2270,6 +2277,7 @@ router.get("/control", authMiddleware, requireOwner, async (req, res) => {
         id: f.id,
         paciente_id: f.paciente_id,
         paciente: `${f.paciente_nombre || ""} ${f.paciente_apellido || ""}`.trim() || "Sin paciente",
+        sin_paciente: sinPacienteDe(f),
         paciente_dni: f.paciente_dni,
         tratamiento: f.tratamiento_nombre || "Tratamiento eliminado",
         sesion: f.sesion || 1,
@@ -2296,6 +2304,7 @@ router.get("/control", authMiddleware, requireOwner, async (req, res) => {
       completos: filasTodas.length - nIncompletos,
       sin_producto: nSinProducto,
       sin_codigo: nSinCodigo,
+      sin_paciente: nSinPaciente,
       incompletos: nIncompletos,
       filtro,
       limite,

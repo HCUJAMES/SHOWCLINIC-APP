@@ -24,7 +24,8 @@ import {
   PictureAsPdf, SaveRounded, CloseRounded,
   VisibilityOffRounded, VisibilityRounded,
   FactCheckRounded, SearchRounded, Inventory2Rounded,
-  QrCode2Rounded, ErrorOutlineRounded, AccessTimeRounded
+  QrCode2Rounded, ErrorOutlineRounded, AccessTimeRounded,
+  PersonOffRounded
 } from "@mui/icons-material";
 
 const MotionCard = motion(Card);
@@ -3135,6 +3136,19 @@ function ControlView({ data, filtro, onFiltro, buscar, onBuscar, onVerPaciente }
     { id: "incompletos", label: "Incompletos", valor: data?.incompletos || 0, grad: "linear-gradient(135deg, #E09A9A 0%, #C05B5B 100%)", Icono: ErrorOutlineRounded, ayuda: "Les falta el producto, el código, o ambos" },
   ];
 
+  // Solo aparece si hay casos: son sesiones guardadas sin paciente, que no
+  // salen en ningún historial. Si no hay ninguna, no vale ocupar espacio.
+  if ((data?.sin_paciente || 0) > 0) {
+    tarjetas.push({
+      id: "sin_paciente",
+      label: "Sin paciente",
+      valor: data.sin_paciente,
+      grad: "linear-gradient(135deg, #C05B5B 0%, #8E3030 100%)",
+      Icono: PersonOffRounded,
+      ayuda: "Se registraron sin elegir paciente: no aparecen en ningún historial",
+    });
+  }
+
   return (
     <Box>
       {/* Resumen — cada tarjeta es también el filtro */}
@@ -3237,12 +3251,28 @@ function ControlView({ data, filtro, onFiltro, buscar, onBuscar, onVerPaciente }
                     }}
                   >
                     <TableCell sx={{ ...tdSx, pl: "17px" }}>
-                      <Typography sx={{ fontSize: "13px", fontWeight: 700, fontFamily: fonts.body, color: colors.primaryDark }}>
-                        {r.paciente}
-                      </Typography>
-                      <Typography sx={{ fontSize: "11px", fontFamily: fonts.body, color: colors.textMuted }}>
-                        DNI {r.paciente_dni || "—"}
-                      </Typography>
+                      {r.sin_paciente ? (
+                        <>
+                          <Chip
+                            size="small"
+                            icon={<PersonOffRounded sx={{ fontSize: 13 }} />}
+                            label="Sin paciente"
+                            sx={{ height: 23, fontSize: "0.7rem", fontFamily: fonts.body, fontWeight: 700, bgcolor: "#FBEAEA", color: "#B04A4A", border: "1px solid #E4BEBE", "& .MuiChip-icon": { color: "#B04A4A" } }}
+                          />
+                          <Typography sx={{ fontSize: "10.5px", fontFamily: fonts.body, color: colors.textMuted, mt: "3px" }}>
+                            No sale en ningún historial
+                          </Typography>
+                        </>
+                      ) : (
+                        <>
+                          <Typography sx={{ fontSize: "13px", fontWeight: 700, fontFamily: fonts.body, color: colors.primaryDark }}>
+                            {r.paciente}
+                          </Typography>
+                          <Typography sx={{ fontSize: "11px", fontFamily: fonts.body, color: colors.textMuted }}>
+                            DNI {r.paciente_dni || "—"}
+                          </Typography>
+                        </>
+                      )}
                     </TableCell>
 
                     <TableCell sx={tdSx}>

@@ -430,6 +430,27 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       return res.status(400).json({ message: "No se enviaron tratamientos" });
     }
 
+    /**
+     * El paciente es obligatorio.
+     *
+     * Sin esta comprobación, guardar sin haber elegido paciente respondía
+     * "registrado correctamente" y dejaba la fila con paciente_id vacío: el
+     * tratamiento quedaba huérfano y no aparecía en NINGÚN historial. Se
+     * validaba en pantalla, pero nada impedía que llegara así al servidor.
+     */
+    const pacienteIdNum = Number(paciente_id);
+    if (!paciente_id || !Number.isFinite(pacienteIdNum) || pacienteIdNum <= 0) {
+      return res.status(400).json({
+        message: "Debes seleccionar la paciente antes de registrar la sesión.",
+      });
+    }
+    const pacienteExiste = await dbGet(`SELECT id FROM patients WHERE id = ?`, [pacienteIdNum]);
+    if (!pacienteExiste) {
+      return res.status(400).json({
+        message: `La paciente indicada (#${pacienteIdNum}) no existe. Vuelve a seleccionarla.`,
+      });
+    }
+
     const fechaLocal = new Date()
       .toLocaleString("sv-SE", { timeZone: "America/Lima" })
       .replace("T", " ")
@@ -605,7 +626,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
-          paciente_id,
+          pacienteIdNum,
           b.tratamiento_id || null,
           JSON.stringify([
             {
@@ -667,7 +688,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
               VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?)
             `,
             [
-              paciente_id,
+              pacienteIdNum,
               tratamientoRealizadoId,
               b.tratamiento_id || null,
               totalFinal,

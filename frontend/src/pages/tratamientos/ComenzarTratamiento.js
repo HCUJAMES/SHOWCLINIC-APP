@@ -669,10 +669,34 @@ const ComenzarTratamiento = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const bloquesValidos = (bloques || []).filter((b) => {
+    // Sin paciente, la sesión se guardaba igual pero quedaba huérfana: no
+    // aparecía en el historial de nadie. Se corta aquí y en el servidor.
+    if (!paciente_id) {
+      showToast({ severity: "error", message: "Selecciona la paciente antes de registrar la sesión" });
+      return;
+    }
+
+    const tieneTratamiento = (b) => {
       const id = b?.tratamiento_id;
       return id != null && String(id).trim() !== "";
-    });
+    };
+
+    // Un bloque a medio llenar (producto elegido pero sin tratamiento) antes se
+    // descartaba sin avisar: se guardaba el resto y ese se perdía en silencio.
+    const bloquesIncompletos = (bloques || []).filter(
+      (b) => !tieneTratamiento(b) && (b?.variante_id || (b?.producto || "").trim() || (b?.codigos || []).some((c) => (c?.codigo || "").trim()))
+    );
+    if (bloquesIncompletos.length > 0) {
+      showToast({
+        severity: "error",
+        message: bloquesIncompletos.length === 1
+          ? "Hay un tratamiento sin seleccionar. Elígelo o quita ese bloque antes de guardar."
+          : `Hay ${bloquesIncompletos.length} tratamientos sin seleccionar. Elígelos o quita esos bloques antes de guardar.`,
+      });
+      return;
+    }
+
+    const bloquesValidos = (bloques || []).filter(tieneTratamiento);
 
     if (bloquesValidos.length === 0) {
       showToast({ severity: "warning", message: "Agrega al menos un tratamiento antes de guardar" });
