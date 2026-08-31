@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 
 import { reservarStockFEFO, consumirStockFEFO } from "../services/inventoryOps.js";
-import db, { dbAll, dbRun } from "../db/database.js";
+import db, { dbAll, dbGet, dbRun } from "../db/database.js";
 import { authMiddleware, requireInventoryWrite } from "../middleware/auth.js";
 
 const router = express.Router();
@@ -36,6 +36,113 @@ const upload = multer({
     }
     cb(null, true);
   },
+});
+
+/* ==============================================
+   🖼️ FOTO DEL PRODUCTO
+
+   Cada variante (el producto tal como se ve en la estantería) puede llevar
+   una foto. Se guarda solo el nombre del archivo; la carpeta se sirve como
+   estática desde /uploads/productos.
+
+   La columna se agrega sola al arrancar. No toca ningún dato existente:
+   los productos que ya había quedan con la foto vacía.
+============================================== */
+let fotoSchemaReady = false;
+async function ensureFotoProductoSchema() {
+  if (fotoSchemaReady) return;
+  try {
+    await dbRun(`ALTER TABLE variantes ADD COLUMN imagen TEXT`);
+  } catch (err) {
+    if (!String(err.message).includes("duplicate column")) {
+      console.error("❌ Error agregando imagen a variantes:", err.message);
+    }
+  }
+  fotoSchemaReady = true;
+}
+ensureFotoProductoSchema();
+
+const CARPETA_FOTOS = "./uploads/productos";
+
+const almacenFotos = multer.diskStorage({
+  destination: (req, file, cb) => {
+    if (!fs.existsSync(CARPETA_FOTOS)) fs.mkdirSync(CARPETA_FOTOS, { recursive: true });
+    cb(null, CARPETA_FOTOS);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || ".jpg";
+    cb(null, `producto_${req.params.id}_${Date.now()}${ext}`);
+  },
+});
+
+const TIPOS_IMAGEN = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+
+const subirFoto = multer({
+  storage: almacenFotos,
+  limits: { fileSize: 6 * 1024 * 1024 },   // 6 MB: de sobra para una foto de producto
+  fileFilter: (req, file, cb) => {
+    if (!TIPOS_IMAGEN.includes(file?.mimetype)) {
+      req.fileValidationError = "El archivo debe ser una imagen (JPG, PNG, WEBP o GIF)";
+      return cb(null, false);
+    }
+    cb(null, true);
+  },
+});
+
+/** Borra del disco una foto anterior, para no acumular archivos sueltos. */
+function borrarFotoAnterior(nombre) {
+  if (!nombre) return;
+  try {
+    const ruta = path.join(CARPETA_FOTOS, path.basename(nombre));
+    if (fs.existsSync(ruta)) fs.unlinkSync(ruta);
+  } catch (err) {
+    console.error("⚠️ No se pudo borrar la foto anterior:", err.message);
+  }
+}
+
+// 📤 Subir o reemplazar la foto de un producto
+router.post("/variantes/:id/imagen", requireInventoryWrite, subirFoto.single("imagen"), async (req, res) => {
+  try {
+    await ensureFotoProductoSchema();
+
+    if (req.fileValidationError) {
+      return res.status(400).json({ message: req.fileValidationError });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "No se recibió ninguna imagen" });
+    }
+
+    const variante = await dbGet(`SELECT id, imagen FROM variantes WHERE id = ?`, [req.params.id]);
+    if (!variante) {
+      borrarFotoAnterior(req.file.filename);   // no dejar el archivo huérfano
+      return res.status(404).json({ message: "El producto no existe" });
+    }
+
+    await dbRun(`UPDATE variantes SET imagen = ? WHERE id = ?`, [req.file.filename, req.params.id]);
+    borrarFotoAnterior(variante.imagen);
+
+    res.json({ message: "✅ Foto actualizada", imagen: req.file.filename });
+  } catch (err) {
+    console.error("❌ Error al subir la foto del producto:", err.message);
+    res.status(500).json({ message: "Error al subir la foto del producto" });
+  }
+});
+
+// 🗑️ Quitar la foto de un producto
+router.delete("/variantes/:id/imagen", requireInventoryWrite, async (req, res) => {
+  try {
+    await ensureFotoProductoSchema();
+    const variante = await dbGet(`SELECT id, imagen FROM variantes WHERE id = ?`, [req.params.id]);
+    if (!variante) return res.status(404).json({ message: "El producto no existe" });
+
+    await dbRun(`UPDATE variantes SET imagen = NULL WHERE id = ?`, [req.params.id]);
+    borrarFotoAnterior(variante.imagen);
+
+    res.json({ message: "✅ Foto eliminada" });
+  } catch (err) {
+    console.error("❌ Error al eliminar la foto del producto:", err.message);
+    res.status(500).json({ message: "Error al eliminar la foto del producto" });
+  }
 });
 
 /* ==============================================

@@ -42,6 +42,11 @@ import {
   AccessTime,
   HighlightOff,
   Tune,
+  PhotoCameraRounded,
+  ImageNotSupportedRounded,
+  ViewModuleRounded,
+  ViewListRounded,
+  DeleteOutlineRounded,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -84,6 +89,152 @@ const chartPalette = [
 ];
 
 // ===== Sistema de diseño ShowClinic (solo presentación) =====
+/** URL pública de la foto de un producto. */
+const urlFoto = (nombreArchivo) =>
+  nombreArchivo ? `${API_BASE}/uploads/productos/${nombreArchivo}` : null;
+
+/**
+ * Foto del producto.
+ *
+ * Si no hay foto muestra la inicial del producto sobre un fondo de la marca,
+ * en vez de un hueco vacío: así la lista se lee igual de bien mientras se van
+ * subiendo las fotos poco a poco.
+ *
+ * Con `editable` aparece un botón discreto para subir o cambiar la imagen.
+ */
+function FotoProducto({ producto, tam = 46, radio = 12, editable = false, onCambio, mostrarQuitar = false }) {
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState(null);
+  const inputRef = React.useRef(null);
+
+  const src = urlFoto(producto?.imagen);
+  const inicial = String(producto?.variante || producto?.marca || "?").trim().charAt(0).toUpperCase() || "?";
+
+  const token = localStorage.getItem("token");
+
+  const subir = async (archivo) => {
+    if (!archivo) return;
+    setSubiendo(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append("imagen", archivo);
+      const res = await fetch(`${API_BASE}/api/inventario/variantes/${producto.variante_id}/imagen`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data.message || "No se pudo subir la foto");
+      else if (onCambio) onCambio(data.imagen);
+    } catch {
+      setError("No se pudo subir la foto");
+    } finally {
+      setSubiendo(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const quitar = async () => {
+    setSubiendo(true);
+    try {
+      await fetch(`${API_BASE}/api/inventario/variantes/${producto.variante_id}/imagen`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (onCambio) onCambio(null);
+    } catch {
+      setError("No se pudo quitar la foto");
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  return (
+    <Box sx={{ position: "relative", width: tam, height: tam, flexShrink: 0 }}>
+      <Box
+        sx={{
+          width: "100%", height: "100%", borderRadius: `${radio}px`, overflow: "hidden",
+          border: `1px solid ${T.border}`, background: src ? "#fff" : T.goldSoft,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "border-color .2s ease",
+        }}
+      >
+        {src ? (
+          <Box
+            component="img"
+            src={src}
+            alt={producto?.variante || "Producto"}
+            loading="lazy"
+            sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+        ) : (
+          <Typography sx={{
+            fontFamily: T.fontTitle, fontWeight: 700, color: T.gold,
+            fontSize: Math.max(13, Math.round(tam * 0.4)), lineHeight: 1,
+          }}>
+            {inicial}
+          </Typography>
+        )}
+      </Box>
+
+      {editable && (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => subir(e.target.files?.[0])}
+          />
+          <IconButton
+            size="small"
+            disabled={subiendo}
+            onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+            title={src ? "Cambiar foto" : "Subir foto"}
+            sx={{
+              position: "absolute", right: -6, bottom: -6,
+              width: 24, height: 24, background: T.gold, color: "#fff",
+              border: "2px solid #fff", boxShadow: "0 2px 6px rgba(0,0,0,0.18)",
+              "&:hover": { background: T.goldDark },
+              "&.Mui-disabled": { background: T.goldLight, color: "#fff" },
+            }}
+          >
+            <PhotoCameraRounded sx={{ fontSize: 13 }} />
+          </IconButton>
+
+          {mostrarQuitar && src && (
+            <IconButton
+              size="small"
+              disabled={subiendo}
+              onClick={(e) => { e.stopPropagation(); quitar(); }}
+              title="Quitar foto"
+              sx={{
+                position: "absolute", left: -6, bottom: -6,
+                width: 24, height: 24, background: "#fff", color: "#C05B5B",
+                border: `1px solid ${T.border}`, boxShadow: "0 2px 6px rgba(0,0,0,0.14)",
+                "&:hover": { background: "#FBEAEA" },
+              }}
+            >
+              <DeleteOutlineRounded sx={{ fontSize: 13 }} />
+            </IconButton>
+          )}
+        </>
+      )}
+
+      {error && (
+        <Typography sx={{
+          position: "absolute", top: "100%", left: 0, mt: 0.5, whiteSpace: "nowrap",
+          fontFamily: T.font, fontSize: 10, color: "#C05B5B", fontWeight: 600,
+        }}>
+          {error}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 const T = {
   pageBg: "#FAF8F5",        // crema muy claro
   surface: "#FFFFFF",
@@ -305,6 +456,13 @@ export default function Inventario() {
   const [productosBase, setProductosBase] = useState([]);
   const [filtroTexto, setFiltroTexto] = useState("");
   const [filtroCategoria, setFiltroCategoria] = useState("Todos");
+  // Galería (fotos grandes) o lista compacta. Se recuerda entre visitas.
+  const [modoGaleria, setModoGaleria] = useState(() => {
+    try { return localStorage.getItem("inventarioVistaGaleria") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("inventarioVistaGaleria", modoGaleria ? "1" : "0"); } catch { /* modo privado */ }
+  }, [modoGaleria]);
 
   // Modal Registrar
   const [openRegistrar, setOpenRegistrar] = useState(false);
@@ -445,6 +603,11 @@ export default function Inventario() {
       variantes.map((v) => [String(v.id), parseFloat(v.contenido_por_presentacion) || 1])
     );
 
+    // Foto del producto (puede no tener; en ese caso se dibuja un marcador)
+    const imagenPorVariante = new Map(
+      variantes.map((v) => [String(v.id), v.imagen || null])
+    );
+
     return Array.from(map.values()).map((p) => {
       // ── STOCK REAL: sale de los CÓDIGOS ACTIVOS del producto ──
       // Es la misma cifra que se ve en "Ver códigos": cada código lleva sus
@@ -463,6 +626,7 @@ export default function Inventario() {
         codigos_usados: tieneCodigos ? cod.codigos_usados : 0,
         codigos_totales: tieneCodigos ? cod.codigos_totales : 0,
         contenido_por_presentacion: contenidoPorVariante.get(String(p.variante_id)) || 1,
+        imagen: imagenPorVariante.get(String(p.variante_id)) || null,
         categoria: inferirCategoria(p.marca, p.variante),
         estado: getEstadoInfo(stockReal, p.vencimiento_proximo),
       };
@@ -1989,6 +2153,30 @@ export default function Inventario() {
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2.5 }}>
               <Typography sx={{ fontFamily: T.fontTitle, fontWeight: 600, color: T.text1, fontSize: 21 }}>Productos en stock</Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              {/* Galería (fotos) o lista compacta */}
+              <Box sx={{ display: "flex", background: T.surface2, borderRadius: "12px", p: "3px", border: `1px solid ${T.border}` }}>
+                {[
+                  { modo: false, Icono: ViewListRounded, titulo: "Ver como lista" },
+                  { modo: true, Icono: ViewModuleRounded, titulo: "Ver con fotos" },
+                ].map(({ modo, Icono, titulo }) => (
+                  <IconButton
+                    key={titulo}
+                    size="small"
+                    title={titulo}
+                    onClick={() => setModoGaleria(modo)}
+                    sx={{
+                      width: 34, height: 30, borderRadius: "9px",
+                      background: modoGaleria === modo ? T.gold : "transparent",
+                      color: modoGaleria === modo ? "#fff" : T.text3,
+                      transition: "background .2s ease, color .2s ease",
+                      "&:hover": { background: modoGaleria === modo ? T.goldDark : "rgba(163,105,32,0.10)" },
+                    }}
+                  >
+                    <Icono sx={{ fontSize: 18 }} />
+                  </IconButton>
+                ))}
+              </Box>
               <TextField
                 placeholder="Buscar producto, marca, lote..."
                 size="small"
@@ -2000,6 +2188,7 @@ export default function Inventario() {
                   "&:hover fieldset": { borderColor: T.borderHover },
                   "&.Mui-focused fieldset": { borderColor: T.gold, borderWidth: 2 } } }}
               />
+              </Box>
             </Box>
 
             {/* Category Chips */}
@@ -2039,9 +2228,12 @@ export default function Inventario() {
                   }}
                     onClick={() => { setProductoDetalle(p); setVista("detalle"); }}
                   >
-                    <Box>
-                      <Typography sx={{ fontFamily: T.font, fontSize: 13.5, fontWeight: 600, color: T.text1 }}>{p.variante || "Sin nombre"}</Typography>
-                      <Typography sx={{ fontFamily: T.font, fontSize: 11, color: T.text3 }}>{p.marca} · {p.unidad_base || "Unidad"}</Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.4, minWidth: 0 }}>
+                      <FotoProducto producto={p} tam={42} radio={10} />
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontFamily: T.font, fontSize: 13.5, fontWeight: 600, color: T.text1 }}>{p.variante || "Sin nombre"}</Typography>
+                        <Typography sx={{ fontFamily: T.font, fontSize: 11, color: T.text3 }}>{p.marca} · {p.unidad_base || "Unidad"}</Typography>
+                      </Box>
                     </Box>
                     <Box>
                       <Chip label={p.categoria} size="small" sx={{ background: catColor.bg, color: catColor.text, fontWeight: 600, fontSize: 11, height: 24 }} />
@@ -2100,6 +2292,113 @@ export default function Inventario() {
                 );
               };
 
+              // Tarjeta con foto grande, para la vista de galería
+              const renderTarjeta = (p, idx, agotado) => {
+                const catColor = getCategoriaColor(p.categoria);
+                const frascos = enFrascos(p.stock, p.contenido_por_presentacion, p.unidad_base);
+                return (
+                  <MotionBox
+                    key={p.variante_id}
+                    custom={idx}
+                    variants={aparecer}
+                    initial="hidden"
+                    animate="show"
+                    whileHover={{ y: -4 }}
+                    onClick={() => { setProductoDetalle(p); setVista("detalle"); }}
+                    sx={{
+                      cursor: "pointer", borderRadius: "16px", overflow: "hidden",
+                      background: "#fff", border: `1px solid ${agotado ? "rgba(211,47,47,0.30)" : T.border}`,
+                      boxShadow: T.shadow, display: "flex", flexDirection: "column",
+                      transition: "box-shadow .2s ease, border-color .2s ease",
+                      "&:hover": { boxShadow: T.shadowHover, borderColor: T.borderHover },
+                    }}
+                  >
+                    {/* Foto grande */}
+                    <Box sx={{
+                      position: "relative", width: "100%", pt: "72%",
+                      background: p.imagen ? "#fff" : `linear-gradient(135deg, ${T.goldSoft} 0%, #EFE3D2 100%)`,
+                      borderBottom: `1px solid ${T.border}`,
+                    }}>
+                      <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {p.imagen ? (
+                          <Box
+                            component="img"
+                            src={urlFoto(p.imagen)}
+                            alt={p.variante}
+                            loading="lazy"
+                            sx={{ width: "100%", height: "100%", objectFit: "contain", p: 1 }}
+                          />
+                        ) : (
+                          <Box sx={{ textAlign: "center", color: T.goldLight }}>
+                            <ImageNotSupportedRounded sx={{ fontSize: 30, opacity: 0.75 }} />
+                            <Typography sx={{ fontFamily: T.font, fontSize: 10.5, fontWeight: 600, mt: 0.4, color: T.text3 }}>
+                              Sin foto
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+
+                      {/* Botón discreto para subir la foto sin salir de la galería */}
+                      <Box sx={{ position: "absolute", right: 8, bottom: 8 }} onClick={(e) => e.stopPropagation()}>
+                        <FotoProducto
+                          producto={p}
+                          tam={30}
+                          radio={9}
+                          editable
+                          onCambio={cargarDatos}
+                        />
+                      </Box>
+
+                      {agotado && (
+                        <Chip
+                          label="Agotado"
+                          size="small"
+                          sx={{ position: "absolute", top: 8, left: 8, height: 21, fontSize: 10, fontWeight: 700,
+                            background: "#d32f2f", color: "#fff" }}
+                        />
+                      )}
+                    </Box>
+
+                    {/* Datos */}
+                    <Box sx={{ p: 1.6, flex: 1, display: "flex", flexDirection: "column", gap: 0.5 }}>
+                      <Typography sx={{ fontFamily: T.font, fontSize: 13.5, fontWeight: 700, color: T.text1, lineHeight: 1.3 }} noWrap
+                        title={p.variante}>
+                        {p.variante || "Sin nombre"}
+                      </Typography>
+                      <Typography sx={{ fontFamily: T.font, fontSize: 11, color: T.text3 }} noWrap>{p.marca}</Typography>
+
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.7, mt: 0.4, flexWrap: "wrap" }}>
+                        <Chip label={p.categoria} size="small"
+                          sx={{ background: catColor.bg, color: catColor.text, fontWeight: 600, fontSize: 10, height: 20 }} />
+                        <Chip label={p.estado.label} size="small"
+                          sx={{ background: p.estado.bg, color: p.estado.color, fontWeight: 600, fontSize: 10, height: 20 }} />
+                      </Box>
+
+                      <Box sx={{ mt: "auto", pt: 0.8 }}>
+                        <Typography sx={{ fontFamily: T.font, fontSize: 14, fontWeight: 700, color: agotado ? "#d32f2f" : T.text1 }}>
+                          {formatStock(p.stock, p.unidad_base)}
+                        </Typography>
+                        {frascos && (
+                          <Typography sx={{ fontFamily: T.font, fontSize: 10.5, color: T.goldDark, fontWeight: 600 }}>
+                            {frascos.texto}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  </MotionBox>
+                );
+              };
+
+              const Galeria = ({ lista, agotados }) => (
+                <Box sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(4, 1fr)", lg: "repeat(5, 1fr)" },
+                  gap: 1.8,
+                }}>
+                  {lista.map((p, idx) => renderTarjeta(p, idx, agotados))}
+                </Box>
+              );
+
               const TableHeader = () => (
                 <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr 1.2fr 0.8fr", px: 2, py: 1.2, borderBottom: `1px solid ${T.border}`, mb: 1 }}>
                   {["PRODUCTO", "CATEGORÍA", "STOCK", "CÓDIGOS ACTIVOS", "VENCE", "ESTADO", "ACCIONES"].map((h) => (
@@ -2116,13 +2415,21 @@ export default function Inventario() {
                     <Typography sx={{ fontFamily: T.font, fontWeight: 700, color: T.text1, fontSize: 14.5 }}>Disponibles</Typography>
                     <Chip label={conStock.length} size="small" sx={{ background: "#e8f5e9", color: "#2e7d32", fontWeight: 700, height: 22 }} />
                   </Box>
-                  <TableHeader />
-                  <Box sx={{ maxHeight: "50vh", overflowY: "auto", "&::-webkit-scrollbar": { width: 6 }, "&::-webkit-scrollbar-thumb": { borderRadius: 3, background: T.goldLight } }}>
-                    {conStock.map((p, idx) => renderFila(p, idx, false))}
-                    {conStock.length === 0 && (
-                      <Typography sx={{ textAlign: "center", py: 3, color: "#999" }}>No hay productos con stock</Typography>
-                    )}
-                  </Box>
+                  {modoGaleria ? (
+                    conStock.length > 0
+                      ? <Galeria lista={conStock} agotados={false} />
+                      : <Typography sx={{ textAlign: "center", py: 3, color: "#999" }}>No hay productos con stock</Typography>
+                  ) : (
+                    <>
+                      <TableHeader />
+                      <Box sx={{ maxHeight: "50vh", overflowY: "auto", "&::-webkit-scrollbar": { width: 6 }, "&::-webkit-scrollbar-thumb": { borderRadius: 3, background: T.goldLight } }}>
+                        {conStock.map((p, idx) => renderFila(p, idx, false))}
+                        {conStock.length === 0 && (
+                          <Typography sx={{ textAlign: "center", py: 3, color: "#999" }}>No hay productos con stock</Typography>
+                        )}
+                      </Box>
+                    </>
+                  )}
 
                   {/* ===== Productos sin stock ===== */}
                   <Divider sx={{ my: 3 }} />
@@ -2131,13 +2438,21 @@ export default function Inventario() {
                     <Typography sx={{ fontFamily: T.font, fontWeight: 700, color: T.text1, fontSize: 14.5 }}>Sin stock</Typography>
                     <Chip label={sinStock.length} size="small" sx={{ background: "#ffebee", color: "#d32f2f", fontWeight: 700, height: 22 }} />
                   </Box>
-                  {sinStock.length > 0 && <TableHeader />}
-                  <Box sx={{ maxHeight: "40vh", overflowY: "auto", "&::-webkit-scrollbar": { width: 6 }, "&::-webkit-scrollbar-thumb": { borderRadius: 3, background: T.goldLight } }}>
-                    {sinStock.map((p, idx) => renderFila(p, idx, true))}
-                    {sinStock.length === 0 && (
-                      <Typography sx={{ textAlign: "center", py: 3, color: "#999" }}>Todos los productos tienen stock</Typography>
-                    )}
-                  </Box>
+                  {modoGaleria ? (
+                    sinStock.length > 0
+                      ? <Galeria lista={sinStock} agotados={true} />
+                      : <Typography sx={{ textAlign: "center", py: 3, color: "#999" }}>Todos los productos tienen stock</Typography>
+                  ) : (
+                    <>
+                      {sinStock.length > 0 && <TableHeader />}
+                      <Box sx={{ maxHeight: "40vh", overflowY: "auto", "&::-webkit-scrollbar": { width: 6 }, "&::-webkit-scrollbar-thumb": { borderRadius: 3, background: T.goldLight } }}>
+                        {sinStock.map((p, idx) => renderFila(p, idx, true))}
+                        {sinStock.length === 0 && (
+                          <Typography sx={{ textAlign: "center", py: 3, color: "#999" }}>Todos los productos tienen stock</Typography>
+                        )}
+                      </Box>
+                    </>
+                  )}
 
                   {/* Footer count */}
                   <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #eee" }}>
