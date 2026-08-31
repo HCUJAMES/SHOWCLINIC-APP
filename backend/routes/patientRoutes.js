@@ -489,7 +489,7 @@ router.delete("/recordatorios/contactado", async (req, res) => {
  * 🔔 RECORDATORIOS DE RETOQUE
  *
  * Cada tratamiento tiene su ciclo: la toxina botulínica (botox, modulaciones)
- * se repite cada 6 meses y el resto una vez al año. Este endpoint calcula,
+ * se repite cada 4 meses y el resto cada 10 meses. Este endpoint calcula,
  * para cada paciente y tratamiento, cuándo toca repetirlo y devuelve los que
  * ya vencieron o están por vencer, para avisar en el dashboard.
  *
@@ -515,8 +515,11 @@ router.get("/recordatorios", async (req, res) => {
       GROUP BY pa.paciente_id, ps.tratamiento_nombre
     `);
 
-    // La toxina se repite cada 6 meses; en la clínica se registra como
-    // "botox", "toxina" o "modulación".
+    // Cada cuántos meses toca repetir el tratamiento.
+    // La toxina se registra en la clínica como "botox", "toxina" o "modulación".
+    const MESES_TOXINA = 4;
+    const MESES_RESTO = 10;
+
     const esToxina = (nombre = "") => {
       const t = String(nombre).toLowerCase();
       return t.includes("botox") || t.includes("toxina") || t.includes("modulaci");
@@ -528,7 +531,7 @@ router.get("/recordatorios", async (req, res) => {
     const candidatos = [];
     for (const f of filas) {
       if (!f.ultima_fecha) continue;
-      const meses = esToxina(f.tratamiento_nombre) ? 6 : 12;
+      const meses = esToxina(f.tratamiento_nombre) ? MESES_TOXINA : MESES_RESTO;
 
       const ultima = new Date(`${f.ultima_fecha}T00:00:00`);
       if (isNaN(ultima)) continue;
@@ -607,6 +610,232 @@ router.get("/recordatorios", async (req, res) => {
   } catch (err) {
     console.error("❌ Error calculando recordatorios:", err.message);
     res.status(500).json({ message: "Error al calcular recordatorios" });
+  }
+});
+
+/* ======================================================================
+   🤝 SEGUIMIENTO DE PROFORMAS SIN CERRAR
+
+   Pacientes que vinieron a consulta, se les hizo la proforma y todavía no
+   empezaron. La mayoría NO hay que marcarlos a mano: si existe presupuesto
+   y ninguna de sus sesiones está completada, es justamente ese caso.
+
+   El marcado manual queda para lo que el sistema no puede deducir: vino a
+   consulta y aún no se le hizo proforma.
+
+   Dos acciones distintas a propósito:
+     · contactado → vuelve a la lista a los 30 días si sigue sin empezar
+     · descartado → dijo que no; no vuelve a aparecer
+====================================================================== */
+let seguimientoSchemaReady = false;
+async function ensureSeguimientoSchema() {
+  if (seguimientoSchemaReady) return;
+  await dbRun(`CREATE TABLE IF NOT EXISTS seguimiento_pacientes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    paciente_id INTEGER NOT NULL UNIQUE,
+    estado TEXT NOT NULL DEFAULT 'pendiente',   -- pendiente | contactado | descartado
+    manual INTEGER NOT NULL DEFAULT 0,          -- 1 = lo marcó una persona
+    nota TEXT,
+    actualizado_en TEXT,
+    actualizado_por TEXT
+  )`);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_seguimiento_estado
+               ON seguimiento_pacientes(estado)`);
+  seguimientoSchemaReady = true;
+}
+
+// Días que se calla el aviso tras marcar "ya lo contacté"
+const DIAS_SILENCIO_SEGUIMIENTO = 30;
+
+router.get("/seguimiento-proformas", async (req, res) => {
+  try {
+    await ensureSeguimientoSchema();
+
+    const hoyLima = new Date().toLocaleString("sv-SE", { timeZone: "America/Lima" }).slice(0, 10);
+    const hoy = new Date(`${hoyLima}T00:00:00`);
+    const diasDesde = (fecha) => {
+      if (!fecha) return null;
+      const f = new Date(String(fecha).replace(" ", "T").slice(0, 19));
+      if (isNaN(f)) return null;
+      f.setHours(0, 0, 0, 0);
+      return Math.round((hoy - f) / 86400000);
+    };
+
+    // 1) Proformas hechas que nunca arrancaron (una fila por paciente: la última)
+    const proformas = await dbAll(`
+      SELECT
+        pa.paciente_id,
+        p.nombre, p.apellido, p.dni, p.celular,
+        MAX(pa.creado_en)  AS fecha_consulta,
+        COUNT(pa.id)       AS proformas,
+        SUM(pa.precio_total) AS monto_total,
+        MAX(pa.precio_total) AS monto_ultima
+      FROM presupuestos_asignados pa
+      JOIN patients p ON p.id = pa.paciente_id
+      WHERE pa.estado <> 'completado'
+        AND NOT EXISTS (
+          SELECT 1 FROM presupuestos_sesiones ps
+          WHERE ps.presupuesto_asignado_id = pa.id AND ps.estado = 'completada'
+        )
+      GROUP BY pa.paciente_id
+    `);
+
+    // 2) Marcados a mano (aunque todavía no tengan proforma)
+    const manuales = await dbAll(`
+      SELECT s.paciente_id, s.nota, p.nombre, p.apellido, p.dni, p.celular
+      FROM seguimiento_pacientes s
+      JOIN patients p ON p.id = s.paciente_id
+      WHERE s.manual = 1
+    `);
+
+    // Fecha de la consulta pagada más reciente, como respaldo cuando no hay proforma
+    const consultas = await dbAll(`
+      SELECT paciente_id, MAX(fecha) AS fecha FROM consultas_paciente GROUP BY paciente_id
+    `).catch(() => []);
+    const fechaConsulta = new Map(consultas.map((c) => [c.paciente_id, c.fecha]));
+
+    // Estado guardado de cada paciente
+    const marcas = await dbAll(`SELECT * FROM seguimiento_pacientes`);
+    const marcaPorPaciente = new Map(marcas.map((m) => [m.paciente_id, m]));
+
+    const porPaciente = new Map();
+
+    for (const f of proformas) {
+      porPaciente.set(f.paciente_id, {
+        paciente_id: f.paciente_id,
+        nombre: f.nombre, apellido: f.apellido, dni: f.dni, celular: f.celular,
+        motivo: "proforma",
+        fecha_consulta: f.fecha_consulta,
+        proformas: f.proformas,
+        monto: Number(f.monto_ultima) || 0,
+        monto_total: Number(f.monto_total) || 0,
+      });
+    }
+
+    for (const m of manuales) {
+      const previo = porPaciente.get(m.paciente_id);
+      if (previo) { previo.nota = m.nota; previo.manual = true; continue; }
+      porPaciente.set(m.paciente_id, {
+        paciente_id: m.paciente_id,
+        nombre: m.nombre, apellido: m.apellido, dni: m.dni, celular: m.celular,
+        motivo: "manual",
+        manual: true,
+        nota: m.nota,
+        fecha_consulta: fechaConsulta.get(m.paciente_id) || null,
+        proformas: 0,
+        monto: 0,
+        monto_total: 0,
+      });
+    }
+
+    const pendientes = [];
+    const atendidos = [];
+
+    for (const item of porPaciente.values()) {
+      const marca = marcaPorPaciente.get(item.paciente_id);
+      const dias = diasDesde(item.fecha_consulta);
+      const fila = {
+        ...item,
+        manual: !!item.manual,
+        dias_desde_consulta: dias,
+        estado: marca?.estado || "pendiente",
+        nota: item.nota ?? marca?.nota ?? null,
+        actualizado_en: marca?.actualizado_en || null,
+      };
+
+      if (marca?.estado === "descartado") { atendidos.push(fila); continue; }
+
+      if (marca?.estado === "contactado") {
+        const desde = diasDesde(marca.actualizado_en);
+        // Aún dentro del silencio: se muestra en la sección de "ya atendidos"
+        if (desde !== null && desde <= DIAS_SILENCIO_SEGUIMIENTO) { atendidos.push(fila); continue; }
+        fila.estado = "pendiente";
+        fila.reaparecio = true;   // ya se le contactó antes y sigue sin empezar
+      }
+
+      pendientes.push(fila);
+    }
+
+    // Primero el dinero dormido más grande; a igual monto, el más antiguo
+    pendientes.sort((a, b) =>
+      (b.monto_total - a.monto_total) || ((b.dias_desde_consulta || 0) - (a.dias_desde_consulta || 0))
+    );
+    atendidos.sort((a, b) => String(b.actualizado_en || "").localeCompare(String(a.actualizado_en || "")));
+
+    res.json({
+      total: pendientes.length,
+      monto_en_juego: pendientes.reduce((s, r) => s + (r.monto_total || 0), 0),
+      dias_silencio: DIAS_SILENCIO_SEGUIMIENTO,
+      seguimientos: pendientes,
+      atendidos,
+    });
+  } catch (err) {
+    console.error("❌ Error obteniendo seguimiento:", err.message);
+    res.status(500).json({ message: "Error al obtener el seguimiento" });
+  }
+});
+
+// ✅ Marcar el estado de un paciente en seguimiento
+router.post("/seguimiento-proformas/:paciente_id", async (req, res) => {
+  try {
+    await ensureSeguimientoSchema();
+    const pacienteId = Number(req.params.paciente_id);
+    if (!Number.isFinite(pacienteId) || pacienteId <= 0) {
+      return res.status(400).json({ message: "Paciente inválido" });
+    }
+
+    const estadosValidos = ["pendiente", "contactado", "descartado"];
+    const manual = req.body?.manual ? 1 : 0;
+    // Añadir a mano significa "ponlo en la lista", no "ya lo llamé": sin estado
+    // explícito entra como pendiente. Sin `manual`, la acción es contactarlo.
+    const porDefecto = manual ? "pendiente" : "contactado";
+    const estado = estadosValidos.includes(req.body?.estado) ? req.body.estado : porDefecto;
+    const nota = req.body?.nota ? String(req.body.nota).slice(0, 500) : null;
+
+    const existe = await dbGet(`SELECT id FROM patients WHERE id = ?`, [pacienteId]);
+    if (!existe) return res.status(404).json({ message: "El paciente no existe" });
+
+    await dbRun(
+      `INSERT INTO seguimiento_pacientes (paciente_id, estado, manual, nota, actualizado_en, actualizado_por)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(paciente_id) DO UPDATE SET
+         estado = excluded.estado,
+         -- el marcado manual no se pierde al cambiar de estado
+         manual = MAX(seguimiento_pacientes.manual, excluded.manual),
+         nota = COALESCE(excluded.nota, seguimiento_pacientes.nota),
+         actualizado_en = excluded.actualizado_en,
+         actualizado_por = excluded.actualizado_por`,
+      [pacienteId, estado, manual, nota, ahoraLima(), req.user?.username || "sistema"]
+    );
+
+    res.json({ message: "✅ Seguimiento actualizado", estado });
+  } catch (err) {
+    console.error("❌ Error guardando seguimiento:", err.message);
+    res.status(500).json({ message: "Error al guardar el seguimiento" });
+  }
+});
+
+// ↩️ Deshacer: vuelve a pendiente. Con ?quitar=1 retira también la marca manual.
+router.delete("/seguimiento-proformas/:paciente_id", async (req, res) => {
+  try {
+    await ensureSeguimientoSchema();
+    const pacienteId = Number(req.params.paciente_id);
+
+    if (String(req.query.quitar) === "1") {
+      await dbRun(`DELETE FROM seguimiento_pacientes WHERE paciente_id = ?`, [pacienteId]);
+      return res.json({ message: "✅ Paciente retirado del seguimiento" });
+    }
+
+    await dbRun(
+      `UPDATE seguimiento_pacientes
+       SET estado = 'pendiente', actualizado_en = ?, actualizado_por = ?
+       WHERE paciente_id = ?`,
+      [ahoraLima(), req.user?.username || "sistema", pacienteId]
+    );
+    res.json({ message: "✅ Seguimiento reabierto" });
+  } catch (err) {
+    console.error("❌ Error deshaciendo seguimiento:", err.message);
+    res.status(500).json({ message: "Error al deshacer el seguimiento" });
   }
 });
 

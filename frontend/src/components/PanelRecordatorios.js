@@ -11,6 +11,9 @@ import {
   ChevronRightRounded,
   ExpandMoreRounded,
   UndoRounded,
+  HandshakeRounded,
+  CloseRounded as DescartarRounded,
+  DescriptionRounded,
 } from "@mui/icons-material";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -18,7 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
  * Aviso lateral de retoques pendientes y cumpleaños del mes.
  *
  * Cada tratamiento tiene su ciclo: la toxina (botox / modulaciones) se repite
- * cada 6 meses y el resto una vez al año. El backend calcula quién ya venció o
+ * cada 4 meses y el resto cada 10 meses. El backend calcula quién ya venció o
  * está por vencer; aquí solo se presenta.
  *
  * En ambas pestañas el ✓ marca a la persona como ya atendida y la saca de la
@@ -58,6 +61,18 @@ const textoPlazo = (dias) => {
     return `venció hace ${d} ${d === 1 ? "día" : "días"}`;
   }
   return `en ${dias} ${dias === 1 ? "día" : "días"}`;
+};
+
+const soles = (n) => `S/ ${Math.round(Number(n) || 0).toLocaleString("es-PE")}`;
+
+// "hace 3 meses" cuando ya pasó mucho; en días cuando es reciente
+const tiempoDesdeConsulta = (dias) => {
+  if (dias == null) return "sin fecha";
+  if (dias <= 0) return "vino hoy";
+  if (dias === 1) return "vino ayer";
+  if (dias < 30) return `hace ${dias} días`;
+  const m = Math.round(dias / 30);
+  return `hace ${m} ${m === 1 ? "mes" : "meses"}`;
 };
 
 // "hoy" / "ayer" / "hace 5 días"
@@ -113,12 +128,14 @@ function BotonCheck({ hecho, onClick, titulo }) {
  * También se declara fuera para que no se remonte y el desplegable conserve
  * su animación de apertura.
  */
-function SeccionMarcados({ marcados, esCumples, abiertaLista, onAlternar, deshaciendo, onDeshacer }) {
+function SeccionMarcados({ marcados, esCumples, esSeguimiento, abiertaLista, onAlternar, deshaciendo, onDeshacer }) {
   if (!marcados.length) return null;
 
   const etiqueta = esCumples
     ? `${marcados.length} ${marcados.length === 1 ? "saludada" : "saludadas"}`
-    : `${marcados.length} ${marcados.length === 1 ? "contactado" : "contactados"}`;
+    : esSeguimiento
+      ? `${marcados.length} ${marcados.length === 1 ? "gestionado" : "gestionados"}`
+      : `${marcados.length} ${marcados.length === 1 ? "contactado" : "contactados"}`;
 
   return (
     <MotionBox layout>
@@ -163,7 +180,9 @@ function SeccionMarcados({ marcados, esCumples, abiertaLista, onAlternar, deshac
           >
             <Box sx={{ pt: 0.8 }}>
               {marcados.map((m) => {
-                const clave = esCumples ? `cumple-${m.paciente_id}` : `${m.paciente_id}-${m.tratamiento}`;
+                const clave = esCumples ? `cumple-${m.paciente_id}`
+                  : esSeguimiento ? `seg-${m.paciente_id}`
+                  : `${m.paciente_id}-${m.tratamiento}`;
                 const ocupado = deshaciendo === clave;
                 return (
                   <Box
@@ -193,7 +212,9 @@ function SeccionMarcados({ marcados, esCumples, abiertaLista, onAlternar, deshac
                       <Typography sx={{ fontSize: 10.5, color: "#7A8E7C" }} noWrap>
                         {esCumples
                           ? `Saludada ${desdeCuando(m.saludado_en)}`
-                          : `Contactado ${desdeCuando(m.contactado_en)}`}
+                          : esSeguimiento
+                            ? `${m.estado === "descartado" ? "Descartado" : "Contactado"} ${desdeCuando(m.actualizado_en)}`
+                            : `Contactado ${desdeCuando(m.contactado_en)}`}
                       </Typography>
                     </Box>
 
@@ -228,7 +249,7 @@ function SeccionMarcados({ marcados, esCumples, abiertaLista, onAlternar, deshac
 
 export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
   const [abierto, setAbierto] = useState(false);
-  const [pestana, setPestana] = useState("retoques");   // "retoques" | "cumples"
+  const [pestana, setPestana] = useState("retoques");   // "retoques" | "cumples" | "seguimiento"
   const [cargando, setCargando] = useState(true);
   const [datos, setDatos] = useState({ total: 0, vencidos: 0, proximos: 0, recordatorios: [], contactados: [] });
 
@@ -236,6 +257,10 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
   const [mesVer, setMesVer] = useState(null);           // null = mes actual
   const [cumples, setCumples] = useState(null);
   const [cargandoCumples, setCargandoCumples] = useState(false);
+
+  // Seguimiento de proformas que no arrancaron
+  const [seguimiento, setSeguimiento] = useState(null);
+  const [cargandoSeguimiento, setCargandoSeguimiento] = useState(false);
 
   // Fila que se está marcando (para la animación de salida)
   const [marcando, setMarcando] = useState(null);
@@ -270,6 +295,22 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
       .catch(() => {})
       .finally(() => setCargandoCumples(false));
   }, [pestana, mesVer, apiBase]);
+
+  const cargarSeguimiento = useCallback(async (silencioso = false) => {
+    if (!token()) return;
+    if (!silencioso) setCargandoSeguimiento(true);
+    try {
+      const res = await fetch(`${apiBase}/api/pacientes/seguimiento-proformas`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (res.ok) setSeguimiento(await res.json());
+    } catch { /* se queda con lo que tenía */ }
+    finally { setCargandoSeguimiento(false); }
+  }, [apiBase]);
+
+  useEffect(() => {
+    if (pestana === "seguimiento") cargarSeguimiento();
+  }, [pestana, cargarSeguimiento]);
 
   // Al cambiar de pestaña se recoge la sección de marcados
   useEffect(() => { setVerMarcados(false); }, [pestana]);
@@ -370,6 +411,44 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
     }, 620);
   };
 
+  /**
+   * Seguimiento: dos salidas distintas a propósito.
+   *   contactado → vuelve en 30 días si sigue sin empezar
+   *   descartado → dijo que no; no vuelve
+   */
+  const marcarSeguimiento = async (s, estado, e) => {
+    if (e) e.stopPropagation();
+    if (marcando) return;
+    const clave = `seg-${s.paciente_id}`;
+    setMarcando(clave);
+
+    try {
+      await fetch(`${apiBase}/api/pacientes/seguimiento-proformas/${s.paciente_id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ estado }),
+      });
+    } catch { /* la fila sale igual */ }
+
+    setTimeout(async () => {
+      await cargarSeguimiento(true);
+      setMarcando(null);
+    }, 620);
+  };
+
+  const deshacerSeguimiento = async (s) => {
+    if (deshaciendo) return;
+    setDeshaciendo(`seg-${s.paciente_id}`);
+    try {
+      await fetch(`${apiBase}/api/pacientes/seguimiento-proformas/${s.paciente_id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      await cargarSeguimiento(true);
+    } catch { /* silencio */ }
+    finally { setDeshaciendo(null); }
+  };
+
   /* ─────────────────────── Deshacer la marca ─────────────────────── */
 
   const deshacerContacto = async (m) => {
@@ -427,21 +506,25 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
 
   const total = datos.total || 0;
   const esCumples = pestana === "cumples";
+  const esSeguimiento = pestana === "seguimiento";
   const mesNombre = MESES[(mesVer || 1) - 1];
 
   const pendientesCumples = (cumples?.cumpleanos || []).filter((c) => !c.saludado);
   const marcados = esCumples
     ? (cumples?.cumpleanos || []).filter((c) => c.saludado)
-    : (datos.contactados || []);
+    : esSeguimiento
+      ? (seguimiento?.atendidos || [])
+      : (datos.contactados || []);
 
   // Props comunes del bloque de marcados, para no repetirlas en cada pestaña
   const propsMarcados = {
     marcados,
     esCumples,
+    esSeguimiento,
     abiertaLista: verMarcados,
     onAlternar: () => setVerMarcados((v) => !v),
     deshaciendo,
-    onDeshacer: esCumples ? deshacerSaludo : deshacerContacto,
+    onDeshacer: esCumples ? deshacerSaludo : esSeguimiento ? deshacerSeguimiento : deshacerContacto,
   };
 
   return (
@@ -560,6 +643,33 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                     )}
                   </Box>
                 </>
+              ) : esSeguimiento ? (
+                <>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <HandshakeRounded sx={{ fontSize: 20 }} />
+                    <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
+                      Seguimiento
+                    </Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: 11.5, opacity: 0.9, mt: 0.3 }}>
+                    Vinieron a consulta y aún no empiezan
+                  </Typography>
+
+                  <Box sx={{ display: "flex", gap: 0.8, mt: 1.2, flexWrap: "wrap" }}>
+                    <Box sx={{ px: 1.1, py: 0.35, borderRadius: "999px", background: "rgba(255,255,255,0.20)" }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
+                        {seguimiento?.total || 0} por contactar
+                      </Typography>
+                    </Box>
+                    {(seguimiento?.monto_en_juego || 0) > 0 && (
+                      <Box sx={{ px: 1.1, py: 0.35, borderRadius: "999px", background: "rgba(0,0,0,0.25)" }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
+                          {soles(seguimiento.monto_en_juego)} en juego
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </>
               ) : (
                 <>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -569,7 +679,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                     </Typography>
                   </Box>
                   <Typography sx={{ fontSize: 11.5, opacity: 0.9, mt: 0.3 }}>
-                    Toxina cada 6 meses · demás tratamientos cada año
+                    Toxina cada 4 meses · demás tratamientos cada 10 meses
                   </Typography>
 
                   {total > 0 && (
@@ -598,6 +708,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                 {[
                   { id: "retoques", texto: "Retoques", Icono: EventRepeatRounded, n: total },
                   { id: "cumples", texto: "Cumpleaños", Icono: CakeRounded, n: cumples?.hoy || 0 },
+                  { id: "seguimiento", texto: "Seguimiento", Icono: HandshakeRounded, n: seguimiento?.total || 0 },
                 ].map((t) => {
                   const activa = pestana === t.id;
                   return (
@@ -759,6 +870,161 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                     <SeccionMarcados {...propsMarcados} />
                   </>
                 )
+              ) : esSeguimiento ? (
+                cargandoSeguimiento ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
+                    <CircularProgress size={26} sx={{ color: ORO }} />
+                  </Box>
+                ) : (
+                  <>
+                    {(seguimiento?.total || 0) === 0 && (
+                      <Box sx={{ textAlign: "center", py: 4.5, px: 2 }}>
+                        <HandshakeRounded sx={{ fontSize: 40, color: "rgba(163,105,32,0.35)" }} />
+                        <Typography sx={{ mt: 1, fontSize: 13.5, fontWeight: 600, color: CAFE }}>
+                          Nada pendiente
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "#8D7B70", mt: 0.5 }}>
+                          Todas las proformas están en marcha o ya gestionadas.
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {(seguimiento?.seguimientos || []).map((s, i) => {
+                      const clave = `seg-${s.paciente_id}`;
+                      const hecho = marcando === clave;
+                      // Más de 3 meses esperando: se marca en rojo
+                      const frio = (s.dias_desde_consulta || 0) >= 90;
+                      return (
+                        <MotionBox
+                          key={clave}
+                          layout
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={hecho
+                            ? { opacity: 0, x: 70, scale: 0.92 }
+                            : { opacity: 1, x: 0, y: 0, scale: 1 }}
+                          transition={{
+                            layout: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
+                            delay: hecho ? 0.16 : 0.05 + i * 0.045,
+                            duration: hecho ? 0.26 : 0.3,
+                            ease: hecho ? "easeIn" : [0.22, 1, 0.36, 1],
+                          }}
+                          whileHover={hecho ? {} : { x: 3 }}
+                          onClick={() => !hecho && onVerPaciente && onVerPaciente(s)}
+                          sx={{
+                            display: "flex", alignItems: "center", gap: 1.2,
+                            p: 1.3, mb: 0.9, borderRadius: "14px", cursor: "pointer",
+                            background: hecho ? "#EDF7EE" : "#fff",
+                            border: `1px solid ${hecho ? "rgba(46,125,50,0.35)" : frio ? "rgba(211,47,47,0.22)" : "rgba(163,105,32,0.14)"}`,
+                            borderLeft: `3px solid ${hecho ? VERDE : frio ? "#D32F2F" : ORO}`,
+                            transition: "background .25s ease, border-color .25s ease, box-shadow .2s ease",
+                            "&:hover": { boxShadow: hecho ? "none" : "0 6px 18px rgba(163,105,32,0.16)" },
+                          }}
+                        >
+                          <Box sx={{
+                            width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            background: frio
+                              ? "linear-gradient(135deg,#D32F2F,#B71C1C)"
+                              : `linear-gradient(135deg, ${ORO}, ${ORO_OSCURO})`,
+                            color: "#fff", fontWeight: 700, fontSize: 13.5,
+                            fontFamily: "'Poppins', sans-serif",
+                          }}>
+                            {iniciales(s.nombre, s.apellido)}
+                          </Box>
+
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
+                              <Typography sx={{ fontSize: 13.2, fontWeight: 700, color: CAFE, lineHeight: 1.25, minWidth: 0 }} noWrap>
+                                {nombreCompleto(s)}
+                              </Typography>
+                              {s.reaparecio && (
+                                <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#C62828", background: "rgba(211,47,47,0.10)", px: 0.5, borderRadius: "5px" }}
+                                  title="Ya se le contactó antes y sigue sin empezar">
+                                  2ª vez
+                                </Typography>
+                              )}
+                            </Box>
+
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, mt: 0.15 }}>
+                              {s.motivo === "proforma" ? (
+                                <>
+                                  <DescriptionRounded sx={{ fontSize: 12, color: ORO_OSCURO }} />
+                                  <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: ORO_OSCURO }}>
+                                    {soles(s.monto_total)}
+                                  </Typography>
+                                  {s.proformas > 1 && (
+                                    <Typography sx={{ fontSize: 10.5, color: "#8D7B70" }}>
+                                      · {s.proformas} proformas
+                                    </Typography>
+                                  )}
+                                </>
+                              ) : (
+                                <Typography sx={{ fontSize: 11.5, color: "#7A6A60" }} noWrap>
+                                  {s.nota || "Marcada para seguimiento"}
+                                </Typography>
+                              )}
+                            </Box>
+
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.9, mt: 0.35, flexWrap: "wrap" }}>
+                              <Typography sx={{
+                                fontSize: 10.5, fontWeight: 700,
+                                color: frio ? "#C62828" : ORO_OSCURO,
+                                background: frio ? "rgba(211,47,47,0.10)" : "rgba(163,105,32,0.10)",
+                                px: 0.8, py: 0.15, borderRadius: "6px",
+                              }}>
+                                {tiempoDesdeConsulta(s.dias_desde_consulta)}
+                              </Typography>
+                              {s.celular && (
+                                <Box
+                                  component="a"
+                                  href={`tel:${s.celular}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  sx={{
+                                    display: "inline-flex", alignItems: "center", gap: 0.3,
+                                    fontSize: 10.5, color: "#7A6A60", textDecoration: "none",
+                                    "&:hover": { color: ORO, textDecoration: "underline" },
+                                  }}
+                                >
+                                  <PhoneRounded sx={{ fontSize: 12 }} />
+                                  {s.celular}
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+
+                          {/* Dos salidas: ya lo contacté · no le interesa */}
+                          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, flexShrink: 0 }}>
+                            <BotonCheck
+                              hecho={hecho}
+                              titulo={hecho ? "Contactado" : "Ya lo contacté (vuelve en 30 días)"}
+                              onClick={(e) => marcarSeguimiento(s, "contactado", e)}
+                            />
+                            <Tooltip title="No le interesa · no vuelve a aparecer" arrow placement="left">
+                              <MotionBox
+                                component="button"
+                                aria-label="No le interesa"
+                                onClick={(e) => marcarSeguimiento(s, "descartado", e)}
+                                whileTap={{ scale: 0.85 }}
+                                sx={{
+                                  width: 30, height: 22, p: 0, cursor: "pointer",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  borderRadius: "999px", background: "transparent",
+                                  border: "1.5px solid rgba(163,105,32,0.25)", color: "#B08A8A",
+                                  transition: "background .2s ease, border-color .2s ease, color .2s ease",
+                                  "&:hover": { background: "rgba(211,47,47,0.10)", borderColor: "#D32F2F", color: "#C62828" },
+                                }}
+                              >
+                                <DescartarRounded sx={{ fontSize: 14 }} />
+                              </MotionBox>
+                            </Tooltip>
+                          </Box>
+                        </MotionBox>
+                      );
+                    })}
+
+                    <SeccionMarcados {...propsMarcados} />
+                  </>
+                )
               ) : cargando ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
                   <CircularProgress size={26} sx={{ color: ORO }} />
@@ -874,7 +1140,9 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
               <Typography sx={{ fontSize: 10.8, color: "#8D7B70", textAlign: "center" }}>
                 {esCumples
                   ? "El ✓ marca que ya la saludaste · abajo puedes deshacerlo"
-                  : "El ✓ marca que ya lo contactaste · abajo puedes deshacerlo"}
+                  : esSeguimiento
+                    ? "✓ ya lo contacté (vuelve en 30 días) · ✕ no le interesa"
+                    : "El ✓ marca que ya lo contactaste · abajo puedes deshacerlo"}
               </Typography>
             </Box>
           </MotionBox>

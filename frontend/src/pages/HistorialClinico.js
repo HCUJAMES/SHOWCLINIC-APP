@@ -17,6 +17,7 @@ import {
   Divider,
   Box,
   IconButton,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -34,7 +35,7 @@ import {
   Tooltip,
   Menu,
 } from "@mui/material";
-import { Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star } from "@mui/icons-material";
+import { Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star, HandshakeRounded } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -133,6 +134,38 @@ const HistorialClinico = () => {
   const location = useLocation();
   const { showToast } = useToast();
   const [pacientes, setPacientes] = useState([]);
+
+  // Pacientes marcados para seguimiento comercial (vinieron y aún no deciden).
+  // Se muestran en la campana del dashboard, pestaña "Seguimiento".
+  const [enSeguimiento, setEnSeguimiento] = useState(new Set());
+  const [seguimientoOcupado, setSeguimientoOcupado] = useState(null);
+
+  const alternarSeguimiento = async (pacienteId) => {
+    if (seguimientoOcupado) return;
+    setSeguimientoOcupado(pacienteId);
+    const estaba = enSeguimiento.has(pacienteId);
+    const cabeceras = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+    try {
+      if (estaba) {
+        await axios.delete(`${API_BASE_URL}/api/pacientes/seguimiento-proformas/${pacienteId}?quitar=1`, { headers: cabeceras });
+      } else {
+        await axios.post(
+          `${API_BASE_URL}/api/pacientes/seguimiento-proformas/${pacienteId}`,
+          { manual: true },
+          { headers: cabeceras }
+        );
+      }
+      setEnSeguimiento((prev) => {
+        const next = new Set(prev);
+        if (estaba) next.delete(pacienteId); else next.add(pacienteId);
+        return next;
+      });
+    } catch (err) {
+      console.error("Error al cambiar el seguimiento:", err);
+    } finally {
+      setSeguimientoOcupado(null);
+    }
+  };
   const [filtro, setFiltro] = useState("");
   const [ordenPacientes, setOrdenPacientes] = useState("reciente");
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null);
@@ -386,6 +419,18 @@ const HistorialClinico = () => {
       .get(`${API_BASE_URL}/api/pacientes/listar`, { headers: authHeaders })
       .then((res) => setPacientes(res.data))
       .catch((err) => console.error("Error al obtener pacientes:", err));
+
+    // Quiénes están ya en seguimiento, para pintar el botón encendido
+    axios
+      .get(`${API_BASE_URL}/api/pacientes/seguimiento-proformas`, { headers: authHeaders })
+      .then((res) => {
+        const marcados = (res.data?.seguimientos || [])
+          .concat(res.data?.atendidos || [])
+          .filter((s) => s.manual)
+          .map((s) => s.paciente_id);
+        setEnSeguimiento(new Set(marcados));
+      })
+      .catch(() => {});
 
     axios
       .get(`${API_BASE_URL}/api/tratamientos/listar`, {
@@ -3447,6 +3492,36 @@ const HistorialClinico = () => {
                         </Box>
                       </Box>
                       <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexShrink: 0 }}>
+                        {/* Añadir al seguimiento: vino a consulta y aún no decide.
+                            Aparece en la campana del dashboard, pestaña Seguimiento. */}
+                        <Tooltip
+                          title={enSeguimiento.has(pac.id)
+                            ? "En seguimiento · quitar de la lista"
+                            : "Marcar para seguimiento"}
+                          arrow
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); alternarSeguimiento(pac.id); }}
+                            disabled={seguimientoOcupado === pac.id}
+                            sx={{
+                              width: 34, height: 34,
+                              border: `1px solid ${enSeguimiento.has(pac.id) ? "#a36920" : "rgba(163,105,32,0.22)"}`,
+                              background: enSeguimiento.has(pac.id) ? "#a36920" : "transparent",
+                              color: enSeguimiento.has(pac.id) ? "#fff" : "#b3a08c",
+                              transition: "background .2s ease, color .2s ease, border-color .2s ease",
+                              "&:hover": {
+                                background: enSeguimiento.has(pac.id) ? "#8a5a1a" : "rgba(163,105,32,0.10)",
+                                borderColor: "#a36920",
+                                color: enSeguimiento.has(pac.id) ? "#fff" : "#a36920",
+                              },
+                            }}
+                          >
+                            {seguimientoOcupado === pac.id
+                              ? <CircularProgress size={14} sx={{ color: "#a36920" }} />
+                              : <HandshakeRounded sx={{ fontSize: 17 }} />}
+                          </IconButton>
+                        </Tooltip>
                         <Button
                           variant="outlined"
                           size="small"
