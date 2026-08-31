@@ -756,9 +756,11 @@ router.get("/seguimiento-proformas", async (req, res) => {
       pendientes.push(fila);
     }
 
-    // Primero el dinero dormido más grande; a igual monto, el más antiguo
+    // Primero el que vino hace más tiempo. Los que no tienen fecha (marcados a
+    // mano sin consulta registrada) van al final, no arriba.
+    const antiguedad = (r) => (r.dias_desde_consulta == null ? -1 : r.dias_desde_consulta);
     pendientes.sort((a, b) =>
-      (b.monto_total - a.monto_total) || ((b.dias_desde_consulta || 0) - (a.dias_desde_consulta || 0))
+      (antiguedad(b) - antiguedad(a)) || (b.monto_total - a.monto_total)
     );
     atendidos.sort((a, b) => String(b.actualizado_en || "").localeCompare(String(a.actualizado_en || "")));
 
