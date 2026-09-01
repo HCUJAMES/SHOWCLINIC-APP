@@ -124,6 +124,55 @@ router.delete("/eliminar/:id", requireDoctor, async (req, res) => {
 
 // ========== RUTAS DE RECETAS (deben ir ANTES de /:id) ==========
 
+/**
+ * Todas las recetas de una vez, agrupadas por tratamiento.
+ *
+ * El catálogo de protocolos necesita mostrar los productos configurados de
+ * cada tratamiento sin abrir nada. Pedirlas una por una sería una consulta
+ * por fila; así se resuelve con una sola.
+ *
+ * Va antes de "/recetas/:tratamiento_id" para que "todas" no se confunda
+ * con un id.
+ */
+router.get("/recetas-todas", async (req, res) => {
+  try {
+    const filas = await dbAll(`
+      SELECT
+        rt.tratamiento_id,
+        rt.variante_id,
+        rt.cantidad_unidades,
+        v.nombre                     AS variante_nombre,
+        v.unidad_base,
+        v.contenido_por_presentacion,
+        v.imagen                     AS variante_imagen,
+        pb.nombre                    AS producto_base_nombre
+      FROM recetas_tratamiento rt
+      LEFT JOIN variantes v       ON v.id = rt.variante_id
+      LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+      ORDER BY rt.tratamiento_id ASC, rt.id ASC
+    `);
+
+    const porTratamiento = {};
+    for (const f of filas) {
+      if (!porTratamiento[f.tratamiento_id]) porTratamiento[f.tratamiento_id] = [];
+      porTratamiento[f.tratamiento_id].push({
+        variante_id: f.variante_id,
+        cantidad_unidades: f.cantidad_unidades,
+        variante_nombre: f.variante_nombre,
+        producto_base_nombre: f.producto_base_nombre,
+        unidad_base: f.unidad_base,
+        contenido_por_presentacion: f.contenido_por_presentacion,
+        imagen: f.variante_imagen || null,
+      });
+    }
+
+    res.json(porTratamiento);
+  } catch (err) {
+    console.error("❌ Error al listar todas las recetas:", err.message);
+    res.status(500).json({ message: "Error al listar las recetas" });
+  }
+});
+
 // Obtener receta de un tratamiento (si existe)
 router.get("/recetas/:tratamiento_id", async (req, res) => {
   try {

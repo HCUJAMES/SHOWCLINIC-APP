@@ -18,13 +18,22 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check, Face } from "@mui/icons-material";
+import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check, Face, Inventory2 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/ToastProvider";
 import FacialMapMini from "../../components/FacialMapMini";
 import { useAuth } from "../../hooks/useAuth";
 import { canCreateTreatments, isDoctor as checkIsDoctor } from "../../utils/permissions";
 import { COLORS, API_BASE_URL } from "../../constants";
+
+/** "Botox - Botox" queda feo; si marca y variante coinciden, se muestra una sola vez. */
+function nombreProducto(p) {
+  const marca = String(p?.producto_base_nombre || "").trim();
+  const variante = String(p?.variante_nombre || "").trim();
+  if (!marca) return variante || "Producto";
+  if (!variante || marca.toLowerCase() === variante.toLowerCase()) return marca;
+  return `${marca} ${variante}`;
+}
 
 export default function CrearTratamiento() {
   const navigate = useNavigate();
@@ -50,6 +59,9 @@ export default function CrearTratamiento() {
   const [imagenesTratamiento, setImagenesTratamiento] = useState([]);
   const [subiendoImagen, setSubiendoImagen] = useState(false);
 
+  // { tratamiento_id: [ {producto_base_nombre, variante_nombre, ...} ] }
+  const [recetasPorTratamiento, setRecetasPorTratamiento] = useState({});
+
   // Estados para el mapa facial 3D por defecto del tratamiento
   const [modalMapa, setModalMapa] = useState(false);
   const [puntosMapa, setPuntosMapa] = useState({});
@@ -64,6 +76,20 @@ export default function CrearTratamiento() {
       return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
     }) : [];
     setTratamientos(tratamientosOrdenados);
+  };
+
+  // Productos configurados de TODOS los protocolos, para mostrarlos en la
+  // lista sin tener que abrir cada uno.
+  const cargarRecetasTodas = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tratamientos/recetas-todas`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      setRecetasPorTratamiento(data && typeof data === "object" ? data : {});
+    } catch (err) {
+      console.error("Error al cargar los productos de los protocolos:", err);
+    }
   };
 
   const cargarVariantes = async () => {
@@ -236,6 +262,7 @@ export default function CrearTratamiento() {
       if (res.ok) {
         showToast({ severity: "success", message: "Producto agregado" });
         await cargarProductosDelTratamiento(tratamientoSeleccionado.id);
+        cargarRecetasTodas();   // refresca lo que se ve en la lista
         setVarianteSeleccionada(null);
         setCantidadProducto(1);
       } else {
@@ -258,6 +285,7 @@ export default function CrearTratamiento() {
       if (res.ok) {
         showToast({ severity: "success", message: "Producto eliminado" });
         await cargarProductosDelTratamiento(tratamientoSeleccionado.id);
+        cargarRecetasTodas();   // refresca lo que se ve en la lista
       } else {
         showToast({ severity: "error", message: "Error al eliminar producto" });
       }
@@ -362,6 +390,7 @@ export default function CrearTratamiento() {
   useEffect(() => {
     cargarTratamientos();
     cargarVariantes();
+    cargarRecetasTodas();
   }, []);
 
   return (
@@ -705,6 +734,60 @@ export default function CrearTratamiento() {
                           {t.descripcion}
                         </Typography>
                       )}
+
+                      {/* Productos configurados: se ven sin abrir nada */}
+                      {(() => {
+                        const productos = recetasPorTratamiento[t.id] || [];
+
+                        if (productos.length === 0) {
+                          return (
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.6 }}>
+                              <Inventory2 sx={{ fontSize: 13, color: "#c9b8a0" }} />
+                              <Typography sx={{ fontSize: "0.7rem", color: "#b3a08c", fontStyle: "italic" }}>
+                                Sin productos configurados
+                              </Typography>
+                            </Box>
+                          );
+                        }
+
+                        // Se muestran 3 y el resto se resume, para no romper la fila
+                        const visibles = productos.slice(0, 3);
+                        const resto = productos.length - visibles.length;
+                        const listaCompleta = productos
+                          .map((p) => `${nombreProducto(p)} · ${p.cantidad_unidades} ${p.unidad_base || "u"}`)
+                          .join("\n");
+
+                        return (
+                          <Box
+                            sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.6, flexWrap: "wrap" }}
+                            title={listaCompleta}
+                          >
+                            <Inventory2 sx={{ fontSize: 13, color: colorPrincipal, flexShrink: 0 }} />
+                            {visibles.map((p) => (
+                              <Chip
+                                key={p.variante_id}
+                                label={`${nombreProducto(p)}${p.cantidad_unidades ? ` · ${p.cantidad_unidades} ${p.unidad_base || "u"}` : ""}`}
+                                size="small"
+                                sx={{
+                                  height: 19,
+                                  fontSize: "0.65rem",
+                                  fontWeight: 600,
+                                  maxWidth: 210,
+                                  backgroundColor: "rgba(163,105,32,0.08)",
+                                  color: "#7a5216",
+                                  border: "1px solid rgba(163,105,32,0.18)",
+                                  "& .MuiChip-label": { px: 0.8 },
+                                }}
+                              />
+                            ))}
+                            {resto > 0 && (
+                              <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: "#a36920" }}>
+                                +{resto} más
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      })()}
                     </Box>
 
                     {/* Precio + Sesiones */}
