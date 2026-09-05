@@ -1433,6 +1433,8 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
     fecha,
     cantidad_total,
     producto_usado,
+    tratamiento_id,
+    nombreTratamiento,
   } = req.body;
 
   try {
@@ -1469,6 +1471,45 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
       }
     }
     
+    /**
+     * Cambiar el tratamiento de una sesión ya registrada.
+     *
+     * El nombre que se ve en el historial NO es una columna: sale de unir
+     * `tratamiento_id` con el catálogo de protocolos. Antes se recibía un
+     * texto suelto y se ignoraba, así que la pantalla decía "actualizado"
+     * y el nombre seguía igual.
+     *
+     * Ahora se cambia el vínculo. Se acepta el id directamente o, si solo
+     * llega el nombre, se busca el protocolo que coincida. Cambiar el
+     * protocolo aquí no renombra nada del catálogo ni afecta a otras
+     * pacientes.
+     */
+    let tratamientoIdFinal = tratamiento.tratamiento_id;
+
+    if (tratamiento_id != null && String(tratamiento_id).trim() !== "") {
+      const nuevoId = Number(tratamiento_id);
+      if (!Number.isFinite(nuevoId) || nuevoId <= 0) {
+        return res.status(400).json({ message: "Tratamiento inválido" });
+      }
+      const existe = await dbGet(`SELECT id FROM tratamientos WHERE id = ?`, [nuevoId]);
+      if (!existe) {
+        return res.status(400).json({ message: "El tratamiento elegido no existe en el catálogo" });
+      }
+      tratamientoIdFinal = nuevoId;
+    } else if (typeof nombreTratamiento === "string" && nombreTratamiento.trim()) {
+      const buscado = nombreTratamiento.trim();
+      const porNombre = await dbGet(
+        `SELECT id FROM tratamientos WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(?))`,
+        [buscado]
+      );
+      if (!porNombre) {
+        return res.status(400).json({
+          message: `No existe un tratamiento llamado "${buscado}" en el catálogo. Elígelo de la lista o créalo primero en Tratamientos.`,
+        });
+      }
+      tratamientoIdFinal = porNombre.id;
+    }
+
     // Validar y formatear fecha (zona horaria Perú GMT-5)
     let fechaStr = tratamiento.fecha;
     if (fecha && typeof fecha === "string") {
@@ -1499,12 +1540,12 @@ router.put("/realizado/:id", requireTratamientoRealizadoWrite, async (req, res) 
 
     // Actualizar el tratamiento
     await dbRun(
-      `UPDATE tratamientos_realizados 
-       SET especialista = ?, sesion = ?, precio_total = ?, descuento = ?, 
+      `UPDATE tratamientos_realizados
+       SET especialista = ?, sesion = ?, precio_total = ?, descuento = ?,
            pagoMetodo = ?, tipoAtencion = ?, fecha = ?,
-           cantidad_total = ?, productos = ?
+           cantidad_total = ?, productos = ?, tratamiento_id = ?
        WHERE id = ?`,
-      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, cantidadStr, productosJSON, tratamientoId]
+      [especialistaStr, sesionNum, precioNum, descuentoNum, pagoMetodoStr, tipoAtencionStr, fechaStr, cantidadStr, productosJSON, tratamientoIdFinal, tratamientoId]
     );
 
     // Si hay deuda asociada, actualizar el monto total

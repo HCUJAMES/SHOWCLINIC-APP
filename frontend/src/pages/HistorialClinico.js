@@ -240,6 +240,8 @@ const HistorialClinico = () => {
   const [editTipoAtencion, setEditTipoAtencion] = useState("Tratamiento");
   const [editFecha, setEditFecha] = useState("");
   const [editNombreTratamiento, setEditNombreTratamiento] = useState("");
+  // Qué protocolo del catálogo queda enlazado a esta sesión
+  const [editTratamientoId, setEditTratamientoId] = useState(null);
   const [editCantidad, setEditCantidad] = useState("");
   const [editProductoUsado, setEditProductoUsado] = useState("");
   const [modalDescuento, setModalDescuento] = useState(false);
@@ -2922,6 +2924,7 @@ const HistorialClinico = () => {
     setEditPagoMetodo(tratamiento.pagoMetodo || "Efectivo");
     setEditTipoAtencion(tratamiento.tipoAtencion || "Tratamiento");
     setEditNombreTratamiento(tratamiento.nombreTratamiento || "");
+    setEditTratamientoId(tratamiento.tratamiento_id || null);
     setEditCantidad(tratamiento.cantidad_total || "");
     
     // Extraer producto usado
@@ -2966,6 +2969,7 @@ const HistorialClinico = () => {
           pagoMetodo: editPagoMetodo,
           tipoAtencion: editTipoAtencion,
           fecha: editFecha,
+          tratamiento_id: editTratamientoId,
           nombreTratamiento: editNombreTratamiento,
           cantidad_total: editCantidad,
           producto_usado: editProductoUsado,
@@ -8007,11 +8011,24 @@ const HistorialClinico = () => {
               />
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Nombre del Tratamiento"
-                value={editNombreTratamiento}
-                onChange={(e) => setEditNombreTratamiento(e.target.value)}
+              {/* El nombre viene del catálogo de protocolos, no es texto suelto:
+                  se elige cuál corresponde y así el historial queda enlazado. */}
+              <Autocomplete
+                options={tratamientosBase}
+                getOptionLabel={(o) => (typeof o === "string" ? o : o?.nombre || "")}
+                isOptionEqualToValue={(o, v) => o?.id === v?.id}
+                value={tratamientosBase.find((t) => t.id === editTratamientoId) || null}
+                onChange={(_, nuevo) => {
+                  setEditTratamientoId(nuevo?.id || null);
+                  setEditNombreTratamiento(nuevo?.nombre || "");
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Tratamiento"
+                    helperText="Elige el tratamiento del catálogo. Cambiarlo aquí no afecta a otras pacientes."
+                  />
+                )}
               />
             </Grid>
             <Grid item xs={6}>
