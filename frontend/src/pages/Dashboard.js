@@ -245,6 +245,10 @@ export default function Dashboard() {
     return lista;
   }, [menuItems]);
 
+  // Cuantos más módulos tenga el rol, antes conviene compactar para que
+  // todo siga entrando en una pantalla.
+  const mqCompacto = `@media (max-height: ${menuItems.length >= 11 ? 1200 : 950}px)`;
+
   const username = localStorage.getItem("username") || role;
   const hora = new Date().getHours();
   const saludo = hora < 12 ? "Buenos días" : hora < 18 ? "Buenas tardes" : "Buenas noches";
@@ -342,8 +346,9 @@ export default function Dashboard() {
           position: "relative",
           cursor: "pointer",
           borderRadius: "20px",
-          p: 2.25,
-          minHeight: 158,
+          p: 1.6,
+          minHeight: 118,
+          [mqCompacto]: { p: 1.15, minHeight: 100 },
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -395,12 +400,13 @@ export default function Dashboard() {
         }}
       >
         {/* Icono */}
-        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.1, [mqCompacto]: { mb: 0.5 } }}>
           <MotionBox
             variants={iconoTarjeta}
             sx={{
               width: 42,
               height: 42,
+              [mqCompacto]: { width: 34, height: 34 },
               borderRadius: "13px",
               position: "relative",
               display: "flex",
@@ -458,7 +464,7 @@ export default function Dashboard() {
         </Typography>
 
         {/* Descripcion */}
-        <Typography sx={{ color: "#8a8a8a", fontSize: "0.72rem", lineHeight: 1.5, flex: 1 }}>
+        <Typography sx={{ color: "#8a8a8a", fontSize: "0.71rem", lineHeight: 1.42, flex: 1 }}>
           {item.description}
         </Typography>
 
@@ -467,9 +473,10 @@ export default function Dashboard() {
           sx={{
             display: "inline-flex",
             alignSelf: "flex-start",
-            mt: 1.4,
+            mt: 1,
+            [mqCompacto]: { mt: 0.6 },
             px: 1.1,
-            py: 0.4,
+            py: 0.35,
             borderRadius: "999px",
             border: "1px solid rgba(186,154,99,0.28)",
             backgroundColor: "rgba(163,105,32,0.05)",
@@ -772,22 +779,24 @@ export default function Dashboard() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          py: { xs: 4, sm: 6 },
+          py: { xs: 2, sm: 2.25 },
           px: 2,
           position: "relative",
           zIndex: 1,
+          // En pantallas bajas se recorta el aire para que igual entre todo
+          [mqCompacto]: { py: 0.6 },
         }}
       >
         <MotionBox
           variants={contenedor}
           initial="hidden"
           animate="show"
-          sx={{ width: "100%", maxWidth: 1200 }}
+          sx={{ width: "100%", maxWidth: 1560 }}
         >
 
           {/* Header */}
-          <Box sx={{ textAlign: "center", mb: { xs: 4, sm: 5.5 } }}>
-            <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", mb: 2 }}>
+          <Box sx={{ textAlign: "center", mb: { xs: 2, sm: 2.25 }, [mqCompacto]: { mb: 1 } }}>
+            <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", mb: 1 }}>
               {/* Halo que respira detrás del logo */}
               <MotionBox
                 aria-hidden
@@ -804,8 +813,9 @@ export default function Dashboard() {
                 src="/logo-showclinic.png"
                 alt="ShowClinic"
                 sx={{
-                  width: 84,
-                  height: 84,
+                  width: 46,
+                  height: 46,
+                  [mqCompacto]: { width: 36, height: 36 },
                   objectFit: "cover",
                   borderRadius: "50%",
                   border: "3px solid rgba(255,255,255,0.9)",
@@ -849,12 +859,13 @@ export default function Dashboard() {
             <MotionBox
               variants={subir}
               sx={{
-                mt: 2.75,
+                mt: 1,
+                [mqCompacto]: { mt: 0.5, py: 0.35 },
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 1.1,
-                px: 2.75,
-                py: 1,
+                px: 2.25,
+                py: 0.55,
                 borderRadius: 50,
                 backgroundColor: "rgba(255,253,247,0.75)",
                 backdropFilter: "blur(10px)",
@@ -881,13 +892,13 @@ export default function Dashboard() {
           </Box>
 
           {/* Módulos, por secciones */}
-          <Box sx={{ maxWidth: 960, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
+          <Box sx={{ maxWidth: 1400, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
             {secciones.map((sec) => (
-              <Box key={sec.id} sx={{ mb: { xs: 3.5, sm: 4.5 }, "&:last-of-type": { mb: 0 } }}>
+              <Box key={sec.id} sx={{ mb: { xs: 1.5, sm: 1.5 }, [mqCompacto]: { mb: 0.55 }, "&:last-of-type": { mb: 0 } }}>
                 {sec.label && (
                   <MotionBox
                     variants={subir}
-                    sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.75, px: 0.5 }}
+                    sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.75, px: 0.5, [mqCompacto]: { mb: 0.4 } }}
                   >
                     <Typography
                       sx={{
@@ -911,8 +922,17 @@ export default function Dashboard() {
                 <Box
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
-                    gap: 2.25,
+                    // Se aprovecha el ancho disponible para que todo entre en
+                    // una pantalla. El tope son 4 columnas: las secciones
+                    // tienen 3 o 4 módulos, así que con 5 quedaría un hueco
+                    // visible al final de cada fila.
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      sm: "repeat(2, 1fr)",
+                      md: "repeat(3, 1fr)",
+                      lg: "repeat(4, 1fr)",
+                    },
+                    gap: { xs: 1.5, sm: 1.75 },
                   }}
                 >
                   {sec.items.map(renderTarjeta)}
@@ -922,7 +942,7 @@ export default function Dashboard() {
           </Box>
 
           {/* Session info */}
-          <MotionBox variants={subir} sx={{ mt: 5.5, textAlign: "center" }}>
+          <MotionBox variants={subir} sx={{ mt: 0.75, [mqCompacto]: { mt: 0.35 }, textAlign: "center" }}>
             <Typography variant="caption" sx={{ color: "#b9ad98", fontWeight: 400, fontSize: "0.75rem", letterSpacing: "0.3px" }}>
               Panel de administración • Sesión activa
             </Typography>
@@ -934,8 +954,9 @@ export default function Dashboard() {
       <Box
         component="footer"
         sx={{
-          py: 2,
+          py: 1.4,
           px: 3,
+          [mqCompacto]: { py: 0.7 },
           position: "relative",
           zIndex: 1,
           borderTop: "1px solid rgba(186,154,99,0.18)",
