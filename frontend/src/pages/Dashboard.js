@@ -1,13 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Typography,
   Box,
-  Grid,
-  Card,
-  CardActionArea,
-  CardContent,
-  Fade,
-  Grow,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -17,7 +11,7 @@ import {
   TextField,
   InputAdornment,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   CircularProgress,
   Collapse,
@@ -40,9 +34,13 @@ import {
   SupervisorAccount,
   QrCode2,
   MonetizationOn,
+  ArrowForwardRounded,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import PanelRecordatorios from "../components/PanelRecordatorios";
+
+const MotionBox = motion(Box);
 
 // Iconos para cada módulo
 const moduleIcons = {
@@ -61,7 +59,66 @@ const moduleIcons = {
   "Gestión CEO": MonetizationOn,
 };
 
+/**
+ * Agrupación de los módulos para que el menú se lea por áreas de trabajo en
+ * vez de como una lista plana. Solo cambia el ORDEN y el encabezado de cada
+ * bloque; el título, la descripción y la etiqueta de cada módulo son los
+ * mismos de siempre. Un módulo que no esté aquí cae en "Otros".
+ */
+const GRUPOS = [
+  { id: "atencion", label: "Atención", titulos: ["Pacientes", "Tratamientos", "Paquetes", "Gestión Clínica"] },
+  { id: "operacion", label: "Operación", titulos: ["Inventario", "Códigos de Barras", "Productos Aplicados", "Especialistas"] },
+  { id: "direccion", label: "Dirección", titulos: ["Finanzas", "Gestión CEO", "Estadísticas"] },
+  { id: "sistema", label: "Sistema", titulos: ["Gestionar", "Usuarios"] },
+];
+
+// Con pocos módulos no vale la pena partir en secciones: se muestran juntos.
+const MINIMO_PARA_AGRUPAR = 7;
+
+const ORO = "#a36920";
+const ORO_CLARO = "#d4af37";
+const ORO_SUAVE = "#ba9a63";
+
 const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
+
+/* ───────────────────────────── animaciones ───────────────────────────── */
+
+const suave = [0.22, 1, 0.36, 1];
+
+const contenedor = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06, delayChildren: 0.15 } },
+};
+
+const subir = {
+  hidden: { opacity: 0, y: 22 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: suave } },
+};
+
+// Cada tarjeta se anima por su cuenta (no hereda del contenedor) y entra
+// escalonada según su posición, que llega por `custom`.
+const tarjeta = {
+  hidden: { opacity: 0, y: 26, scale: 0.97 },
+  show: (i = 0) => ({
+    opacity: 1, y: 0, scale: 1,
+    transition: { duration: 0.5, ease: suave, delay: 0.35 + Math.min(i, 12) * 0.06 },
+  }),
+  hover: { y: -6, transition: { type: "spring", stiffness: 320, damping: 22 } },
+};
+
+// Los hijos declaran también "hidden": si no, aparecen un instante en su
+// estado por defecto antes de que el padre termine de entrar.
+const iconoTarjeta = {
+  hidden: { rotate: 0, scale: 1 },
+  show: { rotate: 0, scale: 1 },
+  hover: { rotate: -6, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 16 } },
+};
+
+const flechaTarjeta = {
+  hidden: { opacity: 0, x: -6 },
+  show: { opacity: 0, x: -6 },
+  hover: { opacity: 1, x: 0, transition: { duration: 0.25, ease: suave } },
+};
 
 export default function Dashboard() {
   const role = localStorage.getItem("role");
@@ -164,9 +221,29 @@ export default function Dashboard() {
         })
         .catch(err => console.error("Error cargando permisos:", err));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
 
   const menuItems = menuItemsByRole[role] || permissionMenuItems;
+
+  // Reparte los módulos del rol en sus secciones, respetando el orden de GRUPOS.
+  const secciones = useMemo(() => {
+    if (menuItems.length < MINIMO_PARA_AGRUPAR) {
+      return [{ id: "todos", label: null, items: menuItems }];
+    }
+    const usados = new Set();
+    const lista = GRUPOS.map((g) => {
+      const items = g.titulos
+        .map((t) => menuItems.find((m) => m.title === t))
+        .filter(Boolean);
+      items.forEach((m) => usados.add(m.title));
+      return { id: g.id, label: g.label, items };
+    }).filter((g) => g.items.length > 0);
+
+    const sueltos = menuItems.filter((m) => !usados.has(m.title));
+    if (sueltos.length) lista.push({ id: "otros", label: "Otros", items: sueltos });
+    return lista;
+  }, [menuItems]);
 
   const username = localStorage.getItem("username") || role;
   const hora = new Date().getHours();
@@ -181,6 +258,7 @@ export default function Dashboard() {
     } else {
       setSearchResults([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   const buscarPacientes = async (query) => {
@@ -188,35 +266,35 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE}/api/pacientes/listar`, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json"
         },
       });
       if (response.ok) {
         const data = await response.json();
-        
+
         // Normalizar texto: quitar tildes, minúsculas, trim espacios múltiples
         const normalize = (str) => (str || "")
           .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
           .toLowerCase()
           .replace(/\s+/g, " ")
           .trim();
-        
+
         const queryNorm = normalize(query);
-        
+
         const filtered = (Array.isArray(data) ? data : []).filter(p => {
           const nombreNorm = normalize(p.nombre);
           const apellidoNorm = normalize(p.apellido);
           const nombreCompletoNorm = `${nombreNorm} ${apellidoNorm}`.trim();
           const dniNorm = (p.dni || "").toString().trim();
-          
-          return nombreNorm.includes(queryNorm) || 
-                 apellidoNorm.includes(queryNorm) || 
+
+          return nombreNorm.includes(queryNorm) ||
+                 apellidoNorm.includes(queryNorm) ||
                  nombreCompletoNorm.includes(queryNorm) ||
                  dniNorm.includes(queryNorm);
         }).slice(0, 5);
-        
+
         setSearchResults(filtered);
       }
     } catch (error) {
@@ -233,6 +311,178 @@ export default function Dashboard() {
     setSearchResults([]);
   };
 
+  const abrirModulo = (item) => {
+    if (item.hasAccess === false) {
+      setDeniedModule(item.title);
+      setOpenAccessDenied(true);
+    } else {
+      navigate(item.path);
+    }
+  };
+
+  /* ─────────────────────────── una tarjeta ─────────────────────────── */
+  const renderTarjeta = (item, index = 0) => {
+    const IconComponent = moduleIcons[item.title];
+    const isLocked = item.hasAccess === false;
+
+    return (
+      <MotionBox
+        key={item.title}
+        custom={index}
+        initial="hidden"
+        animate="show"
+        variants={tarjeta}
+        whileHover={isLocked ? undefined : "hover"}
+        whileTap={isLocked ? undefined : { scale: 0.985 }}
+        onClick={() => abrirModulo(item)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrirModulo(item); } }}
+        sx={{
+          position: "relative",
+          cursor: "pointer",
+          borderRadius: "20px",
+          p: 2.25,
+          minHeight: 158,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          isolation: "isolate",
+          // Vidrio cálido: deja pasar el fondo pero mantiene la lectura
+          background: isLocked
+            ? "rgba(250,248,245,0.55)"
+            : "linear-gradient(160deg, rgba(255,253,247,0.92) 0%, rgba(255,251,242,0.80) 100%)",
+          backdropFilter: "blur(14px)",
+          WebkitBackdropFilter: "blur(14px)",
+          border: `1px solid ${isLocked ? "rgba(0,0,0,0.06)" : "rgba(186,154,99,0.22)"}`,
+          boxShadow: isLocked
+            ? "none"
+            : "0 1px 2px rgba(163,105,32,0.06), 0 10px 30px -12px rgba(163,105,32,0.20)",
+          filter: isLocked ? "grayscale(0.6)" : "none",
+          opacity: isLocked ? 0.62 : 1,
+          transition: "box-shadow .35s ease, border-color .35s ease",
+          outline: "none",
+          "&:focus-visible": { boxShadow: `0 0 0 3px rgba(163,105,32,0.28)` },
+          "&:hover": isLocked ? {} : {
+            borderColor: "rgba(163,105,32,0.45)",
+            boxShadow: "0 2px 4px rgba(163,105,32,0.08), 0 22px 44px -14px rgba(163,105,32,0.32)",
+          },
+          // Hilo dorado superior que se enciende al pasar el cursor
+          "&::before": {
+            content: '""',
+            position: "absolute",
+            left: 18, right: 18, top: 0,
+            height: 2,
+            borderRadius: "0 0 3px 3px",
+            background: `linear-gradient(90deg, transparent, ${ORO_CLARO}, ${ORO}, ${ORO_CLARO}, transparent)`,
+            transform: "scaleX(0)",
+            transformOrigin: "center",
+            transition: "transform .45s cubic-bezier(.22,1,.36,1)",
+          },
+          "&:hover::before": isLocked ? {} : { transform: "scaleX(1)" },
+          // Destello que recorre la tarjeta
+          "&::after": {
+            content: '""',
+            position: "absolute",
+            top: 0, bottom: 0,
+            left: "-60%", width: "50%",
+            background: "linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%)",
+            transform: "skewX(-18deg)",
+            transition: "left .7s cubic-bezier(.22,1,.36,1)",
+            pointerEvents: "none",
+          },
+          "&:hover::after": isLocked ? {} : { left: "120%" },
+        }}
+      >
+        {/* Icono */}
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.5 }}>
+          <MotionBox
+            variants={iconoTarjeta}
+            sx={{
+              width: 42,
+              height: 42,
+              borderRadius: "13px",
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: isLocked
+                ? "rgba(0,0,0,0.05)"
+                : `linear-gradient(135deg, ${ORO_CLARO} 0%, ${ORO} 100%)`,
+              boxShadow: isLocked ? "none" : "0 6px 16px -6px rgba(163,105,32,0.55), inset 0 1px 0 rgba(255,255,255,0.35)",
+            }}
+          >
+            {IconComponent && (
+              <IconComponent sx={{ fontSize: 21, color: isLocked ? "#9e9e9e" : "#fff" }} />
+            )}
+            {isLocked && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  top: -6,
+                  right: -6,
+                  backgroundColor: "#d32f2f",
+                  borderRadius: "50%",
+                  width: 18,
+                  height: 18,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "2px solid white",
+                }}
+              >
+                <Lock sx={{ fontSize: 10, color: "white" }} />
+              </Box>
+            )}
+          </MotionBox>
+
+          {/* Flecha que aparece al pasar el cursor */}
+          {!isLocked && (
+            <MotionBox
+              variants={flechaTarjeta}
+              sx={{
+                width: 28, height: 28, borderRadius: "50%",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "rgba(163,105,32,0.08)",
+                border: "1px solid rgba(163,105,32,0.18)",
+              }}
+            >
+              <ArrowForwardRounded sx={{ fontSize: 15, color: ORO }} />
+            </MotionBox>
+          )}
+        </Box>
+
+        {/* Titulo */}
+        <Typography sx={{ fontWeight: 700, color: "#2e2e2e", fontSize: "0.88rem", lineHeight: 1.3, mb: 0.5 }}>
+          {item.title}
+        </Typography>
+
+        {/* Descripcion */}
+        <Typography sx={{ color: "#8a8a8a", fontSize: "0.72rem", lineHeight: 1.5, flex: 1 }}>
+          {item.description}
+        </Typography>
+
+        {/* Tag */}
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignSelf: "flex-start",
+            mt: 1.4,
+            px: 1.1,
+            py: 0.4,
+            borderRadius: "999px",
+            border: "1px solid rgba(186,154,99,0.28)",
+            backgroundColor: "rgba(163,105,32,0.05)",
+          }}
+        >
+          <Typography sx={{ color: ORO_SUAVE, fontSize: "0.6rem", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+            {isLocked ? "BLOQUEADO" : item.tag}
+          </Typography>
+        </Box>
+      </MotionBox>
+    );
+  };
+
   return (
     <Box
       sx={{
@@ -241,10 +491,21 @@ export default function Dashboard() {
         position: "relative",
         display: "flex",
         flexDirection: "column",
+        overflowX: "hidden",
       }}
     >
-      {/* Decorative top bar */}
-      <Box sx={{ height: 4, background: "linear-gradient(90deg, #a36920 0%, #d4af37 50%, #a36920 100%)" }} />
+      {/* Hilo dorado superior con brillo en movimiento */}
+      <MotionBox
+        animate={{ backgroundPosition: ["0% 50%", "200% 50%"] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+        sx={{
+          height: 4,
+          background: `linear-gradient(90deg, ${ORO} 0%, ${ORO_CLARO} 25%, #f3e2a8 50%, ${ORO_CLARO} 75%, ${ORO} 100%)`,
+          backgroundSize: "200% 100%",
+          position: "relative",
+          zIndex: 2,
+        }}
+      />
 
       {/* Lupa flotante de búsqueda rápida */}
       <Box
@@ -270,17 +531,13 @@ export default function Dashboard() {
             width: 44,
             height: 44,
             background: searchOpen
-              ? "rgba(211,47,47,0.75)"
-              : "rgba(163,105,32,0.65)",
-            backdropFilter: "blur(8px)",
-            boxShadow: "0 4px 16px rgba(163,105,32,0.2)",
+              ? "rgba(211,47,47,0.85)"
+              : `linear-gradient(135deg, ${ORO_CLARO} 0%, ${ORO} 100%)`,
+            boxShadow: "0 6px 18px -4px rgba(163,105,32,0.45)",
             transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
             "&:hover": {
-              transform: "scale(1.1)",
-              background: searchOpen
-                ? "rgba(211,47,47,0.85)"
-                : "rgba(163,105,32,0.85)",
-              boxShadow: "0 6px 20px rgba(163,105,32,0.3)",
+              transform: "scale(1.08)",
+              boxShadow: "0 10px 24px -6px rgba(163,105,32,0.55)",
             },
           }}
         >
@@ -293,16 +550,16 @@ export default function Dashboard() {
 
         <Collapse in={searchOpen} orientation="horizontal" timeout={300}>
           <Paper
-            elevation={8}
+            elevation={0}
             sx={{
               display: "flex",
               alignItems: "center",
               borderRadius: 50,
               overflow: "hidden",
-              backgroundColor: "rgba(255,255,255,0.95)",
-              backdropFilter: "blur(10px)",
-              border: "1px solid rgba(163,105,32,0.2)",
-              boxShadow: "0 6px 24px rgba(163,105,32,0.2)",
+              backgroundColor: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(163,105,32,0.22)",
+              boxShadow: "0 10px 30px -10px rgba(163,105,32,0.35)",
             }}
           >
             <TextField
@@ -328,7 +585,7 @@ export default function Dashboard() {
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    {searching && <CircularProgress size={16} sx={{ color: "#a36920" }} />}
+                    {searching && <CircularProgress size={16} sx={{ color: ORO }} />}
                   </InputAdornment>
                 ),
               }}
@@ -338,87 +595,93 @@ export default function Dashboard() {
       </Box>
 
       {/* Resultados de búsqueda */}
-      {searchOpen && searchResults.length > 0 && (
-        <Paper
-          elevation={12}
-          sx={{
-            position: "fixed",
-            top: 76,
-            left: 20,
-            width: 320,
-            maxHeight: 380,
-            overflowY: "auto",
-            zIndex: 999,
-            borderRadius: 3,
-            backgroundColor: "rgba(255,255,255,0.96)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(163,105,32,0.15)",
-            boxShadow: "0 10px 40px rgba(163,105,32,0.18)",
-          }}
-        >
-          <List sx={{ p: 0 }}>
-            {searchResults.map((paciente, idx) => (
-              <ListItem
-                key={paciente.id}
-                button
-                onClick={() => handleSelectPaciente(paciente)}
-                sx={{
-                  borderBottom: idx < searchResults.length - 1 ? "1px solid rgba(163,105,32,0.08)" : "none",
-                  py: 1.8,
-                  px: 2.5,
-                  transition: "all 0.2s ease",
-                  "&:hover": {
-                    backgroundColor: "rgba(163,105,32,0.06)",
-                    pl: 3,
-                  },
-                }}
-              >
-                <Box
+      <AnimatePresence>
+        {searchOpen && searchResults.length > 0 && (
+          <MotionBox
+            key="resultados"
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: suave }}
+            sx={{
+              position: "fixed",
+              top: 76,
+              left: 20,
+              width: 320,
+              maxHeight: 380,
+              overflowY: "auto",
+              zIndex: 999,
+              borderRadius: "18px",
+              backgroundColor: "rgba(255,255,255,0.94)",
+              backdropFilter: "blur(14px)",
+              border: "1px solid rgba(163,105,32,0.16)",
+              boxShadow: "0 18px 50px -14px rgba(163,105,32,0.35)",
+            }}
+          >
+            <List sx={{ p: 0.75 }}>
+              {searchResults.map((paciente) => (
+                <ListItemButton
+                  key={paciente.id}
+                  onClick={() => handleSelectPaciente(paciente)}
                   sx={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: "50%",
-                    background: "linear-gradient(135deg, rgba(163,105,32,0.1) 0%, rgba(212,175,55,0.2) 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    mr: 2,
+                    borderRadius: "12px",
+                    py: 1.4,
+                    px: 1.75,
+                    transition: "all 0.2s ease",
+                    "&:hover": {
+                      backgroundColor: "rgba(163,105,32,0.07)",
+                      pl: 2.25,
+                    },
                   }}
                 >
-                  <People sx={{ fontSize: 18, color: "#a36920" }} />
-                </Box>
-                <ListItemText
-                  primary={
-                    <Typography sx={{ fontSize: "0.9rem", fontWeight: 600, color: "#2E2E2E" }}>
-                      {paciente.nombre} {paciente.apellido}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography sx={{ fontSize: "0.75rem", color: "#999" }}>
-                      DNI: {paciente.dni || "Sin DNI"}
-                    </Typography>
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
-        </Paper>
-      )}
+                  <Box
+                    sx={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, rgba(163,105,32,0.12) 0%, rgba(212,175,55,0.24) 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      mr: 2,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <People sx={{ fontSize: 18, color: ORO }} />
+                  </Box>
+                  <ListItemText
+                    primary={
+                      <Typography sx={{ fontSize: "0.9rem", fontWeight: 600, color: "#2E2E2E" }}>
+                        {paciente.nombre} {paciente.apellido}
+                      </Typography>
+                    }
+                    secondary={
+                      <Typography sx={{ fontSize: "0.75rem", color: "#999" }}>
+                        DNI: {paciente.dni || "Sin DNI"}
+                      </Typography>
+                    }
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+          </MotionBox>
+        )}
+      </AnimatePresence>
 
       {searchOpen && searchQuery.trim().length >= 2 && searchResults.length === 0 && !searching && (
         <Paper
-          elevation={12}
+          elevation={0}
           sx={{
             position: "fixed",
             top: 76,
             left: 20,
             width: 320,
             zIndex: 999,
-            borderRadius: 3,
-            backgroundColor: "rgba(255,255,255,0.96)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(163,105,32,0.15)",
-            boxShadow: "0 10px 40px rgba(163,105,32,0.18)",
+            borderRadius: "18px",
+            backgroundColor: "rgba(255,255,255,0.94)",
+            backdropFilter: "blur(14px)",
+            border: "1px solid rgba(163,105,32,0.16)",
+            boxShadow: "0 18px 50px -14px rgba(163,105,32,0.35)",
             p: 3,
             textAlign: "center",
           }}
@@ -446,14 +709,14 @@ export default function Dashboard() {
           top: 0,
           height: "100vh",
           width: "50vw",
-          opacity: 0.35,
+          opacity: 0.32,
           pointerEvents: "none",
           zIndex: 0,
           objectFit: "cover",
           objectPosition: "center top",
-          filter: "grayscale(20%)",
-          maskImage: "linear-gradient(to right, rgba(0,0,0,1) 60%, rgba(0,0,0,0))",
-          WebkitMaskImage: "linear-gradient(to right, rgba(0,0,0,1) 60%, rgba(0,0,0,0))",
+          filter: "grayscale(25%) saturate(0.9)",
+          maskImage: "linear-gradient(to right, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
+          WebkitMaskImage: "linear-gradient(to right, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
         }}
       />
       <Box
@@ -466,16 +729,41 @@ export default function Dashboard() {
           top: "-10%",
           height: "110vh",
           width: "50vw",
-          opacity: 0.35,
+          opacity: 0.32,
           pointerEvents: "none",
           zIndex: 0,
           objectFit: "cover",
           objectPosition: "center top",
-          filter: "grayscale(20%)",
-          maskImage: "linear-gradient(to left, rgba(0,0,0,1) 60%, rgba(0,0,0,0))",
-          WebkitMaskImage: "linear-gradient(to left, rgba(0,0,0,1) 60%, rgba(0,0,0,0))",
+          filter: "grayscale(25%) saturate(0.9)",
+          maskImage: "linear-gradient(to left, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
+          WebkitMaskImage: "linear-gradient(to left, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
         }}
       />
+
+      {/* Luces doradas que flotan despacio detrás de todo */}
+      {[
+        { size: 520, top: "-12%", left: "18%", dur: 26, dx: 40, dy: 30, op: 0.28 },
+        { size: 420, top: "48%", left: "62%", dur: 32, dx: -50, dy: 40, op: 0.22 },
+        { size: 300, top: "70%", left: "8%", dur: 22, dx: 30, dy: -35, op: 0.18 },
+      ].map((o, i) => (
+        <MotionBox
+          key={i}
+          aria-hidden
+          animate={{ x: [0, o.dx, 0], y: [0, o.dy, 0] }}
+          transition={{ duration: o.dur, repeat: Infinity, ease: "easeInOut" }}
+          sx={{
+            position: "fixed",
+            top: o.top, left: o.left,
+            width: o.size, height: o.size,
+            borderRadius: "50%",
+            background: `radial-gradient(circle, rgba(212,175,55,${o.op}) 0%, rgba(212,175,55,0) 70%)`,
+            filter: "blur(30px)",
+            pointerEvents: "none",
+            zIndex: 0,
+            willChange: "transform",
+          }}
+        />
+      ))}
 
       {/* Main Content */}
       <Box
@@ -484,185 +772,162 @@ export default function Dashboard() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          py: { xs: 3, sm: 5 },
+          py: { xs: 4, sm: 6 },
           px: 2,
           position: "relative",
           zIndex: 1,
         }}
       >
-        <Fade in timeout={500}>
-          <Box sx={{ width: "100%", maxWidth: 1200 }}>
+        <MotionBox
+          variants={contenedor}
+          initial="hidden"
+          animate="show"
+          sx={{ width: "100%", maxWidth: 1200 }}
+        >
 
-            {/* Header */}
-            <Box sx={{ textAlign: "center", mb: { xs: 3, sm: 4 } }}>
+          {/* Header */}
+          <Box sx={{ textAlign: "center", mb: { xs: 4, sm: 5.5 } }}>
+            <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", mb: 2 }}>
+              {/* Halo que respira detrás del logo */}
+              <MotionBox
+                aria-hidden
+                animate={{ scale: [1, 1.18, 1], opacity: [0.45, 0.15, 0.45] }}
+                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+                sx={{
+                  position: "absolute", inset: -10, borderRadius: "50%",
+                  border: `1.5px solid ${ORO_CLARO}`,
+                  pointerEvents: "none",
+                }}
+              />
               <Box
                 component="img"
                 src="/logo-showclinic.png"
                 alt="ShowClinic"
                 sx={{
-                  width: 80,
-                  height: 80,
+                  width: 84,
+                  height: 84,
                   objectFit: "cover",
                   borderRadius: "50%",
-                  border: "3px solid rgba(163,105,32,0.25)",
-                  boxShadow: "0 8px 28px rgba(163,105,32,0.18)",
-                  mb: 2,
+                  border: "3px solid rgba(255,255,255,0.9)",
+                  boxShadow: `0 0 0 2px rgba(163,105,32,0.35), 0 14px 34px -10px rgba(163,105,32,0.45)`,
+                  display: "block",
+                  position: "relative",
                 }}
               />
+            </MotionBox>
+
+            <MotionBox variants={subir}>
               <Typography
                 variant="h3"
                 sx={{
                   fontFamily: "'Playfair Display', serif",
                   fontWeight: 700,
-                  color: "#a36920",
                   letterSpacing: 4,
                   fontSize: { xs: "1.8rem", sm: "2.4rem", md: "2.8rem" },
+                  // Oro con relieve: degradado sobre el texto
+                  background: `linear-gradient(180deg, #c58a3a 0%, ${ORO} 55%, #7d5017 100%)`,
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  display: "inline-block",
                 }}
               >
                 SHOWCLINIC
               </Typography>
+            </MotionBox>
+
+            <MotionBox variants={subir} sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mt: 0.75 }}>
+              <Box sx={{ width: { xs: 22, sm: 40 }, height: 1, background: `linear-gradient(90deg, transparent, ${ORO_SUAVE})` }} />
               <Typography
-                sx={{ color: "#ba9a63", letterSpacing: 2.5, fontWeight: 500, fontSize: { xs: "0.7rem", sm: "0.85rem" }, mt: 0.5 }}
+                sx={{ color: ORO_SUAVE, letterSpacing: 2.5, fontWeight: 500, fontSize: { xs: "0.7rem", sm: "0.85rem" } }}
               >
                 ESTÉTICA AVANZADA & BIENESTAR
               </Typography>
-              <Box sx={{ mt: 2.5, display: "inline-flex", alignItems: "center", gap: 1, px: 3, py: 1, borderRadius: 50, backgroundColor: "rgba(163,105,32,0.06)", border: "1px solid rgba(186,154,99,0.15)" }}>
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#4CAF50", boxShadow: "0 0 8px rgba(76,175,80,0.5)" }} />
-                <Typography
-                  variant="body1"
-                  sx={{ color: "#6B6B6B", fontWeight: 400, fontSize: { xs: "0.9rem", sm: "1rem" } }}
-                >
-                  {saludo}, <strong style={{ color: "#a36920" }}>{username}</strong>
-                </Typography>
-              </Box>
-            </Box>
+              <Box sx={{ width: { xs: 22, sm: 40 }, height: 1, background: `linear-gradient(90deg, ${ORO_SUAVE}, transparent)` }} />
+            </MotionBox>
 
-            {/* Grid de módulos */}
-            <Box
+            <MotionBox
+              variants={subir}
               sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
-                gap: 2,
-                maxWidth: 850,
-                mx: "auto",
-                px: 2,
+                mt: 2.75,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 1.1,
+                px: 2.75,
+                py: 1,
+                borderRadius: 50,
+                backgroundColor: "rgba(255,253,247,0.75)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(186,154,99,0.25)",
+                boxShadow: "0 8px 24px -12px rgba(163,105,32,0.35)",
               }}
             >
-              {menuItems.map((item, index) => {
-                const IconComponent = moduleIcons[item.title];
-                const isLocked = item.hasAccess === false;
-                return (
-                  <Grow in timeout={300 + index * 100} key={index}>
-                    <Card
-                      onClick={() => {
-                        if (isLocked) {
-                          setDeniedModule(item.title);
-                          setOpenAccessDenied(true);
-                        } else {
-                          navigate(item.path);
-                        }
-                      }}
+              <Box sx={{ position: "relative", width: 8, height: 8 }}>
+                <Box sx={{ position: "absolute", inset: 0, borderRadius: "50%", backgroundColor: "#4CAF50" }} />
+                <MotionBox
+                  aria-hidden
+                  animate={{ scale: [1, 2.2], opacity: [0.6, 0] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
+                  sx={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid #4CAF50" }}
+                />
+              </Box>
+              <Typography
+                variant="body1"
+                sx={{ color: "#6B6B6B", fontWeight: 400, fontSize: { xs: "0.9rem", sm: "1rem" } }}
+              >
+                {saludo}, <strong style={{ color: ORO }}>{username}</strong>
+              </Typography>
+            </MotionBox>
+          </Box>
+
+          {/* Módulos, por secciones */}
+          <Box sx={{ maxWidth: 960, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
+            {secciones.map((sec) => (
+              <Box key={sec.id} sx={{ mb: { xs: 3.5, sm: 4.5 }, "&:last-of-type": { mb: 0 } }}>
+                {sec.label && (
+                  <MotionBox
+                    variants={subir}
+                    sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.75, px: 0.5 }}
+                  >
+                    <Typography
                       sx={{
-                        cursor: "pointer",
-                        borderRadius: 3,
-                        backgroundColor: isLocked ? "rgba(250,248,245,0.5)" : "#fffdf7",
-                        border: isLocked ? "1px solid #e8e8e8" : "1px solid rgba(186,154,99,0.15)",
-                        boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-                        opacity: isLocked ? 0.6 : 1,
-                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                        "&:hover": isLocked ? {} : {
-                          transform: "translateY(-4px)",
-                          boxShadow: "0 8px 24px rgba(163,105,32,0.12)",
-                          border: "1px solid rgba(163,105,32,0.3)",
-                        },
-                        p: 2,
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        minHeight: 145,
+                        color: ORO,
+                        fontSize: "0.66rem",
+                        fontWeight: 700,
+                        letterSpacing: "2px",
+                        textTransform: "uppercase",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {/* Icono */}
-                      <Box
-                        sx={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 2,
-                          background: "linear-gradient(135deg, rgba(163,105,32,0.08) 0%, rgba(212,175,55,0.12) 100%)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          mb: 1.5,
-                          position: "relative",
-                        }}
-                      >
-                        {IconComponent && (
-                          <IconComponent sx={{ fontSize: 20, color: "#a36920" }} />
-                        )}
-                        {isLocked && (
-                          <Box
-                            sx={{
-                              position: "absolute",
-                              top: -6,
-                              right: -6,
-                              backgroundColor: "#d32f2f",
-                              borderRadius: "50%",
-                              width: 18,
-                              height: 18,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              border: "2px solid white",
-                            }}
-                          >
-                            <Lock sx={{ fontSize: 10, color: "white" }} />
-                          </Box>
-                        )}
-                      </Box>
+                      {sec.label}
+                    </Typography>
+                    <Box sx={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(186,154,99,0.45), rgba(186,154,99,0))" }} />
+                    <Typography sx={{ color: "#c0b090", fontSize: "0.62rem", fontWeight: 600 }}>
+                      {sec.items.length}
+                    </Typography>
+                  </MotionBox>
+                )}
 
-                      {/* Titulo */}
-                      <Typography sx={{ fontWeight: 700, color: "#2e2e2e", fontSize: "0.88rem", lineHeight: 1.3, mb: 0.5 }}>
-                        {item.title}
-                      </Typography>
-
-                      {/* Descripcion */}
-                      <Typography sx={{ color: "#999", fontSize: "0.72rem", lineHeight: 1.5, flex: 1 }}>
-                        {item.description}
-                      </Typography>
-
-                      {/* Tag */}
-                      <Box
-                        sx={{
-                          display: "inline-flex",
-                          alignSelf: "flex-start",
-                          mt: 1.2,
-                          px: 1,
-                          py: 0.35,
-                          borderRadius: 1.5,
-                          border: "1px solid rgba(186,154,99,0.25)",
-                          backgroundColor: "rgba(163,105,32,0.04)",
-                        }}
-                      >
-                        <Typography sx={{ color: "#ba9a63", fontSize: "0.6rem", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>
-                          {isLocked ? "BLOQUEADO" : item.tag}
-                        </Typography>
-                      </Box>
-                    </Card>
-                  </Grow>
-                );
-              })}
-            </Box>
-
-            {/* Session info */}
-            <Fade in timeout={800}>
-              <Box sx={{ mt: 5, textAlign: "center" }}>
-                <Typography variant="caption" sx={{ color: "#bbb", fontWeight: 400, fontSize: "0.75rem" }}>
-                  Panel de administración • Sesión activa
-                </Typography>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1fr 1fr 1fr" },
+                    gap: 2.25,
+                  }}
+                >
+                  {sec.items.map(renderTarjeta)}
+                </Box>
               </Box>
-            </Fade>
+            ))}
           </Box>
-        </Fade>
+
+          {/* Session info */}
+          <MotionBox variants={subir} sx={{ mt: 5.5, textAlign: "center" }}>
+            <Typography variant="caption" sx={{ color: "#b9ad98", fontWeight: 400, fontSize: "0.75rem", letterSpacing: "0.3px" }}>
+              Panel de administración • Sesión activa
+            </Typography>
+          </MotionBox>
+        </MotionBox>
       </Box>
 
       {/* Footer */}
@@ -671,8 +936,11 @@ export default function Dashboard() {
         sx={{
           py: 2,
           px: 3,
-          borderTop: "1px solid rgba(186,154,99,0.15)",
-          backgroundColor: "rgba(255,253,247,0.8)",
+          position: "relative",
+          zIndex: 1,
+          borderTop: "1px solid rgba(186,154,99,0.18)",
+          backgroundColor: "rgba(255,253,247,0.72)",
+          backdropFilter: "blur(10px)",
         }}
       >
         <Box
@@ -691,9 +959,9 @@ export default function Dashboard() {
               component="img"
               src="/logo-showclinic.png"
               alt="ShowClinic"
-              sx={{ width: 24, height: 24, borderRadius: "50%", opacity: 0.7 }}
+              sx={{ width: 24, height: 24, borderRadius: "50%", opacity: 0.75, boxShadow: "0 0 0 1px rgba(163,105,32,0.25)" }}
             />
-            <Typography variant="caption" sx={{ color: "#ba9a63", fontWeight: 600, letterSpacing: 0.5, fontSize: "0.72rem" }}>
+            <Typography variant="caption" sx={{ color: ORO_SUAVE, fontWeight: 600, letterSpacing: 0.5, fontSize: "0.72rem" }}>
               ShowClinic
             </Typography>
           </Box>
@@ -707,12 +975,12 @@ export default function Dashboard() {
       </Box>
 
       {/* Modal de Acceso Denegado */}
-      <Dialog 
-        open={openAccessDenied} 
+      <Dialog
+        open={openAccessDenied}
         onClose={() => setOpenAccessDenied(false)}
         maxWidth="xs"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+        PaperProps={{ sx: { borderRadius: "20px", overflow: "hidden" } }}
       >
         <DialogTitle sx={{ background: "linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%)", color: "white", textAlign: "center", py: 2 }}>
           Acceso Restringido
@@ -727,11 +995,11 @@ export default function Dashboard() {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2.5, justifyContent: "center" }}>
-          <Button 
+          <Button
             onClick={() => setOpenAccessDenied(false)}
             variant="contained"
             sx={{
-              backgroundColor: "#a36920",
+              backgroundColor: ORO,
               "&:hover": { backgroundColor: "#8a5a1a" },
               px: 5,
               py: 1,
@@ -739,6 +1007,7 @@ export default function Dashboard() {
               fontWeight: 600,
               textTransform: "none",
               fontSize: "0.9rem",
+              boxShadow: "none",
             }}
           >
             Entendido
@@ -748,4 +1017,3 @@ export default function Dashboard() {
     </Box>
   );
 }
-
