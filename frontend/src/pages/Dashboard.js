@@ -345,12 +345,13 @@ export default function Dashboard() {
         sx={{
           position: "relative",
           cursor: "pointer",
-          borderRadius: "20px",
-          p: 1.6,
-          minHeight: 118,
-          [mqCompacto]: { p: 1.15, minHeight: 100 },
+          borderRadius: "18px",
+          px: 2.4,
+          py: 2.9,
+          [mqCompacto]: { px: 1.9, py: 1.55 },
           display: "flex",
-          flexDirection: "column",
+          alignItems: "center",
+          gap: 2,
           overflow: "hidden",
           isolation: "isolate",
           // Vidrio cálido: deja pasar el fondo pero mantiene la lectura
@@ -372,19 +373,19 @@ export default function Dashboard() {
             borderColor: "rgba(163,105,32,0.45)",
             boxShadow: "0 2px 4px rgba(163,105,32,0.08), 0 22px 44px -14px rgba(163,105,32,0.32)",
           },
-          // Hilo dorado superior que se enciende al pasar el cursor
+          // Filo dorado lateral que se despliega al pasar el cursor
           "&::before": {
             content: '""',
             position: "absolute",
-            left: 18, right: 18, top: 0,
-            height: 2,
-            borderRadius: "0 0 3px 3px",
-            background: `linear-gradient(90deg, transparent, ${ORO_CLARO}, ${ORO}, ${ORO_CLARO}, transparent)`,
-            transform: "scaleX(0)",
+            left: 0, top: 12, bottom: 12,
+            width: 3,
+            borderRadius: "0 3px 3px 0",
+            background: `linear-gradient(180deg, ${ORO_CLARO}, ${ORO})`,
+            transform: "scaleY(0)",
             transformOrigin: "center",
             transition: "transform .45s cubic-bezier(.22,1,.36,1)",
           },
-          "&:hover::before": isLocked ? {} : { transform: "scaleX(1)" },
+          "&:hover::before": isLocked ? {} : { transform: "scaleY(1)" },
           // Destello que recorre la tarjeta
           "&::after": {
             content: '""',
@@ -399,93 +400,95 @@ export default function Dashboard() {
           "&:hover::after": isLocked ? {} : { left: "120%" },
         }}
       >
-        {/* Icono */}
-        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: 1.1, [mqCompacto]: { mb: 0.5 } }}>
-          <MotionBox
-            variants={iconoTarjeta}
-            sx={{
-              width: 42,
-              height: 42,
-              [mqCompacto]: { width: 34, height: 34 },
-              borderRadius: "13px",
-              position: "relative",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: isLocked
-                ? "rgba(0,0,0,0.05)"
-                : `linear-gradient(135deg, ${ORO_CLARO} 0%, ${ORO} 100%)`,
-              boxShadow: isLocked ? "none" : "0 6px 16px -6px rgba(163,105,32,0.55), inset 0 1px 0 rgba(255,255,255,0.35)",
-            }}
-          >
-            {IconComponent && (
-              <IconComponent sx={{ fontSize: 21, color: isLocked ? "#9e9e9e" : "#fff" }} />
-            )}
-            {isLocked && (
-              <Box
-                sx={{
-                  position: "absolute",
-                  top: -6,
-                  right: -6,
-                  backgroundColor: "#d32f2f",
-                  borderRadius: "50%",
-                  width: 18,
-                  height: 18,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "2px solid white",
-                }}
-              >
-                <Lock sx={{ fontSize: 10, color: "white" }} />
-              </Box>
-            )}
-          </MotionBox>
-
-          {/* Flecha que aparece al pasar el cursor */}
-          {!isLocked && (
-            <MotionBox
-              variants={flechaTarjeta}
-              sx={{
-                width: 28, height: 28, borderRadius: "50%",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(163,105,32,0.08)",
-                border: "1px solid rgba(163,105,32,0.18)",
-              }}
-            >
-              <ArrowForwardRounded sx={{ fontSize: 15, color: ORO }} />
-            </MotionBox>
-          )}
-        </Box>
-
-        {/* Titulo */}
-        <Typography sx={{ fontWeight: 700, color: "#2e2e2e", fontSize: "0.88rem", lineHeight: 1.3, mb: 0.5 }}>
-          {item.title}
-        </Typography>
-
-        {/* Descripcion */}
-        <Typography sx={{ color: "#8a8a8a", fontSize: "0.71rem", lineHeight: 1.42, flex: 1 }}>
-          {item.description}
-        </Typography>
-
-        {/* Tag */}
-        <Box
+        {/* Icono en placa dorada */}
+        <MotionBox
+          variants={iconoTarjeta}
           sx={{
-            display: "inline-flex",
-            alignSelf: "flex-start",
-            mt: 1,
-            [mqCompacto]: { mt: 0.6 },
-            px: 1.1,
-            py: 0.35,
-            borderRadius: "999px",
-            border: "1px solid rgba(186,154,99,0.28)",
-            backgroundColor: "rgba(163,105,32,0.05)",
+            width: 52,
+            height: 52,
+            [mqCompacto]: { width: 44, height: 44 },
+            flexShrink: 0,
+            borderRadius: "14px",
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: isLocked
+              ? "rgba(0,0,0,0.05)"
+              : `linear-gradient(140deg, #e6c465 0%, ${ORO_CLARO} 35%, ${ORO} 100%)`,
+            boxShadow: isLocked
+              ? "none"
+              : "0 8px 18px -8px rgba(163,105,32,0.65), inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.08)",
           }}
         >
-          <Typography sx={{ color: ORO_SUAVE, fontSize: "0.6rem", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>
+          {IconComponent && (
+            <IconComponent sx={{ fontSize: 25, color: isLocked ? "#9e9e9e" : "#fff" }} />
+          )}
+          {isLocked && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: -6,
+                right: -6,
+                backgroundColor: "#d32f2f",
+                borderRadius: "50%",
+                width: 18,
+                height: 18,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "2px solid white",
+              }}
+            >
+              <Lock sx={{ fontSize: 10, color: "white" }} />
+            </Box>
+          )}
+        </MotionBox>
+
+        {/* Nombre del módulo y su etiqueta */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            noWrap
+            sx={{
+              fontWeight: 700,
+              color: "#2e2e2e",
+              fontSize: "1rem",
+              lineHeight: 1.25,
+              letterSpacing: "0.1px",
+            }}
+          >
+            {item.title}
+          </Typography>
+          <Typography
+            noWrap
+            sx={{
+              mt: 0.35,
+              color: isLocked ? "#a89c8c" : ORO_SUAVE,
+              fontSize: "0.6rem",
+              fontWeight: 700,
+              letterSpacing: "1.4px",
+              textTransform: "uppercase",
+            }}
+          >
             {isLocked ? "BLOQUEADO" : item.tag}
           </Typography>
         </Box>
+
+        {/* Flecha que aparece al pasar el cursor */}
+        {!isLocked && (
+          <MotionBox
+            variants={flechaTarjeta}
+            sx={{
+              flexShrink: 0,
+              width: 26, height: 26, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(163,105,32,0.09)",
+              border: "1px solid rgba(163,105,32,0.20)",
+            }}
+          >
+            <ArrowForwardRounded sx={{ fontSize: 14, color: ORO }} />
+          </MotionBox>
+        )}
       </MotionBox>
     );
   };
@@ -779,12 +782,12 @@ export default function Dashboard() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          py: { xs: 2, sm: 2.25 },
+          py: { xs: 3, sm: 4 },
           px: 2,
           position: "relative",
           zIndex: 1,
           // En pantallas bajas se recorta el aire para que igual entre todo
-          [mqCompacto]: { py: 0.6 },
+          [mqCompacto]: { py: 2 },
         }}
       >
         <MotionBox
@@ -795,8 +798,8 @@ export default function Dashboard() {
         >
 
           {/* Header */}
-          <Box sx={{ textAlign: "center", mb: { xs: 2, sm: 2.25 }, [mqCompacto]: { mb: 1 } }}>
-            <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", mb: 1 }}>
+          <Box sx={{ textAlign: "center", mb: { xs: 3, sm: 4 }, [mqCompacto]: { mb: 2.25 } }}>
+            <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", mb: 1.5 }}>
               {/* Halo que respira detrás del logo */}
               <MotionBox
                 aria-hidden
@@ -813,9 +816,9 @@ export default function Dashboard() {
                 src="/logo-showclinic.png"
                 alt="ShowClinic"
                 sx={{
-                  width: 46,
-                  height: 46,
-                  [mqCompacto]: { width: 36, height: 36 },
+                  width: 88,
+                  height: 88,
+                  [mqCompacto]: { width: 66, height: 66 },
                   objectFit: "cover",
                   borderRadius: "50%",
                   border: "3px solid rgba(255,255,255,0.9)",
@@ -859,13 +862,13 @@ export default function Dashboard() {
             <MotionBox
               variants={subir}
               sx={{
-                mt: 1,
-                [mqCompacto]: { mt: 0.5, py: 0.35 },
+                mt: 2,
+                [mqCompacto]: { mt: 1.25, py: 0.4 },
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 1.1,
-                px: 2.25,
-                py: 0.55,
+                px: 2.75,
+                py: 0.8,
                 borderRadius: 50,
                 backgroundColor: "rgba(255,253,247,0.75)",
                 backdropFilter: "blur(10px)",
@@ -894,28 +897,35 @@ export default function Dashboard() {
           {/* Módulos, por secciones */}
           <Box sx={{ maxWidth: 1400, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
             {secciones.map((sec) => (
-              <Box key={sec.id} sx={{ mb: { xs: 1.5, sm: 1.5 }, [mqCompacto]: { mb: 0.55 }, "&:last-of-type": { mb: 0 } }}>
+              <Box key={sec.id} sx={{ mb: { xs: 3, sm: 4 }, [mqCompacto]: { mb: 1.75 }, "&:last-of-type": { mb: 0 } }}>
                 {sec.label && (
                   <MotionBox
                     variants={subir}
-                    sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 0.75, px: 0.5, [mqCompacto]: { mb: 0.4 } }}
+                    sx={{ display: "flex", alignItems: "center", gap: 1.4, mb: 1.5, px: 0.5, [mqCompacto]: { mb: 1 } }}
                   >
+                    {/* Rombo dorado como marca de sección */}
+                    <Box
+                      aria-hidden
+                      sx={{
+                        width: 6, height: 6, flexShrink: 0,
+                        transform: "rotate(45deg)",
+                        background: `linear-gradient(135deg, ${ORO_CLARO}, ${ORO})`,
+                        boxShadow: "0 0 8px rgba(212,175,55,0.5)",
+                      }}
+                    />
                     <Typography
                       sx={{
                         color: ORO,
                         fontSize: "0.66rem",
                         fontWeight: 700,
-                        letterSpacing: "2px",
+                        letterSpacing: "2.2px",
                         textTransform: "uppercase",
                         whiteSpace: "nowrap",
                       }}
                     >
                       {sec.label}
                     </Typography>
-                    <Box sx={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(186,154,99,0.45), rgba(186,154,99,0))" }} />
-                    <Typography sx={{ color: "#c0b090", fontSize: "0.62rem", fontWeight: 600 }}>
-                      {sec.items.length}
-                    </Typography>
+                    <Box sx={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(186,154,99,0.5), rgba(186,154,99,0))" }} />
                   </MotionBox>
                 )}
 
@@ -932,7 +942,7 @@ export default function Dashboard() {
                       md: "repeat(3, 1fr)",
                       lg: "repeat(4, 1fr)",
                     },
-                    gap: { xs: 1.5, sm: 1.75 },
+                    gap: { xs: 1.75, sm: 2.4 },
                   }}
                 >
                   {sec.items.map(renderTarjeta)}
@@ -942,7 +952,7 @@ export default function Dashboard() {
           </Box>
 
           {/* Session info */}
-          <MotionBox variants={subir} sx={{ mt: 0.75, [mqCompacto]: { mt: 0.35 }, textAlign: "center" }}>
+          <MotionBox variants={subir} sx={{ mt: 3, [mqCompacto]: { mt: 1.75 }, textAlign: "center" }}>
             <Typography variant="caption" sx={{ color: "#b9ad98", fontWeight: 400, fontSize: "0.75rem", letterSpacing: "0.3px" }}>
               Panel de administración • Sesión activa
             </Typography>
@@ -954,9 +964,9 @@ export default function Dashboard() {
       <Box
         component="footer"
         sx={{
-          py: 1.4,
+          py: 1.75,
           px: 3,
-          [mqCompacto]: { py: 0.7 },
+          [mqCompacto]: { py: 1.2 },
           position: "relative",
           zIndex: 1,
           borderTop: "1px solid rgba(186,154,99,0.18)",

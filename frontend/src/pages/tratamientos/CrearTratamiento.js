@@ -18,7 +18,7 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check, Face, Inventory2 } from "@mui/icons-material";
+import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check, Face, Inventory2, Person } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/ToastProvider";
 import FacialMapMini from "../../components/FacialMapMini";
@@ -62,6 +62,11 @@ export default function CrearTratamiento() {
   // { tratamiento_id: [ {producto_base_nombre, variante_nombre, ...} ] }
   const [recetasPorTratamiento, setRecetasPorTratamiento] = useState({});
 
+  // Especialista que hace habitualmente cada protocolo. Se usa para
+  // precargarlo al crear un presupuesto y no tener que elegirlo cada vez.
+  const [especialistas, setEspecialistas] = useState([]);
+  const [guardandoEspecialista, setGuardandoEspecialista] = useState(null);
+
   // Estados para el mapa facial 3D por defecto del tratamiento
   const [modalMapa, setModalMapa] = useState(false);
   const [puntosMapa, setPuntosMapa] = useState({});
@@ -89,6 +94,50 @@ export default function CrearTratamiento() {
       setRecetasPorTratamiento(data && typeof data === "object" ? data : {});
     } catch (err) {
       console.error("Error al cargar los productos de los protocolos:", err);
+    }
+  };
+
+  const cargarEspecialistas = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/especialistas/listar`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      const data = await res.json();
+      setEspecialistas(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error al cargar especialistas:", err);
+    }
+  };
+
+  // Guarda el especialista por defecto del protocolo (o lo quita con "")
+  const asignarEspecialista = async (tratamientoId, especialistaId) => {
+    setGuardandoEspecialista(tratamientoId);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/tratamientos/${tratamientoId}/especialista`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ especialista_id: especialistaId || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast({ severity: "error", message: data.message || "No se pudo asignar el especialista" });
+        return;
+      }
+      // Se refleja al instante, sin recargar toda la lista
+      setTratamientos((prev) => prev.map((t) => {
+        if (t.id !== tratamientoId) return t;
+        const esp = especialistas.find((e) => String(e.id) === String(especialistaId));
+        return { ...t, especialista_id: especialistaId || null, especialista_nombre: esp?.nombre || null };
+      }));
+      showToast({ severity: "success", message: especialistaId ? "Especialista asignado" : "Especialista quitado" });
+    } catch (err) {
+      console.error(err);
+      showToast({ severity: "error", message: "No se pudo asignar el especialista" });
+    } finally {
+      setGuardandoEspecialista(null);
     }
   };
 
@@ -391,6 +440,7 @@ export default function CrearTratamiento() {
     cargarTratamientos();
     cargarVariantes();
     cargarRecetasTodas();
+    cargarEspecialistas();
   }, []);
 
   return (
@@ -734,6 +784,38 @@ export default function CrearTratamiento() {
                           {t.descripcion}
                         </Typography>
                       )}
+
+                      {/* Especialista que hará este tratamiento por defecto */}
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.6, mt: 0.7 }}>
+                        <Person sx={{ fontSize: 13, color: t.especialista_id ? colorPrincipal : "#c9b8a0", flexShrink: 0 }} />
+                        {isDoctor ? (
+                          <FormControl size="small" variant="standard" sx={{ minWidth: 168 }}>
+                            <Select
+                              value={t.especialista_id ? String(t.especialista_id) : ""}
+                              displayEmpty
+                              disableUnderline
+                              disabled={guardandoEspecialista === t.id}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => asignarEspecialista(t.id, e.target.value)}
+                              renderValue={(v) => {
+                                if (!v) return <em style={{ color: "#b3a08c", fontSize: "0.7rem", fontStyle: "normal" }}>Sin especialista asignado</em>;
+                                const esp = especialistas.find((x) => String(x.id) === String(v));
+                                return <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "#7a5216" }}>{esp?.nombre || "—"}</span>;
+                              }}
+                              sx={{ "& .MuiSelect-select": { py: 0, pr: "18px !important" } }}
+                            >
+                              <MenuItem value=""><em>Sin especialista asignado</em></MenuItem>
+                              {especialistas.map((e) => (
+                                <MenuItem key={e.id} value={String(e.id)}>{e.nombre}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        ) : (
+                          <Typography sx={{ fontSize: "0.7rem", fontWeight: t.especialista_id ? 700 : 400, color: t.especialista_id ? "#7a5216" : "#b3a08c" }}>
+                            {t.especialista_nombre || "Sin especialista asignado"}
+                          </Typography>
+                        )}
+                      </Box>
 
                       {/* Productos configurados: se ven sin abrir nada */}
                       {(() => {

@@ -83,12 +83,78 @@ router.post("/crear", requireTreatmentBaseCreate, (req, res) => {
 });
 
 // ✅ Listar tratamientos
-router.get("/listar", (req, res) => {
-  db.all("SELECT * FROM tratamientos ORDER BY id DESC", [], (err, rows) => {
-    if (err)
-      return res.status(500).json({ message: "Error al listar tratamientos" });
+/**
+ * 👩‍⚕️ ESPECIALISTA POR DEFECTO DEL PROTOCOLO
+ *
+ * Cada tratamiento puede llevar apuntado quién lo hace normalmente. Al armar
+ * un presupuesto el especialista ya viene puesto y no hay que elegirlo uno
+ * por uno; igual se puede cambiar antes de guardar.
+ *
+ * La columna se agrega sola al arrancar y llega vacía en lo que ya existe.
+ */
+let especialistaProtocoloListo = false;
+async function ensureEspecialistaProtocoloSchema() {
+  if (especialistaProtocoloListo) return;
+  try {
+    await dbRun(`ALTER TABLE tratamientos ADD COLUMN especialista_id INTEGER`);
+  } catch (err) {
+    if (!String(err.message).includes("duplicate column")) {
+      console.error("❌ Error agregando especialista_id a tratamientos:", err.message);
+    }
+  }
+  especialistaProtocoloListo = true;
+}
+ensureEspecialistaProtocoloSchema();
+
+router.get("/listar", async (req, res) => {
+  try {
+    await ensureEspecialistaProtocoloSchema();
+    const rows = await dbAll(`
+      SELECT t.*, e.nombre AS especialista_nombre
+      FROM tratamientos t
+      LEFT JOIN especialistas e ON e.id = t.especialista_id
+      ORDER BY t.id DESC
+    `);
     res.json(rows);
-  });
+  } catch (err) {
+    console.error("❌ Error al listar tratamientos:", err.message);
+    res.status(500).json({ message: "Error al listar tratamientos" });
+  }
+});
+
+/**
+ * Cambiar (o quitar) el especialista por defecto de un protocolo.
+ * Enviar especialista_id = null lo deja sin asignar.
+ */
+router.put("/:id/especialista", requireDoctor, async (req, res) => {
+  try {
+    await ensureEspecialistaProtocoloSchema();
+    const idNum = Number(req.params.id);
+    if (!Number.isFinite(idNum) || idNum <= 0) {
+      return res.status(400).json({ message: "ID inválido" });
+    }
+
+    const crudo = req.body?.especialista_id;
+    let espId = null;
+    if (crudo != null && String(crudo).trim() !== "") {
+      espId = Number(crudo);
+      if (!Number.isFinite(espId) || espId <= 0) {
+        return res.status(400).json({ message: "Especialista inválido" });
+      }
+      const existe = await dbGet(`SELECT id FROM especialistas WHERE id = ?`, [espId]);
+      if (!existe) return res.status(400).json({ message: "El especialista no existe" });
+    }
+
+    const r = await dbRun(`UPDATE tratamientos SET especialista_id = ? WHERE id = ?`, [espId, idNum]);
+    if ((r?.changes || 0) === 0) {
+      return res.status(404).json({ message: "Tratamiento no encontrado" });
+    }
+
+    res.json({ message: espId ? "✅ Especialista asignado" : "✅ Especialista quitado", especialista_id: espId });
+  } catch (err) {
+    console.error("❌ Error asignando especialista al protocolo:", err.message);
+    res.status(500).json({ message: "Error al asignar el especialista" });
+  }
 });
 
 // ✅ Conteo de uso por tratamiento (para ordenar por más usados)

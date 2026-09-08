@@ -1164,6 +1164,43 @@ const HistorialClinico = () => {
     setTratamientoImagenCache(prev => ({ ...prev, ...nuevasImagenes }));
   }, [tratamientoImagenCache, authHeaders]);
 
+  /**
+   * Precarga el especialista de cada tratamiento desde su protocolo.
+   *
+   * En Tratamientos → Protocolos se deja apuntado quién hace normalmente cada
+   * tratamiento; aquí ese dato llega solo, para no tener que elegirlo uno por
+   * uno cada vez que se arma un presupuesto. Lo que el usuario cambie a mano
+   * manda: nunca se pisa una elección ya hecha.
+   */
+  useEffect(() => {
+    if (!ofertas.length || !tratamientosBase.length) return;
+
+    const especialistaDelProtocolo = new Map(
+      tratamientosBase
+        .filter((t) => t.especialista_id)
+        .map((t) => [String(t.nombre || "").trim().toLowerCase(), String(t.especialista_id)])
+    );
+    if (especialistaDelProtocolo.size === 0) return;
+
+    setEspecialistaPorTratamiento((prev) => {
+      const siguiente = { ...prev };
+      let huboCambio = false;
+
+      for (const o of ofertas) {
+        const actual = siguiente[o.id] || {};
+        const propuesto = { ...actual };
+
+        for (const it of o.items || []) {
+          if (propuesto[it.nombre]) continue;   // ya elegido a mano
+          const esp = especialistaDelProtocolo.get(String(it.nombre || "").trim().toLowerCase());
+          if (esp) { propuesto[it.nombre] = esp; huboCambio = true; }
+        }
+        if (huboCambio) siguiente[o.id] = propuesto;
+      }
+      return huboCambio ? siguiente : prev;
+    });
+  }, [ofertas, tratamientosBase]);
+
   // Asignar presupuesto al paciente
   const asignarPresupuesto = async (oferta, marcas) => {
     if (!pacienteSeleccionado?.id) return;
