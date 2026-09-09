@@ -240,7 +240,21 @@ export default function Dashboard() {
 
   // Cuantos más módulos tenga el rol, antes conviene compactar para que
   // todo siga entrando en una pantalla.
-  const mqCompacto = `@media (max-height: ${menuItems.length >= 11 ? 1200 : 950}px)`;
+  const mqCompacto = `@media (max-height: ${menuItems.length >= 11 ? 1300 : 1150}px)`;
+
+  // Las tarjetas son cuadradas, así que su alto lo manda el ancho de la
+  // columna. Para que todas las filas sigan entrando en una pantalla se
+  // limita el ancho de la rejilla en función del alto disponible.
+  const anchoRejilla = useMemo(() => {
+    const filas = Math.max(1, secciones.length);
+    const CROMO = 230;        // cabecera y pie
+    const POR_SECCION = 58;   // rótulo de la sección y su separación
+    const GAP = 20;
+    const disponible = `(100vh - ${CROMO}px - ${filas * POR_SECCION}px)`;
+    // El suelo evita que en pantallas muy bajas el cuadro se encoja tanto que
+    // el icono y el texto no quepan; ahí se prefiere que la página desplace.
+    return `max(660px, min(1080px, calc(${disponible} / ${filas} * 4 + ${GAP * 3}px)))`;
+  }, [secciones.length]);
 
   const username = localStorage.getItem("username") || role;
   const hora = new Date().getHours();
@@ -332,92 +346,105 @@ export default function Dashboard() {
         whileHover={isLocked ? undefined : "hover"}
         whileTap={isLocked ? undefined : { scale: 0.985 }}
         onClick={() => abrirModulo(item)}
+        className="modulo-cuadro"
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrirModulo(item); } }}
         sx={{
           position: "relative",
           cursor: "pointer",
-          borderRadius: "20px",
-          px: 2,
-          py: 4,
+          borderRadius: "22px",
+          // Cuadrado de verdad a partir de tablet. En móvil la rejilla es de
+          // una sola columna y un cuadrado ocuparía toda la pantalla.
+          aspectRatio: { xs: "auto", sm: "1 / 1" },
+          px: 1.5,
+          py: { xs: 2.5, sm: 1.5 },
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
           textAlign: "center",
-          gap: 1.5,
-          [mqCompacto]: { gap: 0.55, px: 1.3, py: 1 },
+          gap: 1.4,
+          [mqCompacto]: { gap: 0.9, px: 1.2 },
           overflow: "hidden",
           isolation: "isolate",
-          // Café profundo de la marca (el mismo de la barra de Gestión CEO),
-          // que hace resaltar el dorado mucho más que el crema.
+          // Tarjeta clara y limpia: blanco roto con el dorado sólo como acento.
           background: isLocked
-            ? "linear-gradient(160deg, #6b5c55 0%, #524741 100%)"
-            : "linear-gradient(160deg, #4E362C 0%, #34231C 55%, #2A1A14 100%)",
-          border: `1px solid ${isLocked ? "rgba(255,255,255,0.08)" : "rgba(212,175,55,0.22)"}`,
+            ? "linear-gradient(165deg, #f4f1ec 0%, #ebe6dd 100%)"
+            : "linear-gradient(165deg, #ffffff 0%, #fdfaf5 100%)",
+          border: `1px solid ${isLocked ? "rgba(120,100,80,0.14)" : "rgba(163,105,32,0.16)"}`,
           boxShadow: isLocked
-            ? "0 6px 18px -12px rgba(0,0,0,0.5)"
-            : "0 2px 6px rgba(42,26,20,0.18), 0 16px 34px -16px rgba(42,26,20,0.55)",
-          opacity: isLocked ? 0.55 : 1,
-          transition: "box-shadow .35s ease, border-color .35s ease, transform .35s ease",
+            ? "0 1px 2px rgba(90,66,44,0.04)"
+            : "0 1px 2px rgba(90,66,44,0.05), 0 12px 28px -20px rgba(90,66,44,0.45)",
+          opacity: isLocked ? 0.7 : 1,
+          transition: "box-shadow .35s ease, border-color .35s ease",
           outline: "none",
-          "&:focus-visible": { boxShadow: `0 0 0 3px rgba(212,175,55,0.45)` },
+          "&:focus-visible": { boxShadow: `0 0 0 3px rgba(163,105,32,0.35)` },
           "&:hover": isLocked ? {} : {
-            borderColor: "rgba(212,175,55,0.65)",
-            boxShadow: "0 4px 10px rgba(42,26,20,0.22), 0 26px 50px -18px rgba(42,26,20,0.7), 0 0 0 1px rgba(212,175,55,0.18)",
+            borderColor: "rgba(163,105,32,0.42)",
+            boxShadow: "0 2px 6px rgba(90,66,44,0.07), 0 26px 46px -26px rgba(90,66,44,0.55)",
           },
-          // Halo dorado que nace del icono al pasar el cursor
+          // Velo dorado muy tenue que sube desde el pie al pasar el cursor
           "&::before": {
             content: '""',
             position: "absolute",
-            top: "-30%", left: "50%",
-            width: 220, height: 220,
-            transform: "translateX(-50%) scale(0.4)",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(212,175,55,0.30) 0%, rgba(212,175,55,0) 68%)",
+            inset: 0,
+            background: "radial-gradient(120% 80% at 50% 118%, rgba(212,175,55,0.20) 0%, rgba(212,175,55,0) 62%)",
             opacity: 0,
-            transition: "opacity .5s ease, transform .6s cubic-bezier(.22,1,.36,1)",
+            transition: "opacity .45s ease",
             pointerEvents: "none",
           },
-          "&:hover::before": isLocked ? {} : { opacity: 1, transform: "translateX(-50%) scale(1)" },
-          // Destello que recorre el cuadro
+          "&:hover::before": isLocked ? {} : { opacity: 1 },
+          // Filo dorado que se dibuja en el borde superior
           "&::after": {
             content: '""',
             position: "absolute",
-            top: 0, bottom: 0,
-            left: "-60%", width: "45%",
-            background: "linear-gradient(105deg, transparent 0%, rgba(255,240,205,0.16) 50%, transparent 100%)",
-            transform: "skewX(-18deg)",
-            transition: "left .75s cubic-bezier(.22,1,.36,1)",
+            top: 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 0,
+            height: 2,
+            borderRadius: 2,
+            background: `linear-gradient(90deg, rgba(212,175,55,0), ${ORO_CLARO} 50%, rgba(212,175,55,0))`,
+            transition: "width .5s cubic-bezier(.22,1,.36,1)",
             pointerEvents: "none",
           },
-          "&:hover::after": isLocked ? {} : { left: "125%" },
+          "&:hover::after": isLocked ? {} : { width: "70%" },
         }}
       >
-        {/* Icono en placa dorada */}
+        {/* Icono sobre placa champán */}
         <MotionBox
           variants={iconoTarjeta}
           sx={{
-            width: 54,
-            height: 54,
-            [mqCompacto]: { width: 33, height: 33 },
+            width: 56,
+            height: 56,
+            [mqCompacto]: { width: 44, height: 44 },
             flexShrink: 0,
-            borderRadius: "16px",
+            borderRadius: "18px",
             position: "relative",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             background: isLocked
-              ? "rgba(255,255,255,0.10)"
-              : `linear-gradient(140deg, #F2DFA0 0%, ${ORO_CLARO} 38%, ${ORO} 100%)`,
-            boxShadow: isLocked
-              ? "none"
-              : "0 10px 22px -10px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.15)",
+              ? "#e6e0d6"
+              : "linear-gradient(150deg, #fdf6e6 0%, #f4e6c8 100%)",
+            border: `1px solid ${isLocked ? "rgba(120,100,80,0.16)" : "rgba(212,175,55,0.42)"}`,
+            boxShadow: isLocked ? "none" : "inset 0 1px 0 rgba(255,255,255,0.9)",
+            transition: "background .35s ease, box-shadow .35s ease",
+            ".modulo-cuadro:hover &": isLocked ? {} : {
+              background: `linear-gradient(150deg, #f7e6bb 0%, ${ORO_CLARO} 120%)`,
+              boxShadow: "0 8px 18px -10px rgba(163,105,32,0.6)",
+            },
           }}
         >
           {IconComponent && (
-            <IconComponent sx={{ fontSize: 26, [mqCompacto]: { fontSize: 17 }, color: isLocked ? "rgba(255,255,255,0.5)" : "#2A1A14" }} />
+            <IconComponent
+              sx={{
+                fontSize: 28,
+                [mqCompacto]: { fontSize: 22 },
+                color: isLocked ? "rgba(80,64,48,0.45)" : "#4E362C",
+              }}
+            />
           )}
           {isLocked && (
             <Box
@@ -432,7 +459,7 @@ export default function Dashboard() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                border: "2px solid #34231C",
+                border: "2px solid #ffffff",
               }}
             >
               <Lock sx={{ fontSize: 10, color: "white" }} />
@@ -443,14 +470,20 @@ export default function Dashboard() {
         {/* Nombre del módulo y su etiqueta */}
         <Box sx={{ width: "100%", minWidth: 0 }}>
           <Typography
-            noWrap
             sx={{
               fontWeight: 600,
-              color: isLocked ? "rgba(255,255,255,0.55)" : "#F7EFE3",
+              color: isLocked ? "rgba(62,43,34,0.5)" : "#3E2B22",
               fontSize: "1rem",
-              [mqCompacto]: { fontSize: "0.86rem" },
-              lineHeight: 1.3,
+              [mqCompacto]: { fontSize: "0.88rem" },
+              lineHeight: 1.25,
               letterSpacing: "0.2px",
+              // En un cuadro hay sitio para dos líneas, así que los nombres
+              // largos se parten en vez de cortarse con puntos suspensivos.
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              px: 0.5,
             }}
           >
             {item.title}
@@ -459,8 +492,8 @@ export default function Dashboard() {
             noWrap
             sx={{
               mt: 0.6,
-              [mqCompacto]: { mt: 0.35 },
-              color: isLocked ? "rgba(255,255,255,0.4)" : "rgba(212,175,55,0.85)",
+              [mqCompacto]: { mt: 0.4 },
+              color: isLocked ? "rgba(62,43,34,0.4)" : "#8a6a2f",
               fontSize: "0.58rem",
               fontWeight: 700,
               letterSpacing: "1.8px",
@@ -700,12 +733,12 @@ export default function Dashboard() {
           top: 0,
           height: "100vh",
           width: "50vw",
-          opacity: 0.32,
+          opacity: 0.18,
           pointerEvents: "none",
           zIndex: 0,
           objectFit: "cover",
           objectPosition: "center top",
-          filter: "grayscale(25%) saturate(0.9)",
+          filter: "grayscale(45%) saturate(0.85)",
           maskImage: "linear-gradient(to right, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
           WebkitMaskImage: "linear-gradient(to right, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
         }}
@@ -720,12 +753,12 @@ export default function Dashboard() {
           top: "-10%",
           height: "110vh",
           width: "50vw",
-          opacity: 0.32,
+          opacity: 0.18,
           pointerEvents: "none",
           zIndex: 0,
           objectFit: "cover",
           objectPosition: "center top",
-          filter: "grayscale(25%) saturate(0.9)",
+          filter: "grayscale(45%) saturate(0.85)",
           maskImage: "linear-gradient(to left, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
           WebkitMaskImage: "linear-gradient(to left, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
         }}
@@ -876,7 +909,7 @@ export default function Dashboard() {
           </Box>
 
           {/* Módulos, por secciones */}
-          <Box sx={{ maxWidth: 1240, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
+          <Box sx={{ maxWidth: { xs: "100%", sm: 760, md: 980, lg: anchoRejilla }, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
             {secciones.map((sec) => (
               <Box key={sec.id} sx={{ mb: { xs: 2.5, sm: 3 }, [mqCompacto]: { mb: 0.6 }, "&:last-of-type": { mb: 0 } }}>
                 {sec.label && (
@@ -896,7 +929,9 @@ export default function Dashboard() {
                     />
                     <Typography
                       sx={{
-                        color: ORO,
+                        // Un punto más oscuro que el dorado de marca para que
+                        // el rótulo se lea bien sobre el fondo claro.
+                        color: "#8a5a1c",
                         fontSize: "0.66rem",
                         fontWeight: 700,
                         letterSpacing: "2.2px",
@@ -923,7 +958,7 @@ export default function Dashboard() {
                       md: "repeat(3, 1fr)",
                       lg: "repeat(4, 1fr)",
                     },
-                    gap: { xs: 1.75, sm: 2.4 },
+                    gap: { xs: 1.75, sm: 2.5 },
                   }}
                 >
                   {sec.items.map(renderTarjeta)}
