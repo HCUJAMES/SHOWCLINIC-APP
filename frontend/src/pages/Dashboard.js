@@ -34,7 +34,6 @@ import {
   SupervisorAccount,
   QrCode2,
   MonetizationOn,
-  ArrowForwardRounded,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -112,12 +111,6 @@ const iconoTarjeta = {
   hidden: { rotate: 0, scale: 1 },
   show: { rotate: 0, scale: 1 },
   hover: { rotate: -6, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 16 } },
-};
-
-const flechaTarjeta = {
-  hidden: { opacity: 0, x: -6 },
-  show: { opacity: 0, x: -6 },
-  hover: { opacity: 1, x: 0, transition: { duration: 0.25, ease: suave } },
 };
 
 export default function Dashboard() {
@@ -345,84 +338,86 @@ export default function Dashboard() {
         sx={{
           position: "relative",
           cursor: "pointer",
-          borderRadius: "18px",
-          px: 2.4,
-          py: 2.9,
-          [mqCompacto]: { px: 1.9, py: 1.55 },
+          borderRadius: "20px",
+          px: 2,
+          py: 4,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          gap: 2,
+          justifyContent: "center",
+          textAlign: "center",
+          gap: 1.5,
+          [mqCompacto]: { gap: 0.55, px: 1.3, py: 1 },
           overflow: "hidden",
           isolation: "isolate",
-          // Vidrio cálido: deja pasar el fondo pero mantiene la lectura
+          // Café profundo de la marca (el mismo de la barra de Gestión CEO),
+          // que hace resaltar el dorado mucho más que el crema.
           background: isLocked
-            ? "rgba(250,248,245,0.55)"
-            : "linear-gradient(160deg, rgba(255,253,247,0.92) 0%, rgba(255,251,242,0.80) 100%)",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
-          border: `1px solid ${isLocked ? "rgba(0,0,0,0.06)" : "rgba(186,154,99,0.22)"}`,
+            ? "linear-gradient(160deg, #6b5c55 0%, #524741 100%)"
+            : "linear-gradient(160deg, #4E362C 0%, #34231C 55%, #2A1A14 100%)",
+          border: `1px solid ${isLocked ? "rgba(255,255,255,0.08)" : "rgba(212,175,55,0.22)"}`,
           boxShadow: isLocked
-            ? "none"
-            : "0 1px 2px rgba(163,105,32,0.06), 0 10px 30px -12px rgba(163,105,32,0.20)",
-          filter: isLocked ? "grayscale(0.6)" : "none",
-          opacity: isLocked ? 0.62 : 1,
-          transition: "box-shadow .35s ease, border-color .35s ease",
+            ? "0 6px 18px -12px rgba(0,0,0,0.5)"
+            : "0 2px 6px rgba(42,26,20,0.18), 0 16px 34px -16px rgba(42,26,20,0.55)",
+          opacity: isLocked ? 0.55 : 1,
+          transition: "box-shadow .35s ease, border-color .35s ease, transform .35s ease",
           outline: "none",
-          "&:focus-visible": { boxShadow: `0 0 0 3px rgba(163,105,32,0.28)` },
+          "&:focus-visible": { boxShadow: `0 0 0 3px rgba(212,175,55,0.45)` },
           "&:hover": isLocked ? {} : {
-            borderColor: "rgba(163,105,32,0.45)",
-            boxShadow: "0 2px 4px rgba(163,105,32,0.08), 0 22px 44px -14px rgba(163,105,32,0.32)",
+            borderColor: "rgba(212,175,55,0.65)",
+            boxShadow: "0 4px 10px rgba(42,26,20,0.22), 0 26px 50px -18px rgba(42,26,20,0.7), 0 0 0 1px rgba(212,175,55,0.18)",
           },
-          // Filo dorado lateral que se despliega al pasar el cursor
+          // Halo dorado que nace del icono al pasar el cursor
           "&::before": {
             content: '""',
             position: "absolute",
-            left: 0, top: 12, bottom: 12,
-            width: 3,
-            borderRadius: "0 3px 3px 0",
-            background: `linear-gradient(180deg, ${ORO_CLARO}, ${ORO})`,
-            transform: "scaleY(0)",
-            transformOrigin: "center",
-            transition: "transform .45s cubic-bezier(.22,1,.36,1)",
+            top: "-30%", left: "50%",
+            width: 220, height: 220,
+            transform: "translateX(-50%) scale(0.4)",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(212,175,55,0.30) 0%, rgba(212,175,55,0) 68%)",
+            opacity: 0,
+            transition: "opacity .5s ease, transform .6s cubic-bezier(.22,1,.36,1)",
+            pointerEvents: "none",
           },
-          "&:hover::before": isLocked ? {} : { transform: "scaleY(1)" },
-          // Destello que recorre la tarjeta
+          "&:hover::before": isLocked ? {} : { opacity: 1, transform: "translateX(-50%) scale(1)" },
+          // Destello que recorre el cuadro
           "&::after": {
             content: '""',
             position: "absolute",
             top: 0, bottom: 0,
-            left: "-60%", width: "50%",
-            background: "linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%)",
+            left: "-60%", width: "45%",
+            background: "linear-gradient(105deg, transparent 0%, rgba(255,240,205,0.16) 50%, transparent 100%)",
             transform: "skewX(-18deg)",
-            transition: "left .7s cubic-bezier(.22,1,.36,1)",
+            transition: "left .75s cubic-bezier(.22,1,.36,1)",
             pointerEvents: "none",
           },
-          "&:hover::after": isLocked ? {} : { left: "120%" },
+          "&:hover::after": isLocked ? {} : { left: "125%" },
         }}
       >
         {/* Icono en placa dorada */}
         <MotionBox
           variants={iconoTarjeta}
           sx={{
-            width: 52,
-            height: 52,
-            [mqCompacto]: { width: 44, height: 44 },
+            width: 54,
+            height: 54,
+            [mqCompacto]: { width: 33, height: 33 },
             flexShrink: 0,
-            borderRadius: "14px",
+            borderRadius: "16px",
             position: "relative",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             background: isLocked
-              ? "rgba(0,0,0,0.05)"
-              : `linear-gradient(140deg, #e6c465 0%, ${ORO_CLARO} 35%, ${ORO} 100%)`,
+              ? "rgba(255,255,255,0.10)"
+              : `linear-gradient(140deg, #F2DFA0 0%, ${ORO_CLARO} 38%, ${ORO} 100%)`,
             boxShadow: isLocked
               ? "none"
-              : "0 8px 18px -8px rgba(163,105,32,0.65), inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 0 rgba(0,0,0,0.08)",
+              : "0 10px 22px -10px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.15)",
           }}
         >
           {IconComponent && (
-            <IconComponent sx={{ fontSize: 25, color: isLocked ? "#9e9e9e" : "#fff" }} />
+            <IconComponent sx={{ fontSize: 26, [mqCompacto]: { fontSize: 17 }, color: isLocked ? "rgba(255,255,255,0.5)" : "#2A1A14" }} />
           )}
           {isLocked && (
             <Box
@@ -437,7 +432,7 @@ export default function Dashboard() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                border: "2px solid white",
+                border: "2px solid #34231C",
               }}
             >
               <Lock sx={{ fontSize: 10, color: "white" }} />
@@ -446,15 +441,16 @@ export default function Dashboard() {
         </MotionBox>
 
         {/* Nombre del módulo y su etiqueta */}
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ width: "100%", minWidth: 0 }}>
           <Typography
             noWrap
             sx={{
-              fontWeight: 700,
-              color: "#2e2e2e",
+              fontWeight: 600,
+              color: isLocked ? "rgba(255,255,255,0.55)" : "#F7EFE3",
               fontSize: "1rem",
-              lineHeight: 1.25,
-              letterSpacing: "0.1px",
+              [mqCompacto]: { fontSize: "0.86rem" },
+              lineHeight: 1.3,
+              letterSpacing: "0.2px",
             }}
           >
             {item.title}
@@ -462,33 +458,18 @@ export default function Dashboard() {
           <Typography
             noWrap
             sx={{
-              mt: 0.35,
-              color: isLocked ? "#a89c8c" : ORO_SUAVE,
-              fontSize: "0.6rem",
+              mt: 0.6,
+              [mqCompacto]: { mt: 0.35 },
+              color: isLocked ? "rgba(255,255,255,0.4)" : "rgba(212,175,55,0.85)",
+              fontSize: "0.58rem",
               fontWeight: 700,
-              letterSpacing: "1.4px",
+              letterSpacing: "1.8px",
               textTransform: "uppercase",
             }}
           >
             {isLocked ? "BLOQUEADO" : item.tag}
           </Typography>
         </Box>
-
-        {/* Flecha que aparece al pasar el cursor */}
-        {!isLocked && (
-          <MotionBox
-            variants={flechaTarjeta}
-            sx={{
-              flexShrink: 0,
-              width: 26, height: 26, borderRadius: "50%",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: "rgba(163,105,32,0.09)",
-              border: "1px solid rgba(163,105,32,0.20)",
-            }}
-          >
-            <ArrowForwardRounded sx={{ fontSize: 14, color: ORO }} />
-          </MotionBox>
-        )}
       </MotionBox>
     );
   };
@@ -787,7 +768,7 @@ export default function Dashboard() {
           position: "relative",
           zIndex: 1,
           // En pantallas bajas se recorta el aire para que igual entre todo
-          [mqCompacto]: { py: 2 },
+          [mqCompacto]: { py: 1.4 },
         }}
       >
         <MotionBox
@@ -798,7 +779,7 @@ export default function Dashboard() {
         >
 
           {/* Header */}
-          <Box sx={{ textAlign: "center", mb: { xs: 3, sm: 4 }, [mqCompacto]: { mb: 2.25 } }}>
+          <Box sx={{ textAlign: "center", mb: { xs: 3, sm: 4 }, [mqCompacto]: { mb: 1.5 } }}>
             <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", mb: 1.5 }}>
               {/* Halo que respira detrás del logo */}
               <MotionBox
@@ -818,7 +799,7 @@ export default function Dashboard() {
                 sx={{
                   width: 88,
                   height: 88,
-                  [mqCompacto]: { width: 66, height: 66 },
+                  [mqCompacto]: { width: 48, height: 48 },
                   objectFit: "cover",
                   borderRadius: "50%",
                   border: "3px solid rgba(255,255,255,0.9)",
@@ -895,9 +876,9 @@ export default function Dashboard() {
           </Box>
 
           {/* Módulos, por secciones */}
-          <Box sx={{ maxWidth: 1400, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
+          <Box sx={{ maxWidth: 1240, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
             {secciones.map((sec) => (
-              <Box key={sec.id} sx={{ mb: { xs: 3, sm: 4 }, [mqCompacto]: { mb: 1.75 }, "&:last-of-type": { mb: 0 } }}>
+              <Box key={sec.id} sx={{ mb: { xs: 2.5, sm: 3 }, [mqCompacto]: { mb: 0.6 }, "&:last-of-type": { mb: 0 } }}>
                 {sec.label && (
                   <MotionBox
                     variants={subir}
@@ -952,7 +933,7 @@ export default function Dashboard() {
           </Box>
 
           {/* Session info */}
-          <MotionBox variants={subir} sx={{ mt: 3, [mqCompacto]: { mt: 1.75 }, textAlign: "center" }}>
+          <MotionBox variants={subir} sx={{ mt: 2, [mqCompacto]: { mt: 0.6 }, textAlign: "center" }}>
             <Typography variant="caption" sx={{ color: "#b9ad98", fontWeight: 400, fontSize: "0.75rem", letterSpacing: "0.3px" }}>
               Panel de administración • Sesión activa
             </Typography>
