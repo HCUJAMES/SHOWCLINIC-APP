@@ -241,19 +241,22 @@ export default function Dashboard() {
   // Cuantos más módulos tenga el rol, antes conviene compactar para que
   // todo siga entrando en una pantalla.
   const mqCompacto = `@media (max-height: ${menuItems.length >= 11 ? 1300 : 1150}px)`;
+  // Segundo escalón para portátiles bajos, donde el cuadro se queda pequeño y
+  // el icono a tamaño normal ya no cabría dentro.
+  const mqMini = `@media (max-height: ${menuItems.length >= 11 ? 1000 : 860}px)`;
 
   // Las tarjetas son cuadradas, así que su alto lo manda el ancho de la
   // columna. Para que todas las filas sigan entrando en una pantalla se
   // limita el ancho de la rejilla en función del alto disponible.
   const anchoRejilla = useMemo(() => {
     const filas = Math.max(1, secciones.length);
-    const CROMO = 230;        // cabecera y pie
-    const POR_SECCION = 58;   // rótulo de la sección y su separación
-    const GAP = 20;
+    const CROMO = 88;         // cabecera y pie
+    const POR_SECCION = 50;   // rótulo de la sección y su separación
+    const GAP = 22;
     const disponible = `(100vh - ${CROMO}px - ${filas * POR_SECCION}px)`;
     // El suelo evita que en pantallas muy bajas el cuadro se encoja tanto que
     // el icono y el texto no quepan; ahí se prefiere que la página desplace.
-    return `max(660px, min(1080px, calc(${disponible} / ${filas} * 4 + ${GAP * 3}px)))`;
+    return `max(660px, min(1300px, calc(${disponible} / ${filas} * 4 + ${GAP * 3}px)))`;
   }, [secciones.length]);
 
   const username = localStorage.getItem("username") || role;
@@ -366,6 +369,7 @@ export default function Dashboard() {
           textAlign: "center",
           gap: 1.4,
           [mqCompacto]: { gap: 0.9, px: 1.2 },
+          [mqMini]: { gap: 0.6, px: 1, py: 0.75 },
           overflow: "hidden",
           isolation: "isolate",
           // Tarjeta clara y limpia: blanco roto con el dorado sólo como acento.
@@ -416,11 +420,12 @@ export default function Dashboard() {
         <MotionBox
           variants={iconoTarjeta}
           sx={{
-            width: 56,
-            height: 56,
-            [mqCompacto]: { width: 44, height: 44 },
+            width: 78,
+            height: 78,
+            [mqCompacto]: { width: 68, height: 68 },
+            [mqMini]: { width: 50, height: 50, borderRadius: "16px" },
             flexShrink: 0,
-            borderRadius: "18px",
+            borderRadius: "22px",
             position: "relative",
             display: "flex",
             alignItems: "center",
@@ -440,8 +445,9 @@ export default function Dashboard() {
           {IconComponent && (
             <IconComponent
               sx={{
-                fontSize: 28,
-                [mqCompacto]: { fontSize: 22 },
+                fontSize: 37,
+                [mqCompacto]: { fontSize: 32 },
+                [mqMini]: { fontSize: 25 },
                 color: isLocked ? "rgba(80,64,48,0.45)" : "#4E362C",
               }}
             />
@@ -470,13 +476,23 @@ export default function Dashboard() {
         {/* Nombre del módulo y su etiqueta */}
         <Box sx={{ width: "100%", minWidth: 0 }}>
           <Typography
+            // Con la variante por defecto, index.css fuerza Inter con
+            // !important sobre .MuiTypography-body1 y la serif no se aplicaría.
+            variant="h6"
+            component="div"
             sx={{
+              // La serif con la que ya está escrito SHOWCLINIC. Ata cada módulo
+              // a la marca y se lee mucho más señorial que la sans de antes.
+              fontFamily: "'Cormorant Garamond', Georgia, serif",
               fontWeight: 600,
               color: isLocked ? "rgba(62,43,34,0.5)" : "#3E2B22",
-              fontSize: "1rem",
-              [mqCompacto]: { fontSize: "0.88rem" },
-              lineHeight: 1.25,
-              letterSpacing: "0.2px",
+              // Cormorant tiene la caja baja pequeña, así que necesita ir un
+              // par de puntos por encima de lo que pediría una sans.
+              fontSize: "1.68rem",
+              [mqCompacto]: { fontSize: "1.5rem" },
+              [mqMini]: { fontSize: "1.14rem" },
+              lineHeight: 1.2,
+              letterSpacing: "0.3px",
               // En un cuadro hay sitio para dos líneas, así que los nombres
               // largos se parten en vez de cortarse con puntos suspensivos.
               display: "-webkit-box",
@@ -491,13 +507,18 @@ export default function Dashboard() {
           <Typography
             noWrap
             sx={{
-              mt: 0.6,
-              [mqCompacto]: { mt: 0.4 },
+              mt: 0.9,
+              fontFamily: "'Inter', 'Poppins', sans-serif",
               color: isLocked ? "rgba(62,43,34,0.4)" : "#8a6a2f",
-              fontSize: "0.58rem",
-              fontWeight: 700,
-              letterSpacing: "1.8px",
+              fontSize: "0.6rem",
+              fontWeight: 600,
+              // El interletrado ancho deja un hueco de más al final; el sangrado
+              // lo compensa para que el texto quede centrado de verdad.
+              letterSpacing: "2.6px",
+              textIndent: "2.6px",
               textTransform: "uppercase",
+              [mqCompacto]: { mt: 0.65 },
+              [mqMini]: { mt: 0.4, fontSize: "0.55rem", letterSpacing: "2.2px", textIndent: "2.2px" },
             }}
           >
             {isLocked ? "BLOQUEADO" : item.tag}
@@ -802,6 +823,9 @@ export default function Dashboard() {
           zIndex: 1,
           // En pantallas bajas se recorta el aire para que igual entre todo
           [mqCompacto]: { py: 1.4 },
+          // En el móvil la campana de avisos está fija arriba a la derecha y
+          // se montaba sobre el nombre; se baja la cabecera para librarla.
+          "@media (max-width: 599.95px)": { pt: 9, pb: 3 },
         }}
       >
         <MotionBox
@@ -811,9 +835,21 @@ export default function Dashboard() {
           sx={{ width: "100%", maxWidth: 1560 }}
         >
 
-          {/* Header */}
-          <Box sx={{ textAlign: "center", mb: { xs: 3, sm: 4 }, [mqCompacto]: { mb: 1.5 } }}>
-            <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", mb: 1.5 }}>
+          {/* Header: en pantalla ancha el logo, el nombre y el saludo van en
+              una sola línea. Ocupa la mitad de alto que apilado, y ese alto
+              recuperado se lo quedan los cuadros de los módulos. */}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: "center",
+              justifyContent: "center",
+              gap: { xs: 1.5, md: 3 },
+              mb: { xs: 3, sm: 4 },
+              [mqCompacto]: { mb: 1.6, gap: 2.6 },
+            }}
+          >
+            <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", flexShrink: 0 }}>
               {/* Halo que respira detrás del logo */}
               <MotionBox
                 aria-hidden
@@ -832,7 +868,7 @@ export default function Dashboard() {
                 sx={{
                   width: 88,
                   height: 88,
-                  [mqCompacto]: { width: 48, height: 48 },
+                  [mqCompacto]: { width: 62, height: 62 },
                   objectFit: "cover",
                   borderRadius: "50%",
                   border: "3px solid rgba(255,255,255,0.9)",
@@ -843,14 +879,16 @@ export default function Dashboard() {
               />
             </MotionBox>
 
-            <MotionBox variants={subir}>
+            <MotionBox variants={subir} sx={{ textAlign: { xs: "center", md: "left" } }}>
               <Typography
                 variant="h3"
                 sx={{
-                  fontFamily: "'Playfair Display', serif",
+                  fontFamily: "'Cormorant Garamond', Georgia, serif",
                   fontWeight: 700,
                   letterSpacing: 4,
+                  lineHeight: 1.05,
                   fontSize: { xs: "1.8rem", sm: "2.4rem", md: "2.8rem" },
+                  [mqCompacto]: { fontSize: "2.15rem" },
                   // Oro con relieve: degradado sobre el texto
                   background: `linear-gradient(180deg, #c58a3a 0%, ${ORO} 55%, #7d5017 100%)`,
                   WebkitBackgroundClip: "text",
@@ -861,28 +899,46 @@ export default function Dashboard() {
               >
                 SHOWCLINIC
               </Typography>
+
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: { xs: "center", md: "flex-start" }, gap: 1.5, mt: 0.5 }}>
+                <Box sx={{ width: { xs: 22, sm: 40, md: 0 }, height: 1, background: `linear-gradient(90deg, transparent, ${ORO_SUAVE})` }} />
+                <Typography
+                  sx={{
+                    fontFamily: "'Inter', 'Poppins', sans-serif",
+                    color: "#8a7247",
+                    letterSpacing: 2.6,
+                    fontWeight: 500,
+                    fontSize: { xs: "0.7rem", sm: "0.78rem" },
+                  }}
+                >
+                  ESTÉTICA AVANZADA &amp; BIENESTAR
+                </Typography>
+                <Box sx={{ width: { xs: 22, sm: 40 }, height: 1, background: `linear-gradient(90deg, ${ORO_SUAVE}, transparent)` }} />
+              </Box>
             </MotionBox>
 
-            <MotionBox variants={subir} sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5, mt: 0.75 }}>
-              <Box sx={{ width: { xs: 22, sm: 40 }, height: 1, background: `linear-gradient(90deg, transparent, ${ORO_SUAVE})` }} />
-              <Typography
-                sx={{ color: ORO_SUAVE, letterSpacing: 2.5, fontWeight: 500, fontSize: { xs: "0.7rem", sm: "0.85rem" } }}
-              >
-                ESTÉTICA AVANZADA & BIENESTAR
-              </Typography>
-              <Box sx={{ width: { xs: 22, sm: 40 }, height: 1, background: `linear-gradient(90deg, ${ORO_SUAVE}, transparent)` }} />
-            </MotionBox>
+            {/* Filete dorado que separa la marca del saludo */}
+            <Box
+              aria-hidden
+              sx={{
+                display: { xs: "none", md: "block" },
+                width: "1px",
+                alignSelf: "stretch",
+                my: 1,
+                background: `linear-gradient(180deg, transparent, rgba(186,154,99,0.55), transparent)`,
+              }}
+            />
 
             <MotionBox
               variants={subir}
               sx={{
-                mt: 2,
-                [mqCompacto]: { mt: 1.25, py: 0.4 },
                 display: "inline-flex",
+                flexShrink: 0,
                 alignItems: "center",
                 gap: 1.1,
                 px: 2.75,
                 py: 0.8,
+                [mqCompacto]: { py: 0.55 },
                 borderRadius: 50,
                 backgroundColor: "rgba(255,253,247,0.75)",
                 backdropFilter: "blur(10px)",
@@ -901,7 +957,14 @@ export default function Dashboard() {
               </Box>
               <Typography
                 variant="body1"
-                sx={{ color: "#6B6B6B", fontWeight: 400, fontSize: { xs: "0.9rem", sm: "1rem" } }}
+                sx={{
+                  fontFamily: "'Inter', 'Poppins', sans-serif",
+                  color: "#5f5348",
+                  fontWeight: 400,
+                  letterSpacing: "0.2px",
+                  fontSize: { xs: "0.9rem", sm: "0.95rem" },
+                  whiteSpace: "nowrap",
+                }}
               >
                 {saludo}, <strong style={{ color: ORO }}>{username}</strong>
               </Typography>
@@ -929,12 +992,13 @@ export default function Dashboard() {
                     />
                     <Typography
                       sx={{
+                        fontFamily: "'Inter', 'Poppins', sans-serif",
                         // Un punto más oscuro que el dorado de marca para que
                         // el rótulo se lea bien sobre el fondo claro.
                         color: "#8a5a1c",
-                        fontSize: "0.66rem",
-                        fontWeight: 700,
-                        letterSpacing: "2.2px",
+                        fontSize: "0.68rem",
+                        fontWeight: 600,
+                        letterSpacing: "2.8px",
                         textTransform: "uppercase",
                         whiteSpace: "nowrap",
                       }}
@@ -958,7 +1022,7 @@ export default function Dashboard() {
                       md: "repeat(3, 1fr)",
                       lg: "repeat(4, 1fr)",
                     },
-                    gap: { xs: 1.75, sm: 2.5 },
+                    gap: { xs: 1.75, sm: 2.75 },
                   }}
                 >
                   {sec.items.map(renderTarjeta)}
