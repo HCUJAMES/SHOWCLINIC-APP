@@ -241,22 +241,30 @@ export default function Dashboard() {
   // Cuantos más módulos tenga el rol, antes conviene compactar para que
   // todo siga entrando en una pantalla.
   const mqCompacto = `@media (max-height: ${menuItems.length >= 11 ? 1300 : 1150}px)`;
-  // Segundo escalón para portátiles bajos, donde el cuadro se queda pequeño y
-  // el icono a tamaño normal ya no cabría dentro.
-  const mqMini = `@media (max-height: ${menuItems.length >= 11 ? 1000 : 860}px)`;
+  // Segundo escalón: la portada se encoge y el cuadro con ella, porque a
+  // partir de aquí el icono a tamaño normal ya no cabría dentro.
+  const altoMini = menuItems.length >= 11 ? 1180 : 980;
+  const mqMini = `@media (max-height: ${altoMini}px)`;
+  // El mismo escalón, pero sólo donde la rejilla es de cuatro columnas.
+  const mqMiniAncho = `@media (max-height: ${altoMini}px) and (min-width: 1200px)`;
 
   // Las tarjetas son cuadradas, así que su alto lo manda el ancho de la
   // columna. Para que todas las filas sigan entrando en una pantalla se
   // limita el ancho de la rejilla en función del alto disponible.
   const anchoRejilla = useMemo(() => {
     const filas = Math.max(1, secciones.length);
-    const CROMO = 88;         // cabecera y pie
     const POR_SECCION = 50;   // rótulo de la sección y su separación
     const GAP = 22;
-    const disponible = `(100vh - ${CROMO}px - ${filas * POR_SECCION}px)`;
     // El suelo evita que en pantallas muy bajas el cuadro se encoja tanto que
     // el icono y el texto no quepan; ahí se prefiere que la página desplace.
-    return `max(660px, min(1300px, calc(${disponible} / ${filas} * 4 + ${GAP * 3}px)))`;
+    const formula = (cromo) =>
+      `max(600px, min(1300px, calc((100vh - ${cromo}px - ${filas * POR_SECCION}px) / ${filas} * 4 + ${GAP * 3}px)))`;
+    return {
+      // Con la portada completa (logo grande, nombre grande).
+      normal: formula(246),
+      // Con la portada encogida, que es la que se usa en pantallas bajas.
+      mini: formula(178),
+    };
   }, [secciones.length]);
 
   const username = localStorage.getItem("username") || role;
@@ -822,10 +830,11 @@ export default function Dashboard() {
           position: "relative",
           zIndex: 1,
           // En pantallas bajas se recorta el aire para que igual entre todo
-          [mqCompacto]: { py: 1.4 },
+          [mqCompacto]: { py: 2.5 },
+          [mqMini]: { py: 1.4 },
           // En el móvil la campana de avisos está fija arriba a la derecha y
           // se montaba sobre el nombre; se baja la cabecera para librarla.
-          "@media (max-width: 599.95px)": { pt: 9, pb: 3 },
+          "@media (max-width: 599.95px)": { pt: 6, pb: 3 },
         }}
       >
         <MotionBox
@@ -835,21 +844,27 @@ export default function Dashboard() {
           sx={{ width: "100%", maxWidth: 1560 }}
         >
 
-          {/* Header: en pantalla ancha el logo, el nombre y el saludo van en
-              una sola línea. Ocupa la mitad de alto que apilado, y ese alto
-              recuperado se lo quedan los cuadros de los módulos. */}
+          {/* Header: el logo y el nombre van centrados y sueltos, como una
+              portada. El aire de alrededor es parte del diseño, no un hueco
+              desaprovechado. */}
           <Box
             sx={{
-              display: "flex",
-              flexDirection: { xs: "column", md: "row" },
-              alignItems: "center",
-              justifyContent: "center",
-              gap: { xs: 1.5, md: 3 },
-              mb: { xs: 3, sm: 4 },
-              [mqCompacto]: { mb: 1.6, gap: 2.6 },
+              textAlign: "center",
+              mb: { xs: 3, sm: 5 },
+              [mqCompacto]: { mb: 3 },
+              [mqMini]: { mb: 1.6 },
             }}
           >
-            <MotionBox variants={subir} sx={{ display: "inline-block", position: "relative", flexShrink: 0 }}>
+            <MotionBox
+              variants={subir}
+              sx={{
+                display: "inline-block",
+                position: "relative",
+                mb: 2,
+                [mqCompacto]: { mb: 1.4 },
+                [mqMini]: { mb: 0.9 },
+              }}
+            >
               {/* Halo que respira detrás del logo */}
               <MotionBox
                 aria-hidden
@@ -866,9 +881,10 @@ export default function Dashboard() {
                 src="/logo-showclinic.png"
                 alt="ShowClinic"
                 sx={{
-                  width: 88,
-                  height: 88,
-                  [mqCompacto]: { width: 62, height: 62 },
+                  width: 92,
+                  height: 92,
+                  [mqCompacto]: { width: 74, height: 74 },
+                  [mqMini]: { width: 52, height: 52, borderWidth: "2px" },
                   objectFit: "cover",
                   borderRadius: "50%",
                   border: "3px solid rgba(255,255,255,0.9)",
@@ -879,16 +895,19 @@ export default function Dashboard() {
               />
             </MotionBox>
 
-            <MotionBox variants={subir} sx={{ textAlign: { xs: "center", md: "left" } }}>
+            <MotionBox variants={subir}>
               <Typography
                 variant="h3"
                 sx={{
                   fontFamily: "'Cormorant Garamond', Georgia, serif",
                   fontWeight: 700,
-                  letterSpacing: 4,
+                  // El interletrado ancho es lo que le da el aire de portada.
+                  letterSpacing: { xs: 5, sm: 9 },
+                  textIndent: { xs: "5px", sm: "9px" },
                   lineHeight: 1.05,
-                  fontSize: { xs: "1.8rem", sm: "2.4rem", md: "2.8rem" },
-                  [mqCompacto]: { fontSize: "2.15rem" },
+                  fontSize: { xs: "1.8rem", sm: "2.4rem", md: "3rem" },
+                  [mqCompacto]: { fontSize: "2.5rem" },
+                  [mqMini]: { fontSize: "1.85rem", letterSpacing: 6, textIndent: "6px" },
                   // Oro con relieve: degradado sobre el texto
                   background: `linear-gradient(180deg, #c58a3a 0%, ${ORO} 55%, #7d5017 100%)`,
                   WebkitBackgroundClip: "text",
@@ -900,50 +919,34 @@ export default function Dashboard() {
                 SHOWCLINIC
               </Typography>
 
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: { xs: "center", md: "flex-start" }, gap: 1.5, mt: 0.5 }}>
-                <Box sx={{ width: { xs: 22, sm: 40, md: 0 }, height: 1, background: `linear-gradient(90deg, transparent, ${ORO_SUAVE})` }} />
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, mt: 1, [mqCompacto]: { mt: 0.75 } }}>
+                <Box sx={{ width: { xs: 22, sm: 46 }, height: 1, background: `linear-gradient(90deg, transparent, ${ORO_SUAVE})` }} />
                 <Typography
                   sx={{
                     fontFamily: "'Inter', 'Poppins', sans-serif",
                     color: "#8a7247",
-                    letterSpacing: 2.6,
+                    letterSpacing: 3,
+                    textIndent: "3px",
                     fontWeight: 500,
-                    fontSize: { xs: "0.7rem", sm: "0.78rem" },
+                    fontSize: { xs: "0.7rem", sm: "0.76rem" },
                   }}
                 >
                   ESTÉTICA AVANZADA &amp; BIENESTAR
                 </Typography>
-                <Box sx={{ width: { xs: 22, sm: 40 }, height: 1, background: `linear-gradient(90deg, ${ORO_SUAVE}, transparent)` }} />
+                <Box sx={{ width: { xs: 22, sm: 46 }, height: 1, background: `linear-gradient(90deg, ${ORO_SUAVE}, transparent)` }} />
               </Box>
             </MotionBox>
 
-            {/* Filete dorado que separa la marca del saludo */}
-            <Box
-              aria-hidden
-              sx={{
-                display: { xs: "none", md: "block" },
-                width: "1px",
-                alignSelf: "stretch",
-                my: 1,
-                background: `linear-gradient(180deg, transparent, rgba(186,154,99,0.55), transparent)`,
-              }}
-            />
-
+            {/* Saludo, sin caja: en una portada así, un recuadro más sobraba. */}
             <MotionBox
               variants={subir}
               sx={{
                 display: "inline-flex",
-                flexShrink: 0,
                 alignItems: "center",
                 gap: 1.1,
-                px: 2.75,
-                py: 0.8,
-                [mqCompacto]: { py: 0.55 },
-                borderRadius: 50,
-                backgroundColor: "rgba(255,253,247,0.75)",
-                backdropFilter: "blur(10px)",
-                border: "1px solid rgba(186,154,99,0.25)",
-                boxShadow: "0 8px 24px -12px rgba(163,105,32,0.35)",
+                mt: 2.25,
+                [mqCompacto]: { mt: 1.5 },
+                [mqMini]: { mt: 0.9 },
               }}
             >
               <Box sx={{ position: "relative", width: 8, height: 8 }}>
@@ -972,7 +975,14 @@ export default function Dashboard() {
           </Box>
 
           {/* Módulos, por secciones */}
-          <Box sx={{ maxWidth: { xs: "100%", sm: 760, md: 980, lg: anchoRejilla }, mx: "auto", px: { xs: 0.5, sm: 2 } }}>
+          <Box
+            sx={{
+              maxWidth: { xs: "100%", sm: 760, md: 980, lg: anchoRejilla.normal },
+              [mqMiniAncho]: { maxWidth: anchoRejilla.mini },
+              mx: "auto",
+              px: { xs: 0.5, sm: 2 },
+            }}
+          >
             {secciones.map((sec) => (
               <Box key={sec.id} sx={{ mb: { xs: 2.5, sm: 3 }, [mqCompacto]: { mb: 0.6 }, "&:last-of-type": { mb: 0 } }}>
                 {sec.label && (
