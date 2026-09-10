@@ -62,22 +62,34 @@ import GaleriaTratamiento from "../components/GaleriaTratamiento";
    Se declaran fuera del componente para que React no las vuelva a montar
    en cada render. Todas las tarjetas comparten el mismo encabezado y el
    mismo ritmo de filas, que es lo que hace que la ficha se vea pareja. */
-const FICHA_BORDE = "#EADFCF";
-const FICHA_HAIRLINE = "#F3EADB";
+const FICHA_ORO = "rgba(172,128,45,0.8)";        // marco exterior
+const FICHA_ORO_TENUE = "rgba(196,159,88,0.5)";  // filete interior
+const FICHA_HAIRLINE = "#EFE2CB";
 const FICHA_TEXTO = "#4A342B";
-const FICHA_VACIO = "#c9bfae";
+const FICHA_VACIO = "#bdb1a0";
 
 const TarjetaFicha = ({ icono: Icono, titulo, extra, accion, onClick, children, sx, separador = true }) => (
   <Paper
     elevation={0}
     sx={{
+      position: "relative",
       display: "flex",
       flexDirection: "column",
-      p: { xs: 2.25, sm: 2.75 },
+      p: { xs: 2.5, sm: 3.25 },
       borderRadius: "18px",
       backgroundColor: "#fff",
-      border: `1px solid ${FICHA_BORDE}`,
-      boxShadow: "0 1px 2px rgba(93,64,55,0.04), 0 12px 28px -24px rgba(93,64,55,0.55)",
+      border: `1px solid ${FICHA_ORO}`,
+      boxShadow: "0 1px 2px rgba(93,64,55,0.04), 0 12px 30px -24px rgba(120,88,40,0.6)",
+      // Marco doble: el filete interior es lo que le da el aire de lámina
+      // enmarcada en vez de un simple recuadro.
+      "&::before": {
+        content: '""',
+        position: "absolute",
+        inset: 6,
+        borderRadius: "13px",
+        border: `1px solid ${FICHA_ORO_TENUE}`,
+        pointerEvents: "none",
+      },
       ...sx,
     }}
   >
@@ -89,33 +101,33 @@ const TarjetaFicha = ({ icono: Icono, titulo, extra, accion, onClick, children, 
         gap: 1.5,
         pb: separador ? 1.75 : 0,
         mb: separador ? 2 : 0,
-        borderBottom: separador ? `1px solid ${FICHA_BORDE}` : "none",
+        borderBottom: separador ? `1px solid ${FICHA_ORO_TENUE}` : "none",
         cursor: onClick ? "pointer" : "default",
       }}
     >
       <Box
         sx={{
-          width: 34,
-          height: 34,
+          width: 38,
+          height: 38,
           flexShrink: 0,
-          borderRadius: "11px",
+          borderRadius: "12px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(150deg, #fdf6e6 0%, #f4e6c8 100%)",
-          border: "1px solid rgba(200,169,110,0.45)",
+          background: "linear-gradient(150deg, #fdf6e6 0%, #f2e2bf 100%)",
+          border: "1px solid rgba(184,143,62,0.5)",
         }}
       >
-        <Icono sx={{ fontSize: 18, color: "#5D4037" }} />
+        <Icono sx={{ fontSize: 21, color: "#5D4037" }} />
       </Box>
       <Typography
         sx={{
           flex: 1,
-          fontWeight: 600,
+          fontWeight: 700,
           color: "#8a5a1c",
-          fontSize: "0.7rem",
+          fontSize: "0.82rem",
           textTransform: "uppercase",
-          letterSpacing: "2.2px",
+          letterSpacing: "2.4px",
         }}
       >
         {titulo}
@@ -133,7 +145,7 @@ const CampoFicha = ({ etiqueta, valor, children }) => (
       display: "flex",
       alignItems: "baseline",
       gap: 2,
-      py: 1.05,
+      py: 1.25,
       borderTop: `1px solid ${FICHA_HAIRLINE}`,
       "&:first-of-type": { borderTop: "none", pt: 0 },
       "&:last-of-type": { pb: 0 },
@@ -141,13 +153,13 @@ const CampoFicha = ({ etiqueta, valor, children }) => (
   >
     <Typography
       sx={{
-        width: 124,
+        width: 144,
         flexShrink: 0,
-        color: "#a89880",
-        fontSize: "0.63rem",
+        color: "#9d8b70",
+        fontSize: "0.72rem",
         fontWeight: 600,
         textTransform: "uppercase",
-        letterSpacing: "1.4px",
+        letterSpacing: "1.5px",
       }}
     >
       {etiqueta}
@@ -157,7 +169,7 @@ const CampoFicha = ({ etiqueta, valor, children }) => (
         <Typography
           sx={{
             fontWeight: 500,
-            fontSize: "0.88rem",
+            fontSize: "1.02rem",
             color: valor ? FICHA_TEXTO : FICHA_VACIO,
             wordBreak: "break-word",
           }}
@@ -4047,12 +4059,21 @@ const HistorialClinico = () => {
                   p: 3.5,
                   borderRadius: "24px",
                   backgroundColor: "#FFF8F0",
-                  border: "1px solid #EADFCF",
-                  boxShadow: "0 2px 12px rgba(93, 64, 55, 0.08)"
+                  border: `1px solid ${FICHA_ORO}`,
+                  boxShadow: "0 2px 12px rgba(120, 88, 40, 0.10)"
                 }}
               >
                 {/* Header de Identidad */}
-                <Box sx={{ display: "flex", alignItems: "center", gap: 3, mb: 4, pb: 3, borderBottom: "2px solid #EADFCF" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
+                    mb: 4,
+                    pb: 3,
+                    borderBottom: `1px solid ${FICHA_ORO_TENUE}`,
+                  }}
+                >
                   <Box
                     sx={{
                       width: 72,
@@ -4164,10 +4185,10 @@ const HistorialClinico = () => {
                           )}
                           <Typography
                             sx={{
-                              color: "#8a7863",
-                              fontSize: "0.78rem",
+                              color: "#7d6c58",
+                              fontSize: "0.88rem",
                               fontWeight: 500,
-                              letterSpacing: "0.9px",
+                              letterSpacing: "1.1px",
                               textTransform: "uppercase",
                             }}
                           >
@@ -4209,8 +4230,8 @@ const HistorialClinico = () => {
                           sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
                           title="Tu rol no tiene acceso al teléfono de las pacientes"
                         >
-                          <Lock sx={{ fontSize: 14, color: FICHA_VACIO }} />
-                          <Typography sx={{ fontWeight: 500, color: FICHA_VACIO, fontSize: "0.88rem" }}>
+                          <Lock sx={{ fontSize: 16, color: FICHA_VACIO }} />
+                          <Typography sx={{ fontWeight: 500, color: FICHA_VACIO, fontSize: "1.02rem" }}>
                             Restringido
                           </Typography>
                         </Box>
@@ -4218,7 +4239,7 @@ const HistorialClinico = () => {
                         <Typography
                           sx={{
                             fontWeight: 500,
-                            fontSize: "0.88rem",
+                            fontSize: "1.02rem",
                             color: pacienteSeleccionado.celular ? FICHA_TEXTO : FICHA_VACIO,
                           }}
                         >
@@ -4256,8 +4277,8 @@ const HistorialClinico = () => {
                             <Box
                               aria-hidden
                               sx={{
-                                width: 7,
-                                height: 7,
+                                width: 8,
+                                height: 8,
                                 borderRadius: "50%",
                                 flexShrink: 0,
                                 backgroundColor: hayDato ? "#c77b1f" : "#7fae82",
@@ -4266,7 +4287,7 @@ const HistorialClinico = () => {
                             <Typography
                               sx={{
                                 fontWeight: hayDato ? 600 : 500,
-                                fontSize: "0.88rem",
+                                fontSize: "1.02rem",
                                 color: hayDato ? "#8a4b0f" : "#5c7a5e",
                               }}
                             >
@@ -4301,20 +4322,21 @@ const HistorialClinico = () => {
                             key={h.etiqueta}
                             sx={{
                               textAlign: "center",
-                              py: 2,
+                              py: 2.25,
                               px: 1,
                               borderRadius: "14px",
-                              backgroundColor: consume ? "#fdf3ef" : "#f6f8f3",
-                              border: `1px solid ${consume ? "#f0dcd3" : "#e2e9dd"}`,
+                              backgroundColor: consume ? "#fdf3ef" : "#fbf8f0",
+                              border: `1px solid ${consume ? "#eccfc2" : FICHA_ORO_TENUE}`,
+                              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.9)",
                             }}
                           >
                             <Typography
                               sx={{
-                                color: "#a89880",
-                                fontSize: "0.63rem",
+                                color: "#9d8b70",
+                                fontSize: "0.72rem",
                                 textTransform: "uppercase",
                                 mb: 1,
-                                letterSpacing: "1.4px",
+                                letterSpacing: "1.5px",
                                 fontWeight: 600,
                               }}
                             >
@@ -4324,7 +4346,7 @@ const HistorialClinico = () => {
                               sx={{
                                 fontWeight: 600,
                                 color: consume ? "#b3401f" : "#3f6b45",
-                                fontSize: "0.95rem",
+                                fontSize: "1.15rem",
                               }}
                             >
                               {h.valor || "N/E"}
