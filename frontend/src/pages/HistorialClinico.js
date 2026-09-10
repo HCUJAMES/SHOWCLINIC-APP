@@ -5777,68 +5777,25 @@ const HistorialClinico = () => {
                             <Typography variant="caption" sx={{ fontWeight: "bold", color: "#666", mb: 1, display: "block" }}>
                               Tratamientos:
                             </Typography>
-                            {/* Carrusel horizontal con flechas */}
-                            <Box sx={{ position: "relative", width: "100%", overflow: "hidden" }}>
-                              {/* Flecha izquierda */}
-                              <IconButton
-                                onClick={() => {
-                                  const el = document.getElementById(`carousel-${o.id}`);
-                                  if (el) el.scrollBy({ left: -212, behavior: "smooth" });
-                                }}
-                                sx={{
-                                  position: "absolute",
-                                  left: 4,
-                                  top: "50%",
-                                  transform: "translateY(-50%)",
-                                  zIndex: 3,
-                                  backgroundColor: "rgba(163,105,32,0.9)",
-                                  color: "white",
-                                  width: 32,
-                                  height: 32,
-                                  "&:hover": { backgroundColor: "#a36920" },
-                                  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-                                }}
-                              >
-                                <Typography sx={{ fontSize: 18, fontWeight: "bold", lineHeight: 1 }}>‹</Typography>
-                              </IconButton>
-                              {/* Flecha derecha */}
-                              <IconButton
-                                onClick={() => {
-                                  const el = document.getElementById(`carousel-${o.id}`);
-                                  if (el) el.scrollBy({ left: 212, behavior: "smooth" });
-                                }}
-                                sx={{
-                                  position: "absolute",
-                                  right: 4,
-                                  top: "50%",
-                                  transform: "translateY(-50%)",
-                                  zIndex: 3,
-                                  backgroundColor: "rgba(163,105,32,0.9)",
-                                  color: "white",
-                                  width: 32,
-                                  height: 32,
-                                  "&:hover": { backgroundColor: "#a36920" },
-                                  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-                                }}
-                              >
-                                <Typography sx={{ fontSize: 18, fontWeight: "bold", lineHeight: 1 }}>›</Typography>
-                              </IconButton>
-                            <Box 
+                            <Box sx={{ position: "relative", width: "100%" }}>
+                            {/* Rejilla que reparte los tratamientos en filas
+                                alineadas. Antes era un carrusel con flechas que
+                                además llevaba flexWrap, así que nunca llegaba a
+                                desplazarse y las tarjetas quedaban minúsculas. */}
+                            <Box
                               id={`carousel-${o.id}`}
-                              sx={{ 
-                              display: "flex", 
-                              flexWrap: "wrap",
-                              gap: 1.5, 
-                              overflowX: "auto", 
-                              pb: 1,
-                              px: 0.5,
-                              scrollSnapType: "x mandatory",
-                              scrollBehavior: "smooth",
-                              width: "100%",
-                              "&::-webkit-scrollbar": { display: "none" },
-                              msOverflowStyle: "none",
-                              scrollbarWidth: "none",
-                            }}>
+                              sx={{
+                                display: "grid",
+                                gridTemplateColumns: {
+                                  xs: "repeat(auto-fill, minmax(150px, 1fr))",
+                                  sm: "repeat(auto-fill, minmax(250px, 1fr))",
+                                },
+                                gap: 2,
+                                pb: 1,
+                                px: 0.5,
+                                width: "100%",
+                              }}
+                            >
                               {items.map((it, idx) => {
                                 const tId = it.tratamientoId || it.tratamiento_id;
                                 const imgArray = tId ? tratamientoImagenCache[tId] : null;
@@ -5877,10 +5834,6 @@ const HistorialClinico = () => {
                                     } catch (_) {}
                                   }}
                                   sx={{
-                                    minWidth: 155,
-                                    maxWidth: 200,
-                                    flex: "1 1 155px",
-                                    scrollSnapAlign: "start",
                                     borderRadius: 2.5,
                                     border: `2px solid ${marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(163, 105, 32, 0.2)'}`,
                                     backgroundColor: "#fff",
@@ -5904,12 +5857,14 @@ const HistorialClinico = () => {
                                       if (tId) setGaleriaTratamiento({ id: tId, nombre: it.nombre });
                                       else if (imgUrl) window.open(imgUrl, "_blank");
                                     }}
-                                    sx={{ 
-                                      width: "100%", 
-                                      height: 160, 
-                                      backgroundColor: "#f5f1e4", 
-                                      display: "flex", 
-                                      alignItems: "center", 
+                                    sx={{
+                                      width: "100%",
+                                      // El alto lo manda el ancho de la columna:
+                                      // la foto crece con la tarjeta.
+                                      aspectRatio: "1 / 1",
+                                      backgroundColor: "#f5f1e4",
+                                      display: "flex",
+                                      alignItems: "center",
                                       justifyContent: "center",
                                       cursor: imgUrl || tId ? "pointer" : "default",
                                       position: "relative",
@@ -5941,8 +5896,8 @@ const HistorialClinico = () => {
                                       </>
                                     ) : (
                                       <Box sx={{ textAlign: "center", color: "#ba9a63" }}>
-                                        <Box sx={{ fontSize: "2.5rem", mb: 0.5 }}>💉</Box>
-                                        <Typography variant="caption" sx={{ color: "#ba9a63", fontSize: "0.65rem" }}>
+                                        <Box sx={{ fontSize: "3.6rem", mb: 0.5 }}>💉</Box>
+                                        <Typography variant="caption" sx={{ color: "#ba9a63", fontSize: "0.75rem" }}>
                                           Sin imagen
                                         </Typography>
                                       </Box>
@@ -6004,10 +5959,10 @@ const HistorialClinico = () => {
                                     )}
                                   </Box>
                                   {/* Nombre, sesiones y precio */}
-                                  <Box sx={{ p: 1.2, flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                                    <Typography variant="body2" sx={{ 
-                                      fontWeight: "600", 
-                                      fontSize: "0.85rem", 
+                                  <Box sx={{ p: 1.5, flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                    <Typography variant="body2" sx={{
+                                      fontWeight: "600",
+                                      fontSize: "1rem",
                                       lineHeight: 1.3,
                                       color: marca === "gold" ? "#b8860b" : marca === "purple" ? "#7b1fa2" : "#333",
                                       mb: 0.5,
