@@ -58,6 +58,117 @@ import GaleriaTratamiento from "../components/GaleriaTratamiento";
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
+/* ───────────── Ficha del paciente: tarjeta y campo ─────────────
+   Se declaran fuera del componente para que React no las vuelva a montar
+   en cada render. Todas las tarjetas comparten el mismo encabezado y el
+   mismo ritmo de filas, que es lo que hace que la ficha se vea pareja. */
+const FICHA_BORDE = "#EADFCF";
+const FICHA_HAIRLINE = "#F3EADB";
+const FICHA_TEXTO = "#4A342B";
+const FICHA_VACIO = "#c9bfae";
+
+const TarjetaFicha = ({ icono: Icono, titulo, extra, accion, onClick, children, sx, separador = true }) => (
+  <Paper
+    elevation={0}
+    sx={{
+      display: "flex",
+      flexDirection: "column",
+      p: { xs: 2.25, sm: 2.75 },
+      borderRadius: "18px",
+      backgroundColor: "#fff",
+      border: `1px solid ${FICHA_BORDE}`,
+      boxShadow: "0 1px 2px rgba(93,64,55,0.04), 0 12px 28px -24px rgba(93,64,55,0.55)",
+      ...sx,
+    }}
+  >
+    <Box
+      onClick={onClick}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+        pb: separador ? 1.75 : 0,
+        mb: separador ? 2 : 0,
+        borderBottom: separador ? `1px solid ${FICHA_BORDE}` : "none",
+        cursor: onClick ? "pointer" : "default",
+      }}
+    >
+      <Box
+        sx={{
+          width: 34,
+          height: 34,
+          flexShrink: 0,
+          borderRadius: "11px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "linear-gradient(150deg, #fdf6e6 0%, #f4e6c8 100%)",
+          border: "1px solid rgba(200,169,110,0.45)",
+        }}
+      >
+        <Icono sx={{ fontSize: 18, color: "#5D4037" }} />
+      </Box>
+      <Typography
+        sx={{
+          flex: 1,
+          fontWeight: 600,
+          color: "#8a5a1c",
+          fontSize: "0.7rem",
+          textTransform: "uppercase",
+          letterSpacing: "2.2px",
+        }}
+      >
+        {titulo}
+      </Typography>
+      {extra}
+      {accion}
+    </Box>
+    <Box sx={{ flex: 1 }}>{children}</Box>
+  </Paper>
+);
+
+const CampoFicha = ({ etiqueta, valor, children }) => (
+  <Box
+    sx={{
+      display: "flex",
+      alignItems: "baseline",
+      gap: 2,
+      py: 1.05,
+      borderTop: `1px solid ${FICHA_HAIRLINE}`,
+      "&:first-of-type": { borderTop: "none", pt: 0 },
+      "&:last-of-type": { pb: 0 },
+    }}
+  >
+    <Typography
+      sx={{
+        width: 124,
+        flexShrink: 0,
+        color: "#a89880",
+        fontSize: "0.63rem",
+        fontWeight: 600,
+        textTransform: "uppercase",
+        letterSpacing: "1.4px",
+      }}
+    >
+      {etiqueta}
+    </Typography>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      {children || (
+        <Typography
+          sx={{
+            fontWeight: 500,
+            fontSize: "0.88rem",
+            color: valor ? FICHA_TEXTO : FICHA_VACIO,
+            wordBreak: "break-word",
+          }}
+        >
+          {valor || "—"}
+        </Typography>
+      )}
+    </Box>
+  </Box>
+);
+
 // Paleta para colorear los puntos de cada tratamiento en el mapa facial del presupuesto
 const FACIAL_COLOR_PALETTE = [
   "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
@@ -3963,12 +4074,17 @@ const HistorialClinico = () => {
                   <Box sx={{ flex: 1 }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                       <Typography
+                        // Con la variante por defecto, index.css fuerza Inter con
+                        // !important y la serif de la marca no llegaba a aplicarse.
+                        variant="h4"
+                        component="h2"
                         sx={{
-                          fontFamily: "'Cormorant Garamond', serif",
-                          fontSize: "2rem",
+                          fontFamily: "'Cormorant Garamond', Georgia, serif",
+                          fontSize: "2.3rem",
                           fontWeight: 700,
-                          color: "#5D4037",
-                          lineHeight: 1.2,
+                          letterSpacing: "0.5px",
+                          color: "#4A342B",
+                          lineHeight: 1.15,
                         }}
                       >
                         {`${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim() || "Paciente"}
@@ -4031,309 +4147,221 @@ const HistorialClinico = () => {
                         </IconButton>
                       </Tooltip>
                     </Box>
-                    <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-                      <Chip
-                        label={`${calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"} años`}
-                        sx={{
-                          backgroundColor: "#5D4037",
-                          color: "#FFF8F0",
-                          fontFamily: "'DM Sans', sans-serif",
-                          fontWeight: 600,
-                          fontSize: "0.8rem",
-                          height: "28px"
-                        }}
-                      />
-                      <Chip
-                        label={pacienteSeleccionado.sexo || "—"}
-                        sx={{
-                          backgroundColor: "#C8A96E",
-                          color: "#5D4037",
-                          fontFamily: "'DM Sans', sans-serif",
-                          fontWeight: 600,
-                          fontSize: "0.8rem",
-                          height: "28px"
-                        }}
-                      />
-                      <Chip
-                        label={pacienteSeleccionado.ocupacion || "No especificada"}
-                        sx={{
-                          backgroundColor: "#fff",
-                          color: "#5D4037",
-                          border: "1px solid #EADFCF",
-                          fontFamily: "'DM Sans', sans-serif",
-                          fontWeight: 600,
-                          fontSize: "0.8rem",
-                          height: "28px"
-                        }}
-                      />
+                    {/* Resumen en una sola línea, separado por puntos. Tres
+                        etiquetas de tres colores distintos rompían la calma. */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap", mt: 0.75 }}>
+                      {[
+                        `${calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"} años`,
+                        pacienteSeleccionado.sexo || "—",
+                        pacienteSeleccionado.ocupacion || "Ocupación no especificada",
+                      ].map((dato, i) => (
+                        <React.Fragment key={dato + i}>
+                          {i > 0 && (
+                            <Box
+                              aria-hidden
+                              sx={{ width: 4, height: 4, borderRadius: "50%", backgroundColor: "#d3c4a8" }}
+                            />
+                          )}
+                          <Typography
+                            sx={{
+                              color: "#8a7863",
+                              fontSize: "0.78rem",
+                              fontWeight: 500,
+                              letterSpacing: "0.9px",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            {dato}
+                          </Typography>
+                        </React.Fragment>
+                      ))}
                     </Box>
                   </Box>
                 </Box>
 
-                {/* Tarjetas horizontales de información */}
-                <Grid container spacing={2.5}>
-                  {/* Datos Personales */}
-                  <Grid item xs={12} md={6}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2.5,
-                        borderRadius: "16px",
-                        backgroundColor: "#fff",
-                        border: "1px solid #EADFCF",
-                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, pb: 1.5, borderBottom: "1px solid #EADFCF" }}>
-                        <Person sx={{ color: "#5D4037", fontSize: 20 }} />
-                        <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                          Datos Personales
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 2 }}>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>DNI</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.dni ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.dni || "—"}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Edad</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: (calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad) ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Sexo</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.sexo ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.sexo || "—"}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Fecha Nac.</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.fechaNacimiento ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.fechaNacimiento || "—"}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Embarazada</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.embarazada ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.embarazada || "—"}</Typography>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Grid>
+                {/* Ficha del paciente. Rejilla propia de dos columnas: la de MUI
+                    dejó de aceptar item/xs/md en la v7 y las tarjetas quedaban
+                    del ancho de su contenido, cada una de un tamaño. */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
+                    gap: 2.5,
+                    alignItems: "stretch",
+                  }}
+                >
+                  <TarjetaFicha icono={Person} titulo="Datos personales">
+                    <CampoFicha etiqueta="DNI" valor={pacienteSeleccionado.dni} />
+                    <CampoFicha
+                      etiqueta="Edad"
+                      valor={calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad}
+                    />
+                    <CampoFicha etiqueta="Sexo" valor={pacienteSeleccionado.sexo} />
+                    <CampoFicha etiqueta="Fecha nac." valor={pacienteSeleccionado.fechaNacimiento} />
+                    <CampoFicha etiqueta="Ocupación" valor={pacienteSeleccionado.ocupacion} />
+                    <CampoFicha etiqueta="Embarazada" valor={pacienteSeleccionado.embarazada} />
+                  </TarjetaFicha>
 
-                  {/* Contacto */}
-                  <Grid item xs={12} md={6}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2.5,
-                        borderRadius: "16px",
-                        backgroundColor: "#fff",
-                        border: "1px solid #EADFCF",
-                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, pb: 1.5, borderBottom: "1px solid #EADFCF" }}>
-                        <Phone sx={{ color: "#5D4037", fontSize: 20 }} />
-                        <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                          Contacto
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 2 }}>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Celular</Typography>
-                          {contactoRestringido ? (
-                            <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }} title="Tu rol no tiene acceso al teléfono de las pacientes">
-                              <Lock sx={{ fontSize: 14, color: "#bbb" }} />
-                              <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: "#bbb", fontSize: "0.9rem" }}>
-                                Restringido
-                              </Typography>
-                            </Box>
-                          ) : (
-                            <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.celular ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.celular || "—"}</Typography>
-                          )}
+                  <TarjetaFicha icono={Phone} titulo="Contacto">
+                    <CampoFicha etiqueta="Celular">
+                      {contactoRestringido ? (
+                        <Box
+                          sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+                          title="Tu rol no tiene acceso al teléfono de las pacientes"
+                        >
+                          <Lock sx={{ fontSize: 14, color: FICHA_VACIO }} />
+                          <Typography sx={{ fontWeight: 500, color: FICHA_VACIO, fontSize: "0.88rem" }}>
+                            Restringido
+                          </Typography>
                         </Box>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Correo</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.correo ? "#5D4037" : "#ccc", fontSize: "0.9rem", wordBreak: "break-word" }}>{pacienteSeleccionado.correo || "—"}</Typography>
-                        </Box>
-                        <Box sx={{ gridColumn: "1 / -1" }}>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Dirección</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.direccion ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.direccion || "—"}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Ciudad</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.ciudadResidencia ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.ciudadResidencia || "—"}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>N° Hijos</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: (pacienteSeleccionado.numeroHijos !== null && pacienteSeleccionado.numeroHijos !== undefined) ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.numeroHijos ?? "—"}</Typography>
-                        </Box>
-                        <Box sx={{ gridColumn: "1 / -1" }}>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.5, fontWeight: 600 }}>Referencia</Typography>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, color: pacienteSeleccionado.referencia ? "#5D4037" : "#ccc", fontSize: "0.9rem" }}>{pacienteSeleccionado.referencia || "—"}</Typography>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Grid>
-
-                  {/* Historial Médico */}
-                  <Grid item xs={12}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2.5,
-                        borderRadius: "16px",
-                        backgroundColor: "#fff",
-                        border: "1px solid #EADFCF",
-                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, pb: 1.5, borderBottom: "1px solid #EADFCF" }}>
-                        <LocalHospital sx={{ color: "#5D4037", fontSize: 20 }} />
-                        <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                          Historial Médico
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-                        <Chip 
-                          icon={pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? <Close sx={{ fontSize: 16 }} /> : <Check sx={{ fontSize: 16 }} />}
-                          label={pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? `Alergias: ${pacienteSeleccionado.alergias}` : "Sin alergias"}
-                          sx={{ 
-                            backgroundColor: pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? "#fff3e0" : "#e8f5e9",
-                            color: pacienteSeleccionado.alergias && pacienteSeleccionado.alergias !== "Ninguna" ? "#e65100" : "#2e7d32",
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontWeight: 600,
-                            fontSize: "0.8rem",
-                            height: "32px"
+                      ) : (
+                        <Typography
+                          sx={{
+                            fontWeight: 500,
+                            fontSize: "0.88rem",
+                            color: pacienteSeleccionado.celular ? FICHA_TEXTO : FICHA_VACIO,
                           }}
-                        />
-                        <Chip 
-                          icon={pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? <Close sx={{ fontSize: 16 }} /> : <Check sx={{ fontSize: 16 }} />}
-                          label={pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? `Enfermedades: ${pacienteSeleccionado.enfermedad}` : "Sin enfermedades"}
-                          sx={{ 
-                            backgroundColor: pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? "#fff3e0" : "#e8f5e9",
-                            color: pacienteSeleccionado.enfermedad && pacienteSeleccionado.enfermedad !== "Ninguna" ? "#e65100" : "#2e7d32",
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontWeight: 600,
-                            fontSize: "0.8rem",
-                            height: "32px"
-                          }}
-                        />
-                        <Chip 
-                          label={pacienteSeleccionado.cirugiaEstetica && pacienteSeleccionado.cirugiaEstetica.trim() !== "" ? `Cirugía: ${pacienteSeleccionado.cirugiaEstetica}` : "Sin cirugía estética"}
-                          sx={{ 
-                            backgroundColor: "#f3e5f5",
-                            color: "#6a1b9a",
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontWeight: 600,
-                            fontSize: "0.8rem",
-                            height: "32px"
-                          }}
-                        />
-                      </Box>
-                    </Paper>
-                  </Grid>
-
-                  {/* Hábitos */}
-                  <Grid item xs={12}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2.5,
-                        borderRadius: "16px",
-                        backgroundColor: "#fff",
-                        border: "1px solid #EADFCF",
-                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, pb: 1.5, borderBottom: "1px solid #EADFCF" }}>
-                        <Favorite sx={{ color: "#5D4037", fontSize: 20 }} />
-                        <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                          Hábitos
+                        >
+                          {pacienteSeleccionado.celular || "—"}
                         </Typography>
-                      </Box>
-                      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2 }}>
-                        <Box sx={{ textAlign: "center", p: 2, borderRadius: "12px", backgroundColor: "#FFFDF7", border: "1px solid #EADFCF" }}>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", mb: 1, letterSpacing: "0.5px", fontWeight: 600 }}>Tabaco</Typography>
-                          <Typography sx={{ 
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontWeight: 700, 
-                            color: pacienteSeleccionado.tabaco === "Sí" || pacienteSeleccionado.tabaco === "Ocasional" || pacienteSeleccionado.tabaco === "Frecuente" ? "#d32f2f" : "#2e7d32",
-                            fontSize: "1rem"
-                          }}>
-                            {pacienteSeleccionado.tabaco || "N/E"}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ textAlign: "center", p: 2, borderRadius: "12px", backgroundColor: "#FFFDF7", border: "1px solid #EADFCF" }}>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", mb: 1, letterSpacing: "0.5px", fontWeight: 600 }}>Alcohol</Typography>
-                          <Typography sx={{ 
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontWeight: 700, 
-                            color: pacienteSeleccionado.alcohol === "Sí" || pacienteSeleccionado.alcohol === "Ocasional" || pacienteSeleccionado.alcohol === "Frecuente" ? "#d32f2f" : "#2e7d32",
-                            fontSize: "1rem"
-                          }}>
-                            {pacienteSeleccionado.alcohol || "N/E"}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ textAlign: "center", p: 2, borderRadius: "12px", backgroundColor: "#FFFDF7", border: "1px solid #EADFCF" }}>
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", color: "#999", fontSize: "0.7rem", textTransform: "uppercase", mb: 1, letterSpacing: "0.5px", fontWeight: 600 }}>Drogas</Typography>
-                          <Typography sx={{ 
-                            fontFamily: "'DM Sans', sans-serif",
-                            fontWeight: 700, 
-                            color: pacienteSeleccionado.drogas === "Sí" || pacienteSeleccionado.drogas === "Ocasional" || pacienteSeleccionado.drogas === "Frecuente" ? "#d32f2f" : "#2e7d32",
-                            fontSize: "1rem"
-                          }}>
-                            {pacienteSeleccionado.drogas || "N/E"}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </Paper>
-                  </Grid>
+                      )}
+                    </CampoFicha>
+                    <CampoFicha etiqueta="Correo" valor={pacienteSeleccionado.correo} />
+                    <CampoFicha etiqueta="Dirección" valor={pacienteSeleccionado.direccion} />
+                    <CampoFicha etiqueta="Ciudad" valor={pacienteSeleccionado.ciudadResidencia} />
+                    <CampoFicha
+                      etiqueta="N° hijos"
+                      valor={
+                        pacienteSeleccionado.numeroHijos !== null && pacienteSeleccionado.numeroHijos !== undefined
+                          ? String(pacienteSeleccionado.numeroHijos)
+                          : ""
+                      }
+                    />
+                    <CampoFicha etiqueta="Referencia" valor={pacienteSeleccionado.referencia} />
+                  </TarjetaFicha>
 
-                  {/* Otras Observaciones */}
-                  <Grid item xs={12}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2.5,
-                        borderRadius: "16px",
-                        backgroundColor: "#fff",
-                        border: "1px solid #EADFCF",
-                        boxShadow: "0 1px 4px rgba(93, 64, 55, 0.06)"
-                      }}
-                    >
-                      <Box 
-                        onClick={() => setShowObservaciones(prev => !prev)}
-                        sx={{ 
-                          display: "flex", 
-                          alignItems: "center", 
-                          justifyContent: "space-between",
-                          cursor: "pointer",
-                          mb: showObservaciones ? 2.5 : 0,
-                          pb: showObservaciones ? 2 : 0,
-                          borderBottom: showObservaciones ? "1px solid #EADFCF" : "none"
-                        }}
-                      >
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                          <DescriptionOutlined sx={{ color: "#5D4037", fontSize: 20 }} />
-                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, color: "#5D4037", fontSize: "0.9rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                            Otras Observaciones
-                          </Typography>
-                          {Array.isArray(observaciones) && observaciones.length > 0 && (
-                            <Chip 
-                              label={observaciones.length} 
-                              size="small" 
-                              sx={{ 
-                                backgroundColor: "#C8A96E", 
-                                color: "#5D4037", 
-                                fontFamily: "'DM Sans', sans-serif",
-                                fontWeight: 700,
-                                height: "22px",
-                                fontSize: "0.75rem"
-                              }} 
+                  <TarjetaFicha icono={LocalHospital} titulo="Historial médico">
+                    {[
+                      { etiqueta: "Alergias", valor: pacienteSeleccionado.alergias },
+                      { etiqueta: "Enfermedades", valor: pacienteSeleccionado.enfermedad },
+                      { etiqueta: "Cirugía estética", valor: pacienteSeleccionado.cirugiaEstetica },
+                    ].map((dato) => {
+                      const texto = (dato.valor || "").trim();
+                      // Las fichas antiguas escriben la ausencia de mil formas.
+                      const NEGATIVOS = ["", "-", "--", "no", "no.", "ninguna", "ninguno", "nada", "n/a", "na", "n/e", "sin", "0"];
+                      const hayDato = !NEGATIVOS.includes(texto.toLowerCase());
+                      return (
+                        <CampoFicha key={dato.etiqueta} etiqueta={dato.etiqueta}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Box
+                              aria-hidden
+                              sx={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: "50%",
+                                flexShrink: 0,
+                                backgroundColor: hayDato ? "#c77b1f" : "#7fae82",
+                              }}
                             />
-                          )}
-                        </Box>
-                        <IconButton size="small" sx={{ color: "#5D4037" }}>
-                          {showObservaciones ? <ExpandLess /> : <ExpandMore />}
-                        </IconButton>
-                      </Box>
+                            <Typography
+                              sx={{
+                                fontWeight: hayDato ? 600 : 500,
+                                fontSize: "0.88rem",
+                                color: hayDato ? "#8a4b0f" : "#5c7a5e",
+                              }}
+                            >
+                              {hayDato ? texto : "Sin antecedentes"}
+                            </Typography>
+                          </Box>
+                        </CampoFicha>
+                      );
+                    })}
+                  </TarjetaFicha>
 
+                  <TarjetaFicha icono={Favorite} titulo="Hábitos">
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                        gap: 1.5,
+                        // Centra los tres recuadros cuando la tarjeta vecina es
+                        // más alta y estira esta.
+                        height: "100%",
+                        alignContent: "center",
+                      }}
+                    >
+                      {[
+                        { etiqueta: "Tabaco", valor: pacienteSeleccionado.tabaco },
+                        { etiqueta: "Alcohol", valor: pacienteSeleccionado.alcohol },
+                        { etiqueta: "Drogas", valor: pacienteSeleccionado.drogas },
+                      ].map((h) => {
+                        const consume = ["Sí", "Ocasional", "Frecuente"].includes(h.valor);
+                        return (
+                          <Box
+                            key={h.etiqueta}
+                            sx={{
+                              textAlign: "center",
+                              py: 2,
+                              px: 1,
+                              borderRadius: "14px",
+                              backgroundColor: consume ? "#fdf3ef" : "#f6f8f3",
+                              border: `1px solid ${consume ? "#f0dcd3" : "#e2e9dd"}`,
+                            }}
+                          >
+                            <Typography
+                              sx={{
+                                color: "#a89880",
+                                fontSize: "0.63rem",
+                                textTransform: "uppercase",
+                                mb: 1,
+                                letterSpacing: "1.4px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {h.etiqueta}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                fontWeight: 600,
+                                color: consume ? "#b3401f" : "#3f6b45",
+                                fontSize: "0.95rem",
+                              }}
+                            >
+                              {h.valor || "N/E"}
+                            </Typography>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </TarjetaFicha>
+
+                  <TarjetaFicha
+                    icono={DescriptionOutlined}
+                    titulo="Otras observaciones"
+                    onClick={() => setShowObservaciones((prev) => !prev)}
+                    separador={showObservaciones}
+                    sx={{ gridColumn: { md: "1 / -1" } }}
+                    extra={
+                      Array.isArray(observaciones) && observaciones.length > 0 ? (
+                        <Chip
+                          label={observaciones.length}
+                          size="small"
+                          sx={{
+                            backgroundColor: "#f4e6c8",
+                            color: "#8a5a1c",
+                            fontWeight: 700,
+                            height: "22px",
+                            fontSize: "0.75rem",
+                          }}
+                        />
+                      ) : null
+                    }
+                    accion={
+                      <IconButton size="small" sx={{ color: "#8a5a1c" }}>
+                        {showObservaciones ? <ExpandLess /> : <ExpandMore />}
+                      </IconButton>
+                    }
+                  >
                       <Collapse in={showObservaciones} timeout="auto" unmountOnExit>
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
                           {/* Nueva observación */}
@@ -4540,9 +4568,8 @@ const HistorialClinico = () => {
                           )}
                         </Box>
                       </Collapse>
-                    </Paper>
-                  </Grid>
-                </Grid>
+                  </TarjetaFicha>
+                </Box>
               </Paper>
 
               <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, mt: 4, flexWrap: "wrap" }}>
