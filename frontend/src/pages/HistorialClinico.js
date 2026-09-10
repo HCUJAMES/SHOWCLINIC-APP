@@ -3218,23 +3218,49 @@ const HistorialClinico = () => {
   };
 
   return (
-    <div
-      style={{
-        backgroundImage:
-          "linear-gradient(rgba(255,255,255,0.85), rgba(232,211,57,0.85)), url('/images/background-showclinic.jpg')",
-        backgroundSize: "cover",
+    <Box
+      sx={{
+        position: "relative",
         minHeight: "100vh",
-        padding: "40px 30px",
+        p: { xs: "24px 14px", sm: "40px 30px" },
+        backgroundColor: "#faf5ee",
+        // El retrato va en una capa fija propia: así no se estira con la hoja
+        // (que puede pasar de 3000 px) y no se repinta al hacer scroll.
+        "&::before": {
+          content: '""',
+          position: "fixed",
+          inset: 0,
+          backgroundImage: "url('/images/fondologin5.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          // Aclarado y con poco contraste: donde asome bajo la hoja no debe
+          // crear zonas oscuras que se coman el texto.
+          filter: "grayscale(50%) brightness(1.22) contrast(0.86)",
+          opacity: 0.42,
+          zIndex: 0,
+          pointerEvents: "none",
+        },
+        // Velo cálido que ata la foto a la paleta de la marca
+        "&::after": {
+          content: '""',
+          position: "fixed",
+          inset: 0,
+          background: "linear-gradient(180deg, rgba(255,250,243,0.56) 0%, rgba(252,244,232,0.68) 100%)",
+          zIndex: 0,
+          pointerEvents: "none",
+        },
       }}
     >
-      <Container maxWidth={false} sx={{ maxWidth: "1800px", mx: "auto" }}>
+      <Container maxWidth={false} sx={{ maxWidth: "1800px", mx: "auto", position: "relative", zIndex: 1 }}>
         <Paper
           sx={{
             p: 6,
             borderRadius: "15px",
+            // Algo translúcida para que el retrato del fondo se intuya a
+            // través de la hoja; no tanto como para tocar la legibilidad.
             background:
-              "linear-gradient(180deg, rgba(255,249,236,0.99) 0%, rgba(255,255,255,0.97) 52%, rgba(247,234,193,0.80) 100%)",
-            border: "1px solid rgba(212,175,55,0.22)",
+              "linear-gradient(180deg, rgba(255,249,236,0.93) 0%, rgba(255,255,255,0.91) 52%, rgba(247,234,193,0.80) 100%)",
+            border: `1px solid ${FICHA_ORO_TENUE}`,
             // Sin backdropFilter: esta hoja llega a medir >3000px y el blur
             // obliga a recomponer toda la capa en cada scroll. El degradado ya
             // es casi opaco, así que el efecto no se nota y el scroll va fluido.
@@ -10256,7 +10282,7 @@ const HistorialClinico = () => {
           />
         </DialogContent>
       </Dialog>
-    </div>
+    </Box>
   );
 };
 
