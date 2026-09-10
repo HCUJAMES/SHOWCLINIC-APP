@@ -4991,11 +4991,33 @@ const HistorialClinico = () => {
                         </Box>
                       </Box>
 
-                      <Box 
-                        sx={{ 
-                          display: "grid", 
-                          gridTemplateColumns: { xs: "1fr 1fr 1fr", sm: "1fr 1fr 1fr 1fr", md: "1fr 1fr 1fr 1fr 1fr", lg: "1fr 1fr 1fr 1fr 1fr 1fr" }, 
-                          gap: 1.2,
+                      <Box
+                        sx={{
+                          display: "grid",
+                          // Columnas por ancho mínimo, no por número fijo: así la
+                          // tarjeta mantiene su tamaño cuando aparece el panel de
+                          // resumen y le quita 420 px al catálogo.
+                          gridTemplateColumns: {
+                            xs: "repeat(auto-fill, minmax(140px, 1fr))",
+                            sm: "repeat(auto-fill, minmax(200px, 1fr))",
+                          },
+                          gap: 1.75,
+                          // Con muchos tratamientos la rejilla se hacía larguísima
+                          // y el resumen quedaba lejos. Aquí el catálogo tiene su
+                          // propio desplazamiento y el resumen no se pierde.
+                          maxHeight: { md: "calc(100vh - 170px)" },
+                          overflowY: { md: "auto" },
+                          pr: { md: 1 },
+                          "&::-webkit-scrollbar": { width: "8px" },
+                          "&::-webkit-scrollbar-track": {
+                            backgroundColor: "rgba(163,105,32,0.08)",
+                            borderRadius: "10px",
+                          },
+                          "&::-webkit-scrollbar-thumb": {
+                            backgroundColor: "rgba(163,105,32,0.35)",
+                            borderRadius: "10px",
+                            "&:hover": { backgroundColor: "rgba(163,105,32,0.55)" },
+                          },
                         }}
                       >
                         {catVisible.map((t) => {
@@ -5007,17 +5029,22 @@ const HistorialClinico = () => {
                             <Box
                               key={t.id}
                               sx={{
-                                borderRadius: 2,
-                                border: `1.5px solid ${isSelected ? '#a36920' : 'rgba(163,105,32,0.15)'}`,
-                                backgroundColor: isSelected ? "rgba(163,105,32,0.04)" : "white",
-                                transition: "all 0.2s ease",
+                                borderRadius: "14px",
+                                border: `1.5px solid ${isSelected ? '#a36920' : 'rgba(163,105,32,0.18)'}`,
+                                backgroundColor: "white",
+                                boxShadow: isSelected
+                                  ? "0 0 0 3px rgba(163,105,32,0.14), 0 6px 18px -10px rgba(163,105,32,0.5)"
+                                  : "0 1px 2px rgba(93,64,55,0.05)",
+                                transition: "border-color .2s ease, box-shadow .2s ease",
                                 display: "flex",
                                 flexDirection: "column",
                                 overflow: "hidden",
                                 position: "relative",
-                                "&:hover": { 
+                                "&:hover": {
                                   borderColor: "#ba9a63",
-                                  boxShadow: "0 2px 8px rgba(163,105,32,0.12)",
+                                  boxShadow: isSelected
+                                    ? "0 0 0 3px rgba(163,105,32,0.18), 0 8px 22px -10px rgba(163,105,32,0.55)"
+                                    : "0 6px 18px -10px rgba(163,105,32,0.45)",
                                 },
                               }}
                             >
@@ -5037,75 +5064,113 @@ const HistorialClinico = () => {
                                   position: "relative",
                                   "&:hover img": { transform: "scale(1.06)" },
                                   "& img": { transition: "transform .25s ease" },
+                                  // Sombra al pie de la foto: los botones se leen
+                                  // igual sobre una imagen clara que sobre una oscura.
+                                  "&::after": {
+                                    content: '""',
+                                    position: "absolute",
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    height: "42%",
+                                    background: "linear-gradient(to top, rgba(40,26,16,0.42), rgba(40,26,16,0))",
+                                    pointerEvents: "none",
+                                  },
                                 }}
                               >
                                 {imgUrl ? (
                                   <img src={imgUrl} alt={t.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                 ) : (
-                                  <Typography sx={{ fontSize: "1.5rem", opacity: 0.3 }}>💉</Typography>
+                                  <Typography sx={{ fontSize: "2.4rem", opacity: 0.25 }}>💉</Typography>
                                 )}
+
+                                {/* Cuántas sesiones lleva este tratamiento */}
+                                {count > 0 && (
+                                  <Box
+                                    sx={{
+                                      position: "absolute",
+                                      top: 8,
+                                      left: 8,
+                                      minWidth: 26,
+                                      height: 26,
+                                      px: 0.75,
+                                      borderRadius: "13px",
+                                      backgroundColor: "#a36920",
+                                      color: "white",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      fontSize: "0.8rem",
+                                      fontWeight: 800,
+                                      boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                                    }}
+                                  >
+                                    ×{count}
+                                  </Box>
+                                )}
+
+                                {/* Botones + / − sobre la propia foto */}
+                                <Box
+                                  sx={{
+                                    position: "absolute",
+                                    bottom: 8,
+                                    right: 8,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    backgroundColor: "rgba(255,255,255,0.94)",
+                                    borderRadius: "16px",
+                                    padding: "3px 5px",
+                                    boxShadow: "0 2px 8px rgba(0,0,0,0.22)",
+                                  }}
+                                >
+                                  <Box
+                                    onClick={(e) => { e.stopPropagation(); removeOneOfertaItem(t); }}
+                                    sx={{
+                                      width: 26, height: 26,
+                                      borderRadius: "50%",
+                                      backgroundColor: count > 0 ? "#e57373" : "#eee",
+                                      color: count > 0 ? "white" : "#bbb",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      cursor: count > 0 ? "pointer" : "default",
+                                      fontSize: "1.05rem", fontWeight: 700, lineHeight: 1,
+                                      "&:hover": count > 0 ? { backgroundColor: "#d32f2f" } : {},
+                                    }}
+                                  >−</Box>
+                                  <Box
+                                    onClick={(e) => { e.stopPropagation(); addOfertaItem(t); }}
+                                    sx={{
+                                      width: 26, height: 26,
+                                      borderRadius: "50%",
+                                      backgroundColor: "#a36920",
+                                      color: "white",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      cursor: "pointer",
+                                      fontSize: "1.05rem", fontWeight: 700, lineHeight: 1,
+                                      "&:hover": { backgroundColor: "#8a5a1a" },
+                                    }}
+                                  >+</Box>
+                                </Box>
                               </Box>
-                              {/* Info */}
-                              <Box sx={{ p: 0.8 }}>
-                                <Typography sx={{ 
-                                  fontWeight: 700, 
-                                  fontSize: "0.68rem", 
-                                  color: isSelected ? "#a36920" : "#333",
-                                  lineHeight: 1.2,
+
+                              {/* Nombre y precio */}
+                              <Box sx={{ p: 1.25, display: "flex", flexDirection: "column", flex: 1 }}>
+                                <Typography sx={{
+                                  fontWeight: 700,
+                                  fontSize: "0.86rem",
+                                  color: isSelected ? "#a36920" : "#3E2B22",
+                                  lineHeight: 1.25,
                                   display: "-webkit-box",
                                   WebkitLineClamp: 2,
                                   WebkitBoxOrient: "vertical",
                                   overflow: "hidden",
-                                  minHeight: "1.7em",
+                                  minHeight: "2.5em",
                                 }}>
                                   {t.nombre}
                                 </Typography>
-                                <Typography sx={{ fontWeight: 800, fontSize: "0.72rem", color: isSelected ? "#a36920" : "#666", mt: 0.3 }}>
+                                <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: isSelected ? "#a36920" : "#6b5a49", mt: 0.5 }}>
                                   {t.precio ? `S/ ${Number(t.precio).toFixed(2)}` : "Sin precio"}
                                 </Typography>
-                              </Box>
-                              {/* Botones + / - */}
-                              <Box sx={{
-                                position: "absolute",
-                                bottom: 4,
-                                right: 4,
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 0.3,
-                                backgroundColor: "rgba(255,255,255,0.92)",
-                                borderRadius: 2,
-                                padding: "2px 4px",
-                                boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-                              }}>
-                                <Box
-                                  onClick={(e) => { e.stopPropagation(); removeOneOfertaItem(t); }}
-                                  sx={{
-                                    width: 20, height: 20,
-                                    borderRadius: "50%",
-                                    backgroundColor: count > 0 ? "#e57373" : "#eee",
-                                    color: count > 0 ? "white" : "#bbb",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    cursor: count > 0 ? "pointer" : "default",
-                                    fontSize: "0.85rem", fontWeight: 700, lineHeight: 1,
-                                    "&:hover": count > 0 ? { backgroundColor: "#d32f2f" } : {},
-                                  }}
-                                >−</Box>
-                                <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: count > 0 ? "#a36920" : "#999", minWidth: 14, textAlign: "center" }}>
-                                  {count}
-                                </Typography>
-                                <Box
-                                  onClick={(e) => { e.stopPropagation(); addOfertaItem(t); }}
-                                  sx={{
-                                    width: 20, height: 20,
-                                    borderRadius: "50%",
-                                    backgroundColor: "#a36920",
-                                    color: "white",
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    cursor: "pointer",
-                                    fontSize: "0.85rem", fontWeight: 700, lineHeight: 1,
-                                    "&:hover": { backgroundColor: "#8a5a1a" },
-                                  }}
-                                >+</Box>
                               </Box>
                             </Box>
                           );
