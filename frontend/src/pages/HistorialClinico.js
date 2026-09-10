@@ -35,7 +35,7 @@ import {
   Tooltip,
   Menu,
 } from "@mui/material";
-import { Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star, HandshakeRounded } from "@mui/icons-material";
+import { PhotoCamera, Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star, HandshakeRounded } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -339,6 +339,10 @@ const HistorialClinico = () => {
   const [mostrarTodasFotos, setMostrarTodasFotos] = useState(false);
   const [subiendoFotosPaciente, setSubiendoFotosPaciente] = useState(false);
   const [archivosFotosPaciente, setArchivosFotosPaciente] = useState([]);
+  const [subiendoFotoPerfil, setSubiendoFotoPerfil] = useState(false);
+  // Ruta de la foto que no se pudo cargar, para volver a la inicial en vez de
+  // dejar un círculo vacío. Al cambiar de paciente deja de coincidir sola.
+  const [fotoPerfilRota, setFotoPerfilRota] = useState("");
   const [nombreTratamientoFoto, setNombreTratamientoFoto] = useState("");
   const [fotoPreviewIdx, setFotoPreviewIdx] = useState(null);
   const [fotoSlideDir, setFotoSlideDir] = useState(1);
@@ -1834,6 +1838,46 @@ const HistorialClinico = () => {
       showToast({ severity: "error", message: "Error al subir fotos" });
     } finally {
       setSubiendoFotosPaciente(false);
+    }
+  };
+
+  // Foto de perfil de la paciente, la que se ve en la banda de identidad.
+  const subirFotoPerfil = async (archivo) => {
+    if (!archivo || !pacienteSeleccionado?.id) return;
+    if (!archivo.type.startsWith("image/")) {
+      showToast({ severity: "warning", message: "El archivo debe ser una imagen" });
+      return;
+    }
+    // Tope del lado del cliente: el servidor no pone ninguno en esta ruta y
+    // una foto de cámara sin comprimir puede pesar decenas de megas.
+    if (archivo.size > 5 * 1024 * 1024) {
+      showToast({ severity: "warning", message: "La imagen no debe pasar de 5 MB" });
+      return;
+    }
+    try {
+      setSubiendoFotoPerfil(true);
+      const formData = new FormData();
+      formData.append("foto", archivo);
+      const res = await axios.post(
+        `${API_BASE_URL}/api/pacientes/${pacienteSeleccionado.id}/foto-perfil`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data", ...authHeaders } }
+      );
+      const ruta = res.data?.fotoPerfil;
+      if (ruta) {
+        setPacienteSeleccionado((prev) => (prev ? { ...prev, fotoPerfil: ruta } : prev));
+        setPacientes((prev) =>
+          Array.isArray(prev)
+            ? prev.map((p) => (p.id === pacienteSeleccionado.id ? { ...p, fotoPerfil: ruta } : p))
+            : prev
+        );
+      }
+      showToast({ severity: "success", message: "Foto actualizada" });
+    } catch (e) {
+      console.error("Error al subir foto de perfil:", e);
+      showToast({ severity: "error", message: "No se pudo subir la foto" });
+    } finally {
+      setSubiendoFotoPerfil(false);
     }
   };
 
@@ -4056,43 +4100,118 @@ const HistorialClinico = () => {
                 elevation={0}
                 sx={{
                   mb: 4,
-                  p: 3.5,
+                  p: 0,
+                  overflow: "hidden",
                   borderRadius: "24px",
                   backgroundColor: "#FFF8F0",
                   border: `1px solid ${FICHA_ORO}`,
                   boxShadow: "0 2px 12px rgba(120, 88, 40, 0.10)"
                 }}
               >
-                {/* Header de Identidad */}
+                {/* Banda de identidad: la imagen de marca detrás del nombre es
+                    lo que quita el aire de formulario en blanco. */}
                 <Box
                   sx={{
+                    position: "relative",
                     display: "flex",
                     alignItems: "center",
                     gap: 3,
-                    mb: 4,
-                    pb: 3,
+                    px: 3.5,
+                    py: 3,
                     borderBottom: `1px solid ${FICHA_ORO_TENUE}`,
+                    background: "linear-gradient(100deg, #FFF8F0 0%, #FBEFDE 42%, #F3E2C6 100%)",
+                    overflow: "hidden",
+                    // Retrato de marca difuminado hacia la izquierda
+                    "&::before": {
+                      content: '""',
+                      position: "absolute",
+                      inset: 0,
+                      backgroundImage: "url(/images/modelomodulosderecha.jpg)",
+                      backgroundSize: "cover",
+                      backgroundPosition: "right 18%",
+                      opacity: 0.45,
+                      filter: "grayscale(25%) saturate(0.95)",
+                      maskImage: "linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 34%, rgba(0,0,0,0) 68%)",
+                      WebkitMaskImage: "linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.6) 34%, rgba(0,0,0,0) 68%)",
+                      pointerEvents: "none",
+                    },
+                    // Filete dorado que cierra la banda por abajo
+                    "&::after": {
+                      content: '""',
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 2,
+                      background: "linear-gradient(90deg, rgba(172,128,45,0) 0%, rgba(172,128,45,0.75) 30%, rgba(230,201,138,0.9) 55%, rgba(172,128,45,0) 100%)",
+                      pointerEvents: "none",
+                    },
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: 72,
-                      height: 72,
-                      borderRadius: "50%",
-                      backgroundColor: "#5D4037",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: "'Cormorant Garamond', serif",
-                      fontSize: "2rem",
-                      fontWeight: 700,
-                      color: "#C8A96E",
-                      boxShadow: "0 4px 12px rgba(93, 64, 55, 0.25)"
-                    }}
-                  >
-                    {(pacienteSeleccionado.nombre || "P").charAt(0).toUpperCase()}
+                  {/* Foto de la paciente. Si no tiene, la inicial sobre café. */}
+                  <Box sx={{ position: "relative", flexShrink: 0, zIndex: 1 }}>
+                    <Box
+                      sx={{
+                        width: 96,
+                        height: 96,
+                        borderRadius: "50%",
+                        overflow: "hidden",
+                        backgroundColor: "#5D4037",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontFamily: "'Cormorant Garamond', serif",
+                        fontSize: "2.6rem",
+                        fontWeight: 700,
+                        color: "#C8A96E",
+                        border: "3px solid #fff",
+                        boxShadow: `0 0 0 2px ${FICHA_ORO}, 0 10px 24px -10px rgba(93,64,55,0.5)`,
+                      }}
+                    >
+                      {pacienteSeleccionado.fotoPerfil && fotoPerfilRota !== pacienteSeleccionado.fotoPerfil ? (
+                        <Box
+                          component="img"
+                          src={`${API_BASE_URL}${pacienteSeleccionado.fotoPerfil}`}
+                          alt={`Foto de ${pacienteSeleccionado.nombre || "la paciente"}`}
+                          onError={() => setFotoPerfilRota(pacienteSeleccionado.fotoPerfil)}
+                          sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        />
+                      ) : (
+                        (pacienteSeleccionado.nombre || "P").charAt(0).toUpperCase()
+                      )}
+                    </Box>
+
+                    <Tooltip title={pacienteSeleccionado.fotoPerfil ? "Cambiar foto" : "Subir foto de la paciente"} arrow>
+                      <IconButton
+                        component="label"
+                        disabled={subiendoFotoPerfil}
+                        sx={{
+                          position: "absolute",
+                          right: -2,
+                          bottom: -2,
+                          width: 32,
+                          height: 32,
+                          backgroundColor: "#fff",
+                          border: `1.5px solid ${FICHA_ORO}`,
+                          color: "#8a5a1c",
+                          "&:hover": { backgroundColor: "#FBEFDE" },
+                        }}
+                      >
+                        {subiendoFotoPerfil ? (
+                          <CircularProgress size={15} sx={{ color: "#8a5a1c" }} />
+                        ) : (
+                          <PhotoCamera sx={{ fontSize: 17 }} />
+                        )}
+                        <input
+                          hidden
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => subirFotoPerfil(e.target.files?.[0])}
+                        />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
-                  <Box sx={{ flex: 1 }}>
+                  <Box sx={{ flex: 1, position: "relative", zIndex: 1, minWidth: 0 }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                       <Typography
                         // Con la variante por defecto, index.css fuerza Inter con
@@ -4209,6 +4328,9 @@ const HistorialClinico = () => {
                     gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
                     gap: 2.5,
                     alignItems: "stretch",
+                    // La banda de identidad ocupa el borde, así que el relleno
+                    // que antes tenía la ficha entera lo pone ahora la rejilla.
+                    p: { xs: 2.5, sm: 3.5 },
                   }}
                 >
                   <TarjetaFicha icono={Person} titulo="Datos personales">
