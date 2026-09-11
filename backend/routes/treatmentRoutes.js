@@ -632,6 +632,15 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       const varianteId = b.variante_id ? Number(b.variante_id) : null;
       if (!varianteId) continue;
 
+      // Si el especialista escaneó códigos, el frasco que tiene en la mano es
+      // la verdad: se valida contra las unidades de ese código, más abajo, y no
+      // contra la suma de los lotes del producto. Los dos registros pueden
+      // haberse separado por ajustes manuales de stock, y esa diferencia no
+      // debe impedir guardar una sesión que sí tiene producto real.
+      const tieneCodigos =
+        Array.isArray(b.codigos) && b.codigos.some((c) => (c?.codigo || "").trim());
+      if (tieneCodigos) continue;
+
       const cantidadNecesaria =
         parseNum(b.dosis_unidades) > 0
           ? parseNum(b.dosis_unidades)
@@ -920,13 +929,14 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         }
 
         // Validar cada código y verificar que hay suficientes unidades
+        const codigosValidados = [];
         for (const codigoItem of codigos) {
           const codigoIngresado = (codigoItem.codigo || "").trim();
           const unidadesUsadas = parseNum(codigoItem.unidades_usadas) || 0;
 
           if (!codigoIngresado) {
-            return res.status(400).json({ 
-              message: `Todos los códigos deben tener un valor.` 
+            return res.status(400).json({
+              message: `Todos los códigos deben tener un valor.`
             });
           }
 
@@ -943,22 +953,94 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
           );
 
           if (!codigoValido) {
-            return res.status(400).json({ 
-              message: `Código incorrecto o agotado: ${codigoIngresado}. No coincide con ningún código disponible de este producto.` 
+            return res.status(400).json({
+              message: `Código incorrecto o agotado: ${codigoIngresado}. No coincide con ningún código disponible de este producto.`
             });
           }
 
-          // Verificar que hay suficientes unidades restantes en este código
+          // Un código con unidades_totales en 0 no lleva control por unidades
+          // (cajas, jeringas): solo se escanea para dejar trazabilidad.
+          const llevaUnidades = (parseFloat(codigoValido.unidades_totales) || 0) > 0;
           const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
-          if (unidadesUsadas > 0 && unidadesRestantes > 0 && unidadesUsadas > unidadesRestantes) {
-            return res.status(400).json({ 
-              message: `El código ${codigoIngresado} solo tiene ${unidadesRestantes} unidades restantes. Necesitas ${unidadesUsadas}.` 
+
+          if (llevaUnidades && unidadesUsadas > unidadesRestantes) {
+            return res.status(400).json({
+              message: `El código ${codigoIngresado} solo tiene ${unidadesRestantes} unidades restantes. Necesitas ${unidadesUsadas}.`,
             });
           }
+
+          codigosValidados.push({
+            barcodeUnitId: codigoValido.id,
+            barcode: codigoIngresado,
+            loteId: codigoValido.lote_id,
+            unidadesUsadas,
+            unidadesRestantes,
+            llevaUnidades,
+          });
         }
 
-        // Códigos validados - proceder con descuento de stock usando FEFO
-        if (!usoReceta && cantidadElegida > 0) {
+        // Descuento de stock guiado por los códigos escaneados.
+        // Cada código pertenece a un lote concreto. Descontar de ESE lote, y no
+        // por FEFO sobre toda la variante, es lo que mantiene alineados los dos
+        // registros: el del lote y el del frasco.
+        const codigosQueDescuentan = codigosValidados.filter(
+          (c) => c.llevaUnidades && c.unidadesUsadas > 0 && c.loteId
+        );
+
+        if (!usoReceta && codigosQueDescuentan.length > 0) {
+          const movimiento = await dbRun(
+            `
+              INSERT INTO movimientos_inventario
+              (tipo, motivo, referencia_tipo, referencia_id, usuario)
+              VALUES ('salida', 'tratamiento', 'tratamientos_realizados', ?, ?)
+            `,
+            [tratamientoRealizadoId, especialista || "No especificado"]
+          );
+
+          for (const c of codigosQueDescuentan) {
+            const loteRow = await dbGet(
+              `SELECT id, cantidad_unidades, cantidad_reservada_unidades
+               FROM stock_lotes WHERE id = ?`,
+              [c.loteId]
+            );
+            if (!loteRow) continue;
+
+            // Si el lote quedó con menos por un ajuste manual, se descuenta lo
+            // que haya. El frasco físico ya se usó; bloquear el registro sólo
+            // haría perder la sesión y la trazabilidad del código.
+            const enLote = parseFloat(loteRow.cantidad_unidades) || 0;
+            const aDescontar = Math.min(enLote, c.unidadesUsadas);
+            if (aDescontar < c.unidadesUsadas) {
+              console.warn(
+                `⚠️ Lote ${c.loteId} tenía ${enLote} u y el código ${c.barcode} pedía ${c.unidadesUsadas} u. Se descontó ${aDescontar}.`
+              );
+            }
+            if (aDescontar <= 0) continue;
+
+            const liberarReserva = Math.min(
+              parseFloat(loteRow.cantidad_reservada_unidades) || 0,
+              aDescontar
+            );
+
+            await dbRun(
+              `UPDATE stock_lotes
+                 SET cantidad_unidades = cantidad_unidades - ?,
+                     cantidad_reservada_unidades = MAX(0, cantidad_reservada_unidades - ?),
+                     actualizado_en = datetime('now', '-5 hours')
+               WHERE id = ?`,
+              [aDescontar, liberarReserva, loteRow.id]
+            );
+
+            await dbRun(
+              `INSERT INTO movimientos_detalle
+                 (movimiento_id, variante_id, stock_lote_id, cantidad_unidades)
+               VALUES (?, ?, ?, ?)`,
+              [movimiento.lastID, varianteIdElegida, loteRow.id, aDescontar]
+            );
+          }
+        } else if (!usoReceta && cantidadElegida > 0) {
+          // Códigos sin control por unidades: se descuenta la cantidad indicada
+          // recorriendo los lotes por vencimiento, como siempre.
           const movimiento = await dbRun(
             `
               INSERT INTO movimientos_inventario
@@ -985,21 +1067,9 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         // Dejar constancia del código usado y actualizar sus unidades
         await ensureTratamientoCodigosSchema();
 
-        for (const codigoItem of codigos) {
-          const codigoIngresado = (codigoItem.codigo || "").trim();
-          const unidadesUsadas = parseNum(codigoItem.unidades_usadas) || 0;
-
-          const codigoValido = await dbGet(
-            `SELECT bu.id, bu.unidades_restantes
-             FROM barcode_units bu
-             LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
-             WHERE sl.variante_id = ?
-               AND bu.barcode = ?
-             LIMIT 1`,
-            [varianteIdElegida, codigoIngresado]
-          );
-
-          if (!codigoValido) continue;
+        for (const c of codigosValidados) {
+          const codigoIngresado = c.barcode;
+          const unidadesUsadas = c.unidadesUsadas;
 
           // El enlace se guarda SIEMPRE, aunque no se descuenten unidades:
           // hay productos (cajas, jeringas) donde solo se escanea el código.
@@ -1007,11 +1077,11 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
             `INSERT OR IGNORE INTO tratamiento_codigos
                (tratamiento_realizado_id, barcode_unit_id, barcode, variante_id, unidades_usadas, registrado_en)
              VALUES (?, ?, ?, ?, ?, ?)`,
-            [tratamientoRealizadoId, codigoValido.id, codigoIngresado, varianteIdElegida, unidadesUsadas, fechaLocal]
+            [tratamientoRealizadoId, c.barcodeUnitId, codigoIngresado, varianteIdElegida, unidadesUsadas, fechaLocal]
           );
 
           if (unidadesUsadas > 0) {
-            const unidadesRestantes = parseFloat(codigoValido.unidades_restantes) || 0;
+            const unidadesRestantes = c.unidadesRestantes;
             const nuevasRestantes = Math.max(0, unidadesRestantes - unidadesUsadas);
 
             if (nuevasRestantes <= 0) {
@@ -1020,7 +1090,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
                 `UPDATE barcode_units
                  SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?, unidades_restantes = 0
                  WHERE id = ?`,
-                [tratamientoRealizadoId, codigoValido.id]
+                [tratamientoRealizadoId, c.barcodeUnitId]
               );
             } else {
               // Aún tiene unidades: mantener activo con las restantes actualizadas
@@ -1028,7 +1098,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
                 `UPDATE barcode_units
                  SET unidades_restantes = ?, treatment_id = ?
                  WHERE id = ?`,
-                [nuevasRestantes, tratamientoRealizadoId, codigoValido.id]
+                [nuevasRestantes, tratamientoRealizadoId, c.barcodeUnitId]
               );
             }
           }
