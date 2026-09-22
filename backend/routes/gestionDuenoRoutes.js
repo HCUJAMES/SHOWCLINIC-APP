@@ -1299,7 +1299,6 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
     }
 
     let totalComision = 0;
-    let totalPagado = 0;
     const rows = [];
 
     for (const pres of presupuestos) {
@@ -1307,14 +1306,8 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
       const pct = pres._pct;
       const comision = pres._comision;
 
-      const sumaPagos = await dbGet(
-        `SELECT COALESCE(SUM(monto), 0) as total FROM finanzas WHERE referencia_id = ? AND referencia_tipo IN ('presupuesto_asignado', 'presupuesto_consulta') AND tipo = 'ingreso'`,
-        [pres.id]
-      );
-      const pagado = parseFloat(sumaPagos?.total) || 0;
-
       const ov = await dbGet(
-        `SELECT pagado_override, sesiones_override, comision_override, nota, oculto FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
+        `SELECT sesiones_override, comision_override, nota, oculto FROM especialista_presupuesto_overrides WHERE especialista_id = ? AND presupuesto_id = ?`,
         [id, pres.id]
       );
 
@@ -1322,11 +1315,9 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
       if (ov && ov.oculto) continue;
 
       const comisionFinal = (ov && ov.comision_override != null) ? Number(ov.comision_override) : comision;
-      const pagadoFinal = (ov && ov.pagado_override != null) ? Number(ov.pagado_override) : pagado;
       const sesionesFinal = (ov && ov.sesiones_override != null) ? `${ov.sesiones_override}/${pres.sesiones_totales}` : `${pres.sesiones_completadas}/${pres.sesiones_totales}`;
 
       totalComision += comisionFinal;
-      totalPagado += pagadoFinal;
 
       rows.push({
         paciente: `${pres.paciente_nombre || ""} ${pres.paciente_apellido || ""}`.trim(),
@@ -1334,21 +1325,28 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
         base,
         pct,
         comision: comisionFinal,
-        pagado: pagadoFinal,
         sesiones: sesionesFinal,
         estado: pres.estado_pago,
         nota: (ov && ov.nota) ? ov.nota : null
       });
     }
 
-    // Aplicar KPI overrides globales si existen
+    // Aplicar KPI override de la comisión si existe
     const periodoKey = `${fecha_inicio || "all"}_${fecha_fin || "all"}`;
     const kpiOv = await dbGet(
-      `SELECT pagado_total_override, comision_total_override FROM especialista_kpi_overrides WHERE especialista_id = ? AND periodo_key = ?`,
+      `SELECT comision_total_override FROM especialista_kpi_overrides WHERE especialista_id = ? AND periodo_key = ?`,
       [id, periodoKey]
     );
     if (kpiOv && kpiOv.comision_total_override != null) totalComision = Number(kpiOv.comision_total_override);
-    if (kpiOv && kpiOv.pagado_total_override != null) totalPagado = Number(kpiOv.pagado_total_override);
+
+    // Lo que de verdad se le paga: comisión + pago fijo + pagos extra del
+    // periodo. Es la misma cuenta que la tarjeta "Total a pagar" de la pantalla.
+    // Lo cobrado a los pacientes no entra en este documento: es un comprobante
+    // para el especialista, no un reporte de ingresos de la clínica.
+    const pagoFijo = Number(especialista.pago_fijo) || 0;
+    const extras = await pagosExtraDe(id, { fecha_inicio, fecha_fin });
+    const totalExtras = redondear(extras.reduce((a, e) => a + (Number(e.monto) || 0), 0));
+    const totalAPagar = redondear(totalComision + pagoFijo + totalExtras);
 
     // Generar PDF premium
     const doc = new PDFDocument({ size: "A4", margin: 40 });
@@ -1379,8 +1377,14 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
 
     // Helper: agregar footer a cada página
     const drawPageFooter = () => {
+      // El pie cae por debajo del margen inferior; sin bajar el margen un
+      // momento, PDFKit abre una hoja nueva sólo para esta línea y el PDF
+      // termina con una página en blanco.
+      const margenInferior = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
       doc.fontSize(7).font("Helvetica").fillColor("#BBBBBB");
-      doc.text("ShowClinic", ml, ph - 30, { width: cw, align: "center" });
+      doc.text("ShowClinic", ml, ph - 30, { width: cw, align: "center", lineBreak: false });
+      doc.page.margins.bottom = margenInferior;
     };
 
     // ═══════════════════════════════════════════
@@ -1427,26 +1431,13 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
     y += 16;
 
     // ═══════════════════════════════════════════
-    // KPIs — Tres tarjetas elegantes
+    // TOTAL A PAGAR — un solo monto arriba
     // ═══════════════════════════════════════════
-    const kpiGap = 14;
-    const kpiW = (cw - kpiGap * 2) / 3;
     const kpiH = 62;
-
-    const drawKpiCard = (x, label, value, accent) => {
-      // Fondo con borde redondeado simulado
-      doc.roundedRect(x, y, kpiW, kpiH, 6).lineWidth(1.2).strokeColor(accent === "gold" ? gold : "#E0E0E0").fillAndStroke(cream, accent === "gold" ? gold : "#E0E0E0");
-      // Barra superior de acento
-      doc.rect(x + 1, y + 1, kpiW - 2, 3).fill(accent === "gold" ? gold : brownLight);
-      // Label
-      doc.fontSize(7.5).font("Helvetica").fillColor("#999999").text(label, x + 14, y + 14, { width: kpiW - 28 });
-      // Valor
-      doc.fontSize(16).font("Helvetica-Bold").fillColor(brown).text(value, x + 14, y + 30, { width: kpiW - 28 });
-    };
-
-    drawKpiCard(ml, "PAGO AL ESPECIALISTA", fmtMoney(totalComision), "gold");
-    drawKpiCard(ml + kpiW + kpiGap, "PAGADO POR PACIENTES", fmtMoney(totalPagado), "dark");
-    drawKpiCard(ml + (kpiW + kpiGap) * 2, "PRESUPUESTOS ACTIVOS", `${rows.length}`, "dark");
+    doc.roundedRect(ml, y, cw, kpiH, 6).lineWidth(1.2).fillAndStroke(cream, gold);
+    doc.rect(ml + 1, y + 1, cw - 2, 3).fill(gold);
+    doc.fontSize(8).font("Helvetica").fillColor("#999999").text("TOTAL A PAGAR", ml + 18, y + 15);
+    doc.fontSize(22).font("Helvetica-Bold").fillColor(brown).text(fmtMoney(totalAPagar), ml + 18, y + 29);
     y += kpiH + 24;
 
     // ═══════════════════════════════════════════
@@ -1459,23 +1450,24 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
 
     // Definir columnas con mejor distribución
     const colDefs = [
-      { label: "Paciente",  x: ml,       w: 120 },
-      { label: "Fecha",     x: ml + 120, w: 70  },
-      { label: "Base",      x: ml + 190, w: 70  },
-      { label: "%",         x: ml + 260, w: 35  },
-      { label: "Comisión",  x: ml + 295, w: 75  },
-      { label: "Pagado",    x: ml + 370, w: 75  },
+      { label: "Paciente",  x: ml,       w: 165 },
+      { label: "Fecha",     x: ml + 165, w: 75  },
+      { label: "Base",      x: ml + 240, w: 80  },
+      { label: "%",         x: ml + 320, w: 40  },
+      { label: "Comisión",  x: ml + 360, w: 85  },
       { label: "Sesiones",  x: ml + 445, w: 70  }
     ];
     const tableW = cw;
     const rowH = 26;
     const headerH = 28;
 
-    // Header de tabla
-    doc.roundedRect(ml, y, tableW, headerH, 4).fill(brown);
-    doc.fontSize(7.5).font("Helvetica-Bold").fillColor(white);
-    colDefs.forEach(c => doc.text(c.label.toUpperCase(), c.x + 8, y + 10, { width: c.w - 12 }));
-    y += headerH;
+    const dibujarCabeceraTabla = () => {
+      doc.roundedRect(ml, y, tableW, headerH, 4).fill(brown);
+      doc.fontSize(7.5).font("Helvetica-Bold").fillColor(white);
+      colDefs.forEach(c => doc.text(c.label.toUpperCase(), c.x + 8, y + 10, { width: c.w - 12 }));
+      y += headerH;
+    };
+    dibujarCabeceraTabla();
 
     // Helper: medir altura de texto antes de dibujarlo
     const measureTextHeight = (text, fontSize, fontName, maxWidth) => {
@@ -1483,9 +1475,35 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
       return doc.heightOfString(text, { width: maxWidth });
     };
 
+    // El pago fijo y los pagos extra entran en la misma tabla, como una fila
+    // más: así el total de abajo es la suma de lo que se ve arriba de él.
+    const filasExtra = [
+      ...(pagoFijo > 0
+        ? [{ concepto: "Pago fijo del periodo", fecha: "", tipo: "Fijo", monto: pagoFijo }]
+        : []),
+      ...extras.map((e) => ({
+        concepto: e.concepto,
+        nota: e.notas || null,
+        fecha: (e.fecha || "").slice(0, 10),
+        tipo: e.tipo ? e.tipo.charAt(0).toUpperCase() + e.tipo.slice(1) : "Extra",
+        monto: Number(e.monto) || 0,
+      })),
+    ];
+    const filas = [
+      ...rows.map((r) => ({ ...r, esExtra: false })),
+      ...filasExtra.map((a) => ({ ...a, esExtra: true })),
+    ];
+
+    if (filas.length === 0) {
+      doc.rect(ml, y, tableW, rowH).fill(white);
+      doc.fontSize(8.5).font("Helvetica-Oblique").fillColor("#999999")
+        .text("Sin presupuestos ni pagos en el periodo.", ml + 8, y + 9, { width: tableW - 16 });
+      y += rowH;
+    }
+
     // Filas
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
+    for (let i = 0; i < filas.length; i++) {
+      const r = filas[i];
 
       // Calcular altura de nota si existe
       let notaH = 0;
@@ -1500,34 +1518,40 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
         drawPageFooter();
         doc.addPage();
         y = 40;
-        // Re-dibujar header de tabla en nueva página
-        doc.roundedRect(ml, y, tableW, headerH, 4).fill(brown);
-        doc.fontSize(7.5).font("Helvetica-Bold").fillColor(white);
-        colDefs.forEach(c => doc.text(c.label.toUpperCase(), c.x + 8, y + 10, { width: c.w - 12 }));
-        y += headerH;
+        dibujarCabeceraTabla();
       }
 
-      const rowBg = i % 2 === 0 ? white : "#FAFAF5";
-
-      // Fondo de fila de datos
+      // Los pagos extra llevan un fondo champán y una marca dorada a la
+      // izquierda para distinguirlos de los presupuestos de un vistazo.
+      const rowBg = r.esExtra ? "#FBF4E6" : (i % 2 === 0 ? white : "#FAFAF5");
       doc.rect(ml, y, tableW, rowH).fill(rowBg);
       doc.rect(ml, y + rowH - 0.5, tableW, 0.5).fill("#EEEEEE");
+      if (r.esExtra) doc.rect(ml, y, 3, rowH).fill(gold);
 
-      // Datos
-      doc.fontSize(8.5).font("Helvetica").fillColor(brown);
-      const nombre = r.paciente.length > 16 ? r.paciente.slice(0, 16) + "..." : r.paciente;
-      doc.font("Helvetica-Bold").text(nombre, colDefs[0].x + 8, y + 9, { width: colDefs[0].w - 12 });
-      doc.font("Helvetica").fillColor("#666666");
-      doc.text(r.fecha, colDefs[1].x + 8, y + 9, { width: colDefs[1].w - 12 });
-      doc.fillColor(brown);
-      doc.text(fmtMoney(r.base), colDefs[2].x + 8, y + 9, { width: colDefs[2].w - 12 });
-      doc.text(`${r.pct}%`, colDefs[3].x + 8, y + 9, { width: colDefs[3].w - 12 });
-      doc.font("Helvetica-Bold").fillColor(brownLight);
-      doc.text(fmtMoney(r.comision), colDefs[4].x + 8, y + 9, { width: colDefs[4].w - 12 });
-      doc.font("Helvetica").fillColor(brown);
-      doc.text(fmtMoney(r.pagado), colDefs[5].x + 8, y + 9, { width: colDefs[5].w - 12 });
-      doc.fillColor("#888888");
-      doc.text(r.sesiones, colDefs[6].x + 8, y + 9, { width: colDefs[6].w - 12 });
+      doc.fontSize(8.5);
+      if (r.esExtra) {
+        const concepto = r.concepto.length > 30 ? r.concepto.slice(0, 30) + "..." : r.concepto;
+        doc.font("Helvetica-Bold").fillColor(brown).text(concepto, colDefs[0].x + 8, y + 9, { width: colDefs[0].w - 12 });
+        doc.font("Helvetica").fillColor("#666666").text(r.fecha || "—", colDefs[1].x + 8, y + 9, { width: colDefs[1].w - 12 });
+        doc.fillColor("#BBBBBB").text("—", colDefs[2].x + 8, y + 9, { width: colDefs[2].w - 12 });
+        doc.text("—", colDefs[3].x + 8, y + 9, { width: colDefs[3].w - 12 });
+        // Los descuentos y adelantos (montos negativos) se ven en rojo
+        doc.font("Helvetica-Bold").fillColor(r.monto < 0 ? "#B3401F" : brownLight);
+        doc.text(fmtMoney(r.monto), colDefs[4].x + 8, y + 9, { width: colDefs[4].w - 12 });
+        doc.font("Helvetica").fillColor(gold).text(r.tipo, colDefs[5].x + 8, y + 9, { width: colDefs[5].w - 12 });
+      } else {
+        const nombre = r.paciente.length > 24 ? r.paciente.slice(0, 24) + "..." : r.paciente;
+        doc.font("Helvetica-Bold").fillColor(brown).text(nombre, colDefs[0].x + 8, y + 9, { width: colDefs[0].w - 12 });
+        doc.font("Helvetica").fillColor("#666666");
+        doc.text(r.fecha, colDefs[1].x + 8, y + 9, { width: colDefs[1].w - 12 });
+        doc.fillColor(brown);
+        doc.text(fmtMoney(r.base), colDefs[2].x + 8, y + 9, { width: colDefs[2].w - 12 });
+        doc.text(`${r.pct}%`, colDefs[3].x + 8, y + 9, { width: colDefs[3].w - 12 });
+        doc.font("Helvetica-Bold").fillColor(brownLight);
+        doc.text(fmtMoney(r.comision), colDefs[4].x + 8, y + 9, { width: colDefs[4].w - 12 });
+        doc.font("Helvetica").fillColor("#888888");
+        doc.text(r.sesiones, colDefs[5].x + 8, y + 9, { width: colDefs[5].w - 12 });
+      }
       y += rowH;
 
       // Nota / descripción — altura dinámica con espacio generoso
@@ -1542,23 +1566,30 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
       }
     }
 
+    // Salto de página si lo que viene no cabe
+    const asegurarEspacio = (alto) => {
+      if (y + alto > ph - 50) {
+        drawPageFooter();
+        doc.addPage();
+        y = 40;
+      }
+    };
+
     // ═══════════════════════════════════════════
-    // PIE DE TABLA — Total destacado
+    // PIE DE TABLA — Total a pagar
     // ═══════════════════════════════════════════
     y += 6;
+    asegurarEspacio(56);
     doc.roundedRect(ml, y, tableW, 42, 4).lineWidth(1.5).strokeColor(gold).fillAndStroke("#FFFBF2", gold);
-    // Barra izquierda dorada
     doc.rect(ml + 1, y + 1, 4, 40).fill(gold);
-    doc.fontSize(8).font("Helvetica").fillColor("#999999").text("TOTAL COMISIÓN A PAGAR", ml + 18, y + 10);
-    doc.fontSize(18).font("Helvetica-Bold").fillColor(brown).text(fmtMoney(totalComision), ml + 18, y + 22);
-    // Pagado por pacientes al lado
-    doc.fontSize(8).font("Helvetica").fillColor("#999999").text("TOTAL PAGADO POR PACIENTES", ml + 280, y + 10);
-    doc.fontSize(14).font("Helvetica-Bold").fillColor(brownLight).text(fmtMoney(totalPagado), ml + 280, y + 24);
+    doc.fontSize(8).font("Helvetica").fillColor("#999999").text("TOTAL A PAGAR", ml + 18, y + 10);
+    doc.fontSize(18).font("Helvetica-Bold").fillColor(brown).text(fmtMoney(totalAPagar), ml + 18, y + 22);
     y += 56;
 
     // ═══════════════════════════════════════════
     // FOOTER
     // ═══════════════════════════════════════════
+    asegurarEspacio(44);
     drawGoldLine(y);
     y += 12;
     doc.fontSize(7.5).font("Helvetica").fillColor("#BBBBBB");
