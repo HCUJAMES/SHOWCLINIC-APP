@@ -2549,6 +2549,18 @@ router.get("/costos-productos", authMiddleware, requireOwner, async (req, res) =
       .sort((a, b) => b.costo - a.costo)
       .slice(0, 20);
 
+    // Los precios cargados no dependen del periodo: aunque en estas fechas no
+    // se haya usado el producto, el dueño tiene que poder verlos y corregirlos.
+    const catalogoCostos = await dbAll(
+      `SELECT v.id AS variante_id, v.nombre AS variante, pb.nombre AS producto,
+              v.unidad_base AS unidad, v.contenido_por_presentacion AS contenido,
+              v.costo_unitario AS costo_unitario
+         FROM variantes v
+         LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+        WHERE COALESCE(v.costo_unitario, 0) > 0
+        ORDER BY v.costo_unitario * COALESCE(NULLIF(v.contenido_por_presentacion, 0), 1) DESC`
+    );
+
     res.json({
       resumen: {
         costo_total: redondear(costoTotal),
@@ -2562,6 +2574,14 @@ router.get("/costos-productos", authMiddleware, requireOwner, async (req, res) =
         productos_sin_costo: sinCosto.size,
       },
       productos: [...porProducto.values()].sort((a, b) => b.costo - a.costo),
+      costos_cargados: catalogoCostos.map((c) => ({
+        variante_id: c.variante_id,
+        producto: nombreProducto(c),
+        unidad: c.unidad || "u",
+        contenido: num(c.contenido) || 1,
+        costo_unitario: num(c.costo_unitario),
+        costo_presentacion: redondear(num(c.costo_unitario) * (num(c.contenido) || 1)),
+      })),
       tratamientos,
       pacientes,
       detalle,

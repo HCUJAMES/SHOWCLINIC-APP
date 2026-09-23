@@ -489,8 +489,8 @@ export default function GestionDueno() {
         <Box sx={{ px: { xs: 2, md: "36px" }, py: { xs: 2, md: "28px" }, maxWidth: 1440, mx: "auto" }}>
           {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: "18px", borderRadius: "12px" }}>{error}</Alert>}
 
-          {/* Filtro de periodo (Dashboard, Presupuestos y Especialistas) */}
-          {(tab === 0 || (tab === 1 && !presupuestoDetalle) || tab === 2 || tab === 4) && (
+          {/* Filtro de periodo (todas las pestañas menos Liquidaciones) */}
+          {(tab === 0 || (tab === 1 && !presupuestoDetalle) || tab === 2 || tab === 4 || tab === 5) && (
             <PeriodoFilter
               preset={periodoPreset}
               fechaInicio={fechaInicio}
@@ -3599,8 +3599,11 @@ function CostosProductoView({ data, onEditarCosto, onVerPaciente }) {
   const detalle = data?.detalle || [];
   const sinCosto = data?.sin_costo || [];
 
-  // Solo los productos que ya tienen precio de compra cargado se pueden costear
-  const productosConCosto = productos.filter((p) => Number(p.costo_unitario) > 0);
+  // Los precios cargados se listan siempre, aunque en el periodo elegido no se
+  // haya usado ese producto: son configuración, no movimiento.
+  const productosConCosto = (data?.costos_cargados || []).length
+    ? data.costos_cargados
+    : productos.filter((p) => Number(p.costo_unitario) > 0);
 
   const numero = (n, dec = 2) =>
     Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: dec });
