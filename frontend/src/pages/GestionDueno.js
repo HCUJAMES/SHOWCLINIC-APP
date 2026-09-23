@@ -25,7 +25,7 @@ import {
   VisibilityOffRounded, VisibilityRounded,
   FactCheckRounded, SearchRounded, Inventory2Rounded,
   QrCode2Rounded, ErrorOutlineRounded, AccessTimeRounded,
-  PersonOffRounded
+  PersonOffRounded, ScienceRounded
 } from "@mui/icons-material";
 
 const MotionCard = motion(Card);
@@ -184,6 +184,10 @@ export default function GestionDueno() {
   const [pendientes, setPendientes] = useState([]);
   const [historialLiq, setHistorialLiq] = useState([]);
 
+  // Costos de producto por tratamiento y paciente
+  const [costos, setCostos] = useState(null);
+  const [costoEditar, setCostoEditar] = useState(null);
+
   // Control (auditoría de registro de tratamientos)
   const [control, setControl] = useState(null);
   const [controlFiltro, setControlFiltro] = useState("todos");
@@ -257,13 +261,27 @@ export default function GestionDueno() {
     setLoading(false);
   }, [fechaInicio, fechaFin, controlFiltro, controlBuscar]);
 
+  const loadCostos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const p = new URLSearchParams();
+      if (fechaInicio) p.append("fecha_inicio", fechaInicio);
+      if (fechaFin) p.append("fecha_fin", fechaFin);
+      const qs = p.toString();
+      setCostos(await apiFetch(`/costos-productos${qs ? `?${qs}` : ""}`));
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  }, [fechaInicio, fechaFin]);
+
   useEffect(() => {
     if (tab === 0) loadDashboard();
     else if (tab === 1) loadPresupuestos();
     else if (tab === 2) loadEspecialistas();
     else if (tab === 3) loadPendientes();
     else if (tab === 4) loadControl();
-  }, [tab, loadDashboard, loadPresupuestos, loadEspecialistas, loadPendientes, loadControl]);
+    else if (tab === 5) loadCostos();
+  }, [tab, loadDashboard, loadPresupuestos, loadEspecialistas, loadPendientes, loadControl, loadCostos]);
 
   // Recargar el detalle del especialista al cambiar el periodo
   useEffect(() => {
@@ -402,6 +420,7 @@ export default function GestionDueno() {
     else if (tab === 2) loadEspecialistas();
     else if (tab === 3) loadPendientes();
     else if (tab === 4) loadControl();
+    else if (tab === 5) loadCostos();
   };
 
   const applyPreset = (preset) => {
@@ -422,7 +441,8 @@ export default function GestionDueno() {
     { title: "Presupuestos", subtitle: "Seguimiento de tratamientos y líneas." },
     { title: "Especialistas", subtitle: "Rendimiento y comisiones del equipo." },
     { title: "Liquidaciones", subtitle: "Pagos y comisiones pendientes." },
-    { title: "Control", subtitle: "Tratamientos registrados sin producto o sin código." }
+    { title: "Control", subtitle: "Tratamientos registrados sin producto o sin código." },
+    { title: "Costo de producto", subtitle: "Cuánto insumo se gasta en cada tratamiento y paciente." }
   ];
 
   /* ── RENDER ── */
@@ -543,8 +563,24 @@ export default function GestionDueno() {
               onVerPaciente={(pacienteId) => navigate("/historial-clinico", { state: { pacienteId } })}
             />
           )}
+
+          {/* TAB 5: Costo de producto */}
+          {tab === 5 && (
+            <CostosProductoView
+              data={costos}
+              onEditarCosto={(prod) => setCostoEditar(prod)}
+              onVerPaciente={(pacienteId) => navigate("/historial-clinico", { state: { pacienteId } })}
+            />
+          )}
         </Box>
       </Box>
+
+      {/* Dialog: precio de compra de un producto */}
+      <CostoProductoDialog
+        producto={costoEditar}
+        onClose={() => setCostoEditar(null)}
+        onGuardado={() => { setCostoEditar(null); loadCostos(); }}
+      />
 
       {/* Dialog Culminar */}
       <Dialog open={!!dialogCulminar} onClose={() => setDialogCulminar(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
@@ -606,7 +642,8 @@ function SideBar({ tab, onTab, navigate }) {
     { icon: ReceiptLongRounded, label: "Presupuestos" },
     { icon: GroupsRounded, label: "Especialistas" },
     { icon: PaymentsRounded, label: "Liquidaciones" },
-    { icon: FactCheckRounded, label: "Control" }
+    { icon: FactCheckRounded, label: "Control" },
+    { icon: ScienceRounded, label: "Costo producto" }
   ];
 
   const handleLogout = () => {
@@ -3547,4 +3584,464 @@ function EstadoChip({ estado }) {
   };
   const c = config[estado] || { label: estado, sx: { bgcolor: colors.creamPanel, color: colors.textMuted } };
   return <Chip label={c.label} size="small" sx={{ fontSize: "0.7rem", height: 22, fontWeight: 600, fontFamily: fonts.body, ...c.sx }} />;
+}
+
+/* ======================================================================
+   COSTO DE PRODUCTO — cuánto insumo se gasta por tratamiento y paciente
+====================================================================== */
+function CostosProductoView({ data, onEditarCosto, onVerPaciente }) {
+  const [vista, setVista] = useState("tratamientos");
+
+  const resumen = data?.resumen || {};
+  const productos = data?.productos || [];
+  const tratamientos = data?.tratamientos || [];
+  const pacientes = data?.pacientes || [];
+  const detalle = data?.detalle || [];
+  const sinCosto = data?.sin_costo || [];
+
+  // Solo los productos que ya tienen precio de compra cargado se pueden costear
+  const productosConCosto = productos.filter((p) => Number(p.costo_unitario) > 0);
+
+  const numero = (n, dec = 2) =>
+    Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: dec });
+
+  const thSx = { fontWeight: 600, fontFamily: fonts.body, fontSize: "11px", textTransform: "uppercase", color: colors.textMuted, letterSpacing: "0.6px", borderBottom: `1px solid ${colors.border}`, py: "10px", whiteSpace: "nowrap" };
+  const tdSx = { fontFamily: fonts.body, fontSize: "13px", color: colors.textBody, borderBottom: `1px solid ${colors.border}`, py: "11px" };
+
+  const tarjetas = [
+    { label: "Costo de producto", valor: formatMoney(resumen.costo_total), pie: `${resumen.sesiones || 0} sesiones costeadas de ${resumen.sesiones_totales || 0}`, grad: grads.brown, Icono: ScienceRounded },
+    { label: "Promedio por sesión", valor: formatMoney(resumen.costo_promedio_sesion), pie: "lo que cuesta el insumo de una sesión", grad: grads.gold, Icono: Inventory2Rounded },
+    { label: "Promedio por paciente", valor: formatMoney(resumen.costo_promedio_paciente), pie: `${resumen.pacientes || 0} pacientes con producto costeado`, grad: grads.violet, Icono: GroupsRounded },
+    { label: "Unidades usadas", valor: numero(resumen.unidades), pie: "unidades y ml con costo cargado", grad: grads.green, Icono: CategoryRounded },
+  ];
+
+  const pestanas = [
+    { id: "tratamientos", label: "Por tratamiento" },
+    { id: "productos", label: "Por producto" },
+    { id: "pacientes", label: "Por paciente" },
+    { id: "detalle", label: "Detalle de sesiones" },
+  ];
+
+  const fechaCorta = (f) => String(f || "").slice(0, 10);
+
+  return (
+    <Box>
+      {/* Resumen del periodo */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0,1fr))", lg: "repeat(4, minmax(0,1fr))" }, gap: "16px", mb: "22px" }}>
+        {tarjetas.map((t, i) => (
+          <MotionCard key={t.label} custom={i} initial="hidden" animate="show" variants={fadeUp} sx={{ ...cardSx, overflow: "hidden" }}>
+            <Box sx={{ height: 4, background: t.grad }} />
+            <CardContent sx={{ p: "18px" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "10px" }}>
+                <Box sx={{ width: 34, height: 34, borderRadius: "11px", background: t.grad, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <t.Icono sx={{ fontSize: 18, color: colors.white }} />
+                </Box>
+                <Typography sx={{ fontFamily: fonts.body, fontSize: "11px", fontWeight: 600, letterSpacing: "1.2px", textTransform: "uppercase", color: colors.textMuted }}>
+                  {t.label}
+                </Typography>
+              </Box>
+              <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "27px", color: colors.primaryDark, lineHeight: 1.15 }}>
+                {t.valor}
+              </Typography>
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted, mt: "2px" }}>
+                {t.pie}
+              </Typography>
+            </CardContent>
+          </MotionCard>
+        ))}
+      </Box>
+
+      {/* Precios de compra cargados */}
+      <MotionCard initial="hidden" animate="show" variants={fadeUp} sx={{ ...cardSx, mb: "22px" }}>
+        <CardContent sx={{ p: "20px" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "14px", flexWrap: "wrap" }}>
+            <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "19px", color: colors.primaryDark }}>
+              Precio de compra
+            </Typography>
+            <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textMuted }}>
+              Sobre este precio se calcula todo lo de abajo.
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fill, minmax(260px, 1fr))" }, gap: "14px" }}>
+            {productosConCosto.length === 0 && (
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "13px", color: colors.textMuted }}>
+                Todavía no hay productos con precio de compra cargado.
+              </Typography>
+            )}
+            {productosConCosto.map((p) => (
+              <Box
+                key={p.variante_id}
+                sx={{
+                  p: "16px", borderRadius: "14px", bgcolor: colors.creamPanel,
+                  border: `1px solid ${colors.goldSoft}`, position: "relative",
+                }}
+              >
+                <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "14px", color: colors.primaryDark, pr: "34px" }}>
+                  {p.producto}
+                </Typography>
+                <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "22px", color: colors.primary, mt: "6px" }}>
+                  {formatMoney(p.costo_presentacion)}
+                </Typography>
+                <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>
+                  por {numero(p.contenido)} {p.unidad} · {formatMoney(p.costo_unitario)} cada {p.unidad}
+                </Typography>
+                <Tooltip title="Cambiar precio de compra" arrow>
+                  <IconButton
+                    size="small"
+                    onClick={() => onEditarCosto(p)}
+                    sx={{ position: "absolute", top: 10, right: 10, color: colors.primary, bgcolor: colors.white, border: `1px solid ${colors.border}`, "&:hover": { bgcolor: colors.goldSoft } }}
+                  >
+                    <EditRounded sx={{ fontSize: 15 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            ))}
+          </Box>
+
+          {sinCosto.length > 0 && (
+            <Box sx={{ mt: "18px", p: "14px 16px", borderRadius: "12px", bgcolor: colors.amberBg, border: `1px solid ${colors.goldSoft}` }}>
+              <Typography sx={{ fontFamily: fonts.body, fontWeight: 700, fontSize: "12.5px", color: colors.amberText, mb: "8px" }}>
+                {sinCosto.length} producto{sinCosto.length === 1 ? "" : "s"} sin precio de compra — su gasto no entra en los totales
+              </Typography>
+              <Box sx={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {sinCosto.map((s) => (
+                  <Chip
+                    key={s.variante_id}
+                    label={`${s.producto} · ${numero(s.unidades)} ${s.unidad}`}
+                    onClick={() => onEditarCosto({ variante_id: s.variante_id, producto: s.producto, unidad: s.unidad, contenido: 1, costo_presentacion: 0 })}
+                    sx={{ fontFamily: fonts.body, fontSize: "11.5px", fontWeight: 600, bgcolor: colors.white, color: colors.textBody, border: `1px solid ${colors.border}`, cursor: "pointer", "&:hover": { bgcolor: colors.goldSoft } }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+        </CardContent>
+      </MotionCard>
+
+      {/* Selector de vista */}
+      <Box sx={{ display: "flex", gap: "8px", mb: "16px", flexWrap: "wrap" }}>
+        {pestanas.map((p) => {
+          const activa = vista === p.id;
+          return (
+            <Chip
+              key={p.id}
+              label={p.label}
+              onClick={() => setVista(p.id)}
+              sx={{
+                fontFamily: fonts.body, fontWeight: 600, fontSize: "12.5px", height: 34, borderRadius: "11px", cursor: "pointer",
+                ...(activa
+                  ? { bgcolor: colors.primaryDark, color: colors.white, border: `1px solid ${colors.primaryDark}`, "&:hover": { bgcolor: colors.primary } }
+                  : { bgcolor: colors.white, color: colors.textBody, border: `1px solid ${colors.border}`, "&:hover": { bgcolor: colors.creamPanel } })
+              }}
+            />
+          );
+        })}
+      </Box>
+
+      <MotionCard initial="hidden" animate="show" variants={fadeUp} sx={{ ...cardSx }}>
+        <CardContent sx={{ p: "20px" }}>
+
+          {/* ---- POR TRATAMIENTO ---- */}
+          {vista === "tratamientos" && (
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 820 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={thSx}>Tratamiento</TableCell>
+                    <TableCell sx={thSx}>Producto</TableCell>
+                    <TableCell sx={thSx} align="center">Sesiones</TableCell>
+                    <TableCell sx={thSx} align="right">Promedio por sesión</TableCell>
+                    <TableCell sx={thSx} align="right">Costo por sesión</TableCell>
+                    <TableCell sx={thSx} align="right">Precio de lista</TableCell>
+                    <TableCell sx={thSx} align="right">Insumo</TableCell>
+                    <TableCell sx={thSx} align="right">Costo del periodo</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {tratamientos.length === 0 && (
+                    <TableRow><TableCell colSpan={8} sx={{ ...tdSx, textAlign: "center", color: colors.textMuted, py: "26px" }}>
+                      No hay salidas de producto en el periodo.
+                    </TableCell></TableRow>
+                  )}
+                  {tratamientos.map((t) => (
+                    <TableRow key={`${t.tratamiento_id}-${t.producto}`} hover>
+                      <TableCell sx={{ ...tdSx, fontWeight: 600, color: colors.primaryDark }}>{t.tratamiento}</TableCell>
+                      <TableCell sx={{ ...tdSx, color: colors.textMuted }}>{t.producto}</TableCell>
+                      <TableCell sx={tdSx} align="center">{t.sesiones}</TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 600 }} align="right">
+                        {numero(t.unidades_promedio)} {t.unidad}
+                      </TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 700, color: colors.primary }} align="right">
+                        {t.costo_unitario > 0 ? formatMoney(t.costo_promedio) : "—"}
+                      </TableCell>
+                      <TableCell sx={tdSx} align="right">
+                        {t.precio_lista > 0 ? formatMoney(t.precio_lista) : "—"}
+                      </TableCell>
+                      <TableCell sx={tdSx} align="right">
+                        {t.peso_insumo != null ? (
+                          <Chip
+                            label={`${numero(t.peso_insumo, 1)}%`}
+                            size="small"
+                            sx={{
+                              height: 22, fontSize: "11px", fontWeight: 700, fontFamily: fonts.body,
+                              bgcolor: t.peso_insumo >= 30 ? "#FDECEA" : t.peso_insumo >= 15 ? colors.amberBg : colors.successBg,
+                              color: t.peso_insumo >= 30 ? colors.error : t.peso_insumo >= 15 ? colors.amberText : colors.successText,
+                            }}
+                          />
+                        ) : <Box component="span" sx={{ color: colors.textMuted }}>—</Box>}
+                      </TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 600 }} align="right">
+                        {t.costo_unitario > 0 ? formatMoney(t.costo) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted, mt: "12px" }}>
+                "Insumo" es la parte del precio de lista que se va en producto. El precio de lista sale del protocolo del tratamiento, no de lo que pagó cada paciente.
+              </Typography>
+            </Box>
+          )}
+
+          {/* ---- POR PRODUCTO ---- */}
+          {vista === "productos" && (
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 700 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={thSx}>Producto</TableCell>
+                    <TableCell sx={thSx} align="center">Sesiones</TableCell>
+                    <TableCell sx={thSx} align="right">Cantidad usada</TableCell>
+                    <TableCell sx={thSx} align="right">Costo por {"unidad"}</TableCell>
+                    <TableCell sx={thSx} align="right">Presentaciones</TableCell>
+                    <TableCell sx={thSx} align="right">Costo del periodo</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {productos.length === 0 && (
+                    <TableRow><TableCell colSpan={6} sx={{ ...tdSx, textAlign: "center", color: colors.textMuted, py: "26px" }}>
+                      No hay salidas de producto en el periodo.
+                    </TableCell></TableRow>
+                  )}
+                  {productos.map((p) => (
+                    <TableRow key={p.variante_id} hover>
+                      <TableCell sx={{ ...tdSx, fontWeight: 600, color: colors.primaryDark }}>{p.producto}</TableCell>
+                      <TableCell sx={tdSx} align="center">{p.sesiones}</TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 600 }} align="right">{numero(p.unidades)} {p.unidad}</TableCell>
+                      <TableCell sx={tdSx} align="right">
+                        {p.costo_unitario > 0 ? `${formatMoney(p.costo_unitario)} / ${p.unidad}` : <Box component="span" sx={{ color: colors.amberText }}>sin precio</Box>}
+                      </TableCell>
+                      <TableCell sx={tdSx} align="right">
+                        {p.costo_unitario > 0 && p.contenido > 0
+                          ? numero(p.unidades / p.contenido, 1)
+                          : <Box component="span" sx={{ color: colors.textMuted }}>—</Box>}
+                      </TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 700, color: colors.primary }} align="right">
+                        {p.costo_unitario > 0 ? formatMoney(p.costo) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted, mt: "12px" }}>
+                "Presentaciones" es el equivalente en frascos o cajas completas de lo que se gastó.
+              </Typography>
+            </Box>
+          )}
+
+          {/* ---- POR PACIENTE ---- */}
+          {vista === "pacientes" && (
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 560 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={thSx}>Paciente</TableCell>
+                    <TableCell sx={thSx} align="center">Sesiones</TableCell>
+                    <TableCell sx={thSx} align="right">Costo de producto</TableCell>
+                    <TableCell sx={thSx} align="right">Promedio por sesión</TableCell>
+                    <TableCell sx={thSx} />
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pacientes.length === 0 && (
+                    <TableRow><TableCell colSpan={5} sx={{ ...tdSx, textAlign: "center", color: colors.textMuted, py: "26px" }}>
+                      No hay pacientes con gasto de producto en el periodo.
+                    </TableCell></TableRow>
+                  )}
+                  {pacientes.map((p) => (
+                    <TableRow key={p.paciente_id || p.paciente} hover>
+                      <TableCell sx={{ ...tdSx, fontWeight: 600, color: colors.primaryDark }}>{p.paciente}</TableCell>
+                      <TableCell sx={tdSx} align="center">{p.sesiones}</TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 700, color: colors.primary }} align="right">{formatMoney(p.costo)}</TableCell>
+                      <TableCell sx={tdSx} align="right">{formatMoney(p.costo / (p.sesiones || 1))}</TableCell>
+                      <TableCell sx={tdSx} align="right">
+                        {p.paciente_id && (
+                          <Button
+                            size="small"
+                            onClick={() => onVerPaciente(p.paciente_id)}
+                            sx={{ fontFamily: fonts.body, textTransform: "none", fontWeight: 600, fontSize: "12px", color: colors.primary, borderRadius: "9px" }}
+                          >
+                            Ver historial
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted, mt: "12px" }}>
+                Las 20 pacientes con mayor gasto de producto en el periodo.
+              </Typography>
+            </Box>
+          )}
+
+          {/* ---- DETALLE ---- */}
+          {vista === "detalle" && (
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 860 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={thSx}>Fecha</TableCell>
+                    <TableCell sx={thSx}>Paciente</TableCell>
+                    <TableCell sx={thSx}>Tratamiento</TableCell>
+                    <TableCell sx={thSx}>Producto</TableCell>
+                    <TableCell sx={thSx}>Especialista</TableCell>
+                    <TableCell sx={thSx} align="right">Cantidad</TableCell>
+                    <TableCell sx={thSx} align="right">Costo</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {detalle.length === 0 && (
+                    <TableRow><TableCell colSpan={7} sx={{ ...tdSx, textAlign: "center", color: colors.textMuted, py: "26px" }}>
+                      No hay salidas de producto en el periodo.
+                    </TableCell></TableRow>
+                  )}
+                  {detalle.map((d, i) => (
+                    <TableRow key={`${d.sesion_id}-${d.producto}-${i}`} hover>
+                      <TableCell sx={{ ...tdSx, color: colors.textMuted, whiteSpace: "nowrap" }}>{fechaCorta(d.fecha)}</TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 600, color: colors.primaryDark }}>{d.paciente}</TableCell>
+                      <TableCell sx={tdSx}>{d.tratamiento}</TableCell>
+                      <TableCell sx={{ ...tdSx, color: colors.textMuted }}>{d.producto}</TableCell>
+                      <TableCell sx={{ ...tdSx, color: colors.textMuted }}>{d.especialista}</TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 600 }} align="right">{numero(d.unidades)} {d.unidad}</TableCell>
+                      <TableCell sx={{ ...tdSx, fontWeight: 700, color: d.costo > 0 ? colors.primary : colors.textMuted }} align="right">
+                        {d.costo > 0 ? formatMoney(d.costo) : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {data?.detalle_truncado && (
+                <Typography sx={{ fontFamily: fonts.body, fontSize: "11.5px", color: colors.textMuted, mt: "12px" }}>
+                  Se muestran las {detalle.length} salidas más recientes de {data.total_movimientos}. Acorta el periodo para verlas todas.
+                </Typography>
+              )}
+            </Box>
+          )}
+        </CardContent>
+      </MotionCard>
+    </Box>
+  );
+}
+
+/* Precio de compra de un producto */
+function CostoProductoDialog({ producto, onClose, onGuardado }) {
+  const [costo, setCosto] = useState("");
+  const [contenido, setContenido] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (producto) {
+      setCosto(producto.costo_presentacion ? String(producto.costo_presentacion) : "");
+      setContenido(producto.contenido ? String(producto.contenido) : "1");
+      setError(null);
+    }
+  }, [producto]);
+
+  const costoNum = parseFloat(costo);
+  const contNum = parseFloat(contenido);
+  const valido = Number.isFinite(costoNum) && costoNum > 0 && Number.isFinite(contNum) && contNum > 0;
+  const porUnidad = valido ? costoNum / contNum : 0;
+
+  const guardar = async () => {
+    if (!valido) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      await apiFetch(`/costos-productos/${producto.variante_id}`, {
+        method: "PUT",
+        body: JSON.stringify({ costo_presentacion: costoNum, contenido: contNum })
+      });
+      onGuardado();
+    } catch (e) {
+      setError(e.message || "No se pudo guardar");
+    }
+    setGuardando(false);
+  };
+
+  return (
+    <Dialog open={!!producto} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "18px" } }}>
+      <DialogTitle sx={{ fontFamily: fonts.title, fontWeight: 700, color: colors.primaryDark, fontSize: "21px" }}>
+        Precio de compra
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontFamily: fonts.body, fontWeight: 600, fontSize: "14px", color: colors.primary, mb: "4px" }}>
+          {producto?.producto}
+        </Typography>
+        <Typography sx={{ fontFamily: fonts.body, fontSize: "12.5px", color: colors.textMuted, mb: "18px" }}>
+          Cuánto cuesta una presentación completa y cuánto trae.
+        </Typography>
+
+        <Box sx={{ display: "flex", gap: "12px" }}>
+          <TextField
+            label="Costo de compra"
+            value={costo}
+            onChange={(e) => setCosto(e.target.value)}
+            type="number"
+            size="small"
+            fullWidth
+            InputProps={{ startAdornment: <Typography sx={{ mr: "6px", color: colors.textMuted, fontFamily: fonts.body }}>S/</Typography> }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "11px", fontFamily: fonts.body } }}
+          />
+          <TextField
+            label={`Contenido (${producto?.unidad || "u"})`}
+            value={contenido}
+            onChange={(e) => setContenido(e.target.value)}
+            type="number"
+            size="small"
+            fullWidth
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "11px", fontFamily: fonts.body } }}
+          />
+        </Box>
+
+        <Box sx={{ mt: "16px", p: "14px", borderRadius: "12px", bgcolor: colors.creamPanel, border: `1px solid ${colors.goldSoft}` }}>
+          <Typography sx={{ fontFamily: fonts.body, fontSize: "11px", fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", color: colors.textMuted }}>
+            Costo por {producto?.unidad || "unidad"}
+          </Typography>
+          <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, fontSize: "23px", color: colors.primaryDark }}>
+            {valido ? formatMoney(porUnidad) : "—"}
+          </Typography>
+        </Box>
+
+        {error && (
+          <Typography sx={{ mt: "12px", fontFamily: fonts.body, fontSize: "12.5px", color: colors.error }}>{error}</Typography>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: "24px", pb: "18px" }}>
+        <Button onClick={onClose} sx={{ fontFamily: fonts.body, textTransform: "none", color: colors.textMuted, borderRadius: "10px" }}>
+          Cancelar
+        </Button>
+        <Button
+          onClick={guardar}
+          disabled={!valido || guardando}
+          variant="contained"
+          sx={{ fontFamily: fonts.body, textTransform: "none", fontWeight: 700, borderRadius: "11px", bgcolor: colors.primaryDark, px: "20px", "&:hover": { bgcolor: colors.primary } }}
+        >
+          {guardando ? "Guardando..." : "Guardar"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
 }

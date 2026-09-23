@@ -2351,4 +2351,263 @@ router.get("/control", authMiddleware, requireOwner, async (req, res) => {
   }
 });
 
+/* ======================================================================
+   🧪 COSTO DE PRODUCTO POR TRATAMIENTO Y PACIENTE
+   Responde cuánto cuesta el insumo que se gasta en cada sesión: cuántas
+   unidades salieron, a qué precio de compra, y qué peso tiene ese costo
+   sobre el precio del tratamiento.
+====================================================================== */
+
+// Costos de compra conocidos. Solo se aplican si la variante aún no tiene
+// costo cargado, para no pisar nunca un dato que el dueño haya puesto.
+const COSTOS_INICIALES = [
+  { variante: "Botox", costoPresentacion: 457.85, contenido: 100 },      // S/ 4.5785 por unidad
+  { variante: "Volumen Plus", costoPresentacion: 180.13, contenido: 1 }, // S/ 180.13 por ml
+];
+
+let costosSemillaLista = false;
+async function ensureCostosProducto() {
+  if (costosSemillaLista) return;
+  try {
+    for (const c of COSTOS_INICIALES) {
+      const contenido = c.contenido > 0 ? c.contenido : 1;
+      await dbRun(
+        `UPDATE variantes
+            SET costo_unitario = ?
+          WHERE LOWER(nombre) = LOWER(?)
+            AND (costo_unitario IS NULL OR costo_unitario = 0)`,
+        [c.costoPresentacion / contenido, c.variante]
+      );
+    }
+    costosSemillaLista = true;
+  } catch (err) {
+    console.error("❌ Error cargando costos iniciales:", err.message);
+  }
+}
+
+router.get("/costos-productos", authMiddleware, requireOwner, async (req, res) => {
+  await ensureCostosProducto();
+  try {
+    const { fecha_inicio, fecha_fin } = req.query;
+    const limite = Math.min(Number(req.query.limite) || 300, 2000);
+
+    let cond = "mi.referencia_tipo = 'tratamientos_realizados'";
+    const params = [];
+    if (fecha_inicio) { cond += " AND DATE(tr.fecha) >= ?"; params.push(fecha_inicio); }
+    if (fecha_fin) { cond += " AND DATE(tr.fecha) <= ?"; params.push(fecha_fin); }
+
+    // Una fila por salida de producto ligada a una sesión realizada.
+    const salidas = await dbAll(
+      `SELECT tr.id                AS sesion_id,
+              tr.fecha             AS fecha,
+              tr.especialista      AS especialista,
+              tr.paciente_id       AS paciente_id,
+              TRIM(COALESCE(p.nombre,'') || ' ' || COALESCE(p.apellido,'')) AS paciente,
+              tr.tratamiento_id    AS tratamiento_id,
+              t.nombre             AS tratamiento,
+              t.precio             AS precio_lista,
+              md.variante_id       AS variante_id,
+              v.nombre             AS variante,
+              pb.nombre            AS producto,
+              v.unidad_base        AS unidad,
+              v.contenido_por_presentacion AS contenido,
+              v.costo_unitario     AS costo_unitario,
+              md.cantidad_unidades AS unidades
+         FROM movimientos_detalle md
+         JOIN movimientos_inventario mi ON mi.id = md.movimiento_id
+         JOIN tratamientos_realizados tr ON tr.id = mi.referencia_id
+         JOIN variantes v ON v.id = md.variante_id
+         LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+         LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
+         LEFT JOIN patients p ON p.id = tr.paciente_id
+        WHERE ${cond}
+          AND COALESCE(md.cantidad_unidades, 0) > 0
+        ORDER BY tr.fecha DESC, tr.id DESC`,
+      params
+    );
+
+    const num = (x) => Number(x) || 0;
+    const nombreProducto = (s) => {
+      const base = (s.producto || "").trim();
+      const variante = (s.variante || "").trim();
+      if (base && variante && base.toLowerCase() !== variante.toLowerCase()) return `${base} ${variante}`;
+      return variante || base || "Producto sin nombre";
+    };
+
+    const porProducto = new Map();
+    const porTratamiento = new Map();
+    const sinCosto = new Map();
+    const sesionesVistas = new Set();
+    const pacientesVistos = new Set();
+    // Los promedios solo pueden salir de lo que sí tiene precio de compra:
+    // mezclar sesiones sin costear los aplastaría hacia abajo.
+    const sesionesCosteadas = new Set();
+    const pacientesCosteados = new Set();
+
+    let costoTotal = 0;
+    let unidadesConCosto = 0;
+
+    for (const s of salidas) {
+      const unidades = num(s.unidades);
+      const costoUnit = num(s.costo_unitario);
+      const costo = redondear(unidades * costoUnit);
+      const etiqueta = nombreProducto(s);
+
+      if (costoUnit > 0) {
+        costoTotal += costo;
+        unidadesConCosto += unidades;
+        sesionesCosteadas.add(s.sesion_id);
+        if (s.paciente_id) pacientesCosteados.add(s.paciente_id);
+      } else {
+        const f = sinCosto.get(s.variante_id) || {
+          variante_id: s.variante_id, producto: etiqueta, unidad: s.unidad || "u",
+          unidades: 0, sesiones: 0,
+        };
+        f.unidades += unidades;
+        f.sesiones += 1;
+        sinCosto.set(s.variante_id, f);
+      }
+
+      sesionesVistas.add(s.sesion_id);
+      if (s.paciente_id) pacientesVistos.add(s.paciente_id);
+
+      // ---- Acumulado por producto ----
+      const p = porProducto.get(s.variante_id) || {
+        variante_id: s.variante_id,
+        producto: etiqueta,
+        unidad: s.unidad || "u",
+        contenido: num(s.contenido) || 1,
+        costo_unitario: costoUnit,
+        costo_presentacion: redondear(costoUnit * (num(s.contenido) || 1)),
+        unidades: 0, costo: 0, sesiones: 0,
+      };
+      p.unidades = redondear(p.unidades + unidades);
+      p.costo = redondear(p.costo + costo);
+      p.sesiones += 1;
+      porProducto.set(s.variante_id, p);
+
+      // ---- Acumulado por tratamiento + producto ----
+      const clave = `${s.tratamiento_id || 0}|${s.variante_id}`;
+      const t = porTratamiento.get(clave) || {
+        tratamiento_id: s.tratamiento_id,
+        tratamiento: s.tratamiento || "Sin tratamiento asignado",
+        producto: etiqueta,
+        unidad: s.unidad || "u",
+        costo_unitario: costoUnit,
+        precio_lista: num(s.precio_lista),
+        sesiones: 0, unidades: 0, costo: 0,
+      };
+      t.sesiones += 1;
+      t.unidades = redondear(t.unidades + unidades);
+      t.costo = redondear(t.costo + costo);
+      porTratamiento.set(clave, t);
+    }
+
+    // Promedios y peso del insumo sobre el precio de lista
+    const tratamientos = [...porTratamiento.values()].map((t) => {
+      const unidadesProm = redondear(t.unidades / t.sesiones);
+      const costoProm = redondear(t.costo / t.sesiones);
+      return {
+        ...t,
+        unidades_promedio: unidadesProm,
+        costo_promedio: costoProm,
+        // Qué porcentaje del precio de lista se va en producto
+        peso_insumo: t.precio_lista > 0 ? redondear((costoProm / t.precio_lista) * 100) : null,
+        margen_estimado: t.precio_lista > 0 ? redondear(t.precio_lista - costoProm) : null,
+      };
+    }).sort((a, b) => b.costo - a.costo);
+
+    const detalle = salidas.slice(0, limite).map((s) => ({
+      sesion_id: s.sesion_id,
+      fecha: s.fecha,
+      paciente: s.paciente || "Sin paciente",
+      paciente_id: s.paciente_id,
+      especialista: s.especialista || "—",
+      tratamiento: s.tratamiento || "Sin tratamiento asignado",
+      producto: nombreProducto(s),
+      unidad: s.unidad || "u",
+      unidades: redondear(num(s.unidades)),
+      costo_unitario: num(s.costo_unitario),
+      costo: redondear(num(s.unidades) * num(s.costo_unitario)),
+    }));
+
+    // Ranking de pacientes por gasto en producto
+    const porPaciente = new Map();
+    for (const s of salidas) {
+      if (num(s.costo_unitario) <= 0) continue;
+      const clave = s.paciente_id || `s/i-${s.paciente || ""}`;
+      const f = porPaciente.get(clave) || {
+        paciente_id: s.paciente_id, paciente: s.paciente || "Sin paciente",
+        sesiones: new Set(), costo: 0,
+      };
+      f.sesiones.add(s.sesion_id);
+      f.costo = redondear(f.costo + num(s.unidades) * num(s.costo_unitario));
+      porPaciente.set(clave, f);
+    }
+    const pacientes = [...porPaciente.values()]
+      .map((f) => ({ ...f, sesiones: f.sesiones.size }))
+      .sort((a, b) => b.costo - a.costo)
+      .slice(0, 20);
+
+    res.json({
+      resumen: {
+        costo_total: redondear(costoTotal),
+        sesiones: sesionesCosteadas.size,
+        pacientes: pacientesCosteados.size,
+        sesiones_totales: sesionesVistas.size,
+        pacientes_totales: pacientesVistos.size,
+        unidades: redondear(unidadesConCosto),
+        costo_promedio_sesion: sesionesCosteadas.size > 0 ? redondear(costoTotal / sesionesCosteadas.size) : 0,
+        costo_promedio_paciente: pacientesCosteados.size > 0 ? redondear(costoTotal / pacientesCosteados.size) : 0,
+        productos_sin_costo: sinCosto.size,
+      },
+      productos: [...porProducto.values()].sort((a, b) => b.costo - a.costo),
+      tratamientos,
+      pacientes,
+      detalle,
+      detalle_truncado: salidas.length > limite,
+      total_movimientos: salidas.length,
+      sin_costo: [...sinCosto.values()]
+        .map((f) => ({ ...f, unidades: redondear(f.unidades) }))
+        .sort((a, b) => b.unidades - a.unidades),
+    });
+  } catch (err) {
+    console.error("❌ Error en costos de producto:", err.message);
+    res.status(500).json({ message: "Error al calcular los costos de producto", error: err.message });
+  }
+});
+
+// Guardar el precio de compra de un producto (presentación + contenido)
+router.put("/costos-productos/:varianteId", authMiddleware, requireOwner, async (req, res) => {
+  try {
+    const { varianteId } = req.params;
+    const costoPresentacion = Number(req.body?.costo_presentacion);
+    const contenido = Number(req.body?.contenido);
+
+    if (!Number.isFinite(costoPresentacion) || costoPresentacion < 0) {
+      return res.status(400).json({ message: "El costo de compra debe ser un número válido." });
+    }
+    if (!Number.isFinite(contenido) || contenido <= 0) {
+      return res.status(400).json({ message: "El contenido de la presentación debe ser mayor que cero." });
+    }
+
+    const variante = await dbGet("SELECT id, nombre FROM variantes WHERE id = ?", [varianteId]);
+    if (!variante) return res.status(404).json({ message: "Producto no encontrado" });
+
+    await dbRun(
+      `UPDATE variantes SET costo_unitario = ?, contenido_por_presentacion = ? WHERE id = ?`,
+      [costoPresentacion / contenido, contenido, varianteId]
+    );
+
+    res.json({
+      message: "Costo actualizado",
+      variante_id: Number(varianteId),
+      costo_unitario: costoPresentacion / contenido,
+    });
+  } catch (err) {
+    console.error("❌ Error guardando costo:", err.message);
+    res.status(500).json({ message: "Error al guardar el costo", error: err.message });
+  }
+});
+
 export default router;
