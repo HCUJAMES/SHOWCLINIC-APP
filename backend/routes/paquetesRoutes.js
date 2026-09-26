@@ -39,9 +39,16 @@ const requirePaquetesAsignar = [authMiddleware, requireRole("doctor", "master", 
 ============================== */
 router.get("/", authMiddleware, async (req, res) => {
   try {
+    // La imagen promocional se guarda en base64 y puede pesar varios MB. En la
+    // lista no se muestra, así que se manda solo una marca de si existe y la
+    // imagen se pide aparte por su propia ruta, que el navegador sí cachea.
     const paquetes = await dbAll(
-      `SELECT 
-        p.*,
+      `SELECT
+        p.id, p.nombre, p.descripcion, p.tratamiento_id, p.tratamientos_json,
+        p.productos_json, p.precio_regular, p.precio_paquete, p.descuento_porcentaje,
+        p.sesiones, p.vigencia_inicio, p.vigencia_fin, p.estado,
+        p.creado_en, p.actualizado_en,
+        CASE WHEN LENGTH(COALESCE(p.imagen_promocional,'')) > 0 THEN 1 ELSE 0 END AS tiene_imagen,
         t.nombre as tratamiento_nombre
        FROM paquetes_tratamientos p
        LEFT JOIN tratamientos t ON p.tratamiento_id = t.id
@@ -63,8 +70,12 @@ router.get("/activos", authMiddleware, async (req, res) => {
     const hoy = fechaLima().split(" ")[0];
     
     const paquetes = await dbAll(
-      `SELECT 
-        p.*,
+      `SELECT
+        p.id, p.nombre, p.descripcion, p.tratamiento_id, p.tratamientos_json,
+        p.productos_json, p.precio_regular, p.precio_paquete, p.descuento_porcentaje,
+        p.sesiones, p.vigencia_inicio, p.vigencia_fin, p.estado,
+        p.creado_en, p.actualizado_en,
+        CASE WHEN LENGTH(COALESCE(p.imagen_promocional,'')) > 0 THEN 1 ELSE 0 END AS tiene_imagen,
         t.nombre as tratamiento_nombre
        FROM paquetes_tratamientos p
        LEFT JOIN tratamientos t ON p.tratamiento_id = t.id
@@ -79,6 +90,32 @@ router.get("/activos", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("❌ Error al listar paquetes activos:", err.message);
     res.status(500).json({ message: "Error al listar paquetes activos" });
+  }
+});
+
+/* ==============================
+   🖼️ IMAGEN PROMOCIONAL DE UN PAQUETE
+   Va en su propia ruta para que el navegador la cachee y no viaje dentro
+   del listado, donde multiplicaba el peso de la respuesta.
+============================== */
+router.get("/:id/imagen", async (req, res) => {
+  try {
+    const fila = await dbGet(
+      `SELECT imagen_promocional FROM paquetes_tratamientos WHERE id = ?`,
+      [req.params.id]
+    );
+    const dato = fila?.imagen_promocional || "";
+    const m = /^data:([^;,]+);base64,(.*)$/s.exec(dato);
+    if (!m) return res.status(404).end();
+
+    const buffer = Buffer.from(m[2], "base64");
+    res.setHeader("Content-Type", m[1]);
+    res.setHeader("Content-Length", buffer.length);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.end(buffer);
+  } catch (err) {
+    console.error("❌ Error al obtener la imagen del paquete:", err.message);
+    res.status(500).end();
   }
 });
 

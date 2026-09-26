@@ -27,6 +27,7 @@ import barcodeRoutes from "./routes/barcodeRoutes.js";
 import consultasRoutes from "./routes/consultasRoutes.js";
 import { ocultarContactoSegunRol } from "./middleware/privacidad.js";
 import bcrypt from "bcryptjs";
+import compression from "compression";
 import { autoEmitMiddleware } from "./utils/socketEmitter.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,6 +54,9 @@ io.on("connection", (socket) => {
 app.set("io", io);
 
 app.use(cors());
+// Comprime las respuestas: los listados largos viajan hasta un 87% más
+// livianos, que es lo que más se nota en la red de la clínica.
+app.use(compression());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 

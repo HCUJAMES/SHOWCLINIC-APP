@@ -71,6 +71,9 @@ const Paquetes = () => {
   const [vigenciaFin, setVigenciaFin] = useState("");
   const [imagenPromocional, setImagenPromocional] = useState("");
   const [imagenPreview, setImagenPreview] = useState(null);
+  // Marca si el usuario tocó la imagen en esta edición. Si no la tocó, el
+  // guardado no manda el campo y el servidor conserva la que ya había.
+  const [imagenTocada, setImagenTocada] = useState(false);
 
   const [openConfirmarEliminar, setOpenConfirmarEliminar] = useState(false);
   const [paqueteEliminar, setPaqueteEliminar] = useState(null);
@@ -152,8 +155,22 @@ const Paquetes = () => {
     setPrecioPaquete(paquete.precio_paquete);
     setVigenciaInicio(paquete.vigencia_inicio || "");
     setVigenciaFin(paquete.vigencia_fin || "");
+    // El listado ya no trae la imagen (pesa megas). Se pide la del paquete
+    // concreto antes de editar: si no, al guardar se mandaría null y se
+    // borraría la imagen que ya tenía.
+    setImagenTocada(false);
     setImagenPromocional(paquete.imagen_promocional || "");
     setImagenPreview(paquete.imagen_promocional || null);
+    if (!paquete.imagen_promocional && paquete.tiene_imagen) {
+      axios
+        .get(`${API_BASE_URL}/api/paquetes/${paquete.id}`, { headers: authHeaders })
+        .then((res) => {
+          const img = res.data?.imagen_promocional || "";
+          setImagenPromocional(img);
+          setImagenPreview(img || null);
+        })
+        .catch((err) => console.error("Error al cargar la imagen del paquete:", err));
+    }
 
     setModoEdicion(true);
     setOpenModal(true);
@@ -168,6 +185,7 @@ const Paquetes = () => {
     setPrecioPaquete("");
     setVigenciaInicio("");
     setVigenciaFin("");
+    setImagenTocada(false);
     setImagenPromocional("");
     setImagenPreview(null);
   };
@@ -191,6 +209,7 @@ const Paquetes = () => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64String = reader.result;
+      setImagenTocada(true);
       setImagenPromocional(base64String);
       setImagenPreview(base64String);
     };
@@ -198,6 +217,7 @@ const Paquetes = () => {
   };
 
   const eliminarImagen = () => {
+    setImagenTocada(true);
     setImagenPromocional("");
     setImagenPreview(null);
   };
@@ -279,7 +299,9 @@ const Paquetes = () => {
       sesiones: totalSesiones,
       vigencia_inicio: vigenciaInicio || null,
       vigencia_fin: vigenciaFin || null,
-      imagen_promocional: imagenPromocional || null,
+      // Solo se manda si el usuario la cambió; si no, el servidor mantiene la
+      // imagen actual y no hay forma de borrarla por accidente.
+      ...(modoEdicion && !imagenTocada ? {} : { imagen_promocional: imagenPromocional || null }),
     };
 
     try {

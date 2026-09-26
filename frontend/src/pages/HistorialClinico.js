@@ -592,13 +592,14 @@ const HistorialClinico = () => {
       .then((res) => setEspecialistas(res.data || []))
       .catch((err) => console.error("Error al obtener especialistas:", err));
 
-    // Cargar paquetes activos
+    // Cargar paquetes activos. Se pide la ruta /activos: filtra en el servidor
+    // y no arrastra las imágenes promocionales, que pesan megas en base64.
     axios
-      .get(`${API_BASE_URL}/api/paquetes`, {
+      .get(`${API_BASE_URL}/api/paquetes/activos`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       .then((res) => {
-        const activos = (res.data || []).filter(p => p.estado === 'activo');
+        const activos = res.data || [];
         const paquetesOrdenados = activos.sort((a, b) => {
           return (a.nombre || '').toLowerCase().localeCompare((b.nombre || '').toLowerCase());
         });
@@ -2791,7 +2792,7 @@ const HistorialClinico = () => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const pacientesFiltrados = pacientes
+  const pacientesFiltrados = useMemo(() => pacientes
     .filter(
       (p) => {
         if (!filtro.trim()) return true;
@@ -2826,7 +2827,32 @@ const HistorialClinico = () => {
         default:
           return b.id - a.id;
       }
-    });
+    }), [pacientes, filtro, ordenPacientes]);
+
+  // La lista completa puede pasar de 370 tarjetas. Pintarlas todas de golpe
+  // es lo que hace lento el scroll y el buscador, así que se muestran por
+  // tramos y el resto entra al llegar al final.
+  const PASO_PACIENTES = 40;
+  const [visiblesPacientes, setVisiblesPacientes] = useState(PASO_PACIENTES);
+  const centinelaPacientes = useRef(null);
+
+  useEffect(() => {
+    setVisiblesPacientes(PASO_PACIENTES);
+  }, [filtro, ordenPacientes, pacientes.length]);
+
+  useEffect(() => {
+    const nodo = centinelaPacientes.current;
+    if (!nodo) return;
+    const obs = new IntersectionObserver((entradas) => {
+      if (entradas[0]?.isIntersecting) {
+        setVisiblesPacientes((v) => Math.min(v + PASO_PACIENTES, pacientesFiltrados.length));
+      }
+    }, { rootMargin: "300px" });
+    obs.observe(nodo);
+    return () => obs.disconnect();
+  }, [pacientesFiltrados.length, visiblesPacientes]);
+
+  const pacientesVisibles = pacientesFiltrados.slice(0, visiblesPacientes);
 
   const totalGeneral = tratamientos.reduce(
     (acc, t) => acc + Number(t.precio_total || t.precioTotal || 0),
@@ -3642,7 +3668,7 @@ const HistorialClinico = () => {
 
               {/* Lista de pacientes */}
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
-                {pacientesFiltrados.map((pac) => {
+                {pacientesVisibles.map((pac) => {
                   const iniciales = `${pac.nombre?.charAt(0) || ""}${pac.apellido?.charAt(0) || ""}`.toUpperCase();
                   const coloresAvatar = ["#5a3e1b", "#a36920", "#ba9a63", "#8b6914", "#6b4e1f"];
                   const colorAvatar = coloresAvatar[pac.id % coloresAvatar.length];
@@ -3849,6 +3875,15 @@ const HistorialClinico = () => {
                     </Paper>
                   );
                 })}
+
+                {/* Al entrar en pantalla, carga el siguiente tramo */}
+                {visiblesPacientes < pacientesFiltrados.length && (
+                  <Box ref={centinelaPacientes} sx={{ py: 2, textAlign: "center" }}>
+                    <Typography sx={{ fontSize: "0.8rem", color: "#a89880" }}>
+                      Cargando más pacientes… ({visiblesPacientes} de {pacientesFiltrados.length})
+                    </Typography>
+                  </Box>
+                )}
               </Box>
 
               {/* Menu de clasificación fuera del Paper */}
@@ -6367,10 +6402,11 @@ const HistorialClinico = () => {
                           }}
                         >
                           {/* Imagen Promocional */}
-                          {paquete.imagen_promocional && (
+                          {(paquete.tiene_imagen || paquete.imagen_promocional) && (
                             <Box sx={{ mb: 2, borderRadius: 2, overflow: "hidden", backgroundColor: "#f5f5f5" }}>
                               <img
-                                src={paquete.imagen_promocional}
+                                loading="lazy"
+                                src={paquete.imagen_promocional || `${API_BASE_URL}/api/paquetes/${paquete.id}/imagen`}
                                 alt={paquete.nombre}
                                 style={{
                                   width: "100%",
