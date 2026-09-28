@@ -872,8 +872,21 @@ router.get("/seguimiento", async (req, res) => {
 });
 
 // ✅ Listar pacientes
+// Campos que necesitan las pantallas que muestran listas de pacientes.
+// El resto (observaciones, alergias, dirección, enfermedades…) son textos
+// largos que solo se ven dentro de la ficha, y esa se pide aparte por id.
+const CAMPOS_LISTA_PACIENTE = [
+  "id", "dni", "tipoDocumento", "nombre", "apellido",
+  "edad", "sexo", "fechaNacimiento", "celular", "fotoPerfil",
+  "ciudadResidencia", "clasificacion", "codigo_smsc", "fechaRegistro", "especial",
+].join(", ");
+
 router.get("/listar", (req, res) => {
-  const query = "SELECT * FROM patients ORDER BY id DESC";
+  // ?completo=1 devuelve la fila entera, por si alguna pantalla lo necesita.
+  const completo = req.query.completo === "1";
+  const query = completo
+    ? "SELECT * FROM patients ORDER BY id DESC"
+    : `SELECT ${CAMPOS_LISTA_PACIENTE} FROM patients ORDER BY id DESC`;
   db.all(query, [], (err, rows) => {
     if (err) {
       console.error("❌ Error al listar pacientes:", err);

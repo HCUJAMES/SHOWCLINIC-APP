@@ -122,8 +122,13 @@ router.get("/:id/imagen", async (req, res) => {
 /* ==============================
    🔍 OBTENER UN PAQUETE POR ID
 ============================== */
-router.get("/:id", authMiddleware, async (req, res) => {
+router.get("/:id", authMiddleware, async (req, res, next) => {
   const { id } = req.params;
+
+  // Esta ruta se declara antes que otras de un solo tramo como
+  // /pacientes-en-tratamiento, y se las tragaba devolviendo 404. Si el tramo
+  // no es un número, no es un id de paquete: que siga buscando.
+  if (!/^\d+$/.test(id)) return next();
 
   try {
     const paquete = await dbGet(
@@ -524,7 +529,7 @@ router.get("/pacientes-en-tratamiento", requirePaquetesRead, async (req, res) =>
         (SELECT COUNT(*) FROM paquetes_sesiones ps 
           JOIN paquetes_pacientes pp3 ON ps.paquete_paciente_id = pp3.id 
           WHERE pp3.paciente_id = p.id AND ps.estado = 'pendiente') as sesiones_pendientes
-       FROM pacientes p
+       FROM patients p
        INNER JOIN paquetes_pacientes pp ON pp.paciente_id = p.id
        WHERE pp.estado = 'activo'
        ORDER BY p.nombre ASC`
