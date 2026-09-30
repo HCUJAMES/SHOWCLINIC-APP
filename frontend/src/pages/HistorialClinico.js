@@ -291,6 +291,8 @@ const HistorialClinico = () => {
   };
   const [filtro, setFiltro] = useState("");
   const [ordenPacientes, setOrdenPacientes] = useState("reciente");
+  // "todos" o un mes concreto en formato AAAA-MM
+  const [mesPacientes, setMesPacientes] = useState("todos");
   const [pacienteSeleccionado, setPacienteSeleccionado] = useState(null);
   const [anchorElClasificacion, setAnchorElClasificacion] = useState(null);
   const [pacienteClasificando, setPacienteClasificando] = useState(null);
@@ -2792,7 +2794,31 @@ const HistorialClinico = () => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  const pacientesFiltrados = useMemo(() => pacientes
+  // Meses en los que hay pacientes registrados, del más reciente al más antiguo
+  const mesesDisponibles = useMemo(() => {
+    const vistos = new Set();
+    for (const p of pacientes) {
+      const clave = String(p.fechaRegistro || "").slice(0, 7);
+      if (clave.length === 7) vistos.add(clave);
+    }
+    return [...vistos].sort().reverse();
+  }, [pacientes]);
+
+  // Base sobre la que se calculan tanto el resumen de arriba como la lista
+  const pacientesDelMes = useMemo(() => {
+    if (mesPacientes === "todos") return pacientes;
+    return pacientes.filter((p) => String(p.fechaRegistro || "").slice(0, 7) === mesPacientes);
+  }, [pacientes, mesPacientes]);
+
+  const nombreMes = (clave) => {
+    if (clave === "todos") return "Todos los meses";
+    const [anio, mes] = clave.split("-");
+    const nombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    return `${nombres[Number(mes) - 1] || mes} ${anio}`;
+  };
+
+  const pacientesFiltrados = useMemo(() => pacientesDelMes
     .filter(
       (p) => {
         if (!filtro.trim()) return true;
@@ -2827,7 +2853,7 @@ const HistorialClinico = () => {
         default:
           return b.id - a.id;
       }
-    }), [pacientes, filtro, ordenPacientes]);
+    }), [pacientesDelMes, filtro, ordenPacientes]);
 
   // La lista completa puede pasar de 370 tarjetas. Pintarlas todas de golpe
   // es lo que hace lento el scroll y el buscador, así que se muestran por
@@ -2838,7 +2864,7 @@ const HistorialClinico = () => {
 
   useEffect(() => {
     setVisiblesPacientes(PASO_PACIENTES);
-  }, [filtro, ordenPacientes, pacientes.length]);
+  }, [filtro, ordenPacientes, mesPacientes, pacientes.length]);
 
   useEffect(() => {
     const nodo = centinelaPacientes.current;
@@ -3367,7 +3393,7 @@ const HistorialClinico = () => {
                           color: "#5a3e1b",
                         }}
                       >
-                        {pacientes.length}
+                        {pacientesDelMes.length}
                       </Typography>
                       <Typography
                         sx={{
@@ -3402,14 +3428,12 @@ const HistorialClinico = () => {
                         }}
                       >
                         {(() => {
+                          // Con un mes elegido, todos los de la lista son de ese
+                          // mes. Sin filtro, se cuenta el mes corriente.
+                          if (mesPacientes !== "todos") return pacientesDelMes.length;
                           const hoy = new Date();
-                          const mesActual = hoy.getMonth();
-                          const añoActual = hoy.getFullYear();
-                          return pacientes.filter(p => {
-                            if (!p.fechaRegistro) return false;
-                            const fecha = new Date(p.fechaRegistro);
-                            return fecha.getMonth() === mesActual && fecha.getFullYear() === añoActual;
-                          }).length;
+                          const clave = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
+                          return pacientes.filter(p => String(p.fechaRegistro || "").slice(0, 7) === clave).length;
                         })()}
                       </Typography>
                       <Typography
@@ -3444,7 +3468,7 @@ const HistorialClinico = () => {
                           color: "#2e7d32",
                         }}
                       >
-                        {pacientes.filter(p => p.clasificacion === "Tratamiento").length}
+                        {pacientesDelMes.filter(p => p.clasificacion === "Tratamiento").length}
                       </Typography>
                       <Typography
                         sx={{
@@ -3478,7 +3502,7 @@ const HistorialClinico = () => {
                           color: "#7b1fa2",
                         }}
                       >
-                        {pacientes.filter(p => p.clasificacion === "Convenio").length}
+                        {pacientesDelMes.filter(p => p.clasificacion === "Convenio").length}
                       </Typography>
                       <Typography
                         sx={{
@@ -3512,7 +3536,7 @@ const HistorialClinico = () => {
                           color: "#0288d1",
                         }}
                       >
-                        {pacientes.filter(p => p.clasificacion === "Código").length}
+                        {pacientesDelMes.filter(p => p.clasificacion === "Código").length}
                       </Typography>
                       <Typography
                         sx={{
@@ -3546,7 +3570,7 @@ const HistorialClinico = () => {
                           color: "#ef6c00",
                         }}
                       >
-                        {pacientes.filter(p => p.clasificacion === "Reincorporado").length}
+                        {pacientesDelMes.filter(p => p.clasificacion === "Reincorporado").length}
                       </Typography>
                       <Typography
                         sx={{
@@ -3580,7 +3604,7 @@ const HistorialClinico = () => {
                           color: "#a36920",
                         }}
                       >
-                        {pacientes.filter(p => p.clasificacion === "Solo consulta").length}
+                        {pacientesDelMes.filter(p => p.clasificacion === "Solo consulta").length}
                       </Typography>
                       <Typography
                         sx={{
@@ -3631,6 +3655,50 @@ const HistorialClinico = () => {
                   }}
                 />
               </Paper>
+
+              {/* Filtro por mes de registro: manda sobre el resumen de arriba
+                  y sobre la lista de abajo */}
+              <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
+                <Typography variant="caption" sx={{ color: "#999", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", mr: 0.5 }}>
+                  MES
+                </Typography>
+                <Select
+                  size="small"
+                  value={mesesDisponibles.includes(mesPacientes) || mesPacientes === "todos" ? mesPacientes : "todos"}
+                  onChange={(e) => setMesPacientes(e.target.value)}
+                  sx={{
+                    minWidth: 190,
+                    borderRadius: 2,
+                    backgroundColor: mesPacientes === "todos" ? "white" : "rgba(163,105,32,0.08)",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: mesPacientes === "todos" ? "#5a3e1b" : "#a36920",
+                    "& fieldset": { borderColor: "rgba(163,105,32,0.25)" },
+                    "&:hover fieldset": { borderColor: "#a36920" },
+                  }}
+                >
+                  <MenuItem value="todos" sx={{ fontSize: "0.85rem" }}>Todos los meses</MenuItem>
+                  {mesesDisponibles.map((m) => (
+                    <MenuItem key={m} value={m} sx={{ fontSize: "0.85rem" }}>{nombreMes(m)}</MenuItem>
+                  ))}
+                </Select>
+                {mesPacientes !== "todos" && (
+                  <Chip
+                    label={`${pacientesDelMes.length} paciente${pacientesDelMes.length === 1 ? "" : "s"} · quitar filtro`}
+                    size="small"
+                    onDelete={() => setMesPacientes("todos")}
+                    onClick={() => setMesPacientes("todos")}
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: "0.75rem",
+                      backgroundColor: "rgba(163,105,32,0.12)",
+                      color: "#a36920",
+                      border: "1px solid rgba(163,105,32,0.25)",
+                      "& .MuiChip-deleteIcon": { color: "#a36920" },
+                    }}
+                  />
+                )}
+              </Box>
 
               {/* Filtros de orden */}
               <Box sx={{ display: "flex", gap: 1.5, mb: 3, flexWrap: "wrap", alignItems: "center" }}>
