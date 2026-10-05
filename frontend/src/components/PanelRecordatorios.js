@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Typography, IconButton, Badge, Tooltip, CircularProgress } from "@mui/material";
 import {
   NotificationsActiveRounded,
@@ -32,9 +32,11 @@ import { motion, AnimatePresence } from "framer-motion";
  *
  * Al hacer clic en un paciente se abre su historial clínico.
  *
- * La pestaña Stock avisa sola cuando a un producto le quedan 2 presentaciones
- * o menos. La ✕ cierra la alerta (queda guardado en el servidor); vuelve sola
- * si el stock baja todavía más, y se limpia cuando el producto se repone.
+ * La pestaña Stock avisa sola cuando a un producto le quedan 2 códigos activos
+ * o menos (la misma cifra de "Ver códigos" en inventario). Cuando aparece un
+ * producto nuevo en esa lista sale además un aviso emergente abajo a la
+ * derecha. La ✕ cierra la alerta (queda guardado en el servidor); vuelve sola
+ * si bajan todavía más, y se limpia cuando el producto se repone.
  */
 
 const ORO = "#A36920";
@@ -80,16 +82,21 @@ const tiempoDesdeConsulta = (dias) => {
   return `hace ${m} ${m === 1 ? "mes" : "meses"}`;
 };
 
-// "Quedan 2 frascos" / "Agotado". Si cada presentación trae varias unidades
-// (Botox = 100 U por frasco) se muestran también las unidades.
+// "2 códigos activos · 140 U restantes" / "Agotado"
 const textoStock = (p) => {
-  if (!p || p.stock <= 0) return "Agotado";
-  const n = p.presentaciones;
-  const cifra = Number.isInteger(n) ? n : n.toLocaleString("es-PE", { maximumFractionDigits: 1 });
-  if ((p.contenido_por_presentacion || 1) > 1) {
-    return `Quedan ${cifra} ${n === 1 ? "presentación" : "presentaciones"} · ${Math.round(p.stock).toLocaleString("es-PE")} ${p.unidad_base || "u"}`;
-  }
-  return `Quedan ${cifra} ${p.unidad_base || (n === 1 ? "unidad" : "unidades")}`;
+  if (!p || p.codigos_activos <= 0) return "Agotado · sin códigos activos";
+  const n = p.codigos_activos;
+  const restante = Number(p.unidades_restantes || 0).toLocaleString("es-PE", { maximumFractionDigits: 2 });
+  return `${n} ${n === 1 ? "código activo" : "códigos activos"} · ${restante} ${p.unidad_base || "u"} restantes`;
+};
+
+// Alertas ya avisadas con el popup en esta sesión (para no repetirlo)
+const CLAVE_POPUP_STOCK = "stockPopupAvisados";
+const leerAvisados = () => {
+  try { return new Set(JSON.parse(sessionStorage.getItem(CLAVE_POPUP_STOCK) || "[]")); } catch { return new Set(); }
+};
+const guardarAvisados = (set) => {
+  try { sessionStorage.setItem(CLAVE_POPUP_STOCK, JSON.stringify([...set])); } catch { /* modo privado */ }
 };
 
 // "hoy" / "ayer" / "hace 5 días"
@@ -279,9 +286,12 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
   const [seguimiento, setSeguimiento] = useState(null);
   const [cargandoSeguimiento, setCargandoSeguimiento] = useState(false);
 
-  // Productos con poco stock (≤ 2 presentaciones)
+  // Productos con poco stock (≤ 2 códigos activos)
   const [stock, setStock] = useState(null);
   const [verCerradas, setVerCerradas] = useState(false);
+  // Aviso emergente con los productos que acaban de quedar con poco stock
+  const [popupStock, setPopupStock] = useState(null);
+  const timerPopup = useRef(null);
 
   // Fila que se está marcando (para la animación de salida)
   const [marcando, setMarcando] = useState(null);
@@ -341,9 +351,25 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
       const res = await fetch(`${apiBase}/api/inventario/alertas-stock`, {
         headers: { Authorization: `Bearer ${token()}` },
       });
-      if (res.ok) setStock(await res.json());
+      if (!res.ok) return;
+      const data = await res.json();
+      setStock(data);
+
+      // Popup solo con lo que aún no se avisó en esta sesión. Si a un producto
+      // le baja otro código (de 2 a 1, por ejemplo) se vuelve a avisar.
+      const avisados = leerAvisados();
+      const clave = (p) => `${p.variante_id}-${p.codigos_activos}`;
+      const nuevos = (data.alertas || []).filter((p) => !avisados.has(clave(p)));
+      guardarAvisados(new Set((data.alertas || []).map(clave)));
+      if (nuevos.length) {
+        setPopupStock(nuevos);
+        clearTimeout(timerPopup.current);
+        timerPopup.current = setTimeout(() => setPopupStock(null), 15000);
+      }
     } catch { /* se queda con lo que tenía */ }
   }, [apiBase]);
+
+  useEffect(() => () => clearTimeout(timerPopup.current), []);
 
   useEffect(() => {
     cargarStock();
@@ -351,7 +377,15 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
     return () => clearInterval(intervalo);
   }, [cargarStock]);
 
-  useEffect(() => { if (abierto) cargarStock(); }, [abierto, cargarStock]);
+  useEffect(() => {
+    if (abierto) { cargarStock(); setPopupStock(null); }
+  }, [abierto, cargarStock]);
+
+  const verAlertasStock = () => {
+    setPopupStock(null);
+    setPestana("stock");
+    setAbierto(true);
+  };
 
   // Al cambiar de pestaña se recoge la sección de marcados
   useEffect(() => { setVerMarcados(false); setVerCerradas(false); }, [pestana]);
@@ -654,6 +688,73 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
         )}
       </MotionBox>
 
+      {/* Aviso emergente de stock bajo */}
+      <AnimatePresence>
+        {popupStock && !abierto && (
+          <MotionBox
+            key="popup-stock"
+            role="alert"
+            initial={{ opacity: 0, y: 40, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.96 }}
+            transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+            sx={{
+              position: "fixed", bottom: 22, right: 22, zIndex: 1400,
+              width: { xs: "calc(100vw - 32px)", sm: 360 },
+              borderRadius: "18px", overflow: "hidden",
+              background: "#fff",
+              border: "1px solid rgba(211,47,47,0.25)",
+              boxShadow: "0 18px 44px rgba(62,39,35,0.28)",
+            }}
+          >
+            <Box sx={{
+              display: "flex", alignItems: "center", gap: 1, px: 1.8, py: 1.2,
+              background: "linear-gradient(135deg,#D9822B 0%,#B5541B 100%)", color: "#fff",
+            }}>
+              <Inventory2Rounded sx={{ fontSize: 20 }} />
+              <Typography sx={{ flex: 1, fontWeight: 700, fontSize: 14 }}>
+                {popupStock.length === 1 ? "Producto con poco stock" : `${popupStock.length} productos con poco stock`}
+              </Typography>
+              <IconButton size="small" aria-label="Cerrar aviso" onClick={() => setPopupStock(null)}
+                sx={{ color: "#fff", p: 0.4, "&:hover": { background: "rgba(255,255,255,0.18)" } }}>
+                <CloseRounded sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Box>
+            <Box sx={{ px: 1.8, py: 1.2 }}>
+              {popupStock.slice(0, 4).map((p) => (
+                <Box key={p.variante_id} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.45 }}>
+                  <Box sx={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                    background: p.codigos_activos <= 0 ? "#D32F2F" : "#E08A1E" }} />
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: CAFE }} noWrap>{p.variante}</Typography>
+                    <Typography sx={{ fontSize: 11.5, color: p.codigos_activos <= 0 ? "#C62828" : "#9A5B0C", fontWeight: 600 }} noWrap>
+                      {textoStock(p)}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+              {popupStock.length > 4 && (
+                <Typography sx={{ fontSize: 11.5, color: "#8D7B70", mt: 0.3 }}>
+                  y {popupStock.length - 4} más…
+                </Typography>
+              )}
+              <Box
+                component="button"
+                onClick={verAlertasStock}
+                sx={{
+                  mt: 1.1, width: "100%", py: 0.9, borderRadius: "10px", cursor: "pointer",
+                  border: "none", fontWeight: 700, fontSize: 12.5, color: "#fff",
+                  background: `linear-gradient(135deg, ${ORO} 0%, ${ORO_OSCURO} 100%)`,
+                  "&:hover": { filter: "brightness(1.08)" },
+                }}
+              >
+                Ver alertas de stock
+              </Box>
+            </Box>
+          </MotionBox>
+        )}
+      </AnimatePresence>
+
       {/* Panel */}
       <AnimatePresence>
         {abierto && (
@@ -689,7 +790,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                     </Typography>
                   </Box>
                   <Typography sx={{ fontSize: 11.5, opacity: 0.9, mt: 0.3 }}>
-                    Productos con {stock?.umbral ?? 2} o menos en inventario
+                    Productos con {stock?.umbral ?? 2} códigos activos o menos
                   </Typography>
                   <Box sx={{ display: "flex", gap: 0.8, mt: 1.2, flexWrap: "wrap" }}>
                     <Box sx={{ px: 1.1, py: 0.35, borderRadius: "999px", background: "rgba(255,255,255,0.20)" }}>
@@ -697,10 +798,10 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                         {totalStock} por reponer
                       </Typography>
                     </Box>
-                    {(stock?.alertas || []).some((p) => p.stock <= 0) && (
+                    {(stock?.alertas || []).some((p) => p.codigos_activos <= 0) && (
                       <Box sx={{ px: 1.1, py: 0.35, borderRadius: "999px", background: "rgba(0,0,0,0.25)" }}>
                         <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
-                          {(stock?.alertas || []).filter((p) => p.stock <= 0).length} agotado{(stock?.alertas || []).filter((p) => p.stock <= 0).length === 1 ? "" : "s"}
+                          {(stock?.alertas || []).filter((p) => p.codigos_activos <= 0).length} agotado{(stock?.alertas || []).filter((p) => p.codigos_activos <= 0).length === 1 ? "" : "s"}
                         </Typography>
                       </Box>
                     )}
@@ -869,7 +970,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                           Stock en orden
                         </Typography>
                         <Typography sx={{ fontSize: 12, color: "#8D7B70", mt: 0.5 }}>
-                          Ningún producto tiene {stock.umbral} o menos por ahora.
+                          Ningún producto tiene {stock.umbral} códigos activos o menos.
                         </Typography>
                       </Box>
                     )}
@@ -877,7 +978,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                     {stock.alertas.map((p, i) => {
                       const clave = `stock-${p.variante_id}`;
                       const hecho = marcando === clave;
-                      const agotado = p.stock <= 0;
+                      const agotado = p.codigos_activos <= 0;
                       return (
                         <MotionBox
                           key={clave}

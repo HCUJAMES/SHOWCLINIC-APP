@@ -189,14 +189,15 @@ router.put("/variantes/visibilidad", requireInventoryWrite, async (req, res) => 
 /* ==============================================
    🔔 ALERTAS DE STOCK BAJO (panel de avisos del dashboard)
 
-   Avisa cuando a un producto le quedan 2 presentaciones o menos (frascos,
-   jeringas, cajas… según contenido_por_presentacion). El stock se calcula
-   igual que en la pantalla de inventario: manda lo que dicen los códigos
-   activos y, si el producto no tiene códigos, lo que suman los lotes.
+   Se guía por los CÓDIGOS ACTIVOS, igual que "Ver códigos" en inventario:
+   cada código es un frasco/jeringa/caja física y lleva sus unidades
+   restantes, que bajan al escanearlo. Avisa cuando a un producto le quedan
+   2 códigos activos o menos (0 = agotado). Los productos que nunca tuvieron
+   códigos no entran: sin códigos no hay una cifra precisa.
 
-   "Cerrar alerta" guarda cuántas presentaciones quedaban en ese momento
-   (variantes.alerta_stock_cerrada). La alerta vuelve sola si el stock baja
-   todavía más, y la marca se borra cuando el producto se repone (> 2).
+   "Cerrar alerta" guarda cuántos códigos activos quedaban en ese momento
+   (variantes.alerta_stock_cerrada). La alerta vuelve sola si bajan todavía
+   más, y la marca se borra cuando el producto se repone (> 2).
    Los productos ocultos en el inventario no generan alertas.
 ============================================== */
 const UMBRAL_STOCK_BAJO = 2;
@@ -217,53 +218,36 @@ async function ensureAlertaStockSchema() {
 ensureAlertaStockSchema();
 
 async function calcularStockBajo() {
+  // Mismo criterio de "activo" que /api/barcodes/stock-por-variante
   const filas = await dbAll(`
     SELECT
       v.id AS variante_id,
       v.nombre AS variante,
       pb.nombre AS marca,
       v.unidad_base,
-      v.imagen,
-      COALESCE(v.contenido_por_presentacion, 1) AS contenido,
       v.alerta_stock_cerrada,
-      lotes.stock_lotes,
-      cod.codigos_totales,
-      cod.unidades_codigos
-    FROM variantes v
+      COUNT(bu.id) AS codigos_totales,
+      SUM(CASE WHEN bu.status = 'active' OR COALESCE(bu.unidades_restantes, 0) > 0 THEN 1 ELSE 0 END) AS codigos_activos,
+      COALESCE(SUM(CASE WHEN bu.status = 'active' OR COALESCE(bu.unidades_restantes, 0) > 0
+                        THEN COALESCE(bu.unidades_restantes, 0) ELSE 0 END), 0) AS unidades_restantes
+    FROM barcode_units bu
+    JOIN stock_lotes sl ON sl.id = bu.lote_id
+    JOIN variantes v ON v.id = sl.variante_id
     LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
-    JOIN (
-      SELECT variante_id,
-             SUM(MAX(0, COALESCE(cantidad_unidades, 0) - COALESCE(cantidad_reservada_unidades, 0))) AS stock_lotes
-      FROM stock_lotes
-      GROUP BY variante_id
-    ) lotes ON lotes.variante_id = v.id
-    LEFT JOIN (
-      SELECT sl.variante_id,
-             COUNT(bu.id) AS codigos_totales,
-             COALESCE(SUM(CASE WHEN bu.status = 'active' OR COALESCE(bu.unidades_restantes, 0) > 0
-                               THEN COALESCE(bu.unidades_restantes, 0) ELSE 0 END), 0) AS unidades_codigos
-      FROM barcode_units bu
-      JOIN stock_lotes sl ON sl.id = bu.lote_id
-      GROUP BY sl.variante_id
-    ) cod ON cod.variante_id = v.id
     WHERE COALESCE(v.oculto_inventario, 0) = 0
+    GROUP BY v.id
   `);
 
-  return filas.map((f) => {
-    const stock = Number(f.codigos_totales) > 0 ? Number(f.unidades_codigos) || 0 : Number(f.stock_lotes) || 0;
-    const contenido = Number(f.contenido) > 0 ? Number(f.contenido) : 1;
-    return {
-      variante_id: f.variante_id,
-      variante: f.variante || "Sin nombre",
-      marca: f.marca || "",
-      unidad_base: f.unidad_base || "",
-      imagen: f.imagen || null,
-      stock,
-      contenido_por_presentacion: contenido,
-      presentaciones: Math.round((stock / contenido) * 100) / 100,
-      cerrada_en: f.alerta_stock_cerrada,
-    };
-  });
+  return filas.map((f) => ({
+    variante_id: f.variante_id,
+    variante: f.variante || "Sin nombre",
+    marca: f.marca || "",
+    unidad_base: f.unidad_base || "",
+    codigos_activos: Number(f.codigos_activos) || 0,
+    codigos_totales: Number(f.codigos_totales) || 0,
+    unidades_restantes: Math.round((Number(f.unidades_restantes) || 0) * 100) / 100,
+    cerrada_en: f.alerta_stock_cerrada,
+  }));
 }
 
 router.get("/alertas-stock", async (req, res) => {
@@ -274,11 +258,11 @@ router.get("/alertas-stock", async (req, res) => {
     const alertas = [];
     const cerradas = [];
     for (const p of productos) {
-      const bajo = p.presentaciones <= UMBRAL_STOCK_BAJO;
+      const bajo = p.codigos_activos <= UMBRAL_STOCK_BAJO;
       const cerrada = p.cerrada_en !== null && p.cerrada_en !== undefined;
 
       // Se repuso o bajó todavía más desde que se cerró: la alerta se reactiva
-      if (cerrada && (!bajo || p.presentaciones < Number(p.cerrada_en))) {
+      if (cerrada && (!bajo || p.codigos_activos < Number(p.cerrada_en))) {
         await dbRun(`UPDATE variantes SET alerta_stock_cerrada = NULL WHERE id = ?`, [p.variante_id]);
         if (bajo) alertas.push(p);
         continue;
@@ -287,7 +271,7 @@ router.get("/alertas-stock", async (req, res) => {
       (cerrada ? cerradas : alertas).push(p);
     }
 
-    const orden = (a, b) => a.presentaciones - b.presentaciones || a.variante.localeCompare(b.variante);
+    const orden = (a, b) => a.codigos_activos - b.codigos_activos || a.unidades_restantes - b.unidades_restantes || a.variante.localeCompare(b.variante);
     alertas.sort(orden);
     cerradas.sort(orden);
 
@@ -304,7 +288,7 @@ router.post("/alertas-stock/:id/cerrar", async (req, res) => {
     await ensureAlertaStockSchema();
     const p = (await calcularStockBajo()).find((x) => String(x.variante_id) === String(req.params.id));
     if (!p) return res.status(404).json({ message: "El producto no existe" });
-    await dbRun(`UPDATE variantes SET alerta_stock_cerrada = ? WHERE id = ?`, [p.presentaciones, p.variante_id]);
+    await dbRun(`UPDATE variantes SET alerta_stock_cerrada = ? WHERE id = ?`, [p.codigos_activos, p.variante_id]);
     res.json({ message: "✅ Alerta cerrada" });
   } catch (err) {
     console.error("❌ Error al cerrar alerta de stock:", err.message);
