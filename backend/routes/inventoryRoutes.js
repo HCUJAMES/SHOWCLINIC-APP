@@ -146,6 +146,185 @@ router.delete("/variantes/:id/imagen", requireInventoryWrite, async (req, res) =
 });
 
 /* ==============================================
+   👁️ PRODUCTOS OCULTOS EN LA VISTA DE INVENTARIO
+
+   Solo afecta lo que se muestra en la pantalla de inventario (gráficos,
+   lista y galería). El producto, su stock y sus códigos siguen intactos.
+   La columna se agrega sola al arrancar; todo queda visible por defecto.
+============================================== */
+let ocultoSchemaReady = false;
+async function ensureOcultoInventarioSchema() {
+  if (ocultoSchemaReady) return;
+  try {
+    await dbRun(`ALTER TABLE variantes ADD COLUMN oculto_inventario INTEGER DEFAULT 0`);
+  } catch (err) {
+    if (!String(err.message).includes("duplicate column")) {
+      console.error("❌ Error agregando oculto_inventario a variantes:", err.message);
+    }
+  }
+  ocultoSchemaReady = true;
+}
+ensureOcultoInventarioSchema();
+
+// Ocultar o mostrar uno o varios productos: { ids: [1, 2], oculto: true }
+router.put("/variantes/visibilidad", requireInventoryWrite, async (req, res) => {
+  try {
+    await ensureOcultoInventarioSchema();
+    const ids = Array.isArray(req.body?.ids)
+      ? req.body.ids.map((id) => parseInt(id, 10)).filter((id) => Number.isInteger(id))
+      : [];
+    if (ids.length === 0) return res.status(400).json({ message: "No se indicaron productos" });
+
+    const oculto = req.body?.oculto ? 1 : 0;
+    const marcas = ids.map(() => "?").join(", ");
+    await dbRun(`UPDATE variantes SET oculto_inventario = ? WHERE id IN (${marcas})`, [oculto, ...ids]);
+
+    res.json({ message: oculto ? "✅ Productos ocultados" : "✅ Productos visibles", ids, oculto: !!oculto });
+  } catch (err) {
+    console.error("❌ Error al cambiar la visibilidad de productos:", err.message);
+    res.status(500).json({ message: "Error al guardar qué productos se muestran" });
+  }
+});
+
+/* ==============================================
+   🔔 ALERTAS DE STOCK BAJO (panel de avisos del dashboard)
+
+   Avisa cuando a un producto le quedan 2 presentaciones o menos (frascos,
+   jeringas, cajas… según contenido_por_presentacion). El stock se calcula
+   igual que en la pantalla de inventario: manda lo que dicen los códigos
+   activos y, si el producto no tiene códigos, lo que suman los lotes.
+
+   "Cerrar alerta" guarda cuántas presentaciones quedaban en ese momento
+   (variantes.alerta_stock_cerrada). La alerta vuelve sola si el stock baja
+   todavía más, y la marca se borra cuando el producto se repone (> 2).
+   Los productos ocultos en el inventario no generan alertas.
+============================================== */
+const UMBRAL_STOCK_BAJO = 2;
+
+let alertaStockSchemaReady = false;
+async function ensureAlertaStockSchema() {
+  if (alertaStockSchemaReady) return;
+  await ensureOcultoInventarioSchema();
+  try {
+    await dbRun(`ALTER TABLE variantes ADD COLUMN alerta_stock_cerrada REAL`);
+  } catch (err) {
+    if (!String(err.message).includes("duplicate column")) {
+      console.error("❌ Error agregando alerta_stock_cerrada a variantes:", err.message);
+    }
+  }
+  alertaStockSchemaReady = true;
+}
+ensureAlertaStockSchema();
+
+async function calcularStockBajo() {
+  const filas = await dbAll(`
+    SELECT
+      v.id AS variante_id,
+      v.nombre AS variante,
+      pb.nombre AS marca,
+      v.unidad_base,
+      v.imagen,
+      COALESCE(v.contenido_por_presentacion, 1) AS contenido,
+      v.alerta_stock_cerrada,
+      lotes.stock_lotes,
+      cod.codigos_totales,
+      cod.unidades_codigos
+    FROM variantes v
+    LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
+    JOIN (
+      SELECT variante_id,
+             SUM(MAX(0, COALESCE(cantidad_unidades, 0) - COALESCE(cantidad_reservada_unidades, 0))) AS stock_lotes
+      FROM stock_lotes
+      GROUP BY variante_id
+    ) lotes ON lotes.variante_id = v.id
+    LEFT JOIN (
+      SELECT sl.variante_id,
+             COUNT(bu.id) AS codigos_totales,
+             COALESCE(SUM(CASE WHEN bu.status = 'active' OR COALESCE(bu.unidades_restantes, 0) > 0
+                               THEN COALESCE(bu.unidades_restantes, 0) ELSE 0 END), 0) AS unidades_codigos
+      FROM barcode_units bu
+      JOIN stock_lotes sl ON sl.id = bu.lote_id
+      GROUP BY sl.variante_id
+    ) cod ON cod.variante_id = v.id
+    WHERE COALESCE(v.oculto_inventario, 0) = 0
+  `);
+
+  return filas.map((f) => {
+    const stock = Number(f.codigos_totales) > 0 ? Number(f.unidades_codigos) || 0 : Number(f.stock_lotes) || 0;
+    const contenido = Number(f.contenido) > 0 ? Number(f.contenido) : 1;
+    return {
+      variante_id: f.variante_id,
+      variante: f.variante || "Sin nombre",
+      marca: f.marca || "",
+      unidad_base: f.unidad_base || "",
+      imagen: f.imagen || null,
+      stock,
+      contenido_por_presentacion: contenido,
+      presentaciones: Math.round((stock / contenido) * 100) / 100,
+      cerrada_en: f.alerta_stock_cerrada,
+    };
+  });
+}
+
+router.get("/alertas-stock", async (req, res) => {
+  try {
+    await ensureAlertaStockSchema();
+    const productos = await calcularStockBajo();
+
+    const alertas = [];
+    const cerradas = [];
+    for (const p of productos) {
+      const bajo = p.presentaciones <= UMBRAL_STOCK_BAJO;
+      const cerrada = p.cerrada_en !== null && p.cerrada_en !== undefined;
+
+      // Se repuso o bajó todavía más desde que se cerró: la alerta se reactiva
+      if (cerrada && (!bajo || p.presentaciones < Number(p.cerrada_en))) {
+        await dbRun(`UPDATE variantes SET alerta_stock_cerrada = NULL WHERE id = ?`, [p.variante_id]);
+        if (bajo) alertas.push(p);
+        continue;
+      }
+      if (!bajo) continue;
+      (cerrada ? cerradas : alertas).push(p);
+    }
+
+    const orden = (a, b) => a.presentaciones - b.presentaciones || a.variante.localeCompare(b.variante);
+    alertas.sort(orden);
+    cerradas.sort(orden);
+
+    res.json({ umbral: UMBRAL_STOCK_BAJO, total: alertas.length, alertas, cerradas });
+  } catch (err) {
+    console.error("❌ Error calculando alertas de stock:", err.message);
+    res.status(500).json({ message: "Error al calcular las alertas de stock" });
+  }
+});
+
+// Cerrar la alerta de un producto (queda guardado el stock que tenía)
+router.post("/alertas-stock/:id/cerrar", async (req, res) => {
+  try {
+    await ensureAlertaStockSchema();
+    const p = (await calcularStockBajo()).find((x) => String(x.variante_id) === String(req.params.id));
+    if (!p) return res.status(404).json({ message: "El producto no existe" });
+    await dbRun(`UPDATE variantes SET alerta_stock_cerrada = ? WHERE id = ?`, [p.presentaciones, p.variante_id]);
+    res.json({ message: "✅ Alerta cerrada" });
+  } catch (err) {
+    console.error("❌ Error al cerrar alerta de stock:", err.message);
+    res.status(500).json({ message: "Error al cerrar la alerta" });
+  }
+});
+
+// Volver a mostrar una alerta cerrada
+router.delete("/alertas-stock/:id/cerrar", async (req, res) => {
+  try {
+    await ensureAlertaStockSchema();
+    await dbRun(`UPDATE variantes SET alerta_stock_cerrada = NULL WHERE id = ?`, [req.params.id]);
+    res.json({ message: "✅ Alerta reabierta" });
+  } catch (err) {
+    console.error("❌ Error al reabrir alerta de stock:", err.message);
+    res.status(500).json({ message: "Error al reabrir la alerta" });
+  }
+});
+
+/* ==============================================
    🧱 CREAR PRODUCTO
 ============================================== */
 router.post("/crear", requireInventoryWrite, (req, res) => {

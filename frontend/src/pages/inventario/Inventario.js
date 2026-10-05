@@ -504,16 +504,33 @@ export default function Inventario() {
   const [ajustandoStock, setAjustandoStock] = useState(false);
 
   // Estado de presentación de los gráficos (NO toca la data subyacente)
-  const [productosOcultos, setProductosOcultos] = useState([]);
   const [topN, setTopN] = useState(8);
   const [anchorTopMenu, setAnchorTopMenu] = useState(null);
   // Producto resaltado al pasar el mouse: sincroniza dona y barras
   const [productoActivo, setProductoActivo] = useState(null);
 
-  const toggleProductoGrafico = (varianteId) => {
-    setProductosOcultos((prev) =>
-      prev.includes(varianteId) ? prev.filter((id) => id !== varianteId) : [...prev, varianteId]
+  // Ocultar/mostrar productos en la vista de inventario. Se guarda en el
+  // servidor (variantes.oculto_inventario), así queda igual en todas las PCs.
+  const guardarVisibilidad = async (ids, oculto) => {
+    if (!ids.length) return;
+    const idsTexto = new Set(ids.map(String));
+    const marcar = (valor) => setVariantes((prev) =>
+      prev.map((v) => (idsTexto.has(String(v.id)) ? { ...v, oculto_inventario: valor } : v))
     );
+    marcar(oculto ? 1 : 0);
+    try {
+      const res = await fetch(`${API_BASE}/api/inventario/variantes/visibilidad`, {
+        method: "PUT", headers, body: JSON.stringify({ ids, oculto }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "No se pudo guardar");
+    } catch (err) {
+      marcar(oculto ? 0 : 1);
+      alert(`❌ ${err.message}`);
+    }
+  };
+
+  const toggleProductoGrafico = (varianteId) => {
+    guardarVisibilidad([varianteId], !productosOcultos.includes(varianteId));
   };
 
   const obtenerSiguienteCorrelativo = async (nombreProducto, lote) => {
@@ -559,7 +576,7 @@ export default function Inventario() {
     }).catch(err => console.error("Error cargando datos:", err));
   };
 
-  const productos = useMemo(() => {
+  const productosTodos = useMemo(() => {
     const map = new Map();
     stockLotes.forEach((l) => {
       const key = String(l.variante_id);
@@ -607,6 +624,9 @@ export default function Inventario() {
     const imagenPorVariante = new Map(
       variantes.map((v) => [String(v.id), v.imagen || null])
     );
+    const ocultoPorVariante = new Map(
+      variantes.map((v) => [String(v.id), Number(v.oculto_inventario) === 1])
+    );
 
     return Array.from(map.values()).map((p) => {
       // ── STOCK REAL: sale de los CÓDIGOS ACTIVOS del producto ──
@@ -627,11 +647,19 @@ export default function Inventario() {
         codigos_totales: tieneCodigos ? cod.codigos_totales : 0,
         contenido_por_presentacion: contenidoPorVariante.get(String(p.variante_id)) || 1,
         imagen: imagenPorVariante.get(String(p.variante_id)) || null,
+        oculto: ocultoPorVariante.get(String(p.variante_id)) || false,
         categoria: inferirCategoria(p.marca, p.variante),
         estado: getEstadoInfo(stockReal, p.vencimiento_proximo),
       };
     });
   }, [stockLotes, variantes, stockPorCodigos]);
+
+  // Lo que se muestra en el inventario: sin los productos que el usuario ocultó
+  const productos = useMemo(() => productosTodos.filter((p) => !p.oculto), [productosTodos]);
+  const productosOcultos = useMemo(
+    () => productosTodos.filter((p) => p.oculto).map((p) => p.variante_id),
+    [productosTodos]
+  );
 
   const categorias = useMemo(() => {
     const counts = {};
@@ -2086,7 +2114,7 @@ export default function Inventario() {
           </MotionCard>
         </Box>
 
-        {/* Popover: filtro de productos del Top (solo presentación) */}
+        {/* Popover: qué productos se muestran en el inventario (se guarda en el servidor) */}
         <Popover
           open={Boolean(anchorTopMenu)}
           anchorEl={anchorTopMenu}
@@ -2108,17 +2136,17 @@ export default function Inventario() {
               />
             </Box>
             <Box sx={{ display: "flex", gap: 1, mb: 0.5 }}>
-              <Button size="small" onClick={() => setProductosOcultos([])} sx={{ textTransform: "none", fontSize: 12, color: T.gold, fontWeight: 600, minWidth: 0 }}>Seleccionar todo</Button>
-              <Button size="small" onClick={() => setProductosOcultos(productos.filter((p) => p.stock > 0).map((p) => p.variante_id))} sx={{ textTransform: "none", fontSize: 12, color: T.text2, minWidth: 0 }}>Limpiar</Button>
+              <Button size="small" onClick={() => guardarVisibilidad(productosOcultos, false)} sx={{ textTransform: "none", fontSize: 12, color: T.gold, fontWeight: 600, minWidth: 0 }}>Mostrar todos</Button>
+              <Button size="small" onClick={() => guardarVisibilidad(productosTodos.filter((p) => !p.oculto).map((p) => p.variante_id), true)} sx={{ textTransform: "none", fontSize: 12, color: T.text2, minWidth: 0 }}>Ocultar todos</Button>
             </Box>
             <Divider sx={{ mb: 0.5 }} />
             <Typography sx={{ fontFamily: T.font, fontSize: 11, color: T.text3, mb: 0.5 }}>
-              Desmarca los que no quieras ver en los gráficos
+              Desmarca los que no quieras ver en el inventario (gráficos, lista y fotos). Se guarda automáticamente.
             </Typography>
             <Box sx={{ maxHeight: 260, overflowY: "auto",
               "&::-webkit-scrollbar": { width: 5 },
               "&::-webkit-scrollbar-thumb": { borderRadius: 999, background: "rgba(163,105,32,0.25)" } }}>
-              {productos.filter((p) => p.stock > 0).sort((a, b) => b.stock - a.stock).map((p) => {
+              {[...productosTodos].sort((a, b) => b.stock - a.stock || (a.variante || "").localeCompare(b.variante || "")).map((p) => {
                 const f = enFrascos(p.stock, p.contenido_por_presentacion, p.unidad_base);
                 const visible = !productosOcultos.includes(p.variante_id);
                 return (
@@ -2154,6 +2182,19 @@ export default function Inventario() {
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2.5 }}>
               <Typography sx={{ fontFamily: T.fontTitle, fontWeight: 600, color: T.text1, fontSize: 21 }}>Productos en stock</Typography>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              {/* Qué productos se muestran (los ocultos se guardan en el servidor) */}
+              <Button size="small" onClick={(e) => setAnchorTopMenu(e.currentTarget)}
+                startIcon={<Tune sx={{ fontSize: 16 }} />}
+                sx={{ fontFamily: T.font, textTransform: "none", fontSize: 12, fontWeight: 600, color: T.gold, height: 36,
+                  border: `1px solid ${T.border}`, borderRadius: "10px", px: 1.2, whiteSpace: "nowrap",
+                  "&:hover": { background: T.goldSoft, borderColor: T.borderHover } }}>
+                Elegir productos
+                {productosOcultos.length > 0 && (
+                  <Box component="span" sx={{ ml: 0.6, px: 0.6, py: 0.05, borderRadius: "6px", background: T.gold, color: "#fff", fontSize: 10, fontWeight: 700 }}>
+                    {productosOcultos.length} ocultos
+                  </Box>
+                )}
+              </Button>
               {/* Galería (fotos) o lista compacta */}
               <Box sx={{ display: "flex", background: T.surface2, borderRadius: "12px", p: "3px", border: `1px solid ${T.border}` }}>
                 {[

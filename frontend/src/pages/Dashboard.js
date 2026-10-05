@@ -749,6 +749,7 @@ export default function Dashboard() {
       <PanelRecordatorios
         apiBase={API_BASE}
         onVerPaciente={(r) => navigate("/historial-clinico", { state: { pacienteId: r.paciente_id } })}
+        onVerInventario={() => navigate("/inventario")}
       />
 
       {/* Decorative model images */}

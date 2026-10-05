@@ -14,6 +14,7 @@ import {
   HandshakeRounded,
   CloseRounded as DescartarRounded,
   DescriptionRounded,
+  Inventory2Rounded,
 } from "@mui/icons-material";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -30,6 +31,10 @@ import { motion, AnimatePresence } from "framer-motion";
  * la marca vive en la base de datos, no solo en pantalla).
  *
  * Al hacer clic en un paciente se abre su historial clínico.
+ *
+ * La pestaña Stock avisa sola cuando a un producto le quedan 2 presentaciones
+ * o menos. La ✕ cierra la alerta (queda guardado en el servidor); vuelve sola
+ * si el stock baja todavía más, y se limpia cuando el producto se repone.
  */
 
 const ORO = "#A36920";
@@ -73,6 +78,18 @@ const tiempoDesdeConsulta = (dias) => {
   if (dias < 30) return `hace ${dias} días`;
   const m = Math.round(dias / 30);
   return `hace ${m} ${m === 1 ? "mes" : "meses"}`;
+};
+
+// "Quedan 2 frascos" / "Agotado". Si cada presentación trae varias unidades
+// (Botox = 100 U por frasco) se muestran también las unidades.
+const textoStock = (p) => {
+  if (!p || p.stock <= 0) return "Agotado";
+  const n = p.presentaciones;
+  const cifra = Number.isInteger(n) ? n : n.toLocaleString("es-PE", { maximumFractionDigits: 1 });
+  if ((p.contenido_por_presentacion || 1) > 1) {
+    return `Quedan ${cifra} ${n === 1 ? "presentación" : "presentaciones"} · ${Math.round(p.stock).toLocaleString("es-PE")} ${p.unidad_base || "u"}`;
+  }
+  return `Quedan ${cifra} ${p.unidad_base || (n === 1 ? "unidad" : "unidades")}`;
 };
 
 // "hoy" / "ayer" / "hace 5 días"
@@ -247,9 +264,9 @@ function SeccionMarcados({ marcados, esCumples, esSeguimiento, abiertaLista, onA
   );
 }
 
-export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
+export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInventario }) {
   const [abierto, setAbierto] = useState(false);
-  const [pestana, setPestana] = useState("retoques");   // "retoques" | "cumples" | "seguimiento"
+  const [pestana, setPestana] = useState("retoques");   // "retoques" | "cumples" | "seguimiento" | "stock"
   const [cargando, setCargando] = useState(true);
   const [datos, setDatos] = useState({ total: 0, vencidos: 0, proximos: 0, recordatorios: [], contactados: [] });
 
@@ -261,6 +278,10 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
   // Seguimiento de proformas que no arrancaron
   const [seguimiento, setSeguimiento] = useState(null);
   const [cargandoSeguimiento, setCargandoSeguimiento] = useState(false);
+
+  // Productos con poco stock (≤ 2 presentaciones)
+  const [stock, setStock] = useState(null);
+  const [verCerradas, setVerCerradas] = useState(false);
 
   // Fila que se está marcando (para la animación de salida)
   const [marcando, setMarcando] = useState(null);
@@ -312,8 +333,58 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
     if (pestana === "seguimiento") cargarSeguimiento();
   }, [pestana, cargarSeguimiento]);
 
+  // Stock bajo: se revisa al entrar, cada 5 minutos y al abrir el panel,
+  // así la alerta aparece sola sin tener que entrar al inventario.
+  const cargarStock = useCallback(async () => {
+    if (!token()) return;
+    try {
+      const res = await fetch(`${apiBase}/api/inventario/alertas-stock`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (res.ok) setStock(await res.json());
+    } catch { /* se queda con lo que tenía */ }
+  }, [apiBase]);
+
+  useEffect(() => {
+    cargarStock();
+    const intervalo = setInterval(cargarStock, 5 * 60 * 1000);
+    return () => clearInterval(intervalo);
+  }, [cargarStock]);
+
+  useEffect(() => { if (abierto) cargarStock(); }, [abierto, cargarStock]);
+
   // Al cambiar de pestaña se recoge la sección de marcados
-  useEffect(() => { setVerMarcados(false); }, [pestana]);
+  useEffect(() => { setVerMarcados(false); setVerCerradas(false); }, [pestana]);
+
+  const cerrarAlertaStock = async (p, e) => {
+    if (e) e.stopPropagation();
+    if (marcando) return;
+    const clave = `stock-${p.variante_id}`;
+    setMarcando(clave);
+    try {
+      await fetch(`${apiBase}/api/inventario/alertas-stock/${p.variante_id}/cerrar`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+    } catch { /* la fila sale igual */ }
+    setTimeout(async () => {
+      await cargarStock();
+      setMarcando(null);
+    }, 620);
+  };
+
+  const reabrirAlertaStock = async (p) => {
+    if (deshaciendo) return;
+    setDeshaciendo(`stock-${p.variante_id}`);
+    try {
+      await fetch(`${apiBase}/api/inventario/alertas-stock/${p.variante_id}/cerrar`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      await cargarStock();
+    } catch { /* silencio */ }
+    finally { setDeshaciendo(null); }
+  };
 
   /* ─────────── Marcar: "ya lo contacté" / "ya la saludé" ─────────── */
 
@@ -505,6 +576,9 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
   /* ─────────────────────────── Derivados ─────────────────────────── */
 
   const total = datos.total || 0;
+  const totalStock = stock?.total || 0;
+  const totalAvisos = total + totalStock;
+  const esStock = pestana === "stock";
   const esCumples = pestana === "cumples";
   const esSeguimiento = pestana === "seguimiento";
   const mesNombre = MESES[(mesVer || 1) - 1];
@@ -536,11 +610,11 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
         transition={{ delay: 0.4, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         sx={{ position: "fixed", top: 78, right: 22, zIndex: 1200 }}
       >
-        <Tooltip title="Retoques pendientes" arrow placement="left">
+        <Tooltip title={totalStock > 0 ? `Avisos · ${totalStock} producto${totalStock === 1 ? "" : "s"} con poco stock` : "Avisos"} arrow placement="left">
           <Badge
-            badgeContent={total}
+            badgeContent={totalAvisos}
             max={99}
-            invisible={total === 0 || abierto}
+            invisible={totalAvisos === 0 || abierto}
             sx={{
               "& .MuiBadge-badge": {
                 bgcolor: "#D32F2F", color: "#fff", fontWeight: 700, fontSize: 11,
@@ -567,7 +641,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
         </Tooltip>
 
         {/* Pulso suave cuando hay avisos y el panel está cerrado */}
-        {total > 0 && !abierto && (
+        {totalAvisos > 0 && !abierto && (
           <MotionBox
             aria-hidden
             animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
@@ -606,7 +680,33 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
               background: `linear-gradient(135deg, ${ORO} 0%, ${ORO_OSCURO} 100%)`,
               color: "#fff",
             }}>
-              {esCumples ? (
+              {esStock ? (
+                <>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Inventory2Rounded sx={{ fontSize: 20 }} />
+                    <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
+                      Stock bajo
+                    </Typography>
+                  </Box>
+                  <Typography sx={{ fontSize: 11.5, opacity: 0.9, mt: 0.3 }}>
+                    Productos con {stock?.umbral ?? 2} o menos en inventario
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 0.8, mt: 1.2, flexWrap: "wrap" }}>
+                    <Box sx={{ px: 1.1, py: 0.35, borderRadius: "999px", background: "rgba(255,255,255,0.20)" }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
+                        {totalStock} por reponer
+                      </Typography>
+                    </Box>
+                    {(stock?.alertas || []).some((p) => p.stock <= 0) && (
+                      <Box sx={{ px: 1.1, py: 0.35, borderRadius: "999px", background: "rgba(0,0,0,0.25)" }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
+                          {(stock?.alertas || []).filter((p) => p.stock <= 0).length} agotado{(stock?.alertas || []).filter((p) => p.stock <= 0).length === 1 ? "" : "s"}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </>
+              ) : esCumples ? (
                 <>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CakeRounded sx={{ fontSize: 20 }} />
@@ -709,6 +809,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                   { id: "retoques", texto: "Retoques", Icono: EventRepeatRounded, n: total },
                   { id: "cumples", texto: "Cumpleaños", Icono: CakeRounded, n: cumples?.hoy || 0 },
                   { id: "seguimiento", texto: "Seguimiento", Icono: HandshakeRounded, n: seguimiento?.total || 0 },
+                  { id: "stock", texto: "Stock", Icono: Inventory2Rounded, n: totalStock },
                 ].map((t) => {
                   const activa = pestana === t.id;
                   return (
@@ -724,7 +825,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
                       }}
                     >
                       <t.Icono sx={{ fontSize: 15 }} />
-                      <Typography sx={{ fontSize: 12.5, fontWeight: activa ? 700 : 600 }}>{t.texto}</Typography>
+                      <Typography sx={{ fontSize: 11.5, fontWeight: activa ? 700 : 600 }}>{t.texto}</Typography>
                       {t.n > 0 && (
                         <Box sx={{
                           minWidth: 16, height: 16, px: 0.4, borderRadius: "999px",
@@ -754,7 +855,161 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
               "&::-webkit-scrollbar": { width: 6 },
               "&::-webkit-scrollbar-thumb": { borderRadius: 999, background: "rgba(163,105,32,0.30)" },
             }}>
-              {esCumples ? (
+              {esStock ? (
+                stock == null ? (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
+                    <CircularProgress size={26} sx={{ color: ORO }} />
+                  </Box>
+                ) : (
+                  <>
+                    {totalStock === 0 && (
+                      <Box sx={{ textAlign: "center", py: 4.5, px: 2 }}>
+                        <Inventory2Rounded sx={{ fontSize: 40, color: "rgba(163,105,32,0.35)" }} />
+                        <Typography sx={{ mt: 1, fontSize: 13.5, fontWeight: 600, color: CAFE }}>
+                          Stock en orden
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "#8D7B70", mt: 0.5 }}>
+                          Ningún producto tiene {stock.umbral} o menos por ahora.
+                        </Typography>
+                      </Box>
+                    )}
+
+                    {stock.alertas.map((p, i) => {
+                      const clave = `stock-${p.variante_id}`;
+                      const hecho = marcando === clave;
+                      const agotado = p.stock <= 0;
+                      return (
+                        <MotionBox
+                          key={clave}
+                          layout
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={hecho
+                            ? { opacity: 0, x: 70, scale: 0.92 }
+                            : { opacity: 1, x: 0, y: 0, scale: 1 }}
+                          transition={{
+                            layout: { duration: 0.34, ease: [0.22, 1, 0.36, 1] },
+                            delay: hecho ? 0.16 : 0.05 + i * 0.045,
+                            duration: hecho ? 0.26 : 0.3,
+                            ease: hecho ? "easeIn" : [0.22, 1, 0.36, 1],
+                          }}
+                          whileHover={hecho ? {} : { x: 3 }}
+                          onClick={() => !hecho && onVerInventario && onVerInventario(p)}
+                          sx={{
+                            display: "flex", alignItems: "center", gap: 1.2,
+                            p: 1.3, mb: 0.9, borderRadius: "14px", cursor: onVerInventario ? "pointer" : "default",
+                            background: "#fff",
+                            border: `1px solid ${agotado ? "rgba(211,47,47,0.22)" : "rgba(163,105,32,0.14)"}`,
+                            borderLeft: `3px solid ${agotado ? "#D32F2F" : "#E08A1E"}`,
+                            transition: "box-shadow .2s ease",
+                            "&:hover": { boxShadow: hecho ? "none" : "0 6px 18px rgba(163,105,32,0.16)" },
+                          }}
+                        >
+                          <Box sx={{
+                            width: 38, height: 38, borderRadius: "12px", flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            background: agotado
+                              ? "linear-gradient(135deg,#D32F2F,#B71C1C)"
+                              : "linear-gradient(135deg,#E9A13B,#C77A12)",
+                            color: "#fff",
+                          }}>
+                            <Inventory2Rounded sx={{ fontSize: 19 }} />
+                          </Box>
+
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography sx={{ fontSize: 13.2, fontWeight: 700, color: CAFE, lineHeight: 1.25 }} noWrap>
+                              {p.variante}
+                            </Typography>
+                            {p.marca && (
+                              <Typography sx={{ fontSize: 11.5, color: "#7A6A60" }} noWrap>{p.marca}</Typography>
+                            )}
+                            <Typography sx={{
+                              display: "inline-block", mt: 0.35,
+                              fontSize: 10.5, fontWeight: 700,
+                              color: agotado ? "#C62828" : "#9A5B0C",
+                              background: agotado ? "rgba(211,47,47,0.10)" : "rgba(224,138,30,0.14)",
+                              px: 0.8, py: 0.15, borderRadius: "6px",
+                            }}>
+                              {textoStock(p)}
+                            </Typography>
+                          </Box>
+
+                          <Tooltip title="Cerrar alerta" arrow placement="left">
+                            <MotionBox
+                              component="button"
+                              aria-label="Cerrar alerta"
+                              onClick={(e) => cerrarAlertaStock(p, e)}
+                              whileTap={{ scale: 0.85 }}
+                              sx={{
+                                flexShrink: 0, width: 30, height: 30, p: 0, cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                borderRadius: "50%", background: "transparent",
+                                border: "1.5px solid rgba(163,105,32,0.30)", color: "rgba(163,105,32,0.65)",
+                                transition: "background .2s ease, border-color .2s ease, color .2s ease",
+                                "&:hover": { background: "rgba(163,105,32,0.12)", borderColor: ORO, color: ORO_OSCURO },
+                              }}
+                            >
+                              <CloseRounded sx={{ fontSize: 16 }} />
+                            </MotionBox>
+                          </Tooltip>
+                        </MotionBox>
+                      );
+                    })}
+
+                    {/* Alertas cerradas: se pueden volver a mostrar */}
+                    {stock.cerradas.length > 0 && (
+                      <Box>
+                        <Box
+                          onClick={() => setVerCerradas((v) => !v)}
+                          sx={{
+                            display: "flex", alignItems: "center", gap: 0.7,
+                            px: 1.2, py: 0.85, borderRadius: "12px", cursor: "pointer",
+                            border: "1px dashed rgba(163,105,32,0.35)",
+                            background: verCerradas ? "rgba(163,105,32,0.08)" : "transparent",
+                            "&:hover": { background: "rgba(163,105,32,0.08)" },
+                          }}
+                        >
+                          <Typography sx={{ flex: 1, fontSize: 11.8, fontWeight: 700, color: ORO_OSCURO }}>
+                            {stock.cerradas.length} {stock.cerradas.length === 1 ? "alerta cerrada" : "alertas cerradas"}
+                          </Typography>
+                          <Typography sx={{ fontSize: 10.8, color: "#8D7B70", fontWeight: 600 }}>
+                            {verCerradas ? "ocultar" : "ver"}
+                          </Typography>
+                          <ExpandMoreRounded sx={{ fontSize: 17, color: ORO_OSCURO, transform: verCerradas ? "rotate(180deg)" : "none", transition: "transform .25s ease" }} />
+                        </Box>
+                        {verCerradas && (
+                          <Box sx={{ pt: 0.8 }}>
+                            {stock.cerradas.map((p) => {
+                              const ocupado = deshaciendo === `stock-${p.variante_id}`;
+                              return (
+                                <Box key={p.variante_id} sx={{
+                                  display: "flex", alignItems: "center", gap: 1,
+                                  p: 1, mb: 0.6, borderRadius: "12px",
+                                  background: "rgba(163,105,32,0.05)", border: "1px solid rgba(163,105,32,0.14)",
+                                  opacity: ocupado ? 0.5 : 1,
+                                }}>
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: CAFE }} noWrap>{p.variante}</Typography>
+                                    <Typography sx={{ fontSize: 10.5, color: "#8D7B70" }} noWrap>{textoStock(p)}</Typography>
+                                  </Box>
+                                  <Tooltip title="Volver a mostrar" arrow placement="left">
+                                    <span>
+                                      <IconButton size="small" disabled={ocupado} onClick={() => reabrirAlertaStock(p)}
+                                        sx={{ width: 28, height: 28, color: ORO_OSCURO, border: "1px solid rgba(163,105,32,0.25)",
+                                          "&:hover": { background: "rgba(163,105,32,0.12)", borderColor: ORO } }}>
+                                        {ocupado ? <CircularProgress size={13} sx={{ color: ORO }} /> : <UndoRounded sx={{ fontSize: 15 }} />}
+                                      </IconButton>
+                                    </span>
+                                  </Tooltip>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+                  </>
+                )
+              ) : esCumples ? (
                 cargandoCumples ? (
                   <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
                     <CircularProgress size={26} sx={{ color: ORO }} />
@@ -1138,7 +1393,9 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente }) {
 
             <Box sx={{ px: 2, py: 1.1, borderTop: "1px solid rgba(163,105,32,0.14)", background: "#fff" }}>
               <Typography sx={{ fontSize: 10.8, color: "#8D7B70", textAlign: "center" }}>
-                {esCumples
+                {esStock
+                  ? "✕ cierra la alerta · vuelve sola si el stock baja más"
+                  : esCumples
                   ? "El ✓ marca que ya la saludaste · abajo puedes deshacerlo"
                   : esSeguimiento
                     ? "✓ ya lo contacté (vuelve en 30 días) · ✕ no le interesa"
