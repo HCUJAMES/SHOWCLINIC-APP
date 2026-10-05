@@ -7,6 +7,22 @@ import { authMiddleware, requirePatientWrite, requireRole } from "../middleware/
 
 const router = express.Router();
 
+/**
+ * Tratamiento que trae a la paciente, anotado al registrarla. Sirve para saber
+ * con qué llegó cada quien aunque todavía no se le haya hecho nada.
+ * Se agrega aquí para que la base del servidor se actualice sola al desplegar.
+ */
+(async () => {
+  try {
+    await dbRun(`ALTER TABLE patients ADD COLUMN tratamientoInteres TEXT`);
+    console.log("✅ Columna tratamientoInteres agregada a patients");
+  } catch (err) {
+    if (!String(err.message).includes("duplicate column")) {
+      console.error("❌ Error agregando tratamientoInteres:", err.message);
+    }
+  }
+})();
+
 router.use(authMiddleware);
 
 const storagePerfil = multer.diskStorage({
@@ -60,6 +76,7 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     referenciaDetalle,
     numeroHijos,
     especial,
+    tratamientoInteres,
   } = req.body;
 
   const dniStr = typeof dni === "string" ? dni.trim() : String(dni || "").trim();
@@ -94,7 +111,8 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
     UPDATE patients
     SET tipoDocumento=?, dni=?, nombre=?, apellido=?, edad=?, sexo=?, direccion=?, ocupacion=?,
         fechaNacimiento=?, ciudadNacimiento=?, ciudadResidencia=?, alergias=?, enfermedad=?,
-        correo=?, celular=?, cirugiaEstetica=?, embarazada=?, drogas=?, tabaco=?, alcohol=?, referencia=?, referenciaDetalle=?, numeroHijos=?, especial=?
+        correo=?, celular=?, cirugiaEstetica=?, embarazada=?, drogas=?, tabaco=?, alcohol=?, referencia=?, referenciaDetalle=?, numeroHijos=?, especial=?,
+        tratamientoInteres=COALESCE(?, tratamientoInteres)
     WHERE id=?
   `;
 
@@ -125,6 +143,9 @@ router.put("/editar/:id", requirePatientWrite, (req, res) => {
       referenciaDetalle,
       numeroHijos,
       especial ? 1 : 0,
+      // COALESCE en el SQL: si la pantalla no manda el campo, se conserva.
+      // Mandarlo vacío sí lo borra, que es lo que se espera al limpiarlo.
+      tratamientoInteres !== undefined ? String(tratamientoInteres) : null,
       id,
     ],
     function (err) {
@@ -186,6 +207,7 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
     referenciaDetalle,
     numeroHijos,
     especial,
+    tratamientoInteres,
   } = req.body;
 
   const query = `
@@ -193,8 +215,9 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
       tipoDocumento, dni, nombre, apellido, edad, sexo, direccion, ocupacion,
       fechaNacimiento, ciudadNacimiento, ciudadResidencia,
       alergias, enfermedad, correo, celular,
-      cirugiaEstetica, embarazada, drogas, tabaco, alcohol, referencia, referenciaDetalle, numeroHijos, especial
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      cirugiaEstetica, embarazada, drogas, tabaco, alcohol, referencia, referenciaDetalle, numeroHijos, especial,
+      tratamientoInteres
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `;
 
   db.run(
@@ -224,6 +247,7 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
       referenciaDetalle,
       numeroHijos,
       especial ? 1 : 0,
+      tratamientoInteres || null,
     ],
     function (err) {
       if (err) {

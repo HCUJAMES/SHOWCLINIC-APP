@@ -45,6 +45,9 @@ export default function BuscarPaciente() {
   const [pacienteTratamientos, setPacienteTratamientos] = useState([]);
   const [pacienteTratamientosOwner, setPacienteTratamientosOwner] = useState(null);
   const [selectedPaciente, setSelectedPaciente] = useState(null);
+  // Mientras se traen todos los campos no se puede guardar, o se grabaría la
+  // versión recortada del listado y se perderían datos.
+  const [cargandoFicha, setCargandoFicha] = useState(false);
   const [openModal, setOpenModal] = useState(false);
   const [openTratamientosModal, setOpenTratamientosModal] = useState(false);
   const [tabValue, setTabValue] = useState(0);
@@ -188,8 +191,19 @@ export default function BuscarPaciente() {
       showToast({ severity: "warning", message: "No tienes permisos para editar pacientes" });
       return;
     }
+    // El listado viaja liviano y no trae todos los campos. Si se editara con
+    // esa versión recortada, al guardar se mandarían vacíos los que faltan y
+    // se borrarían datos de la ficha. Por eso se pide la paciente completa.
     setSelectedPaciente({ ...paciente });
     setOpenModal(true);
+    setCargandoFicha(true);
+    fetch(`${API_BASE_URL}/api/pacientes/${paciente.id}`, { headers: authHeaders })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((completo) => {
+        if (completo && completo.id === paciente.id) setSelectedPaciente(completo);
+      })
+      .catch((err) => console.error("Error al cargar la paciente para editar:", err))
+      .finally(() => setCargandoFicha(false));
   };
 
   // Guardar cambios (editar paciente)
@@ -783,9 +797,10 @@ export default function BuscarPaciente() {
             <Button
               onClick={handleSave}
               variant="contained"
+              disabled={cargandoFicha}
               sx={{ backgroundColor: colorPrincipal, color: "white" }}
             >
-              Guardar Cambios
+              {cargandoFicha ? "Cargando datos..." : "Guardar Cambios"}
             </Button>
           </DialogActions>
         </Dialog>

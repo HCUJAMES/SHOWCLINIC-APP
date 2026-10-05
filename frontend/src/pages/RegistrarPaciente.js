@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   TextField,
@@ -12,6 +12,7 @@ import {
   FormControlLabel,
   ToggleButton,
   ToggleButtonGroup,
+  Autocomplete,
 } from "@mui/material";
 import { ArrowBack, Home } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -196,10 +197,30 @@ export default function RegistrarPaciente() {
     referenciaDetalle: "",
     numeroHijos: "",
     especial: false,
+    tratamientoInteres: "",
   };
 
   const [formData, setFormData] = useState(initialFormData);
   const [errors, setErrors] = useState({});
+  // Catálogo de tratamientos, para elegir el de interés sin escribirlo a mano
+  const [tratamientos, setTratamientos] = useState([]);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/tratamientos/listar`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => {
+        const lista = Array.isArray(d) ? d : [];
+        setTratamientos(
+          lista
+            .map((t) => t.nombre)
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b, "es"))
+        );
+      })
+      .catch(() => setTratamientos([]));
+  }, [token]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -646,6 +667,30 @@ export default function RegistrarPaciente() {
         {/* ═══════ 4. DATOS ADMINISTRATIVOS ═══════ */}
         <SectionCard number={4} title="Datos administrativos">
           <Grid container spacing={2.5} alignItems="flex-start">
+            <Grid item xs={12} sm={6} md={4}>
+              <FieldLabel label="Tratamiento de interés" />
+              <Autocomplete
+                freeSolo
+                options={tratamientos}
+                // Se controla el texto escrito, no la opción elegida: así la
+                // lista filtra mientras se escribe y además admite un nombre
+                // que todavía no esté en el catálogo.
+                inputValue={formData.tratamientoInteres}
+                onInputChange={(e, valor) =>
+                  setFormData((prev) => ({ ...prev, tratamientoInteres: valor }))
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    fullWidth
+                    size="small"
+                    placeholder="¿Por qué tratamiento vino?"
+                    sx={inputSx}
+                  />
+                )}
+              />
+            </Grid>
+
             <Grid item xs={12} sm={6} md={4}>
               <FieldLabel label="¿Cómo se enteró de ShowClinic?" />
               <TextField

@@ -4472,6 +4472,26 @@ const HistorialClinico = () => {
                     <CampoFicha etiqueta="Fecha nac." valor={pacienteSeleccionado.fechaNacimiento} />
                     <CampoFicha etiqueta="Ocupación" valor={pacienteSeleccionado.ocupacion} />
                     <CampoFicha etiqueta="Embarazada" valor={pacienteSeleccionado.embarazada} />
+                    <CampoFicha etiqueta="Tratamiento de interés">
+                      {pacienteSeleccionado.tratamientoInteres ? (
+                        <Chip
+                          label={pacienteSeleccionado.tratamientoInteres}
+                          size="small"
+                          sx={{
+                            height: 26,
+                            fontSize: "0.82rem",
+                            fontWeight: 600,
+                            backgroundColor: "#f6ecd8",
+                            color: "#8a5a1c",
+                            border: "1px solid rgba(196,159,88,0.5)",
+                          }}
+                        />
+                      ) : (
+                        <Typography sx={{ fontWeight: 500, fontSize: "1.02rem", color: FICHA_VACIO }}>
+                          —
+                        </Typography>
+                      )}
+                    </CampoFicha>
                   </TarjetaFicha>
 
                   <TarjetaFicha icono={Phone} titulo="Contacto">
