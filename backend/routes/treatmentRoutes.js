@@ -574,12 +574,13 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
     // 1) VALIDAR STOCK PARA TODOS LOS TRATAMIENTOS QUE TENGAN RECETA
     //    Si el doctor eligió una variante específica, se salta la validación por receta
     //    y se valida solo la variante elegida en el paso 1.b
-    //    En Retoque sin producto seleccionado, se salta la validación de receta
-    const esRetoque = tipoAtencion === "Retoque";
+    //    En Retoque o Control sin producto seleccionado, se salta la validación
+    //    de receta: estas sesiones pueden hacerse sin usar producto.
+    const esRetoque = tipoAtencion === "Retoque" || tipoAtencion === "Control";
     for (const b of productosData) {
       if (!b.tratamiento_id) continue; // sin tratamiento asociado, usa flujo clásico
       if (b.variante_id) continue; // variante elegida manualmente → validar en paso 1.b
-      if (esRetoque) continue; // en retoque sin producto, no validar receta
+      if (esRetoque) continue; // en retoque/control sin producto, no validar receta
 
       const recetas = await dbAll(
         `SELECT * FROM recetas_tratamiento WHERE tratamiento_id = ?`,
@@ -714,8 +715,9 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
         subtotal = precioVariante * cantidadMl;
       }
 
-      // Permitir precio 0 si viene de un paquete o si es sin pago
-      if (!(subtotal > 0) && !b.sesion_paquete_id && !esSinPago) {
+      // Permitir precio 0 si viene de un paquete, si es sin pago o si es un
+      // control (los controles pueden hacerse sin producto y sin costo)
+      if (!(subtotal > 0) && !b.sesion_paquete_id && !esSinPago && tipoAtencion !== "Control") {
         return res.status(400).json({ message: "No se pudo calcular el precio del tratamiento. Establece un precio o selecciona un producto." });
       }
 
@@ -867,7 +869,7 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
 
       // Intentar usar receta_tratamiento si existe
       // Si el doctor eligió una variante específica, se salta la receta y se usa el flujo directo
-      // En Retoque sin producto seleccionado, no descontar stock por receta
+      // En Retoque o Control sin producto seleccionado, no descontar stock por receta
       let usoReceta = false;
       const varianteElegidaDirecta = b.variante_id ? Number(b.variante_id) : null;
       if (b.tratamiento_id && !varianteElegidaDirecta && !esRetoque) {

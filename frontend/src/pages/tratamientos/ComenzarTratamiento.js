@@ -1096,13 +1096,13 @@ const ComenzarTratamiento = () => {
                         </FormControl>
                       </Grid>
 
-                      {/* Producto y cantidad (opcional en Retoque) */}
+                      {/* Producto y cantidad (opcional en Retoque y Control) */}
                           <Grid item xs={12} sm={6} md sx={{ flexGrow: 1, minWidth: 260 }}>
                             {(() => {
                               // Filtrar productos según la receta del tratamiento
                               const receta = b.tratamiento_id ? recetasPorTratamiento[b.tratamiento_id] || [] : [];
                               const tieneReceta = Array.isArray(receta) && receta.length > 0;
-                              const esRetoque = tipoAtencion === "Retoque";
+                              const esRetoque = tipoAtencion === "Retoque" || tipoAtencion === "Control";
                               
                               // Si hay receta, solo mostrar los productos de la receta
                               // Si no hay receta, mostrar todos los productos
@@ -1146,7 +1146,7 @@ const ComenzarTratamiento = () => {
                                       label={esRetoque ? "Producto (opcional)" : tieneReceta ? "Producto (filtrado)" : "Producto"}
                                       placeholder={esRetoque ? "Sin producto (opcional)" : tieneReceta ? "Productos configurados para este tratamiento" : "Seleccionar producto"}
                                       fullWidth
-                                      helperText={esRetoque ? "En retoque el producto es opcional" : tieneReceta ? `${opcionesProductos.length} producto(s) disponible(s)` : ""}
+                                      helperText={esRetoque ? `En ${tipoAtencion.toLowerCase()} el producto es opcional` : tieneReceta ? `${opcionesProductos.length} producto(s) disponible(s)` : ""}
                                       sx={{
                                         "& .MuiInputBase-root": {
                                           backgroundColor: "rgba(255,255,255,0.95)",
