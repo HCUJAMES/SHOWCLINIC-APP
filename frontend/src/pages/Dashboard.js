@@ -41,7 +41,7 @@ import PanelRecordatorios from "../components/PanelRecordatorios";
 
 const MotionBox = motion(Box);
 
-// Iconos para cada módulo
+// Iconos para cada módulo 
 const moduleIcons = {
   Pacientes: People,
   Tratamientos: MedicalServices,
@@ -80,7 +80,7 @@ const ORO_SUAVE = "#ba9a63";
 
 const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
 
-/* ───────────────────────────── animaciones ───────────────────────────── */
+/* --animaciones-- */
 
 const suave = [0.22, 1, 0.36, 1];
 

@@ -1457,6 +1457,131 @@ router.delete("/protocolo/imagen/:imagenId", requireTreatmentBaseCreate, async (
   }
 });
 
+/**
+ * 🩺 CASOS CLÍNICOS (ANTES / DESPUÉS)
+ *
+ * Cada caso es un par de fotos de una misma paciente: antes y después del
+ * tratamiento, con un título opcional. Van en su propia tabla para no
+ * mezclarse con las fotos de portada (tratamiento_imagenes), que son las que
+ * se ven en las tarjetas del catálogo.
+ */
+const MAX_CASOS_POR_TRATAMIENTO = 20;
+
+let casosSchemaReady = false;
+async function ensureCasosSchema() {
+  if (casosSchemaReady) return;
+  await dbRun(`CREATE TABLE IF NOT EXISTS tratamiento_casos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tratamiento_id INTEGER NOT NULL,
+    titulo TEXT,
+    antes_url TEXT NOT NULL,
+    despues_url TEXT NOT NULL,
+    creado_en TEXT DEFAULT (datetime('now', '-5 hours'))
+  )`);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_tratamiento_casos_tratamiento
+               ON tratamiento_casos(tratamiento_id)`);
+  casosSchemaReady = true;
+}
+
+const uploadCasoImg = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = "./uploads/tratamientos";
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    // El nombre lleva "antes"/"despues": las dos fotos llegan en el mismo
+    // milisegundo y con solo la hora se pisarían.
+    filename: (req, file, cb) => {
+      cb(null, `caso_${req.params.tratamientoId}_${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
+    },
+  }),
+  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+  limits: { fileSize: 15 * 1024 * 1024 },
+});
+
+const borrarArchivoCaso = (url) => {
+  if (!url) return;
+  const filePath = path.join(".", url);
+  try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch { /* ya no está */ }
+};
+
+// Listar los casos de un tratamiento
+router.get("/protocolo/:tratamientoId/casos", async (req, res) => {
+  try {
+    await ensureCasosSchema();
+    const casos = await dbAll(
+      `SELECT id, tratamiento_id, titulo, antes_url, despues_url, creado_en
+       FROM tratamiento_casos WHERE tratamiento_id = ? ORDER BY id DESC`,
+      [req.params.tratamientoId]
+    );
+    res.json(casos);
+  } catch (err) {
+    console.error("❌ Error al obtener casos clínicos:", err.message);
+    res.status(500).json({ message: "Error al obtener los casos clínicos" });
+  }
+});
+
+// Crear un caso: campos "antes" y "despues" (una foto cada uno) + "titulo"
+router.post(
+  "/protocolo/:tratamientoId/casos",
+  requireTreatmentBaseCreate,
+  uploadCasoImg.fields([{ name: "antes", maxCount: 1 }, { name: "despues", maxCount: 1 }]),
+  async (req, res) => {
+    const antes = req.files?.antes?.[0];
+    const despues = req.files?.despues?.[0];
+    const limpiar = () => {
+      if (antes) borrarArchivoCaso(`/uploads/tratamientos/${antes.filename}`);
+      if (despues) borrarArchivoCaso(`/uploads/tratamientos/${despues.filename}`);
+    };
+
+    try {
+      await ensureCasosSchema();
+      if (!antes || !despues) {
+        limpiar();
+        return res.status(400).json({ message: "Sube las dos fotos: antes y después (solo imágenes)" });
+      }
+
+      const { tratamientoId } = req.params;
+      const fila = await dbGet(
+        `SELECT COUNT(*) AS n FROM tratamiento_casos WHERE tratamiento_id = ?`,
+        [tratamientoId]
+      );
+      if ((fila?.n || 0) >= MAX_CASOS_POR_TRATAMIENTO) {
+        limpiar();
+        return res.status(400).json({ message: `Máximo ${MAX_CASOS_POR_TRATAMIENTO} casos por tratamiento` });
+      }
+
+      const titulo = String(req.body?.titulo || "").trim().slice(0, 120) || null;
+      await dbRun(
+        `INSERT INTO tratamiento_casos (tratamiento_id, titulo, antes_url, despues_url) VALUES (?, ?, ?, ?)`,
+        [tratamientoId, titulo, `/uploads/tratamientos/${antes.filename}`, `/uploads/tratamientos/${despues.filename}`]
+      );
+      res.json({ message: "✅ Caso clínico guardado" });
+    } catch (err) {
+      limpiar();
+      console.error("❌ Error al guardar caso clínico:", err.message);
+      res.status(500).json({ message: "Error al guardar el caso clínico" });
+    }
+  }
+);
+
+// Eliminar un caso (y sus dos fotos)
+router.delete("/protocolo/caso/:casoId", requireTreatmentBaseCreate, async (req, res) => {
+  try {
+    await ensureCasosSchema();
+    const caso = await dbGet(`SELECT * FROM tratamiento_casos WHERE id = ?`, [req.params.casoId]);
+    if (!caso) return res.status(404).json({ message: "Caso no encontrado" });
+    await dbRun(`DELETE FROM tratamiento_casos WHERE id = ?`, [req.params.casoId]);
+    borrarArchivoCaso(caso.antes_url);
+    borrarArchivoCaso(caso.despues_url);
+    res.json({ message: "Caso eliminado" });
+  } catch (err) {
+    console.error("❌ Error al eliminar caso clínico:", err.message);
+    res.status(500).json({ message: "Error al eliminar el caso clínico" });
+  }
+});
+
 /* ==============================
    �📋 HISTORIAL CLÍNICO
 ============================== */
