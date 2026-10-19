@@ -62,6 +62,8 @@ const TreatmentTimelineMatrix = ({
   className = "",
   presupuestoId,
   especialistas = [],
+  minimizado = false,       // solo cabecera + avance; la matriz se oculta
+  onToggleMinimizar,
 }) => {
   // ─── State ───
   const [specialistNames, setSpecialistNames] = useState({});
@@ -304,8 +306,17 @@ const TreatmentTimelineMatrix = ({
             {budget.totalSessions} sesiones
           </span>
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          {onRemoveWeek && weeks.length > 1 && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {onToggleMinimizar && (
+            <button
+              onClick={onToggleMinimizar}
+              style={{ background: minimizado ? COLORS.gold : "transparent", border: `0.5px solid ${COLORS.gold}`, borderRadius: 6, padding: "6px 10px", fontSize: 11, fontFamily: FONTS.sans, fontWeight: 600, color: minimizado ? "#fff" : COLORS.gold, cursor: "pointer", transition: "all 0.2s" }}
+              title={minimizado ? "Mostrar el gráfico completo" : "Hacer más pequeño"}
+            >
+              {minimizado ? "▾ Expandir" : "▴ Minimizar"}
+            </button>
+          )}
+          {!minimizado && onRemoveWeek && weeks.length > 1 && (
             <button
               onClick={onRemoveWeek}
               style={{ background: "transparent", border: `0.5px solid ${COLORS.brownLight}`, borderRadius: 6, padding: "6px 10px", fontSize: 11, fontFamily: FONTS.sans, fontWeight: 500, color: COLORS.brownLight, cursor: "pointer", transition: "all 0.2s" }}
@@ -316,7 +327,7 @@ const TreatmentTimelineMatrix = ({
               − Semana
             </button>
           )}
-          {onAddWeek && (
+          {!minimizado && onAddWeek && (
             <button
               onClick={onAddWeek}
               style={{ background: "transparent", border: `0.5px solid ${COLORS.gold}`, borderRadius: 6, padding: "6px 10px", fontSize: 11, fontFamily: FONTS.sans, fontWeight: 600, color: COLORS.gold, cursor: "pointer", transition: "all 0.2s" }}
@@ -360,6 +371,9 @@ const TreatmentTimelineMatrix = ({
         </div>
       </div>
 
+      {/* Matriz y leyenda: se ocultan al minimizar (sin desmontarlas, así no
+          se pierde lo que ya se cargó del layout) */}
+      <div style={{ display: minimizado ? "none" : "block" }}>
       {/* ═══ MATRIX AREA ═══ */}
       <div style={{ display: "flex", position: "relative" }}>
         {/* ─── Left Panel (Categories) ─── */}
@@ -835,6 +849,7 @@ const TreatmentTimelineMatrix = ({
           <div style={{ width: 4, height: 14, borderRadius: 2, background: "#4CAF50" }} />
           <span style={{ fontFamily: FONTS.sans, fontSize: 11, letterSpacing: "0.8px", color: COLORS.brownMain, opacity: 0.85 }}>Alta</span>
         </div>
+      </div>
       </div>
 
       {/* Scrollbar styles */}

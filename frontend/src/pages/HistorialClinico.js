@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import useSocket from "../hooks/useSocket";
+import useMinimizados from "../hooks/useMinimizados";
 import {
   Container,
   Typography,
@@ -182,6 +183,48 @@ const CampoFicha = ({ etiqueta, valor, children }) => (
 );
 
 // Paleta para colorear los puntos de cada tratamiento en el mapa facial del presupuesto
+/**
+ * Botón para minimizar / expandir una tarjeta (presupuestos, paquetes…).
+ * Va fuera del componente para que React no lo vuelva a crear en cada render.
+ */
+const BotonMinimizar = ({ minimizado, onClick, color = "#a36920" }) => (
+  <Button
+    size="small"
+    variant="outlined"
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    startIcon={minimizado ? <ExpandMore sx={{ fontSize: 16 }} /> : <ExpandLess sx={{ fontSize: 16 }} />}
+    title={minimizado ? "Mostrar todo el contenido" : "Hacer más pequeño"}
+    sx={{
+      fontSize: "0.7rem", py: 0.25, px: 1, minWidth: "auto", textTransform: "none", fontWeight: 600,
+      borderRadius: 2, borderColor: color, color, whiteSpace: "nowrap",
+      "& .MuiButton-startIcon": { mr: 0.4 },
+      "&:hover": { backgroundColor: "rgba(163, 105, 32, 0.08)", borderColor: color },
+    }}
+  >
+    {minimizado ? "Expandir" : "Minimizar"}
+  </Button>
+);
+
+/** "Minimizar todos" / "Expandir todos" para la cabecera de una sección. */
+const BotonMinimizarTodos = ({ ids, minimizados, fijarVarios, color = "#a36920" }) => {
+  if (!ids || ids.length < 2) return null;
+  const todosMin = ids.every((id) => minimizados[id]);
+  return (
+    <Button
+      size="small"
+      onClick={() => fijarVarios(ids, !todosMin)}
+      startIcon={todosMin ? <ExpandMore sx={{ fontSize: 16 }} /> : <ExpandLess sx={{ fontSize: 16 }} />}
+      sx={{
+        ml: "auto", fontSize: "0.72rem", textTransform: "none", fontWeight: 700, color,
+        borderRadius: 2, whiteSpace: "nowrap",
+        "&:hover": { backgroundColor: "rgba(163, 105, 32, 0.08)" },
+      }}
+    >
+      {todosMin ? "Expandir todos" : "Minimizar todos"}
+    </Button>
+  );
+};
+
 const FACIAL_COLOR_PALETTE = [
   "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
   "#F7DC6F", "#BB8FCE", "#85C1E2", "#F8B88B", "#ABEBC6",
@@ -443,11 +486,12 @@ const HistorialClinico = () => {
   const [montoConsultaPresupuesto, setMontoConsultaPresupuesto] = useState("");
   const [metodoPagoConsultaPresupuesto, setMetodoPagoConsultaPresupuesto] = useState("efectivo");
   
-  // Estado para controlar qué presupuestos están colapsados
-  const [presupuestosColapsados, setPresupuestosColapsados] = useState({});
-  
-  // Estado para controlar qué paquetes están colapsados
-  const [paquetesColapsados, setPaquetesColapsados] = useState({});
+  // Tarjetas minimizadas. Se recuerdan en el navegador: al volver a abrir
+  // el historial del paciente quedan como se dejaron.
+  const [presupuestosColapsados, alternarPresupuestoMin, fijarPresupuestosMin] = useMinimizados("hc-min-presupuestos-asignados");
+  const [paquetesColapsados, alternarPaqueteMin, fijarPaquetesMin] = useMinimizados("hc-min-paquetes");
+  const [ofertasMinimizadas, alternarOfertaMin, fijarOfertasMin] = useMinimizados("hc-min-presupuestos-paciente");
+  const [seguimientosMinimizados, alternarSeguimientoMin, fijarSeguimientosMin] = useMinimizados("hc-min-seguimiento");
   const [presupuestosAsignadosCheck, setPresupuestosAsignadosCheck] = useState({});
   const [paquetesPromoExpanded, setPaquetesPromoExpanded] = useState(false);
   const [tratamientosMarcados, setTratamientosMarcadosRaw] = useState({});
@@ -5661,12 +5705,19 @@ const HistorialClinico = () => {
                     border: "1px solid rgba(163, 105, 32, 0.3)",
                   }}
                 >
-                      <Typography
-                        variant="h6"
-                        sx={{ color: "#a36920", fontWeight: "bold", mb: 2, display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        📋 Presupuestos del Paciente
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2, flexWrap: "wrap" }}>
+                        <Typography
+                          variant="h6"
+                          sx={{ color: "#a36920", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          📋 Presupuestos del Paciente
+                        </Typography>
+                        <BotonMinimizarTodos
+                          ids={ofertas.map((o) => o.id)}
+                          minimizados={ofertasMinimizadas}
+                          fijarVarios={fijarOfertasMin}
+                        />
+                      </Box>
 
                   {/* Leyenda de estados */}
                   <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
@@ -5788,6 +5839,10 @@ const HistorialClinico = () => {
                               }}>
                                 {totalItems} tratamiento{totalItems !== 1 ? 's' : ''}
                               </Box>
+                              <BotonMinimizar
+                                minimizado={!!ofertasMinimizadas[o.id]}
+                                onClick={() => alternarOfertaMin(o.id)}
+                              />
                               <IconButton
                                 size="small"
                                 onClick={() => eliminarOferta(o.id)}
@@ -5801,6 +5856,9 @@ const HistorialClinico = () => {
                             </Box>
                           </Box>
                           
+                          {/* Contenido minimizable del presupuesto */}
+                          {!ofertasMinimizadas[o.id] && (
+                          <>
                           {/* Asignación de especialistas (por lotes, no uno por uno) */}
                           {!yaAsignado && (
                             <AsignacionEspecialistas
@@ -6298,6 +6356,8 @@ const HistorialClinico = () => {
                               </Button>
                             </Box>
                           </Box>
+                          </>
+                          )}
                         </Paper>
                       );
                     })}
@@ -6308,6 +6368,15 @@ const HistorialClinico = () => {
               <Divider sx={{ mb: 3 }} />
 
               {/* Calendario de Tratamientos - Timeline Matrix */}
+              {presupuestosAsignados.filter((p) => !hiddenTimelines[p.id]).length > 1 && (
+                <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                  <BotonMinimizarTodos
+                    ids={presupuestosAsignados.filter((p) => !hiddenTimelines[p.id]).map((p) => p.id)}
+                    minimizados={seguimientosMinimizados}
+                    fijarVarios={fijarSeguimientosMin}
+                  />
+                </Box>
+              )}
               {presupuestosAsignados.map(presupuesto => {
                 const sesiones = presupuesto.sesiones || [];
                 const completadas = sesiones.filter(s => s.estado === 'completada').length;
@@ -6393,6 +6462,8 @@ const HistorialClinico = () => {
                   <div key={`timeline-${presupuesto.id}`} ref={(el) => { timelineRefs.current[presupuesto.id] = el; }} style={{ marginBottom: 24 }}>
                     <TreatmentTimelineMatrix
                       presupuestoId={presupuesto.id}
+                      minimizado={!!seguimientosMinimizados[presupuesto.id]}
+                      onToggleMinimizar={() => alternarSeguimientoMin(presupuesto.id)}
                       especialistas={especialistas}
                       budget={{
                         id: `PRE-${presupuesto.id}`,
@@ -6617,6 +6688,11 @@ const HistorialClinico = () => {
                     >
                       Presupuestos Asignados
                     </Typography>
+                    <BotonMinimizarTodos
+                      ids={presupuestosAsignados.map((p) => p.id)}
+                      minimizados={presupuestosColapsados}
+                      fijarVarios={fijarPresupuestosMin}
+                    />
                   </Box>
                   <Box sx={{ display: "grid", gap: 2 }}>
                     {presupuestosAsignados.map((presupuesto) => {
@@ -6682,30 +6758,10 @@ const HistorialClinico = () => {
                               >
                                 <Receipt />
                               </IconButton>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => {
-                                  setPresupuestosColapsados(prev => ({
-                                    ...prev,
-                                    [presupuesto.id]: !prev[presupuesto.id]
-                                  }));
-                                }}
-                                sx={{
-                                  fontSize: "0.7rem",
-                                  py: 0.25,
-                                  px: 1,
-                                  minWidth: "auto",
-                                  borderColor: "#a36920",
-                                  color: "#a36920",
-                                  "&:hover": { 
-                                    backgroundColor: "rgba(163, 105, 32, 0.08)",
-                                    borderColor: "#8a541a"
-                                  }
-                                }}
-                              >
-                                {presupuestosColapsados[presupuesto.id] ? "Abrir" : "Guardar"}
-                              </Button>
+                              <BotonMinimizar
+                                minimizado={!!presupuestosColapsados[presupuesto.id]}
+                                onClick={() => alternarPresupuestoMin(presupuesto.id)}
+                              />
                             </Box>
                           </Box>
                           
@@ -7258,6 +7314,12 @@ const HistorialClinico = () => {
                     >
                       Paquetes del Paciente
                     </Typography>
+                    <BotonMinimizarTodos
+                      ids={paquetesPaciente.map((p) => p.id)}
+                      minimizados={paquetesColapsados}
+                      fijarVarios={fijarPaquetesMin}
+                      color="#1565c0"
+                    />
                   </Box>
                   <Box sx={{ display: "grid", gap: 2 }}>
                     {paquetesPaciente.map((paquete) => {
@@ -7309,30 +7371,11 @@ const HistorialClinico = () => {
                               >
                                 <Receipt />
                               </IconButton>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                onClick={() => {
-                                  setPaquetesColapsados(prev => ({
-                                    ...prev,
-                                    [paquete.id]: !prev[paquete.id]
-                                  }));
-                                }}
-                                sx={{
-                                  fontSize: "0.7rem",
-                                  py: 0.25,
-                                  px: 1,
-                                  minWidth: "auto",
-                                  borderColor: "#2196f3",
-                                  color: "#2196f3",
-                                  "&:hover": { 
-                                    backgroundColor: "rgba(33, 150, 243, 0.08)",
-                                    borderColor: "#1565c0"
-                                  }
-                                }}
-                              >
-                                {paquetesColapsados[paquete.id] ? "Abrir" : "Guardar"}
-                              </Button>
+                              <BotonMinimizar
+                                minimizado={!!paquetesColapsados[paquete.id]}
+                                onClick={() => alternarPaqueteMin(paquete.id)}
+                                color="#1565c0"
+                              />
                             </Box>
                           </Box>
                           
