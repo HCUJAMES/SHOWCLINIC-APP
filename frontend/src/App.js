@@ -22,6 +22,7 @@ const Gestion = React.lazy(() => import("./pages/Gestion"));
 const Paquetes = React.lazy(() => import("./pages/Paquetes"));
 const GestionClinica = React.lazy(() => import("./pages/GestionPersonalCards"));
 const ProductosAplicados = React.lazy(() => import("./pages/ProductosAplicados"));
+const AntesDespues = React.lazy(() => import("./pages/AntesDespues"));
 const GestionUsuariosPage = React.lazy(() => import("./pages/GestionUsuariosPage"));
 const CodigosBarras = React.lazy(() => import("./pages/CodigosBarras"));
 const SeguimientoPacientes = React.lazy(() => import("./pages/SeguimientoPacientes"));
@@ -192,6 +193,15 @@ function App() {
           element={
             <ProtectedRoute>
               <GestionClinica />
+            </ProtectedRoute>
+          }
+        />
+        {/* Antes y Después: abierto a todos los roles */}
+        <Route
+          path="/antes-despues"
+          element={
+            <ProtectedRoute>
+              <AntesDespues />
             </ProtectedRoute>
           }
         />

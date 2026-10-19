@@ -368,6 +368,8 @@ const HistorialClinico = () => {
   const [asignandoPresupuesto, setAsignandoPresupuesto] = useState(false);
   const [showOferta, setShowOferta] = useState(false);
   const [ofertaItems, setOfertaItems] = useState([]);
+  // Tratamientos del plan con los campos de edición abiertos (precio, sesiones…)
+  const [planEditando, setPlanEditando] = useState({});
   const [guardandoOferta, setGuardandoOferta] = useState(false);
   const [ofertas, setOfertas] = useState([]);
   const [ofertaEditId, setOfertaEditId] = useState(null);
@@ -5231,18 +5233,6 @@ const HistorialClinico = () => {
                                   position: "relative",
                                   "&:hover img": { transform: "scale(1.06)" },
                                   "& img": { transition: "transform .25s ease" },
-                                  // Sombra al pie de la foto: los botones se leen
-                                  // igual sobre una imagen clara que sobre una oscura.
-                                  "&::after": {
-                                    content: '""',
-                                    position: "absolute",
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    height: "42%",
-                                    background: "linear-gradient(to top, rgba(40,26,16,0.42), rgba(40,26,16,0))",
-                                    pointerEvents: "none",
-                                  },
                                 }}
                               >
                                 {imgUrl ? (
@@ -5276,48 +5266,6 @@ const HistorialClinico = () => {
                                   </Box>
                                 )}
 
-                                {/* Botones + / − sobre la propia foto */}
-                                <Box
-                                  sx={{
-                                    position: "absolute",
-                                    bottom: 8,
-                                    right: 8,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                    backgroundColor: "rgba(255,255,255,0.94)",
-                                    borderRadius: "16px",
-                                    padding: "3px 5px",
-                                    boxShadow: "0 2px 8px rgba(0,0,0,0.22)",
-                                  }}
-                                >
-                                  <Box
-                                    onClick={(e) => { e.stopPropagation(); removeOneOfertaItem(t); }}
-                                    sx={{
-                                      width: 26, height: 26,
-                                      borderRadius: "50%",
-                                      backgroundColor: count > 0 ? "#e57373" : "#eee",
-                                      color: count > 0 ? "white" : "#bbb",
-                                      display: "flex", alignItems: "center", justifyContent: "center",
-                                      cursor: count > 0 ? "pointer" : "default",
-                                      fontSize: "1.05rem", fontWeight: 700, lineHeight: 1,
-                                      "&:hover": count > 0 ? { backgroundColor: "#d32f2f" } : {},
-                                    }}
-                                  >−</Box>
-                                  <Box
-                                    onClick={(e) => { e.stopPropagation(); addOfertaItem(t); }}
-                                    sx={{
-                                      width: 26, height: 26,
-                                      borderRadius: "50%",
-                                      backgroundColor: "#a36920",
-                                      color: "white",
-                                      display: "flex", alignItems: "center", justifyContent: "center",
-                                      cursor: "pointer",
-                                      fontSize: "1.05rem", fontWeight: 700, lineHeight: 1,
-                                      "&:hover": { backgroundColor: "#8a5a1a" },
-                                    }}
-                                  >+</Box>
-                                </Box>
                               </Box>
 
                               {/* Nombre y precio */}
@@ -5335,9 +5283,57 @@ const HistorialClinico = () => {
                                 }}>
                                   {t.nombre}
                                 </Typography>
-                                <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: isSelected ? "#a36920" : "#6b5a49", mt: 0.5 }}>
-                                  {t.precio ? `S/ ${Number(t.precio).toFixed(2)}` : "Sin precio"}
-                                </Typography>
+                                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, mt: "auto", pt: 0.75 }}>
+                                  <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: isSelected ? "#a36920" : "#6b5a49" }}>
+                                    {t.precio ? `S/ ${Number(t.precio).toFixed(2)}` : "Sin precio"}
+                                  </Typography>
+
+                                  {/* − cantidad + : fuera de la foto, más fácil de pulsar */}
+                                  <Box sx={{
+                                    display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0,
+                                    p: "3px", borderRadius: "999px",
+                                    backgroundColor: isSelected ? "rgba(163,105,32,0.10)" : "#f5f1e4",
+                                  }}>
+                                    <Box
+                                      component="button"
+                                      type="button"
+                                      aria-label={`Quitar ${t.nombre}`}
+                                      disabled={count === 0}
+                                      onClick={(e) => { e.stopPropagation(); removeOneOfertaItem(t); }}
+                                      sx={{
+                                        width: 32, height: 32, p: 0, border: "none", borderRadius: "50%",
+                                        backgroundColor: count > 0 ? "#fff" : "transparent",
+                                        color: count > 0 ? "#c62828" : "#c9bba6",
+                                        boxShadow: count > 0 ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        cursor: count > 0 ? "pointer" : "default",
+                                        fontSize: "1.25rem", fontWeight: 700, lineHeight: 1,
+                                        transition: "background-color .15s ease, transform .1s ease",
+                                        "&:hover": count > 0 ? { backgroundColor: "#ffebee" } : {},
+                                        "&:active": count > 0 ? { transform: "scale(0.9)" } : {},
+                                      }}
+                                    >−</Box>
+                                    <Typography sx={{ minWidth: 18, textAlign: "center", fontWeight: 800, fontSize: "0.9rem", color: count > 0 ? "#a36920" : "#b5a58f" }}>
+                                      {count}
+                                    </Typography>
+                                    <Box
+                                      component="button"
+                                      type="button"
+                                      aria-label={`Agregar ${t.nombre}`}
+                                      onClick={(e) => { e.stopPropagation(); addOfertaItem(t); }}
+                                      sx={{
+                                        width: 32, height: 32, p: 0, border: "none", borderRadius: "50%",
+                                        backgroundColor: "#a36920", color: "white",
+                                        boxShadow: "0 2px 6px rgba(163,105,32,0.35)",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        cursor: "pointer", fontSize: "1.25rem", fontWeight: 700, lineHeight: 1,
+                                        transition: "background-color .15s ease, transform .1s ease",
+                                        "&:hover": { backgroundColor: "#8a5a1a" },
+                                        "&:active": { transform: "scale(0.9)" },
+                                      }}
+                                    >+</Box>
+                                  </Box>
+                                </Box>
                               </Box>
                             </Box>
                           );
@@ -5356,337 +5352,308 @@ const HistorialClinico = () => {
                   </Box>
                   {/* FIN LADO IZQUIERDO */}
 
-                  {/* Resumen de seleccionados (panel lateral) */}
-                  {ofertaItems.length > 0 && (
-                    <Box sx={{ 
-                      width: { md: 420 },
-                      minWidth: { md: 420 },
-                      backgroundColor: "#faf8f4",
-                      borderRadius: 3,
-                      border: "1px solid rgba(163,105,32,0.15)",
-                      boxShadow: { md: "0 4px 12px rgba(163,105,32,0.12)" },
-                      p: 2,
+                  {/* Plan elegido + Mapa 3D. En pantallas anchas van lado a lado:
+                      la lista junto al catálogo (a la izquierda del 3D), grande y
+                      legible para enseñársela al paciente. */}
+                  {ofertaItems.length > 0 && (() => {
+                    const campoSx = {
+                      "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 2, fontSize: "0.85rem", height: 38 },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
+                        "&:hover fieldset": { borderColor: "#ba9a63" },
+                        "&.Mui-focused fieldset": { borderColor: "#a36920" },
+                      },
+                      "& .MuiInputLabel-root": { fontSize: "0.75rem" },
+                      "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
+                    };
+                    const soles = (n) => `S/ ${(Number(n) || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    const totalSesiones = ofertaItems.reduce((s, it) => s + (parseInt(it.sesiones, 10) || 1), 0);
+                    const descuento = Number(descuentoOferta) || 0;
+                    const scrollSx = {
+                      "&::-webkit-scrollbar": { width: "8px" },
+                      "&::-webkit-scrollbar-track": { backgroundColor: "rgba(163,105,32,0.08)", borderRadius: "10px", margin: "8px" },
+                      "&::-webkit-scrollbar-thumb": { backgroundColor: "rgba(163,105,32,0.35)", borderRadius: "10px", "&:hover": { backgroundColor: "rgba(163,105,32,0.55)" } },
+                    };
+                    return (
+                    <Box sx={{
                       display: "flex",
-                      flexDirection: "column",
+                      flexDirection: { xs: "column", lg: "row" },
+                      gap: 2,
                       alignSelf: "flex-start",
+                      width: { md: 420, lg: "auto" },
+                      flexShrink: 0,
                       position: { md: "sticky" },
                       top: { md: 20 },
-                      maxHeight: { md: "calc(100vh - 40px)" },
-                      overflowY: { md: "auto" },
-                      transition: "box-shadow 0.3s ease",
-                      "&:hover": {
-                        boxShadow: { md: "0 6px 16px rgba(163,105,32,0.18)" },
-                      },
-                      "&::-webkit-scrollbar": {
-                        width: "8px",
-                      },
-                      "&::-webkit-scrollbar-track": {
-                        backgroundColor: "rgba(163,105,32,0.08)",
-                        borderRadius: "10px",
-                        margin: "8px",
-                      },
-                      "&::-webkit-scrollbar-thumb": {
-                        backgroundColor: "rgba(163,105,32,0.35)",
-                        borderRadius: "10px",
-                        "&:hover": {
-                          backgroundColor: "rgba(163,105,32,0.55)",
-                        },
-                      },
                     }}>
-                      {/* Mapa Facial 3D arriba del resumen */}
-                      <Box sx={{ 
-                        mb: 2,
+
+                      {/* ── Plan de tratamiento (lo que ve el paciente) ── */}
+                      <Box sx={{
+                        width: { lg: 400 },
+                        display: "flex", flexDirection: "column",
+                        borderRadius: "20px", overflow: "hidden",
+                        backgroundColor: "#fffdf9",
+                        border: "1px solid rgba(163,105,32,0.22)",
+                        boxShadow: "0 12px 32px -12px rgba(163,105,32,0.35)",
+                        maxHeight: { md: "calc(100vh - 40px)" },
+                      }}>
+                        {/* Cabecera */}
+                        <Box sx={{ px: 2.5, py: 2, background: "linear-gradient(135deg, #a36920 0%, #8a5a1a 100%)", color: "#fff" }}>
+                          <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: "1.45rem", lineHeight: 1.15, color: "#fff" }}>
+                            Plan de tratamiento
+                          </Typography>
+                          {pacienteSeleccionado && (
+                            <Typography sx={{ fontSize: "0.85rem", opacity: 0.92, mt: 0.3, color: "#fff" }} noWrap>
+                              {`${pacienteSeleccionado.nombre || ""} ${pacienteSeleccionado.apellido || ""}`.trim()}
+                            </Typography>
+                          )}
+                          <Box sx={{ display: "flex", gap: 0.8, mt: 1.2, flexWrap: "wrap" }}>
+                            {[
+                              `${ofertaItems.length} tratamiento${ofertaItems.length === 1 ? "" : "s"}`,
+                              `${totalSesiones} sesi${totalSesiones === 1 ? "ón" : "ones"}`,
+                            ].map((txt) => (
+                              <Box key={txt} sx={{ px: 1.2, py: 0.35, borderRadius: "999px", backgroundColor: "rgba(255,255,255,0.2)" }}>
+                                <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#fff" }}>{txt}</Typography>
+                              </Box>
+                            ))}
+                          </Box>
+                        </Box>
+
+                        {/* Tratamientos elegidos */}
+                        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", p: 1.5, ...scrollSx }}>
+                          {ofertaItems.map((item, idx) => {
+                            const t = tratamientosBase.find(x => x.id === item.tratamientoId);
+                            if (!t) return null;
+                            const imgs = tratamientoImagenCache[t.id];
+                            const foto = Array.isArray(imgs) && imgs.length > 0 ? imgs[0] : null;
+                            const sesiones = parseInt(item?.sesiones, 10) || 1;
+                            const claveItem = `${item.tratamientoId}-${idx}`;
+                            // Sin precio se abre solo, para que no se olvide ponerlo
+                            const editando = !!planEditando[claveItem] || !(Number(item?.precio) > 0);
+                            return (
+                              <Box
+                                key={`${item.tratamientoId}-${idx}`}
+                                sx={{
+                                  p: 1.5, mb: 1.25,
+                                  backgroundColor: "#fff",
+                                  borderRadius: "16px",
+                                  border: "1px solid rgba(163,105,32,0.14)",
+                                  boxShadow: "0 2px 8px rgba(93,64,55,0.06)",
+                                }}
+                              >
+                                {/* Foto + nombre + precio grande */}
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                                  <Box sx={{ position: "relative", flexShrink: 0 }}>
+                                    <Box sx={{
+                                      width: 62, height: 62, borderRadius: "14px", overflow: "hidden",
+                                      backgroundColor: "#f5f1e4", display: "flex", alignItems: "center", justifyContent: "center",
+                                    }}>
+                                      {foto
+                                        ? <img src={foto} alt={t.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                        : <Typography sx={{ fontSize: "1.6rem", opacity: 0.3 }}>💉</Typography>}
+                                    </Box>
+                                    <Box sx={{
+                                      position: "absolute", top: -6, left: -6, width: 24, height: 24, borderRadius: "50%",
+                                      backgroundColor: "#a36920", color: "#fff", border: "2px solid #fff",
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      fontSize: "0.72rem", fontWeight: 800,
+                                    }}>{idx + 1}</Box>
+                                  </Box>
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#3E2723", lineHeight: 1.25 }}>
+                                      {t.nombre}
+                                    </Typography>
+                                    <Typography sx={{ fontSize: "0.8rem", color: "#8D7B70", mt: 0.2 }}>
+                                      {sesiones} sesi{sesiones === 1 ? "ón" : "ones"}{item?.producto ? ` · ${item.producto}` : ""}{item?.ml ? ` · ${item.ml} ml` : ""}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+                                    <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: "1.15rem", color: "#a36920", lineHeight: 1.1 }}>
+                                      {soles(item?.precio)}
+                                    </Typography>
+                                    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 0.25, mt: 0.3 }}>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => setPlanEditando((prev) => ({ ...prev, [claveItem]: !prev[claveItem] }))}
+                                        title={editando ? "Listo" : "Editar precio, sesiones y producto"}
+                                        sx={{
+                                          width: 26, height: 26,
+                                          color: editando ? "#fff" : "#a36920",
+                                          backgroundColor: editando ? "#a36920" : "transparent",
+                                          "&:hover": { backgroundColor: editando ? "#8a5a1a" : "rgba(163,105,32,0.1)" },
+                                        }}
+                                      >
+                                        {editando ? <Check sx={{ fontSize: 16 }} /> : <Edit sx={{ fontSize: 15 }} />}
+                                      </IconButton>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => removeOneOfertaItem(t)}
+                                        title="Quitar del plan"
+                                        sx={{ width: 26, height: 26, color: "#c9a99a", "&:hover": { color: "#d32f2f", backgroundColor: "#ffebee" } }}
+                                      >
+                                        <Close sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </Box>
+                                  </Box>
+                                </Box>
+
+                                {/* Campos editables (se abren con el lápiz) */}
+                                {editando && (
+                                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 80px", gap: 0.75, mt: 1.25 }}>
+                                  <TextField size="small" label="Precio S/" type="number"
+                                    value={item?.precio ?? ""} onChange={(e) => setOfertaPrecio(t.id, e.target.value)}
+                                    sx={{ ...campoSx, "& .MuiInputBase-root": { ...campoSx["& .MuiInputBase-root"], fontWeight: 700 } }} />
+                                  <TextField size="small" label="Sesiones" type="number"
+                                    value={item?.sesiones ?? "1"} onChange={(e) => setOfertaSesiones(t.id, e.target.value)}
+                                    inputProps={{ min: 1, step: 1 }} sx={campoSx} />
+                                  <Autocomplete
+                                    freeSolo
+                                    size="small"
+                                    options={productosInventario}
+                                    getOptionLabel={(option) => typeof option === "string" ? option : option?.label || ""}
+                                    value={item?.producto || ""}
+                                    onChange={(e, newValue) => {
+                                      const val = typeof newValue === "string" ? newValue : newValue?.value || "";
+                                      setOfertaProducto(t.id, val);
+                                    }}
+                                    onInputChange={(e, newInputValue, reason) => {
+                                      if (reason === "input") setOfertaProducto(t.id, newInputValue);
+                                    }}
+                                    filterOptions={(options, { inputValue }) => {
+                                      const term = (inputValue || "").toLowerCase();
+                                      if (!term) return options.slice(0, 20);
+                                      return options.filter(o => o.label.toLowerCase().includes(term)).slice(0, 20);
+                                    }}
+                                    renderInput={(params) => <TextField {...params} label="Producto" sx={campoSx} />}
+                                  />
+                                  <TextField size="small" label="ML" type="number"
+                                    value={item?.ml ?? ""} onChange={(e) => setOfertaMl(t.id, e.target.value)}
+                                    inputProps={{ min: 0, step: 0.1 }} sx={campoSx} />
+                                </Box>
+                                )}
+                              </Box>
+                            );
+                          })}
+                        </Box>
+
+                        {/* Total + descuento + botones */}
+                        <Box sx={{ p: 2, borderTop: "1px solid rgba(163,105,32,0.15)", backgroundColor: "#faf6ee" }}>
+                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", mb: 1 }}>
+                            <Typography sx={{ fontSize: "0.9rem", color: "#6b5a49", fontWeight: 600 }}>Subtotal</Typography>
+                            <Typography sx={{ fontSize: "1rem", color: "#3E2723", fontWeight: 700 }}>{soles(totalOferta)}</Typography>
+                          </Box>
+                          <Box sx={{ mb: 1.25 }}>
+                            <Typography sx={{ fontSize: "0.8rem", color: "#6b5a49", mb: 0.6 }}>Descuento</Typography>
+                            <DescuentoDual
+                              compact
+                              base={totalOferta}
+                              value={descuento}
+                              onChange={(monto) => setDescuentoOferta(monto ? String(monto) : "")}
+                            />
+                          </Box>
+                          {descuento > 0 && (
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", mb: 0.5 }}>
+                              <Typography sx={{ fontSize: "0.9rem", color: "#2e7d32", fontWeight: 600 }}>Ahorro</Typography>
+                              <Typography sx={{ fontSize: "1rem", color: "#2e7d32", fontWeight: 700 }}>− {soles(descuento)}</Typography>
+                            </Box>
+                          )}
+                          <Box sx={{
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                            mt: 1, mb: 1.75, px: 1.75, py: 1.25, borderRadius: "14px",
+                            background: "linear-gradient(135deg, rgba(163,105,32,0.12), rgba(212,175,55,0.14))",
+                          }}>
+                            <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: "#8a5a1a", letterSpacing: 0.5, textTransform: "uppercase" }}>Total</Typography>
+                            <Typography sx={{ fontFamily: "'Playfair Display', serif", fontSize: "1.9rem", fontWeight: 700, color: "#a36920", lineHeight: 1 }}>
+                              {soles(totalOferta - descuento)}
+                            </Typography>
+                          </Box>
+
+                          <Box sx={{ display: "flex", gap: 1 }}>
+                            {ofertaEditId && (
+                              <Button
+                                variant="outlined"
+                                sx={{
+                                  borderColor: "#e0e0e0", color: "#888", borderRadius: 3, textTransform: "none", fontSize: "0.9rem",
+                                  "&:hover": { backgroundColor: "#f5f5f5", borderColor: "#ccc" },
+                                }}
+                                onClick={() => {
+                                  setOfertaEditId(null);
+                                  setOfertaItems([]);
+                                  setDescuentoOferta("");
+                                  setShowOferta(false);
+                                }}
+                              >
+                                Cancelar
+                              </Button>
+                            )}
+                            <Button
+                              variant="contained"
+                              fullWidth
+                              sx={{
+                                background: "linear-gradient(135deg, #a36920 0%, #8a5a1a 100%)",
+                                borderRadius: 3, fontWeight: 700, textTransform: "none", fontSize: "0.95rem", py: 1.1,
+                                boxShadow: "0 6px 16px rgba(163,105,32,0.3)",
+                                "&:hover": { boxShadow: "0 8px 20px rgba(163,105,32,0.4)" },
+                              }}
+                              disabled={guardandoOferta || ofertaItems.length === 0}
+                              onClick={guardarOferta}
+                            >
+                              {ofertaEditId ? "Guardar cambios" : "Guardar presupuesto"}
+                            </Button>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {/* ── Mapa Facial 3D (a la derecha de la lista) ── */}
+                      <Box sx={{
+                        width: { lg: 300 },
+                        alignSelf: "flex-start",
                         backgroundColor: "#2a2a2a",
-                        borderRadius: 2,
+                        borderRadius: "20px",
                         border: "1px solid #3a3a3a",
                         overflow: "hidden",
+                        boxShadow: "0 12px 32px -14px rgba(0,0,0,0.5)",
                       }}>
-                        {/* Header */}
-                        <Box sx={{ 
-                          p: 1.5, 
-                          backgroundColor: "#1a1a1a", 
-                          borderBottom: "1px solid #3a3a3a"
-                        }}>
-                          <Typography sx={{ 
-                            fontFamily: "'Cormorant Garamond', serif",
-                            fontWeight: 700, 
-                            fontSize: "0.9rem", 
-                            color: "#C8A96E",
-                            textAlign: "center"
-                          }}>
+                        <Box sx={{ p: 1.5, backgroundColor: "#1a1a1a", borderBottom: "1px solid #3a3a3a" }}>
+                          <Typography sx={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: "1rem", color: "#C8A96E", textAlign: "center" }}>
                             Mapa Facial 3D
                           </Typography>
                         </Box>
-
-                        {/* Visor 3D con los puntos predeterminados de los tratamientos seleccionados */}
-                        <Box 
+                        <Box
                           className="stage"
-                          sx={{ 
+                          sx={{
                             position: "relative",
                             backgroundColor: "#1a1a1a",
                             backgroundImage: "radial-gradient(circle at center, rgba(200, 169, 110, 0.03) 1px, transparent 1px)",
-                            backgroundSize: "20px 20px"
+                            backgroundSize: "20px 20px",
                           }}
                         >
-                          <FacialMapMini
-                            points={ofertaFacialPoints}
-                            editable={false}
-                            height={420}
-                          />
+                          <FacialMapMini points={ofertaFacialPoints} editable={false} height={420} />
                         </Box>
-
-                        {/* Leyenda: color por tratamiento + nº de puntos */}
-                        {ofertaFacialLeyenda.length > 0 && (
+                        {ofertaFacialLeyenda.length > 0 ? (
                           <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 0.6 }}>
                             {ofertaFacialLeyenda.map((l) => (
                               <Box key={l.id} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                 <Box sx={{ width: 11, height: 11, borderRadius: "50%", backgroundColor: l.color, boxShadow: `0 0 6px ${l.color}`, flexShrink: 0 }} />
-                                <Typography sx={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.85)", flex: 1, lineHeight: 1.2 }}>
+                                <Typography sx={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.85)", flex: 1, lineHeight: 1.2 }}>
                                   {l.nombre}
                                 </Typography>
-                                <Typography sx={{ fontSize: "0.68rem", color: l.count > 0 ? "#C8A96E" : "rgba(255,255,255,0.35)", fontWeight: 700 }}>
+                                <Typography sx={{ fontSize: "0.7rem", color: l.count > 0 ? "#C8A96E" : "rgba(255,255,255,0.35)", fontWeight: 700 }}>
                                   {l.count > 0 ? `${l.count} pts` : "sin puntos"}
                                 </Typography>
                               </Box>
                             ))}
                           </Box>
-                        )}
-                        {ofertaFacialLeyenda.length === 0 && (
+                        ) : (
                           <Box sx={{ p: 1.5 }}>
-                            <Typography sx={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
+                            <Typography sx={{ fontSize: "0.72rem", color: "rgba(255,255,255,0.4)", textAlign: "center" }}>
                               Selecciona tratamientos para ver sus puntos en el mapa
                             </Typography>
                           </Box>
                         )}
                       </Box>
-
-                      <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#1a1a1a", mb: 1.5 }}>
-                        Resumen ({ofertaItems.length})
-                      </Typography>
-
-                      {/* Lista de items editables */}
-                      <Box sx={{ 
-                        maxHeight: "300px",
-                        overflowY: "auto",
-                        mb: 1,
-                        pr: 0.5,
-                        "&::-webkit-scrollbar": {
-                          width: "6px",
-                        },
-                        "&::-webkit-scrollbar-track": {
-                          backgroundColor: "rgba(163,105,32,0.05)",
-                          borderRadius: "10px",
-                        },
-                        "&::-webkit-scrollbar-thumb": {
-                          backgroundColor: "rgba(163,105,32,0.3)",
-                          borderRadius: "10px",
-                          "&:hover": {
-                            backgroundColor: "rgba(163,105,32,0.5)",
-                          },
-                        },
-                      }}>
-                        {ofertaItems.map((item, idx) => {
-                          const t = tratamientosBase.find(x => x.id === item.tratamientoId);
-                          if (!t) return null;
-                          return (
-                            <Box
-                              key={`${item.tratamientoId}-${idx}`}
-                              sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 0.8,
-                                p: 1.2,
-                                mb: 1,
-                                backgroundColor: "white",
-                                borderRadius: 2,
-                                border: "1px solid rgba(163,105,32,0.1)",
-                              }}
-                            >
-                              {/* Header: nombre + botón eliminar */}
-                              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: "#1a1a1a", flex: 1, lineHeight: 1.3 }}>
-                                  {t.nombre}
-                                </Typography>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => removeOneOfertaItem(t)}
-                                  sx={{ width: 22, height: 22, color: "#e57373", "&:hover": { color: "#d32f2f" } }}
-                                >
-                                  <Close sx={{ fontSize: 14 }} />
-                                </IconButton>
-                              </Box>
-
-                              {/* Precio + Sesiones */}
-                              <Box sx={{ display: "flex", gap: 0.5 }}>
-                                <TextField
-                                  size="small"
-                                  label="S/ Precio"
-                                  type="number"
-                                  value={item?.precio ?? ""}
-                                  onChange={(e) => setOfertaPrecio(t.id, e.target.value)}
-                                  sx={{
-                                    flex: 1,
-                                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.78rem", fontWeight: 700, height: 34 },
-                                    "& .MuiOutlinedInput-root": {
-                                      "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
-                                      "&:hover fieldset": { borderColor: "#ba9a63" },
-                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                    },
-                                    "& .MuiInputLabel-root": { fontSize: "0.7rem" },
-                                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                                  }}
-                                />
-                                <TextField
-                                  size="small"
-                                  label="Sesiones"
-                                  type="number"
-                                  value={item?.sesiones ?? "1"}
-                                  onChange={(e) => setOfertaSesiones(t.id, e.target.value)}
-                                  inputProps={{ min: 1, step: 1 }}
-                                  sx={{
-                                    width: 70,
-                                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.78rem", height: 34 },
-                                    "& .MuiOutlinedInput-root": {
-                                      "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
-                                      "&:hover fieldset": { borderColor: "#ba9a63" },
-                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                    },
-                                    "& .MuiInputLabel-root": { fontSize: "0.7rem" },
-                                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                                  }}
-                                />
-                              </Box>
-
-                              {/* Producto + ML */}
-                              <Box sx={{ display: "flex", gap: 0.5 }}>
-                                <Autocomplete
-                                  freeSolo
-                                  size="small"
-                                  options={productosInventario}
-                                  getOptionLabel={(option) => typeof option === "string" ? option : option?.label || ""}
-                                  value={item?.producto || ""}
-                                  onChange={(e, newValue) => {
-                                    const val = typeof newValue === "string" ? newValue : newValue?.value || "";
-                                    setOfertaProducto(t.id, val);
-                                  }}
-                                  onInputChange={(e, newInputValue, reason) => {
-                                    if (reason === "input") setOfertaProducto(t.id, newInputValue);
-                                  }}
-                                  filterOptions={(options, { inputValue }) => {
-                                    const term = (inputValue || "").toLowerCase();
-                                    if (!term) return options.slice(0, 20);
-                                    return options.filter(o => o.label.toLowerCase().includes(term)).slice(0, 20);
-                                  }}
-                                  sx={{ flex: 1 }}
-                                  renderInput={(params) => (
-                                    <TextField
-                                      {...params}
-                                      label="Producto"
-                                      sx={{
-                                        "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.75rem", height: 34 },
-                                        "& .MuiOutlinedInput-root": {
-                                          "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
-                                          "&:hover fieldset": { borderColor: "#ba9a63" },
-                                          "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                        },
-                                        "& .MuiInputLabel-root": { fontSize: "0.7rem" },
-                                        "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                                      }}
-                                    />
-                                  )}
-                                />
-                                <TextField
-                                  size="small"
-                                  label="ML"
-                                  type="number"
-                                  value={item?.ml ?? ""}
-                                  onChange={(e) => setOfertaMl(t.id, e.target.value)}
-                                  inputProps={{ min: 0, step: 0.1 }}
-                                  sx={{
-                                    width: 55,
-                                    "& .MuiInputBase-root": { backgroundColor: "#fffdf7", borderRadius: 1.5, fontSize: "0.75rem", height: 34 },
-                                    "& .MuiOutlinedInput-root": {
-                                      "& fieldset": { borderColor: "rgba(163,105,32,0.2)" },
-                                      "&:hover fieldset": { borderColor: "#ba9a63" },
-                                      "&.Mui-focused fieldset": { borderColor: "#a36920" },
-                                    },
-                                    "& .MuiInputLabel-root": { fontSize: "0.7rem" },
-                                    "& .MuiInputLabel-root.Mui-focused": { color: "#a36920" },
-                                  }}
-                                />
-                              </Box>
-                            </Box>
-                          );
-                        })}
-                      </Box>
-
-                      {/* Total + descuento + botones */}
-                      <Box sx={{ pt: 1.5, mt: 1, borderTop: "1px solid rgba(163,105,32,0.15)" }}>
-                        <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#a36920", mb: 0.5 }}>
-                          Subtotal: S/ {totalOferta.toFixed(2)}
-                        </Typography>
-                        <Box sx={{ mb: 1 }}>
-                          <Typography sx={{ fontSize: "0.8rem", color: "#666", mb: 0.6 }}>
-                            Descuento
-                          </Typography>
-                          <DescuentoDual
-                            compact
-                            base={totalOferta}
-                            value={Number(descuentoOferta) || 0}
-                            onChange={(monto) => setDescuentoOferta(monto ? String(monto) : "")}
-                          />
-                        </Box>
-                        {Number(descuentoOferta) > 0 && (
-                          <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: "#a36920", mb: 1.5 }}>
-                            Total: S/ {(totalOferta - Number(descuentoOferta)).toFixed(2)}
-                          </Typography>
-                        )}
-                        
-                        <Box sx={{ display: "flex", gap: 1 }}>
-                          {ofertaEditId && (
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              sx={{
-                                borderColor: "#e0e0e0",
-                                color: "#888",
-                                borderRadius: 3,
-                                textTransform: "none",
-                                fontSize: "0.8rem",
-                                "&:hover": { backgroundColor: "#f5f5f5", borderColor: "#ccc" },
-                              }}
-                              onClick={() => {
-                                setOfertaEditId(null);
-                                setOfertaItems([]);
-                                setDescuentoOferta("");
-                                setShowOferta(false);
-                              }}
-                            >
-                              Cancelar
-                            </Button>
-                          )}
-                          <Button
-                            variant="contained"
-                            size="small"
-                            sx={{
-                              backgroundColor: "#a36920",
-                              borderRadius: 3,
-                              fontWeight: 700,
-                              textTransform: "none",
-                              fontSize: "0.8rem",
-                              px: 2.5,
-                              boxShadow: "none",
-                              "&:hover": { backgroundColor: "#8a5a1a", boxShadow: "none" },
-                            }}
-                            disabled={guardandoOferta || ofertaItems.length === 0}
-                            onClick={guardarOferta}
-                          >
-                            {ofertaEditId ? "Guardar cambios" : "Guardar presupuesto"}
-                          </Button>
-                        </Box>
-                      </Box>
                     </Box>
-                  )}
+                    );
+                  })()}
 
                   </Box>
                   {/* FIN Layout dividido */}

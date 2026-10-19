@@ -32,3 +32,6 @@ Thumbs.db
 
 # Uploads (opcional - descomentar si no quieres subir archivos)
 # uploads/
+
+# Videos de "Antes y Después": pesan mucho y viven solo en el servidor
+backend/uploads/videos/

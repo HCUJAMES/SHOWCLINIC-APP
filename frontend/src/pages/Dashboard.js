@@ -34,6 +34,7 @@ import {
   SupervisorAccount,
   QrCode2,
   MonetizationOn,
+  VideoLibrary,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -56,6 +57,7 @@ const moduleIcons = {
   "Usuarios": SupervisorAccount,
   "Códigos de Barras": QrCode2,
   "Gestión CEO": MonetizationOn,
+  "Antes y Después": VideoLibrary,
 };
 
 /**
@@ -65,11 +67,21 @@ const moduleIcons = {
  * mismos de siempre. Un módulo que no esté aquí cae en "Otros".
  */
 const GRUPOS = [
-  { id: "atencion", label: "Atención", titulos: ["Pacientes", "Tratamientos", "Paquetes", "Gestión Clínica"] },
+  { id: "atencion", label: "Atención", titulos: ["Pacientes", "Tratamientos", "Paquetes", "Gestión Clínica", "Antes y Después"] },
   { id: "operacion", label: "Operación", titulos: ["Inventario", "Códigos de Barras", "Productos Aplicados", "Especialistas"] },
   { id: "direccion", label: "Dirección", titulos: ["Finanzas", "Gestión CEO", "Estadísticas"] },
   { id: "sistema", label: "Sistema", titulos: ["Gestionar", "Usuarios"] },
 ];
+
+// Módulo de videos antes/después: visible y con todos los permisos para
+// cualquier rol.
+const MODULO_VIDEOS = {
+  title: "Antes y Después",
+  path: "/antes-despues",
+  description: "Videos de antes y después de cada tratamiento realizado",
+  tag: "VIDEOS",
+  hasAccess: true,
+};
 
 // Con pocos módulos no vale la pena partir en secciones: se muestran juntos.
 const MINIMO_PARA_AGRUPAR = 7;
@@ -217,7 +229,14 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
 
-  const menuItems = menuItemsByRole[role] || permissionMenuItems;
+  // "Antes y Después" es para todos: se agrega a cualquier rol, también a los
+  // usuarios cuyo menú sale de sus permisos.
+  const menuItems = useMemo(() => {
+    const base = menuItemsByRole[role] || permissionMenuItems;
+    if (base.some((m) => m.path === MODULO_VIDEOS.path)) return base;
+    return [...base, MODULO_VIDEOS];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, permissionMenuItems]);
 
   // Reparte los módulos del rol en sus secciones, respetando el orden de GRUPOS.
   const secciones = useMemo(() => {

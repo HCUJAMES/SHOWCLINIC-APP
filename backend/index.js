@@ -25,6 +25,7 @@ import gestionClinicaRoutes from "./routes/gestionClinicaRoutes.js";
 import gestionDuenoRoutes from "./routes/gestionDuenoRoutes.js";
 import barcodeRoutes from "./routes/barcodeRoutes.js";
 import consultasRoutes from "./routes/consultasRoutes.js";
+import videosRoutes from "./routes/videosRoutes.js";
 import { ocultarContactoSegunRol } from "./middleware/privacidad.js";
 import bcrypt from "bcryptjs";
 import compression from "compression";
@@ -35,6 +36,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
+// Los videos de "Antes y Después" pueden pesar cientos de MB: por Wi-Fi la
+// subida tarda más de los 5 minutos que Node permite por defecto.
+httpServer.requestTimeout = 60 * 60 * 1000;
 
 // Socket.IO — sincronización en tiempo real entre dispositivos
 const io = new Server(httpServer, {
@@ -1465,6 +1469,7 @@ app.use("/api/gestion-clinica", gestionClinicaRoutes);
 app.use("/api/gestion-dueno", gestionDuenoRoutes);
 app.use("/api/barcodes", barcodeRoutes);
 app.use("/api/consultas", consultasRoutes);
+app.use("/api/videos", videosRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
 app.use("/uploads/especialistas", express.static("uploads/especialistas"));
 
