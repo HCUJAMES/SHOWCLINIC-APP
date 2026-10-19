@@ -20,6 +20,16 @@ import axios from "axios";
 
 const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
+// Fecha local AAAA-MM-DD. toISOString() da la fecha en UTC: en Perú, desde
+// las 7 p. m. ya marca el día siguiente y "Hoy" dejaba fuera lo de hoy.
+const fechaLocalISO = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const textoUnidades = (c) =>
+  c && Number(c.unidades_usadas) > 0
+    ? ` · ${Number(c.unidades_usadas).toLocaleString("es-PE", { maximumFractionDigits: 2 })} ${c.unidad_base || "u"}`
+    : "";
+
 const ProductosAplicados = () => {
   const [tratamientos, setTratamientos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -57,8 +67,8 @@ const ProductosAplicados = () => {
     const hace30Dias = new Date();
     hace30Dias.setDate(hoy.getDate() - 30);
     
-    setFechaFin(hoy.toISOString().split("T")[0]);
-    setFechaInicio(hace30Dias.toISOString().split("T")[0]);
+    setFechaFin(fechaLocalISO(hoy));
+    setFechaInicio(fechaLocalISO(hace30Dias));
   }, []);
 
   useEffect(() => {
@@ -102,8 +112,8 @@ const ProductosAplicados = () => {
     const hoy = new Date();
     const desde = new Date();
     desde.setDate(hoy.getDate() - (dias - 1));
-    setFechaFin(hoy.toISOString().split("T")[0]);
-    setFechaInicio(desde.toISOString().split("T")[0]);
+    setFechaFin(fechaLocalISO(hoy));
+    setFechaInicio(fechaLocalISO(desde));
   };
 
   // Métricas para las tarjetas de resumen
@@ -399,7 +409,7 @@ const ProductosAplicados = () => {
                 const aplicado = !!r.treatment_id && !!r.paciente_id;
                 return (
                   <Paper
-                    key={r.barcode_unit_id}
+                    key={`${r.barcode_unit_id}-${r.treatment_id || "libre"}`}
                     elevation={0}
                     sx={{
                       p: 2,
@@ -448,6 +458,11 @@ const ProductosAplicados = () => {
                         <Typography sx={{ fontSize: "0.85rem" }}>
                           <b>Sesión:</b> {r.sesion || "-"}
                         </Typography>
+                        {Number(r.unidades_usadas) > 0 && (
+                          <Typography sx={{ fontSize: "0.85rem" }}>
+                            <b>Usado:</b> {Number(r.unidades_usadas).toLocaleString("es-PE", { maximumFractionDigits: 2 })} {r.unidad_base || "u"}
+                          </Typography>
+                        )}
                       </Box>
                     ) : (
                       <Typography sx={{ fontSize: "0.85rem", color: "#8B7D6B" }}>
@@ -536,7 +551,7 @@ const ProductosAplicados = () => {
                             <Chip
                               key={`${c.barcode}-${i}`}
                               icon={<QrCodeScanner sx={{ fontSize: "0.9rem !important" }} />}
-                              label={c.barcode}
+                              label={`${c.barcode}${textoUnidades(c)}`}
                               size="small"
                               title={c.producto || ""}
                               sx={{

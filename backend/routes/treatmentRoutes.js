@@ -678,6 +678,61 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
       }
     }
 
+    // 1.c) VALIDAR TODOS LOS CÓDIGOS ANTES DE GUARDAR NADA
+    //    Antes los códigos se revisaban después de insertar el tratamiento: si
+    //    uno fallaba, la sesión quedaba guardada a medias (sin código ni
+    //    descuento) y al reintentar se duplicaba. También se suma el uso de
+    //    un mismo código repetido en la sesión, para no pasarse de lo que tiene.
+    const usoPorCodigo = new Map(); // barcode_unit_id → { barcode, usadas, restantes, llevaUnidades }
+    for (const b of productosData) {
+      const varianteId = b.variante_id ? Number(b.variante_id) : null;
+      if (!varianteId) continue;
+
+      const codigos = Array.isArray(b.codigos) ? b.codigos : [];
+      if (codigos.length === 0) {
+        return res.status(400).json({
+          message: `Debes ingresar al menos un código del producto para validar el inventario.`,
+        });
+      }
+
+      for (const codigoItem of codigos) {
+        const codigoIngresado = (codigoItem?.codigo || "").trim();
+        if (!codigoIngresado) {
+          return res.status(400).json({ message: `Todos los códigos deben tener un valor.` });
+        }
+        const fila = await dbGet(
+          `SELECT bu.id, bu.unidades_totales, bu.unidades_restantes
+           FROM barcode_units bu
+           LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
+           WHERE sl.variante_id = ?
+             AND bu.barcode = ?
+             AND (bu.status = 'active' OR bu.unidades_restantes > 0)
+           LIMIT 1`,
+          [varianteId, codigoIngresado]
+        );
+        if (!fila) {
+          return res.status(400).json({
+            message: `Código incorrecto o agotado: ${codigoIngresado}. No coincide con ningún código disponible de este producto.`,
+          });
+        }
+        const previo = usoPorCodigo.get(fila.id) || {
+          barcode: codigoIngresado,
+          usadas: 0,
+          restantes: parseFloat(fila.unidades_restantes) || 0,
+          llevaUnidades: (parseFloat(fila.unidades_totales) || 0) > 0,
+        };
+        previo.usadas += parseNum(codigoItem.unidades_usadas) || 0;
+        usoPorCodigo.set(fila.id, previo);
+      }
+    }
+    for (const c of usoPorCodigo.values()) {
+      if (c.llevaUnidades && c.usadas > c.restantes) {
+        return res.status(400).json({
+          message: `El código ${c.barcode} solo tiene ${c.restantes} unidades restantes. En esta sesión se piden ${c.usadas}.`,
+        });
+      }
+    }
+
     // 2) REGISTRAR TRATAMIENTOS Y DESCONTAR STOCK (RECETAS + FEFO)
     for (const b of productosData) {
       const descuentoPct = parseFloat(b.descuento) || 0;
@@ -1075,34 +1130,30 @@ router.post("/realizado", requireTratamientoRealizadoWrite, upload.array("fotos"
 
           // El enlace se guarda SIEMPRE, aunque no se descuenten unidades:
           // hay productos (cajas, jeringas) donde solo se escanea el código.
+          // Si el mismo código se escribió dos veces en el bloque, se suman
+          // sus unidades en vez de perder la segunda línea.
           await dbRun(
-            `INSERT OR IGNORE INTO tratamiento_codigos
+            `INSERT INTO tratamiento_codigos
                (tratamiento_realizado_id, barcode_unit_id, barcode, variante_id, unidades_usadas, registrado_en)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(tratamiento_realizado_id, barcode_unit_id)
+             DO UPDATE SET unidades_usadas = unidades_usadas + excluded.unidades_usadas`,
             [tratamientoRealizadoId, c.barcodeUnitId, codigoIngresado, varianteIdElegida, unidadesUsadas, fechaLocal]
           );
 
           if (unidadesUsadas > 0) {
-            const unidadesRestantes = c.unidadesRestantes;
-            const nuevasRestantes = Math.max(0, unidadesRestantes - unidadesUsadas);
-
-            if (nuevasRestantes <= 0) {
-              // Agotado: marcar como escaneado/usado
-              await dbRun(
-                `UPDATE barcode_units
-                 SET status = 'scanned', scanned_at = datetime('now', '-5 hours'), treatment_id = ?, unidades_restantes = 0
-                 WHERE id = ?`,
-                [tratamientoRealizadoId, c.barcodeUnitId]
-              );
-            } else {
-              // Aún tiene unidades: mantener activo con las restantes actualizadas
-              await dbRun(
-                `UPDATE barcode_units
-                 SET unidades_restantes = ?, treatment_id = ?
-                 WHERE id = ?`,
-                [nuevasRestantes, tratamientoRealizadoId, c.barcodeUnitId]
-              );
-            }
+            // Se resta sobre el valor actual de la base (no sobre el que se leyó
+            // al validar): así un código repetido en la sesión descuenta las
+            // dos veces y no se pisa. Al llegar a 0 queda como usado.
+            await dbRun(
+              `UPDATE barcode_units
+               SET status = CASE WHEN COALESCE(unidades_restantes, 0) - ? <= 0 THEN 'scanned' ELSE status END,
+                   scanned_at = CASE WHEN COALESCE(unidades_restantes, 0) - ? <= 0 THEN datetime('now', '-5 hours') ELSE scanned_at END,
+                   unidades_restantes = MAX(0, COALESCE(unidades_restantes, 0) - ?),
+                   treatment_id = ?
+               WHERE id = ?`,
+              [unidadesUsadas, unidadesUsadas, unidadesUsadas, tratamientoRealizadoId, c.barcodeUnitId]
+            );
           }
         }
       } else if (!usoReceta && !varianteIdElegida) {
@@ -2079,7 +2130,12 @@ router.get("/productos-aplicados", authMiddleware, requireRole(["master"]), asyn
       params
     );
 
-    // Obtener los códigos de barras usados en estos tratamientos
+    // Códigos usados en estos tratamientos.
+    // Se leen de tratamiento_codigos (un registro por cada uso), NO de
+    // barcode_units.treatment_id: esa columna guarda solo el ÚLTIMO
+    // tratamiento de cada frasco, así que con el botox (100 U repartidas
+    // entre varias pacientes) las aplicaciones anteriores salían "Sin código".
+    await ensureTratamientoCodigosSchema();
     const treatmentIds = tratamientos.map((t) => t.id).filter((id) => id != null);
     const codigosPorTratamiento = {};
     if (treatmentIds.length > 0) {
@@ -2087,16 +2143,19 @@ router.get("/productos-aplicados", authMiddleware, requireRole(["master"]), asyn
       const codigosRows = await dbAll(
         `
         SELECT
-          bu.treatment_id,
-          bu.barcode,
+          tc.tratamiento_realizado_id AS treatment_id,
+          tc.barcode,
+          tc.unidades_usadas,
+          v.unidad_base,
           pb.nombre AS producto_base_nombre,
           v.nombre AS variante_nombre
-        FROM barcode_units bu
+        FROM tratamiento_codigos tc
+        LEFT JOIN barcode_units bu ON bu.id = tc.barcode_unit_id
         LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
-        LEFT JOIN variantes v ON v.id = sl.variante_id
+        LEFT JOIN variantes v ON v.id = COALESCE(tc.variante_id, sl.variante_id)
         LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
-        WHERE bu.treatment_id IN (${placeholders})
-        ORDER BY bu.scanned_at ASC, bu.id ASC
+        WHERE tc.tratamiento_realizado_id IN (${placeholders})
+        ORDER BY tc.id ASC
         `,
         treatmentIds
       );
@@ -2106,6 +2165,8 @@ router.get("/productos-aplicados", authMiddleware, requireRole(["master"]), asyn
         }
         codigosPorTratamiento[row.treatment_id].push({
           barcode: row.barcode,
+          unidades_usadas: Number(row.unidades_usadas) || 0,
+          unidad_base: row.unidad_base || "",
           producto: `${row.producto_base_nombre || ""} ${row.variante_nombre || ""}`.trim(),
         });
       }
@@ -2159,6 +2220,10 @@ router.get("/buscar-por-codigo", authMiddleware, requireRole(["master"]), async 
       return res.status(400).json({ message: "Debes indicar un código a buscar" });
     }
 
+    // Una fila por cada aplicación del código (tratamiento_codigos): un frasco
+    // de botox puede haberse usado en varias pacientes y deben salir todas.
+    // Los códigos que aún no se usan salen una vez, como "Disponible".
+    await ensureTratamientoCodigosSchema();
     const like = `%${codigo}%`;
     const filas = await dbAll(
       `
@@ -2168,8 +2233,9 @@ router.get("/buscar-por-codigo", authMiddleware, requireRole(["master"]), async 
         bu.status,
         bu.unidades_totales,
         bu.unidades_restantes,
-        bu.scanned_at,
-        bu.treatment_id,
+        COALESCE(tc.registrado_en, bu.scanned_at) AS scanned_at,
+        tc.tratamiento_realizado_id AS treatment_id,
+        tc.unidades_usadas,
         v.nombre AS variante_nombre,
         v.unidad_base,
         pb.nombre AS producto_base_nombre,
@@ -2187,12 +2253,13 @@ router.get("/buscar-por-codigo", authMiddleware, requireRole(["master"]), async 
       LEFT JOIN stock_lotes sl ON sl.id = bu.lote_id
       LEFT JOIN variantes v ON v.id = sl.variante_id
       LEFT JOIN productos_base pb ON pb.id = v.producto_base_id
-      LEFT JOIN tratamientos_realizados tr ON tr.id = bu.treatment_id
+      LEFT JOIN tratamiento_codigos tc ON tc.barcode_unit_id = bu.id
+      LEFT JOIN tratamientos_realizados tr ON tr.id = tc.tratamiento_realizado_id
       LEFT JOIN tratamientos t ON t.id = tr.tratamiento_id
       LEFT JOIN patients p ON p.id = tr.paciente_id
       WHERE bu.barcode = ? OR bu.barcode LIKE ?
-      ORDER BY (bu.barcode = ?) DESC, bu.scanned_at DESC, bu.id DESC
-      LIMIT 50
+      ORDER BY (bu.barcode = ?) DESC, bu.id DESC, tr.fecha DESC
+      LIMIT 100
       `,
       [codigo, like, codigo]
     );
