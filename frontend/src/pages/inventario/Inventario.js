@@ -73,6 +73,15 @@ const colorCream = "#fffdf7";
 
 // Paleta de gráficos: degradado de la gama dorada/marrón de ShowClinic.
 // Ordenada de más intenso a más suave para que el gráfico se lea como una escala.
+// "2026-02-12 22:40:16" → "12 feb 2026". Se cambia el espacio por "T"
+// porque Safari no entiende la fecha con espacio y mostraba "Invalid Date".
+const fechaCorta = (f) => {
+  if (!f) return "—";
+  const d = new Date(String(f).trim().replace(" ", "T"));
+  if (isNaN(d)) return String(f).slice(0, 10);
+  return d.toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" });
+};
+
 const chartPalette = [
   "#8A5A1A", // dorado profundo
   "#A36920", // dorado marca
@@ -593,12 +602,17 @@ export default function Inventario() {
           jeringas: parseFloat(l.jeringas) || 0,
           lotes_count: 1,
           vencimiento_proximo: l.fecha_vencimiento || null,
+          // El producto no guarda su fecha: se toma la de su primer lote
+          fecha_registro: l.creado_en || null,
+          ultimo_ingreso: l.creado_en || null,
         });
       } else {
         prev.stock += disponible;
         prev.cajas += (parseFloat(l.cajas) || 0);
         prev.jeringas += (parseFloat(l.jeringas) || 0);
         prev.lotes_count += 1;
+        if (l.creado_en && (!prev.fecha_registro || l.creado_en < prev.fecha_registro)) prev.fecha_registro = l.creado_en;
+        if (l.creado_en && (!prev.ultimo_ingreso || l.creado_en > prev.ultimo_ingreso)) prev.ultimo_ingreso = l.creado_en;
         if (l.fecha_vencimiento && (!prev.vencimiento_proximo || l.fecha_vencimiento < prev.vencimiento_proximo)) {
           prev.vencimiento_proximo = l.fecha_vencimiento;
         }
@@ -610,6 +624,7 @@ export default function Inventario() {
         map.set(key, {
           variante_id: v.id, marca: v.producto_base_nombre || "", variante: v.nombre || "",
           unidad_base: v.unidad_base || "", stock: 0, cajas: 0, jeringas: 0, lotes_count: 0, vencimiento_proximo: null,
+          fecha_registro: null, ultimo_ingreso: null,
         });
       }
     });
@@ -2261,7 +2276,7 @@ export default function Inventario() {
                 const rowBg = agotado ? "#FDF3F2" : idx % 2 === 0 ? "#fff" : "#FDFBF7";
                 return (
                   <Box key={p.variante_id} sx={{
-                    display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr 1.2fr 0.8fr",
+                    display: "grid", gridTemplateColumns: "2fr 0.9fr 1fr 0.8fr 0.8fr 1fr 1fr 0.8fr",
                     px: 2, py: 1.6, alignItems: "center", borderBottom: `1px solid ${T.border}`, background: rowBg, borderRadius: "10px",
                     transition: "background .18s ease, transform .18s ease",
                     "&:hover": { background: T.goldSoft, transform: "translateX(3px)" },
@@ -2314,6 +2329,14 @@ export default function Inventario() {
                       )}
                     </Box>
                     <Typography variant="body2" sx={{ color: "#666" }}>{formatVencimiento(p.vencimiento_proximo)}</Typography>
+                    <Box title={p.fecha_registro ? `Registrado el ${fechaCorta(p.fecha_registro)}` : "Sin lotes registrados"}>
+                      <Typography sx={{ fontFamily: T.font, fontSize: 12.5, color: T.text1 }}>{fechaCorta(p.fecha_registro)}</Typography>
+                      {p.lotes_count > 1 && p.ultimo_ingreso && p.ultimo_ingreso !== p.fecha_registro && (
+                        <Typography sx={{ fontFamily: T.font, fontSize: 10, color: T.text3 }}>
+                          último ingreso {fechaCorta(p.ultimo_ingreso)}
+                        </Typography>
+                      )}
+                    </Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: p.estado.dot }} />
                       <Typography variant="caption" sx={{ color: p.estado.color, fontWeight: 600 }}>{p.estado.label}</Typography>
@@ -2407,6 +2430,11 @@ export default function Inventario() {
                         {p.variante || "Sin nombre"}
                       </Typography>
                       <Typography sx={{ fontFamily: T.font, fontSize: 11, color: T.text3 }} noWrap>{p.marca}</Typography>
+                      {p.fecha_registro && (
+                        <Typography sx={{ fontFamily: T.font, fontSize: 10.5, color: T.text3 }} noWrap>
+                          Registrado: {fechaCorta(p.fecha_registro)}
+                        </Typography>
+                      )}
 
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.7, mt: 0.4, flexWrap: "wrap" }}>
                         <Chip label={p.categoria} size="small"
@@ -2441,8 +2469,8 @@ export default function Inventario() {
               );
 
               const TableHeader = () => (
-                <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 0.8fr 1fr 1.2fr 0.8fr", px: 2, py: 1.2, borderBottom: `1px solid ${T.border}`, mb: 1 }}>
-                  {["PRODUCTO", "CATEGORÍA", "STOCK", "CÓDIGOS ACTIVOS", "VENCE", "ESTADO", "ACCIONES"].map((h) => (
+                <Box sx={{ display: "grid", gridTemplateColumns: "2fr 0.9fr 1fr 0.8fr 0.8fr 1fr 1fr 0.8fr", px: 2, py: 1.2, borderBottom: `1px solid ${T.border}`, mb: 1 }}>
+                  {["PRODUCTO", "CATEGORÍA", "STOCK", "CÓDIGOS ACTIVOS", "VENCE", "REGISTRO", "ESTADO", "ACCIONES"].map((h) => (
                     <Typography key={h} sx={{ fontFamily: T.font, fontSize: 10.5, fontWeight: 700, color: T.text3, letterSpacing: 0.8 }}>{h}</Typography>
                   ))}
                 </Box>
@@ -2549,7 +2577,12 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
               <Chip label={categoria} size="small" sx={{ background: getCategoriaColor(categoria).bg, color: getCategoriaColor(categoria).text, fontWeight: 700, fontSize: 11 }} />
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d", mb: 0.5 }}>{productoDetalle.variante}</Typography>
-            <Typography variant="body2" sx={{ color: "#888", mb: 2 }}>{productoDetalle.marca} · {productoDetalle.unidad_base || "Unidad"}</Typography>
+            <Typography variant="body2" sx={{ color: "#888", mb: 2 }}>
+              {productoDetalle.marca} · {productoDetalle.unidad_base || "Unidad"}
+              {productoDetalle.fecha_registro ? ` · Registrado el ${fechaCorta(productoDetalle.fecha_registro)}` : ""}
+              {productoDetalle.lotes_count > 1 && productoDetalle.ultimo_ingreso && productoDetalle.ultimo_ingreso !== productoDetalle.fecha_registro
+                ? ` · Último ingreso ${fechaCorta(productoDetalle.ultimo_ingreso)}` : ""}
+            </Typography>
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
               <Button variant="contained" startIcon={<Add />} onClick={onNuevoLote} sx={{ background: colorPrincipal, borderRadius: 2, "&:hover": { background: "#8a5a1a" } }}>
                 Nuevo lote
@@ -2610,7 +2643,7 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
                           }} icon={<Box sx={{ width: 6, height: 6, borderRadius: "50%", background: estado.color, ml: 1 }} />} />
                         </Box>
                         <Typography variant="caption" sx={{ color: "#888" }}>
-                          Ingreso: {lote.creado_en ? new Date(lote.creado_en).toLocaleDateString() : "N/A"} · Vence: {formatVencimiento(lote.fecha_vencimiento)}
+                          Ingreso: {lote.creado_en ? fechaCorta(lote.creado_en) : "N/A"} · Vence: {formatVencimiento(lote.fecha_vencimiento)}
                           {lote.cajas > 0 && ` · ${lote.cajas} cajas`}
                           {lote.jeringas > 0 && ` · ${lote.jeringas} jeringas`}
                         </Typography>
