@@ -382,7 +382,9 @@ router.get("/stock-por-variante", requireBarcodeAccess, async (req, res) => {
           CASE WHEN bu.status = 'active' OR COALESCE(bu.unidades_restantes, 0) > 0
                THEN COALESCE(bu.unidades_restantes, 0) ELSE 0 END
         ), 0) AS unidades_disponibles,
-        COALESCE(SUM(COALESCE(bu.unidades_totales, 0)), 0) AS unidades_registradas
+        COALESCE(SUM(COALESCE(bu.unidades_totales, 0)), 0) AS unidades_registradas,
+        MIN(bu.created_at) AS primer_codigo,
+        MAX(bu.created_at) AS ultimo_codigo
       FROM barcode_units bu
       JOIN stock_lotes sl ON sl.id = bu.lote_id
       GROUP BY sl.variante_id
@@ -397,6 +399,9 @@ router.get("/stock-por-variante", requireBarcodeAccess, async (req, res) => {
         codigos_usados: Number(f.codigos_usados) || 0,
         unidades_disponibles: Number(f.unidades_disponibles) || 0,
         unidades_registradas: Number(f.unidades_registradas) || 0,
+        // Cuándo se registró el primer y el último código del producto
+        primer_codigo: f.primer_codigo || null,
+        ultimo_codigo: f.ultimo_codigo || null,
         tiene_codigos: true,
       };
     }
@@ -426,6 +431,8 @@ router.get("/variant/:varianteId/codes", requireBarcodeAccess, async (req, res) 
         bu.unit_index,
         bu.unidades_totales,
         bu.unidades_restantes,
+        bu.created_at,
+        bu.scanned_at,
         sl.lote,
         sl.fecha_vencimiento,
         sl.cantidad_unidades

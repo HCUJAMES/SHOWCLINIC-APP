@@ -660,6 +660,11 @@ export default function Inventario() {
         codigos_activos: tieneCodigos ? cod.codigos_activos : 0,
         codigos_usados: tieneCodigos ? cod.codigos_usados : 0,
         codigos_totales: tieneCodigos ? cod.codigos_totales : 0,
+        // Fecha de ingreso: manda la de los CÓDIGOS (cuándo se registraron);
+        // si el producto aún no tiene códigos, se usa la de sus lotes.
+        fecha_registro: (tieneCodigos && cod.primer_codigo) || p.fecha_registro,
+        ultimo_ingreso: (tieneCodigos && cod.ultimo_codigo) || p.ultimo_ingreso,
+        fecha_desde_codigos: !!(tieneCodigos && cod.primer_codigo),
         contenido_por_presentacion: contenidoPorVariante.get(String(p.variante_id)) || 1,
         imagen: imagenPorVariante.get(String(p.variante_id)) || null,
         oculto: ocultoPorVariante.get(String(p.variante_id)) || false,
@@ -1520,9 +1525,15 @@ export default function Inventario() {
                           border: code.status === "active" ? "1px solid rgba(46,125,50,0.2)" : "1px solid rgba(211,47,47,0.2)",
                         }}
                       >
-                        <Typography sx={{ fontFamily: "monospace", fontSize: "0.9rem", fontWeight: 600, flex: 1 }}>
-                          {code.barcode}
-                        </Typography>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontFamily: "monospace", fontSize: "0.9rem", fontWeight: 600 }}>
+                            {code.barcode}
+                          </Typography>
+                          <Typography sx={{ fontSize: "0.72rem", color: "#8D7B70" }}>
+                            Ingresado: {fechaCorta(code.created_at)}
+                            {code.status !== "active" && code.scanned_at ? ` · Usado: ${fechaCorta(code.scanned_at)}` : ""}
+                          </Typography>
+                        </Box>
                         <Chip
                           label={code.status === "active" ? "Activo" : "Usado"}
                           size="small"
@@ -2329,9 +2340,11 @@ export default function Inventario() {
                       )}
                     </Box>
                     <Typography variant="body2" sx={{ color: "#666" }}>{formatVencimiento(p.vencimiento_proximo)}</Typography>
-                    <Box title={p.fecha_registro ? `Registrado el ${fechaCorta(p.fecha_registro)}` : "Sin lotes registrados"}>
+                    <Box title={p.fecha_registro
+                      ? `Ingresado el ${fechaCorta(p.fecha_registro)} (según ${p.fecha_desde_codigos ? "sus códigos" : "sus lotes"})`
+                      : "Sin códigos ni lotes registrados"}>
                       <Typography sx={{ fontFamily: T.font, fontSize: 12.5, color: T.text1 }}>{fechaCorta(p.fecha_registro)}</Typography>
-                      {p.lotes_count > 1 && p.ultimo_ingreso && p.ultimo_ingreso !== p.fecha_registro && (
+                      {p.ultimo_ingreso && String(p.ultimo_ingreso).slice(0, 10) !== String(p.fecha_registro || "").slice(0, 10) && (
                         <Typography sx={{ fontFamily: T.font, fontSize: 10, color: T.text3 }}>
                           último ingreso {fechaCorta(p.ultimo_ingreso)}
                         </Typography>
@@ -2580,7 +2593,7 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
             <Typography variant="body2" sx={{ color: "#888", mb: 2 }}>
               {productoDetalle.marca} · {productoDetalle.unidad_base || "Unidad"}
               {productoDetalle.fecha_registro ? ` · Registrado el ${fechaCorta(productoDetalle.fecha_registro)}` : ""}
-              {productoDetalle.lotes_count > 1 && productoDetalle.ultimo_ingreso && productoDetalle.ultimo_ingreso !== productoDetalle.fecha_registro
+              {productoDetalle.ultimo_ingreso && String(productoDetalle.ultimo_ingreso).slice(0, 10) !== String(productoDetalle.fecha_registro || "").slice(0, 10)
                 ? ` · Último ingreso ${fechaCorta(productoDetalle.ultimo_ingreso)}` : ""}
             </Typography>
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
