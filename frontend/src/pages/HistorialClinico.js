@@ -36,7 +36,7 @@ import {
   Tooltip,
   Menu,
 } from "@mui/material";
-import { PhotoCamera, Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star, HandshakeRounded } from "@mui/icons-material";
+import { PhotoCamera, Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star, HandshakeRounded, Badge, Cake, WarningAmberRounded, LocationOnOutlined, PhoneIphone, AutoAwesome } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
@@ -65,30 +65,42 @@ import GaleriaTratamiento from "../components/GaleriaTratamiento";
    mismo ritmo de filas, que es lo que hace que la ficha se vea pareja. */
 const FICHA_ORO = "rgba(172,128,45,0.8)";        // marco exterior
 const FICHA_ORO_TENUE = "rgba(196,159,88,0.5)";  // filete interior
-const FICHA_HAIRLINE = "#EFE2CB";
-const FICHA_TEXTO = "#4A342B";
-const FICHA_VACIO = "#bdb1a0";
+const FICHA_HAIRLINE = "#E6D3B0";
+const FICHA_TEXTO = "#3B2A22";
+const FICHA_VACIO = "#A08F78";
+const FICHA_ETIQUETA = "#7A5E3E";                  // etiquetas legibles, no grises
+const FICHA_FONDO_TARJETA = "#FFFAF2";             // crema: el blanco puro cansaba la vista
 
-const TarjetaFicha = ({ icono: Icono, titulo, extra, accion, onClick, children, sx, separador = true }) => (
+const TarjetaFicha = ({ icono: Icono, titulo, subtitulo, extra, accion, onClick, children, sx, separador = true, columnas = 1 }) => (
   <Paper
     elevation={0}
     sx={{
       position: "relative",
       display: "flex",
       flexDirection: "column",
-      p: { xs: 2.5, sm: 3.25 },
-      borderRadius: "18px",
-      backgroundColor: "#fff",
-      border: `1px solid ${FICHA_ORO}`,
-      boxShadow: "0 1px 2px rgba(93,64,55,0.04), 0 12px 30px -24px rgba(120,88,40,0.6)",
-      // Marco doble: el filete interior es lo que le da el aire de lámina
-      // enmarcada en vez de un simple recuadro.
+      p: { xs: 2.5, sm: 3 },
+      borderRadius: "20px",
+      backgroundColor: FICHA_FONDO_TARJETA,
+      border: `1px solid ${FICHA_HAIRLINE}`,
+      boxShadow: "0 1px 2px rgba(93,64,55,0.04), 0 18px 36px -28px rgba(120,88,40,0.45)",
+      overflow: "hidden",
+      transition: "box-shadow 0.25s ease, border-color 0.25s ease",
+      "&:hover": {
+        borderColor: FICHA_ORO_TENUE,
+        boxShadow: "0 1px 2px rgba(93,64,55,0.05), 0 22px 44px -28px rgba(120,88,40,0.55)",
+      },
+      // Filete dorado en el borde superior: une las tarjetas a la banda de
+      // identidad sin volver a enmarcarlas dos veces.
       "&::before": {
         content: '""',
         position: "absolute",
-        inset: 6,
-        borderRadius: "13px",
-        border: `1px solid ${FICHA_ORO_TENUE}`,
+        top: 0,
+        left: 24,
+        right: 24,
+        height: 2,
+        borderRadius: "0 0 2px 2px",
+        background: "linear-gradient(90deg, rgba(200,169,110,0) 0%, #C8A96E 50%, rgba(200,169,110,0) 100%)",
+        opacity: 0.7,
         pointerEvents: "none",
       },
       ...sx,
@@ -99,88 +111,138 @@ const TarjetaFicha = ({ icono: Icono, titulo, extra, accion, onClick, children, 
       sx={{
         display: "flex",
         alignItems: "center",
-        gap: 1.5,
-        pb: separador ? 1.75 : 0,
-        mb: separador ? 2 : 0,
-        borderBottom: separador ? `1px solid ${FICHA_ORO_TENUE}` : "none",
+        gap: 1.75,
+        pb: separador ? 2 : 0,
+        mb: separador ? 2.5 : 0,
+        borderBottom: separador ? `1px solid ${FICHA_HAIRLINE}` : "none",
         cursor: onClick ? "pointer" : "default",
       }}
     >
       <Box
         sx={{
-          width: 38,
-          height: 38,
+          width: 42,
+          height: 42,
           flexShrink: 0,
-          borderRadius: "12px",
+          borderRadius: "50%",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "linear-gradient(150deg, #fdf6e6 0%, #f2e2bf 100%)",
-          border: "1px solid rgba(184,143,62,0.5)",
+          background: "linear-gradient(145deg, #6B4A3E 0%, #4A342B 100%)",
+          boxShadow: "0 0 0 3px #F6EBD6, 0 6px 14px -6px rgba(74,52,43,0.6)",
         }}
       >
-        <Icono sx={{ fontSize: 21, color: "#5D4037" }} />
+        <Icono sx={{ fontSize: 20, color: "#E6C98A" }} />
       </Box>
-      <Typography
-        sx={{
-          flex: 1,
-          fontWeight: 700,
-          color: "#8a5a1c",
-          fontSize: "0.82rem",
-          textTransform: "uppercase",
-          letterSpacing: "2.4px",
-        }}
-      >
-        {titulo}
-      </Typography>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant="h6"
+          component="h3"
+          sx={{
+            fontWeight: 800,
+            color: FICHA_TEXTO,
+            fontSize: "1.12rem",
+            lineHeight: 1.2,
+            letterSpacing: "0.2px",
+          }}
+        >
+          {titulo}
+        </Typography>
+        {subtitulo && (
+          <Typography sx={{ color: FICHA_ETIQUETA, fontSize: "0.82rem", fontWeight: 500, mt: 0.25 }}>
+            {subtitulo}
+          </Typography>
+        )}
+      </Box>
       {extra}
       {accion}
     </Box>
-    <Box sx={{ flex: 1 }}>{children}</Box>
+    <Box
+      sx={{
+        flex: 1,
+        ...(columnas > 1 && {
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: `repeat(${columnas}, minmax(0, 1fr))` },
+          columnGap: 3,
+          rowGap: 2.25,
+          alignContent: "start",
+        }),
+      }}
+    >
+      {children}
+    </Box>
   </Paper>
 );
 
-const CampoFicha = ({ etiqueta, valor, children }) => (
-  <Box
-    sx={{
-      display: "flex",
-      alignItems: "baseline",
-      gap: 2,
-      py: 1.25,
-      borderTop: `1px solid ${FICHA_HAIRLINE}`,
-      "&:first-of-type": { borderTop: "none", pt: 0 },
-      "&:last-of-type": { pb: 0 },
-    }}
-  >
+// Etiqueta arriba y valor abajo: se lee de un vistazo y deja que la rejilla
+// de la tarjeta alinee los campos en columnas parejas.
+const CampoFicha = ({ etiqueta, valor, children, ancho }) => (
+  <Box sx={{ minWidth: 0, ...(ancho && { gridColumn: "1 / -1" }) }}>
     <Typography
       sx={{
-        width: 144,
-        flexShrink: 0,
-        color: "#9d8b70",
-        fontSize: "0.72rem",
-        fontWeight: 600,
+        color: FICHA_ETIQUETA,
+        fontSize: "0.76rem",
+        fontWeight: 700,
         textTransform: "uppercase",
-        letterSpacing: "1.5px",
+        letterSpacing: "1px",
+        mb: 0.5,
       }}
     >
       {etiqueta}
     </Typography>
-    <Box sx={{ flex: 1, minWidth: 0 }}>
-      {children || (
-        <Typography
-          sx={{
-            fontWeight: 500,
-            fontSize: "1.02rem",
-            color: valor ? FICHA_TEXTO : FICHA_VACIO,
-            wordBreak: "break-word",
-          }}
-        >
-          {valor || "—"}
-        </Typography>
-      )}
-    </Box>
+    {children || (
+      <Typography
+        sx={{
+          fontWeight: 600,
+          fontSize: "1.06rem",
+          color: valor ? FICHA_TEXTO : FICHA_VACIO,
+          wordBreak: "break-word",
+          lineHeight: 1.4,
+        }}
+      >
+        {valor || "—"}
+      </Typography>
+    )}
   </Box>
 );
+
+// Las fichas antiguas escriben la ausencia de mil formas.
+const NEGATIVOS_ANTECEDENTE = ["", "-", "--", "no", "no.", "ninguna", "ninguno", "nada", "n/a", "na", "n/e", "sin", "0"];
+const tieneAntecedente = (valor) => !NEGATIVOS_ANTECEDENTE.includes((valor || "").trim().toLowerCase());
+
+// Pastilla de dato rápido en la banda de identidad.
+const DatoRapido = ({ icono: Icono, children, tono = "neutro" }) => {
+  const tonos = {
+    neutro: { bg: "rgba(250,239,220,0.92)", borde: "rgba(172,128,45,0.55)", color: "#3B2A22", icono: "#8a5a1c" },
+    alerta: { bg: "rgba(253,236,232,0.92)", borde: "rgba(198,90,60,0.4)", color: "#9a3412", icono: "#c2410c" },
+  };
+  const t = tonos[tono];
+  return (
+    <Box
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 0.75,
+        px: 1.5,
+        py: 0.6,
+        borderRadius: "999px",
+        backgroundColor: t.bg,
+        border: `1px solid ${t.borde}`,
+        backdropFilter: "blur(6px)",
+        color: t.color,
+        fontSize: "0.9rem",
+        fontWeight: 700,
+        lineHeight: 1.3,
+        whiteSpace: "nowrap",
+        maxWidth: "100%",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+    >
+      {Icono && <Icono sx={{ fontSize: 16, color: t.icono, flexShrink: 0 }} />}
+      {children}
+    </Box>
+  );
+};
 
 // Paleta para colorear los puntos de cada tratamiento en el mapa facial del presupuesto
 /**
@@ -4240,16 +4302,6 @@ const HistorialClinico = () => {
                 </Box>
 
                 <Box sx={{ textAlign: { xs: "left", sm: "right" } }}>
-                  <Typography
-                    variant="body2"
-                    sx={{ color: "rgba(0,0,0,0.62)", lineHeight: 1.4 }}
-                  >
-                    {pacienteSeleccionado.nombre} {pacienteSeleccionado.apellido}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.52)" }}>
-                    Documento: {pacienteSeleccionado.tipoDocumento || 'DNI'}: {pacienteSeleccionado.dni}
-                  </Typography>
-
                   {Number(resumenDeuda?.total_pendiente || 0) > 0 ? (
                     <Typography
                       variant="caption"
@@ -4277,10 +4329,10 @@ const HistorialClinico = () => {
                   mb: 4,
                   p: 0,
                   overflow: "hidden",
-                  borderRadius: "24px",
-                  backgroundColor: "#FFF8F0",
-                  border: `1px solid ${FICHA_ORO}`,
-                  boxShadow: "0 2px 12px rgba(120, 88, 40, 0.10)"
+                  borderRadius: "28px",
+                  backgroundColor: "#F4EADB",
+                  border: `1px solid ${FICHA_ORO_TENUE}`,
+                  boxShadow: "0 2px 6px rgba(93,64,55,0.04), 0 30px 60px -40px rgba(120,88,40,0.45)"
                 }}
               >
                 {/* Banda de identidad: la imagen de marca detrás del nombre es
@@ -4289,10 +4341,11 @@ const HistorialClinico = () => {
                   sx={{
                     position: "relative",
                     display: "flex",
-                    alignItems: "center",
-                    gap: 3,
-                    px: 3.5,
-                    py: 3,
+                    flexDirection: { xs: "column", sm: "row" },
+                    alignItems: { xs: "flex-start", sm: "center" },
+                    gap: { xs: 2, sm: 3.5 },
+                    px: { xs: 2.5, sm: 4 },
+                    py: { xs: 3, sm: 3.75 },
                     borderBottom: `1px solid ${FICHA_ORO_TENUE}`,
                     background: "linear-gradient(100deg, #FFF8F0 0%, #FBEFDE 42%, #F3E2C6 100%)",
                     overflow: "hidden",
@@ -4327,20 +4380,20 @@ const HistorialClinico = () => {
                   <Box sx={{ position: "relative", flexShrink: 0, zIndex: 1 }}>
                     <Box
                       sx={{
-                        width: 96,
-                        height: 96,
+                        width: 112,
+                        height: 112,
                         borderRadius: "50%",
                         overflow: "hidden",
-                        backgroundColor: "#5D4037",
+                        background: "linear-gradient(145deg, #6B4A3E 0%, #4A342B 100%)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         fontFamily: "'Cormorant Garamond', serif",
-                        fontSize: "2.6rem",
+                        fontSize: "3rem",
                         fontWeight: 700,
-                        color: "#C8A96E",
-                        border: "3px solid #fff",
-                        boxShadow: `0 0 0 2px ${FICHA_ORO}, 0 10px 24px -10px rgba(93,64,55,0.5)`,
+                        color: "#E6C98A",
+                        border: "4px solid #fff",
+                        boxShadow: `0 0 0 1.5px ${FICHA_ORO}, 0 0 0 6px rgba(230,201,138,0.25), 0 16px 32px -14px rgba(93,64,55,0.6)`,
                       }}
                     >
                       {pacienteSeleccionado.fotoPerfil && fotoPerfilRota !== pacienteSeleccionado.fotoPerfil ? (
@@ -4387,6 +4440,18 @@ const HistorialClinico = () => {
                     </Tooltip>
                   </Box>
                   <Box sx={{ flex: 1, position: "relative", zIndex: 1, minWidth: 0 }}>
+                    <Typography
+                      sx={{
+                        color: "#8a5a1c",
+                        fontSize: "0.7rem",
+                        fontWeight: 700,
+                        letterSpacing: "3px",
+                        textTransform: "uppercase",
+                        mb: 0.5,
+                      }}
+                    >
+                      Ficha del paciente
+                    </Typography>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
                       <Typography
                         // Con la variante por defecto, index.css fuerza Inter con
@@ -4398,7 +4463,7 @@ const HistorialClinico = () => {
                           fontSize: "2.3rem",
                           fontWeight: 700,
                           letterSpacing: "0.5px",
-                          color: "#4A342B",
+                          color: "#3B2A22",
                           lineHeight: 1.15,
                         }}
                       >
@@ -4462,34 +4527,27 @@ const HistorialClinico = () => {
                         </IconButton>
                       </Tooltip>
                     </Box>
-                    {/* Resumen en una sola línea, separado por puntos. Tres
-                        etiquetas de tres colores distintos rompían la calma. */}
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap", mt: 0.75 }}>
-                      {[
-                        `${calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"} años`,
-                        pacienteSeleccionado.sexo || "—",
-                        pacienteSeleccionado.ocupacion || "Ocupación no especificada",
-                      ].map((dato, i) => (
-                        <React.Fragment key={dato + i}>
-                          {i > 0 && (
-                            <Box
-                              aria-hidden
-                              sx={{ width: 4, height: 4, borderRadius: "50%", backgroundColor: "#d3c4a8" }}
-                            />
-                          )}
-                          <Typography
-                            sx={{
-                              color: "#7d6c58",
-                              fontSize: "0.88rem",
-                              fontWeight: 500,
-                              letterSpacing: "1.1px",
-                              textTransform: "uppercase",
-                            }}
-                          >
-                            {dato}
-                          </Typography>
-                        </React.Fragment>
-                      ))}
+                    {/* Datos rápidos: lo que se consulta en cada cita, sin
+                        tener que bajar a las tarjetas. */}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap", mt: 1.25 }}>
+                      <DatoRapido icono={Badge}>
+                        {pacienteSeleccionado.tipoDocumento || "DNI"} {pacienteSeleccionado.dni || "—"}
+                      </DatoRapido>
+                      <DatoRapido icono={Cake}>
+                        {calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad || "—"} años
+                        {pacienteSeleccionado.sexo ? ` · ${pacienteSeleccionado.sexo}` : ""}
+                      </DatoRapido>
+                      {!contactoRestringido && pacienteSeleccionado.celular && (
+                        <DatoRapido icono={PhoneIphone}>{pacienteSeleccionado.celular}</DatoRapido>
+                      )}
+                      {pacienteSeleccionado.ciudadResidencia && (
+                        <DatoRapido icono={LocationOnOutlined}>{pacienteSeleccionado.ciudadResidencia}</DatoRapido>
+                      )}
+                      {tieneAntecedente(pacienteSeleccionado.alergias) && (
+                        <DatoRapido icono={WarningAmberRounded} tono="alerta">
+                          Alergia: {pacienteSeleccionado.alergias.trim()}
+                        </DatoRapido>
+                      )}
                     </Box>
                   </Box>
                 </Box>
@@ -4501,46 +4559,141 @@ const HistorialClinico = () => {
                   sx={{
                     display: "grid",
                     gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
-                    gap: 2.5,
+                    gap: 3,
                     alignItems: "stretch",
                     // La banda de identidad ocupa el borde, así que el relleno
                     // que antes tenía la ficha entera lo pone ahora la rejilla.
-                    p: { xs: 2.5, sm: 3.5 },
+                    p: { xs: 2, sm: 3.5 },
                   }}
                 >
-                  <TarjetaFicha icono={Person} titulo="Datos personales">
-                    <CampoFicha etiqueta="DNI" valor={pacienteSeleccionado.dni} />
+                  {/* Tratamiento de interés: es el motivo de la visita, así que
+                      encabeza la ficha a todo el ancho y con el color de marca. */}
+                  {(() => {
+                    const tratamientos = (pacienteSeleccionado.tratamientoInteres || "")
+                      .split(/[,;\n]+/)
+                      .map((t) => t.trim())
+                      .filter(Boolean);
+                    const hay = tratamientos.length > 0;
+                    return (
+                      <Box
+                        sx={{
+                          gridColumn: "1 / -1",
+                          position: "relative",
+                          overflow: "hidden",
+                          display: "flex",
+                          flexDirection: { xs: "column", sm: "row" },
+                          alignItems: { xs: "flex-start", sm: "center" },
+                          gap: { xs: 2, sm: 3 },
+                          px: { xs: 2.5, sm: 3.5 },
+                          py: { xs: 2.5, sm: 3 },
+                          borderRadius: "20px",
+                          background: hay
+                            ? "linear-gradient(120deg, #3B2A22 0%, #5D4037 55%, #7A5440 100%)"
+                            : FICHA_FONDO_TARJETA,
+                          border: hay ? "1px solid #C8A96E" : `1px dashed ${FICHA_ORO_TENUE}`,
+                          boxShadow: hay
+                            ? "0 0 0 4px rgba(230,201,138,0.18), 0 24px 44px -26px rgba(59,42,34,0.75)"
+                            : "none",
+                          // Brillo dorado en la esquina: le da el aire de pieza destacada.
+                          ...(hay && {
+                            "&::after": {
+                              content: '""',
+                              position: "absolute",
+                              top: -80,
+                              right: -60,
+                              width: 260,
+                              height: 260,
+                              borderRadius: "50%",
+                              background: "radial-gradient(circle, rgba(230,201,138,0.35) 0%, rgba(230,201,138,0) 70%)",
+                              pointerEvents: "none",
+                            },
+                          }),
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 58,
+                            height: 58,
+                            flexShrink: 0,
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: hay
+                              ? "linear-gradient(145deg, #F3DDA6 0%, #C8A96E 55%, #A9843E 100%)"
+                              : "#efe2c8",
+                            boxShadow: hay ? "0 0 0 4px rgba(243,221,166,0.25), 0 8px 18px -6px rgba(0,0,0,0.45)" : "none",
+                            position: "relative",
+                            zIndex: 1,
+                          }}
+                        >
+                          <AutoAwesome sx={{ fontSize: 30, color: hay ? "#3B2A22" : FICHA_VACIO }} />
+                        </Box>
+                        <Box sx={{ flex: 1, minWidth: 0, position: "relative", zIndex: 1 }}>
+                          <Typography
+                            sx={{
+                              color: hay ? "#E6C98A" : FICHA_ETIQUETA,
+                              fontSize: "0.8rem",
+                              fontWeight: 800,
+                              letterSpacing: "2.5px",
+                              textTransform: "uppercase",
+                              mb: 1,
+                            }}
+                          >
+                            Tratamiento de interés
+                          </Typography>
+                          {hay ? (
+                            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.25 }}>
+                              {tratamientos.map((t) => (
+                                <Box
+                                  key={t}
+                                  sx={{
+                                    px: 2.25,
+                                    py: 0.9,
+                                    borderRadius: "999px",
+                                    background: "linear-gradient(135deg, #FFF6E2 0%, #F3DDA6 100%)",
+                                    border: "1px solid #E6C98A",
+                                    color: "#3B2A22",
+                                    fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                                    fontWeight: 800,
+                                    lineHeight: 1.25,
+                                    boxShadow: "0 6px 14px -8px rgba(0,0,0,0.5)",
+                                  }}
+                                >
+                                  {t}
+                                </Box>
+                              ))}
+                            </Box>
+                          ) : (
+                            <Typography sx={{ color: FICHA_VACIO, fontWeight: 600, fontSize: "1.06rem" }}>
+                              Aún no se registró un tratamiento de interés
+                            </Typography>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  })()}
+
+                  <TarjetaFicha icono={Person} titulo="Datos personales" subtitulo="Identificación y perfil" columnas={2}>
+                    <CampoFicha
+                      etiqueta={pacienteSeleccionado.tipoDocumento || "DNI"}
+                      valor={pacienteSeleccionado.dni}
+                    />
+                    <CampoFicha etiqueta="Fecha de nacimiento" valor={pacienteSeleccionado.fechaNacimiento} />
                     <CampoFicha
                       etiqueta="Edad"
-                      valor={calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad}
+                      valor={
+                        calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad
+                          ? `${calcularEdad(pacienteSeleccionado.fechaNacimiento) || pacienteSeleccionado.edad} años`
+                          : ""
+                      }
                     />
                     <CampoFicha etiqueta="Sexo" valor={pacienteSeleccionado.sexo} />
-                    <CampoFicha etiqueta="Fecha nac." valor={pacienteSeleccionado.fechaNacimiento} />
                     <CampoFicha etiqueta="Ocupación" valor={pacienteSeleccionado.ocupacion} />
                     <CampoFicha etiqueta="Embarazada" valor={pacienteSeleccionado.embarazada} />
-                    <CampoFicha etiqueta="Tratamiento de interés">
-                      {pacienteSeleccionado.tratamientoInteres ? (
-                        <Chip
-                          label={pacienteSeleccionado.tratamientoInteres}
-                          size="small"
-                          sx={{
-                            height: 26,
-                            fontSize: "0.82rem",
-                            fontWeight: 600,
-                            backgroundColor: "#f6ecd8",
-                            color: "#8a5a1c",
-                            border: "1px solid rgba(196,159,88,0.5)",
-                          }}
-                        />
-                      ) : (
-                        <Typography sx={{ fontWeight: 500, fontSize: "1.02rem", color: FICHA_VACIO }}>
-                          —
-                        </Typography>
-                      )}
-                    </CampoFicha>
                   </TarjetaFicha>
 
-                  <TarjetaFicha icono={Phone} titulo="Contacto">
+                  <TarjetaFicha icono={Phone} titulo="Contacto" subtitulo="Cómo y dónde ubicarla" columnas={2}>
                     <CampoFicha etiqueta="Celular">
                       {contactoRestringido ? (
                         <Box
@@ -4548,15 +4701,15 @@ const HistorialClinico = () => {
                           title="Tu rol no tiene acceso al teléfono de las pacientes"
                         >
                           <Lock sx={{ fontSize: 16, color: FICHA_VACIO }} />
-                          <Typography sx={{ fontWeight: 500, color: FICHA_VACIO, fontSize: "1.02rem" }}>
+                          <Typography sx={{ fontWeight: 600, color: FICHA_VACIO, fontSize: "1.06rem" }}>
                             Restringido
                           </Typography>
                         </Box>
                       ) : (
                         <Typography
                           sx={{
-                            fontWeight: 500,
-                            fontSize: "1.02rem",
+                            fontWeight: 600,
+                            fontSize: "1.06rem",
                             color: pacienteSeleccionado.celular ? FICHA_TEXTO : FICHA_VACIO,
                           }}
                         >
@@ -4564,59 +4717,75 @@ const HistorialClinico = () => {
                         </Typography>
                       )}
                     </CampoFicha>
-                    <CampoFicha etiqueta="Correo" valor={pacienteSeleccionado.correo} />
-                    <CampoFicha etiqueta="Dirección" valor={pacienteSeleccionado.direccion} />
                     <CampoFicha etiqueta="Ciudad" valor={pacienteSeleccionado.ciudadResidencia} />
+                    <CampoFicha etiqueta="Correo" valor={pacienteSeleccionado.correo} ancho />
+                    <CampoFicha etiqueta="Dirección" valor={pacienteSeleccionado.direccion} ancho />
                     <CampoFicha
-                      etiqueta="N° hijos"
+                      etiqueta="N° de hijos"
                       valor={
                         pacienteSeleccionado.numeroHijos !== null && pacienteSeleccionado.numeroHijos !== undefined
                           ? String(pacienteSeleccionado.numeroHijos)
                           : ""
                       }
                     />
-                    <CampoFicha etiqueta="Referencia" valor={pacienteSeleccionado.referencia} />
+                    <CampoFicha etiqueta="Cómo nos conoció" valor={pacienteSeleccionado.referencia} />
                   </TarjetaFicha>
 
-                  <TarjetaFicha icono={LocalHospital} titulo="Historial médico">
-                    {[
-                      { etiqueta: "Alergias", valor: pacienteSeleccionado.alergias },
-                      { etiqueta: "Enfermedades", valor: pacienteSeleccionado.enfermedad },
-                      { etiqueta: "Cirugía estética", valor: pacienteSeleccionado.cirugiaEstetica },
-                    ].map((dato) => {
-                      const texto = (dato.valor || "").trim();
-                      // Las fichas antiguas escriben la ausencia de mil formas.
-                      const NEGATIVOS = ["", "-", "--", "no", "no.", "ninguna", "ninguno", "nada", "n/a", "na", "n/e", "sin", "0"];
-                      const hayDato = !NEGATIVOS.includes(texto.toLowerCase());
-                      return (
-                        <CampoFicha key={dato.etiqueta} etiqueta={dato.etiqueta}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Box
-                              aria-hidden
-                              sx={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: "50%",
-                                flexShrink: 0,
-                                backgroundColor: hayDato ? "#c77b1f" : "#7fae82",
-                              }}
-                            />
+                  <TarjetaFicha icono={LocalHospital} titulo="Historial médico" subtitulo="Antecedentes declarados">
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+                      {[
+                        { etiqueta: "Alergias", valor: pacienteSeleccionado.alergias },
+                        { etiqueta: "Enfermedades", valor: pacienteSeleccionado.enfermedad },
+                        { etiqueta: "Cirugía estética", valor: pacienteSeleccionado.cirugiaEstetica },
+                      ].map((dato) => {
+                        const hayDato = tieneAntecedente(dato.valor);
+                        return (
+                          <Box
+                            key={dato.etiqueta}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 2,
+                              px: 2,
+                              py: 1.5,
+                              borderRadius: "14px",
+                              backgroundColor: hayDato ? "#fdf4ea" : "#f7faf6",
+                              border: `1px solid ${hayDato ? "rgba(199,123,31,0.28)" : "rgba(127,174,130,0.28)"}`,
+                              borderLeft: `4px solid ${hayDato ? "#c77b1f" : "#7fae82"}`,
+                            }}
+                          >
                             <Typography
                               sx={{
-                                fontWeight: hayDato ? 600 : 500,
-                                fontSize: "1.02rem",
-                                color: hayDato ? "#8a4b0f" : "#5c7a5e",
+                                width: 130,
+                                flexShrink: 0,
+                                color: FICHA_ETIQUETA,
+                                fontSize: "0.76rem",
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
                               }}
                             >
-                              {hayDato ? texto : "Sin antecedentes"}
+                              {dato.etiqueta}
+                            </Typography>
+                            <Typography
+                              sx={{
+                                flex: 1,
+                                minWidth: 0,
+                                fontWeight: hayDato ? 700 : 600,
+                                fontSize: "1.04rem",
+                                color: hayDato ? "#8a4b0f" : "#4f7353",
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              {hayDato ? dato.valor.trim() : "Sin antecedentes"}
                             </Typography>
                           </Box>
-                        </CampoFicha>
-                      );
-                    })}
+                        );
+                      })}
+                    </Box>
                   </TarjetaFicha>
 
-                  <TarjetaFicha icono={Favorite} titulo="Hábitos">
+                  <TarjetaFicha icono={Favorite} titulo="Hábitos" subtitulo="Consumo declarado">
                     <Box
                       sx={{
                         display: "grid",
@@ -4639,31 +4808,44 @@ const HistorialClinico = () => {
                             key={h.etiqueta}
                             sx={{
                               textAlign: "center",
-                              py: 2.25,
+                              py: 2.5,
                               px: 1,
-                              borderRadius: "14px",
-                              backgroundColor: consume ? "#fdf3ef" : "#fbf8f0",
-                              border: `1px solid ${consume ? "#eccfc2" : FICHA_ORO_TENUE}`,
-                              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.9)",
+                              borderRadius: "16px",
+                              background: consume
+                                ? "linear-gradient(180deg, #fff6ef 0%, #fbe6dc 100%)"
+                                : "linear-gradient(180deg, #f6faf3 0%, #e9f1e5 100%)",
+                              border: `1px solid ${consume ? "#eccfc2" : "#dde8da"}`,
                             }}
                           >
+                            <Box
+                              aria-hidden
+                              sx={{
+                                width: 10,
+                                height: 10,
+                                mx: "auto",
+                                mb: 1.25,
+                                borderRadius: "50%",
+                                backgroundColor: consume ? "#d0603a" : "#7fae82",
+                                boxShadow: `0 0 0 4px ${consume ? "rgba(208,96,58,0.15)" : "rgba(127,174,130,0.18)"}`,
+                              }}
+                            />
                             <Typography
                               sx={{
-                                color: "#9d8b70",
-                                fontSize: "0.72rem",
+                                color: FICHA_ETIQUETA,
+                                fontSize: "0.76rem",
                                 textTransform: "uppercase",
-                                mb: 1,
-                                letterSpacing: "1.5px",
-                                fontWeight: 600,
+                                mb: 0.5,
+                                letterSpacing: "1px",
+                                fontWeight: 700,
                               }}
                             >
                               {h.etiqueta}
                             </Typography>
                             <Typography
                               sx={{
-                                fontWeight: 600,
+                                fontWeight: 700,
                                 color: consume ? "#b3401f" : "#3f6b45",
-                                fontSize: "1.15rem",
+                                fontSize: "1.1rem",
                               }}
                             >
                               {h.valor || "N/E"}
@@ -4677,6 +4859,7 @@ const HistorialClinico = () => {
                   <TarjetaFicha
                     icono={DescriptionOutlined}
                     titulo="Otras observaciones"
+                    subtitulo="Notas del equipo sobre la paciente"
                     onClick={() => setShowObservaciones((prev) => !prev)}
                     separador={showObservaciones}
                     sx={{ gridColumn: { md: "1 / -1" } }}
