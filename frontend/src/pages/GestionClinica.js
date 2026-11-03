@@ -80,7 +80,7 @@ import {
   History,
   Settings,
   FileDownload
-} from "@mui/icons-material";
+} from "../iconos";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";

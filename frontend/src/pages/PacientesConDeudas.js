@@ -21,7 +21,7 @@ import {
   Grid,
   IconButton,
 } from "@mui/material";
-import { ArrowBack, Home, Delete } from "@mui/icons-material";
+import { ArrowBack, Home, Delete } from "../iconos";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 
@@ -380,7 +380,7 @@ export default function PacientesConDeudas() {
         fullWidth
       >
         <DialogTitle sx={{ backgroundColor: "#b3412e", color: "white", textAlign: "center" }}>
-          ⚠️ Eliminar Deuda
+          Eliminar Deuda
         </DialogTitle>
         <DialogContent sx={{ mt: 3, textAlign: "center" }}>
           <Typography variant="h6" sx={{ mb: 1, color: "#333", fontWeight: "bold" }}>

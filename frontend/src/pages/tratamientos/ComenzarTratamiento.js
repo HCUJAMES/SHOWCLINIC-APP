@@ -23,7 +23,7 @@ import {
   InputAdornment,
   Chip,
 } from "@mui/material";
-import { ArrowBack, Receipt, Home, QrCodeScanner, Close, Add as AddIcon } from "@mui/icons-material";
+import { ArrowBack, Receipt, Home, QrCodeScanner, Close, Add as AddIcon } from "../../iconos";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "../../components/ToastProvider";
@@ -1429,7 +1429,7 @@ const ComenzarTratamiento = () => {
                   }}
                 >
                   <Typography variant="body2" sx={{ color: "#a36920", fontWeight: 600 }}>
-                    💰 Los pagos se gestionan desde el historial del paciente (Presupuestos Asignados / Paquetes)
+                    Los pagos se gestionan desde el historial del paciente (Presupuestos Asignados / Paquetes)
                   </Typography>
                 </Box>
               </Grid>
@@ -1479,7 +1479,7 @@ const ComenzarTratamiento = () => {
           {paquetesPaciente.length > 0 && (
             <Box sx={{ mb: 3 }}>
               <Typography sx={{ fontWeight: 700, color: "#4f6b80", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-                📦 Paquetes Contratados (En Curso)
+                Paquetes Contratados (En Curso)
               </Typography>
               <List sx={{ pt: 0 }}>
                 {paquetesPaciente.map((paquete) => {
@@ -1502,7 +1502,7 @@ const ComenzarTratamiento = () => {
                         primary={
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                             <Typography sx={{ fontWeight: 700, color: "#4f6b80" }}>
-                              🎁 {paquete.paquete_nombre}
+                              {paquete.paquete_nombre}
                             </Typography>
                             <Box sx={{ 
                               backgroundColor: "#5f7f96", 
@@ -1551,7 +1551,7 @@ const ComenzarTratamiento = () => {
           {ofertasPaciente.length > 0 && (
             <Box>
               <Typography sx={{ fontWeight: 700, color: colorPrincipal, mb: 1.5 }}>
-                📋 Presupuestos Iniciales
+                Presupuestos Iniciales
               </Typography>
               <List sx={{ pt: 0 }}>
                 {ofertasPaciente.map((oferta) => (

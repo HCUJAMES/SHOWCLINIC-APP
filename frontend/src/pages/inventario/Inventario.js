@@ -47,7 +47,7 @@ import {
   ViewModuleRounded,
   ViewListRounded,
   DeleteOutlineRounded,
-} from "@mui/icons-material";
+} from "../../iconos";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import bwipjs from "bwip-js";
@@ -534,7 +534,7 @@ export default function Inventario() {
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "No se pudo guardar");
     } catch (err) {
       marcar(oculto ? 0 : 1);
-      alert(`❌ ${err.message}`);
+      alert(`${err.message}`);
     }
   };
 
@@ -894,11 +894,11 @@ export default function Inventario() {
         }
       } else {
         const error = await res.json();
-        alert(`❌ ${error.message}`);
+        alert(`${error.message}`);
       }
     } catch (err) {
       console.error("Error eliminando código:", err);
-      alert("❌ Error al eliminar código");
+      alert("Error al eliminar código");
     }
   };
 
@@ -921,7 +921,7 @@ export default function Inventario() {
         body: JSON.stringify(formEditarCantidad),
       });
       if (res.ok) {
-        alert("✅ Cantidad actualizada correctamente");
+        alert("Cantidad actualizada correctamente");
         setOpenEditarCantidadModal(false);
         // Recargar códigos
         if (productoDetalle?.variante_id) {
@@ -929,11 +929,11 @@ export default function Inventario() {
         }
       } else {
         const error = await res.json();
-        alert(`❌ ${error.message}`);
+        alert(`${error.message}`);
       }
     } catch (err) {
       console.error("Error actualizando cantidad:", err);
-      alert("❌ Error al actualizar cantidad");
+      alert("Error al actualizar cantidad");
     } finally {
       setEditandoCantidad(false);
     }
@@ -949,15 +949,15 @@ export default function Inventario() {
       );
       if (res.ok) {
         const data = await res.json();
-        alert(`✅ ${data.deleted} código(s) eliminado(s)`);
+        alert(`${data.deleted} código(s) eliminado(s)`);
         cargarCodigosProducto(productoDetalle.variante_id);
       } else {
         const error = await res.json();
-        alert(`❌ ${error.message}`);
+        alert(`${error.message}`);
       }
     } catch (err) {
       console.error("Error eliminando códigos:", err);
-      alert("❌ Error al eliminar códigos");
+      alert("Error al eliminar códigos");
     }
   };
 
@@ -986,18 +986,18 @@ export default function Inventario() {
 
       if (res.ok) {
         const data = await res.json();
-        alert(`✅ ${data.message}`);
+        alert(`${data.message}`);
         setOpenAjusteStockModal(false);
         setFormAjusteStock({ cantidad_a_reducir: "", motivo: "" });
         setLoteAjustando(null);
         cargarDatos(); // Recargar datos del inventario
       } else {
         const error = await res.json();
-        alert(`❌ ${error.message}`);
+        alert(`${error.message}`);
       }
     } catch (err) {
       console.error("Error ajustando stock:", err);
-      alert("❌ Error al ajustar stock");
+      alert("Error al ajustar stock");
     } finally {
       setAjustandoStock(false);
     }

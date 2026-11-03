@@ -18,13 +18,15 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
-import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check, Face, Inventory2, Person } from "@mui/icons-material";
+import { ArrowBack, Home, Settings, Add, Delete, PhotoCamera, Close, Edit, Check, Face, Inventory2, Person } from "../../iconos";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../../components/ToastProvider";
-import FacialMapMini from "../../components/FacialMapMini";
 import { useAuth } from "../../hooks/useAuth";
 import { canCreateTreatments, isDoctor as checkIsDoctor } from "../../utils/permissions";
 import { COLORS, API_BASE_URL } from "../../constants";
+
+// three.js se descarga solo cuando se muestra el mapa
+const FacialMapMini = React.lazy(() => import("../../components/FacialMapMini"));
 
 /** "Botox - Botox" queda feo; si marca y variante coinciden, se muestra una sola vez. */
 function nombreProducto(p) {
@@ -988,7 +990,7 @@ export default function CrearTratamiento() {
           {/* Sección de imágenes del tratamiento */}
           <Divider sx={{ my: 2 }} />
           <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1, color: colorPrincipal }}>
-            📸 Imágenes del tratamiento ({imagenesTratamiento.length}/6):
+            Imágenes del tratamiento ({imagenesTratamiento.length}/6):
           </Typography>
 
           {imagenesTratamiento.length > 0 ? (
@@ -1062,7 +1064,7 @@ export default function CrearTratamiento() {
           {/* Mapa facial 3D por defecto */}
           <Divider sx={{ my: 2 }} />
           <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1, color: colorPrincipal }}>
-            🎭 Mapa facial 3D del tratamiento:
+            Mapa facial 3D del tratamiento:
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Marca los puntos que se aplican en este tratamiento. Aparecerán de forma
@@ -1140,6 +1142,7 @@ export default function CrearTratamiento() {
               ? "Haz clic sobre el rostro para marcar los puntos del tratamiento. Usa la herramienta de borrar para quitarlos."
               : "Visualización de los puntos predeterminados de este tratamiento."}
           </Typography>
+          <React.Suspense fallback={<Box sx={{ height: 420, display: "flex", alignItems: "center", justifyContent: "center", color: "#ba9a63", fontSize: 13 }}>Cargando mapa 3D…</Box>}>
           <FacialMapMini
             points={puntosMapa}
             onChange={setPuntosMapa}
@@ -1147,6 +1150,7 @@ export default function CrearTratamiento() {
             color={colorPrincipal}
             height={420}
           />
+          </React.Suspense>
           <Typography variant="caption" sx={{ display: "block", mt: 1, color: "#888" }}>
             {Object.keys(puntosMapa || {}).length} punto(s) marcado(s)
           </Typography>

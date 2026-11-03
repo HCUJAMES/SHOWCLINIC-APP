@@ -9,7 +9,7 @@ import {
   SwapHorizRounded, PlayArrowRounded, PauseRounded, CloseRounded, CheckCircleRounded,
   ErrorOutlineRounded, PeopleAltRounded, MovieRounded, PendingActionsRounded,
   CalendarMonthRounded, OpenInFullRounded, PersonRounded,
-} from "@mui/icons-material";
+} from "../iconos";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**

@@ -15,7 +15,7 @@ import {
   CloseRounded as DescartarRounded,
   DescriptionRounded,
   Inventory2Rounded,
-} from "@mui/icons-material";
+} from "../iconos";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**
@@ -837,7 +837,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                     </Box>
                     {(cumples?.hoy || 0) > 0 && (
                       <Box sx={{ px: 1.1, py: 0.35, borderRadius: "999px", background: "rgba(0,0,0,0.25)" }}>
-                        <Typography sx={{ fontSize: 11, fontWeight: 700 }}>🎉 {cumples.hoy} hoy</Typography>
+                        <Typography sx={{ fontSize: 11, fontWeight: 700 }}>{cumples.hoy} hoy</Typography>
                       </Box>
                     )}
                   </Box>

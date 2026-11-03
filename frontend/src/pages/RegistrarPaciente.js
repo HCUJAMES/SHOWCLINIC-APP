@@ -14,7 +14,7 @@ import {
   ToggleButtonGroup,
   Autocomplete,
 } from "@mui/material";
-import { ArrowBack, Home } from "@mui/icons-material";
+import { ArrowBack, Home } from "../iconos";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { useAuth } from "../hooks/useAuth";

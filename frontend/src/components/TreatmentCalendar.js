@@ -347,7 +347,7 @@ const TreatmentCalendar = ({
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <button onClick={toggleEditMode} style={{ background: editMode ? "#a8612a" : "transparent", color: editMode ? "#fff" : C.muted, border: `1px solid ${editMode ? "#a8612a" : C.border}`, borderRadius: 8, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.2s" }}>
-              {editMode ? "✓ Guardar" : "✏ Editar"}
+              {editMode ? "✓ Guardar" : "Editar"}
             </button>
             {editMode && (
               <button onClick={toggleConnectMode} style={{ background: connectMode ? C.gold : "transparent", color: connectMode ? "#fff" : C.muted, border: `1px solid ${connectMode ? C.gold : C.border}`, borderRadius: 8, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.2s" }}>

@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useState, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF } from "@react-three/drei";
 import { Box, IconButton, Tooltip as MuiTooltip } from "@mui/material";
-import { Add, Delete, Refresh } from "@mui/icons-material";
+import { Add, Delete, Refresh } from "../iconos";
 import { HeadModel } from "./FacialMap3D";
 
 // Precargar el modelo (compartido con FacialMap3D)

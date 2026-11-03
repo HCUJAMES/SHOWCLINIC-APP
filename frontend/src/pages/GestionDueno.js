@@ -26,7 +26,7 @@ import {
   FactCheckRounded, SearchRounded, Inventory2Rounded,
   QrCode2Rounded, ErrorOutlineRounded, AccessTimeRounded,
   PersonOffRounded, ScienceRounded
-} from "@mui/icons-material";
+} from "../iconos";
 
 const MotionCard = motion(Card);
 const MotionBox = motion(Box);
@@ -2904,7 +2904,7 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
           {/* Nota/Descripción visible */}
           {!editing && ov.nota && (
             <Box sx={{ mt: "10px", p: "10px 14px", borderRadius: "10px", bgcolor: "#FFFDF8", border: `1px solid ${colors.gold}`, display: "flex", gap: "8px", alignItems: "flex-start" }}>
-              <Typography sx={{ fontSize: "11px", color: colors.gold, fontWeight: 700, fontFamily: fonts.body, mt: "1px" }}>📝</Typography>
+              <EditRounded sx={{ fontSize: 14, color: colors.gold, mt: "1px" }} />
               <Typography sx={{ fontSize: "12px", color: colors.textBody, fontFamily: fonts.body, lineHeight: 1.4 }}>{ov.nota}</Typography>
             </Box>
           )}

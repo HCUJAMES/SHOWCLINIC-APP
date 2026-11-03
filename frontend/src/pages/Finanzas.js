@@ -22,12 +22,10 @@ import {
   DialogActions,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney, CalendarMonth, SwapVert, Today, DateRange, PointOfSale, TrendingDown, Search } from "@mui/icons-material";
+import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney, CalendarMonth, SwapVert, Today, DateRange, PointOfSale, TrendingDown, Search } from "../iconos";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+import { cargarPDF, cargarXLSX } from "../utils/cargarLibs";
 import { useToast } from "../components/ToastProvider";
 import { formatearFechaCorta } from "../utils/dateUtils";
 
@@ -555,7 +553,8 @@ const Finanzas = () => {
     }
   };
 
-  const exportarExcel = () => {
+  const exportarExcel = async () => {
+    const XLSX = await cargarXLSX();
     // Preparar datos para Excel
     const datosTabla = (reporte || []).map((r) => ({
       Fecha: formatearFechaCorta(r.fecha),
@@ -621,6 +620,7 @@ const Finanzas = () => {
 
   const generarPDF = () => {
     const generar = async () => {
+      const { jsPDF, autoTable } = await cargarPDF();
       const doc = new jsPDF("p", "pt", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();

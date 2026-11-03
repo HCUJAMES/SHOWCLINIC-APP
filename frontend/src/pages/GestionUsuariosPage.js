@@ -53,7 +53,7 @@ import {
   Edit,
   Add,
   Badge
-} from "@mui/icons-material";
+} from "../iconos";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "../components/ToastProvider";

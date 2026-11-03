@@ -12,7 +12,7 @@ import {
   Typography,
   Button,
 } from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
+import { Menu as MenuIcon } from "../iconos";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useToast } from "./ToastProvider";
 

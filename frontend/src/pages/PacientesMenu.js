@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Typography, Paper, IconButton, Grid, Avatar } from "@mui/material";
-import { ArrowBack, Home, Search, PersonAdd, Description, CreditCard, Groups, EventNote } from "@mui/icons-material";
+import { ArrowBack, Home, Search, PersonAdd, Description, CreditCard, Groups, EventNote } from "../iconos";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { canWritePatients } from "../utils/permissions";

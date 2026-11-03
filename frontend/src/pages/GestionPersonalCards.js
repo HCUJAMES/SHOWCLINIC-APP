@@ -42,13 +42,12 @@ import {
   PictureAsPdf,
   Add,
   Delete
-} from "@mui/icons-material";
+} from "../iconos";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { formatearFechaCorta } from "../utils/dateUtils";
-import * as XLSX from "xlsx";
-import { generarReporteComisionPDF } from "../utils/generarReporteComisionPDF";
+import { cargarXLSX } from "../utils/cargarLibs";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -305,7 +304,8 @@ const GestionPersonalCards = () => {
     }
   };
 
-  const exportarExcel = (trabajador) => {
+  const exportarExcel = async (trabajador) => {
+    const XLSX = await cargarXLSX();
     if (!trabajador) return;
     const datos = [{
       'Nombre': trabajador.especialista_nombre,
@@ -327,6 +327,7 @@ const GestionPersonalCards = () => {
   const exportarPDF = async (trabajador) => {
     if (!trabajador) return;
     try {
+      const { generarReporteComisionPDF } = await import("../utils/generarReporteComisionPDF");
       await generarReporteComisionPDF({
         trabajador,
         presupuestos: presupuestosEsp,

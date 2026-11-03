@@ -38,7 +38,7 @@ import {
   VisibilityOff,
   Save,
   Close
-} from "@mui/icons-material";
+} from "../iconos";
 import axios from "axios";
 import { useToast } from "./ToastProvider";
 

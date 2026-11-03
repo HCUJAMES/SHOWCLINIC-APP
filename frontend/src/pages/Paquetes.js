@@ -36,7 +36,7 @@ import {
   Cancel,
   KeyboardArrowDown,
   KeyboardArrowUp,
-} from "@mui/icons-material";
+} from "../iconos";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useToast } from "../components/ToastProvider";
@@ -668,7 +668,7 @@ const Paquetes = () => {
             {/* Columna izquierda - Información básica */}
             <Grid item xs={12} md={6} sx={{ p: 4, borderRight: { md: "1px solid #e7dfd0" } }}>
               <Typography variant="h6" sx={{ mb: 3, color: "#a36920", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}>
-                📋 Información del Paquete
+                Información del Paquete
               </Typography>
               
               <TextField
@@ -700,7 +700,7 @@ const Paquetes = () => {
               {/* Sección de Imagen Promocional */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: "bold", color: "#333" }}>
-                  🖼️ Imagen Promocional
+                  Imagen Promocional
                 </Typography>
                 
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -764,7 +764,7 @@ const Paquetes = () => {
               {/* Sección de Tratamientos */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: "bold", color: "#333" }}>
-                  🏥 Tratamientos Incluidos
+                  Tratamientos Incluidos
                 </Typography>
                 
                 <Autocomplete
@@ -872,7 +872,7 @@ const Paquetes = () => {
                   border: "1px solid #90caf9"
                 }}>
                   <Typography variant="body2" color="primary">
-                    💡 <strong>Nota:</strong> Los productos se descontarán automáticamente del inventario según las recetas configuradas en cada tratamiento.
+                    <strong>Nota:</strong> Los productos se descontarán automáticamente del inventario según las recetas configuradas en cada tratamiento.
                   </Typography>
                 </Box>
               )}
@@ -881,7 +881,7 @@ const Paquetes = () => {
             {/* Columna derecha - Precios y vigencia */}
             <Grid item xs={12} md={6} sx={{ p: 4, backgroundColor: "#fafafa" }}>
               <Typography variant="h6" sx={{ mb: 3, color: "#a36920", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}>
-                💰 Precios y Promoción
+                Precios y Promoción
               </Typography>
 
               <Grid container spacing={3}>
@@ -956,7 +956,7 @@ const Paquetes = () => {
               <Divider sx={{ my: 4 }} />
 
               <Typography variant="h6" sx={{ mb: 3, color: "#a36920", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}>
-                📅 Vigencia (Opcional)
+                Vigencia (Opcional)
               </Typography>
 
               <Grid container spacing={3}>
@@ -990,7 +990,7 @@ const Paquetes = () => {
 
                 <Grid item xs={12}>
                   <Typography variant="caption" color="text.secondary">
-                    💡 Deja las fechas vacías si la promoción no tiene límite de tiempo
+                    Deja las fechas vacías si la promoción no tiene límite de tiempo
                   </Typography>
                 </Grid>
               </Grid>
@@ -999,7 +999,7 @@ const Paquetes = () => {
               {tratamientosSeleccionados.length > 0 && (
                 <Box sx={{ mt: 4 }}>
                   <Typography variant="h6" sx={{ mb: 2, color: "#a36920", fontWeight: "bold" }}>
-                    📦 Resumen del Paquete
+                    Resumen del Paquete
                   </Typography>
                   <Card sx={{ borderRadius: 2, backgroundColor: "white" }}>
                     <CardContent>
@@ -1042,7 +1042,7 @@ const Paquetes = () => {
               boxShadow: "0 4px 12px rgba(163, 105, 32, 0.3)",
             }}
           >
-            {modoEdicion ? "💾 Actualizar Paquete" : "✨ Crear Paquete"}
+            {modoEdicion ? "Actualizar Paquete" : "Crear Paquete"}
           </Button>
         </DialogActions>
       </Dialog>

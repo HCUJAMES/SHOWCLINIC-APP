@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { TextField, Button, Typography, Box, InputAdornment, IconButton, CircularProgress } from "@mui/material";
-import { Visibility, VisibilityOff, PersonOutline, LockOutlined } from "@mui/icons-material";
+import { Visibility, VisibilityOff, PersonOutline, LockOutlined } from "../iconos";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";

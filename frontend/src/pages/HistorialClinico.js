@@ -36,26 +36,24 @@ import {
   Tooltip,
   Menu,
 } from "@mui/material";
-import { PhotoCamera, Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star, HandshakeRounded, Badge, Cake, WarningAmberRounded, LocationOnOutlined, PhoneIphone, AutoAwesome } from "@mui/icons-material";
+import { PhotoCamera, Lock, ArrowBack, Home, Receipt, Edit, Delete, DeleteForever, Print, Close, Description, ExpandMore, ExpandLess, SortByAlpha, Schedule, ShoppingCart, AddShoppingCart, RemoveShoppingCart, PictureAsPdf, Person, Phone, LocalHospital, Favorite, Check, CardGiftcard, Assignment, Inventory, Inventory2, Face, FitnessCenter, DescriptionOutlined, ChevronLeft, ChevronRight, Refresh, Visibility, CenterFocusStrong, Fullscreen, Star, HandshakeRounded, Badge, Cake, WarningAmberRounded, LocationOnOutlined, PhoneIphone, AutoAwesome, MedicalServices, Search, ZoomIn } from "../iconos";
 import { useNavigate, useLocation } from "react-router-dom";
 import { calcularEdad, formatearFechaCorta } from "../utils/dateUtils";
 import axios from "axios";
-import { generarProformaPDF, generarProformaPaquete } from "../utils/generarProformaPDF";
-import generarConsentimientoPDF from "../utils/generarConsentimientoPDF";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import html2canvas from "html2canvas";
+import { cargarPDF, cargarHtml2canvas } from "../utils/cargarLibs";
 import { useToast } from "../components/ToastProvider";
 import ReciboTicket from "../components/ReciboTicket";
 import ReciboConsolidado from "../components/ReciboConsolidado";
-import FacialMap3D from "../components/FacialMap3D";
-import FacialMapMini from "../components/FacialMapMini";
 import PatientJourneyChart from "../components/PatientJourneyChart";
 import TreatmentCalendar from "../components/TreatmentCalendar";
 import TreatmentTimelineMatrix from "../components/TreatmentTimelineMatrix";
 import AsignacionEspecialistas from "../components/AsignacionEspecialistas";
 import DescuentoDual from "../components/DescuentoDual";
 import GaleriaTratamiento from "../components/GaleriaTratamiento";
+
+// El mapa 3D usa three.js (~1 MB): se descarga solo cuando se abre
+const FacialMap3D = React.lazy(() => import("../components/FacialMap3D"));
+const FacialMapMini = React.lazy(() => import("../components/FacialMapMini"));
 
  const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -1320,7 +1318,7 @@ const HistorialClinico = () => {
       setCarritoAnimacion(animKey || item.id);
       setTimeout(() => setCarritoAnimacion(null), 800);
 
-      showToast({ severity: "success", message: `🛒 ${nombre} agregado al carrito` });
+      showToast({ severity: "success", message: `${nombre} agregado al carrito` });
       await cargarCarritos(pacienteSeleccionado.id);
     } catch (err) {
       console.error("Error al agregar al carrito:", err);
@@ -1378,11 +1376,17 @@ const HistorialClinico = () => {
   };
 
   // Cargar TODAS las imágenes de cada tratamiento para mostrar en cards del presupuesto
+  // Se llama desde el render, así que varias veces seguidas antes de que el
+  // caché se actualice: este registro evita pedir la misma imagen 5-6 veces.
+  const imagenesSolicitadasRef = useRef(new Set());
   const cargarImagenesPresupuesto = useCallback(async (sesiones) => {
     if (!sesiones || sesiones.length === 0) return;
     const idsUnicos = [...new Set(sesiones.map(s => s.tratamiento_id).filter(Boolean))];
-    const faltantes = idsUnicos.filter(id => !(id in tratamientoImagenCache));
+    const faltantes = idsUnicos.filter(
+      id => !(id in tratamientoImagenCache) && !imagenesSolicitadasRef.current.has(id)
+    );
     if (faltantes.length === 0) return;
+    faltantes.forEach(id => imagenesSolicitadasRef.current.add(id));
     
     const nuevasImagenes = {};
     await Promise.all(faltantes.map(async (tId) => {
@@ -2079,9 +2083,10 @@ const HistorialClinico = () => {
   };
 
   // Generar recibo PDF del paquete
-  const generarReciboPaquete = (paquete) => {
+  const generarReciboPaquete = async (paquete) => {
     if (!pacienteSeleccionado || !paquete) return;
 
+    const { jsPDF } = await cargarPDF();
     const doc = new jsPDF("p", "mm", [80, 250]);
     const pageWidth = 80;
     let y = 5;
@@ -2398,10 +2403,10 @@ const HistorialClinico = () => {
 <body>
   <div class="toolbar no-print">
     <span style="font-weight:bold;font-size:13px;letter-spacing:0.5px;">Comprobante ShowClinic</span>
-    <button onclick="window.print()">🖨 Imprimir</button>
+    <button onclick="window.print()">Imprimir</button>
   </div>
   <div class="hint-bar no-print" style="width:302px;margin-top:55px;">
-    ✏️ Haz clic en cualquier texto para editarlo · Pasa el mouse sobre items para eliminar
+    Haz clic en cualquier texto para editarlo · Pasa el mouse sobre items para eliminar
   </div>
   <div class="receipt" style="margin-top:0;">
     <!-- LOGO -->
@@ -2996,6 +3001,7 @@ const HistorialClinico = () => {
   const generarPDF = async () => {
     if (!pacienteSeleccionado) return;
 
+    const { jsPDF, autoTable } = await cargarPDF();
     const doc = new jsPDF("p", "pt", "a4");
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -3747,7 +3753,7 @@ const HistorialClinico = () => {
                   onChange={(e) => setFiltro(e.target.value)}
                   size="small"
                   InputProps={{
-                    startAdornment: <Typography sx={{ mr: 1, color: "#999" }}>🔍</Typography>,
+                    startAdornment: <Search sx={{ mr: 1, color: "#999", fontSize: 20 }} />,
                   }}
                   sx={{
                     "& .MuiInputBase-root": { 
@@ -4213,7 +4219,7 @@ const HistorialClinico = () => {
 
                   <Tooltip title="Consentimiento Informado" arrow>
                     <IconButton
-                      onClick={() => generarConsentimientoPDF(pacienteSeleccionado)}
+                      onClick={async () => (await import("../utils/generarConsentimientoPDF")).default(pacienteSeleccionado)}
                       sx={{
                         backgroundColor: "white",
                         border: "1.5px solid #ba9a63",
@@ -4261,7 +4267,7 @@ const HistorialClinico = () => {
                       setModalPagoConsultaGlobal(true);
                     }}
                   >
-                    💊 Pagar Consulta
+                    Pagar Consulta
                   </Button>
 
                   <Tooltip title="Carrito de tratamientos" arrow>
@@ -5270,7 +5276,7 @@ const HistorialClinico = () => {
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="🔍 Buscar tratamiento..."
+                    placeholder="Buscar tratamiento..."
                     value={catalogoFiltro}
                     onChange={(e) => { setCatalogoFiltro(e.target.value); setCatalogoCarouselIdx(0); }}
                     sx={{ 
@@ -5422,7 +5428,7 @@ const HistorialClinico = () => {
                                 {imgUrl ? (
                                   <img src={imgUrl} alt={t.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                 ) : (
-                                  <Typography sx={{ fontSize: "2.4rem", opacity: 0.25 }}>💉</Typography>
+                                  <MedicalServices sx={{ fontSize: "2.4rem", opacity: 0.3, color: "#a36920" }} />
                                 )}
 
                                 {/* Cuántas sesiones lleva este tratamiento */}
@@ -5633,7 +5639,7 @@ const HistorialClinico = () => {
                                     }}>
                                       {foto
                                         ? <img src={foto} alt={t.nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                        : <Typography sx={{ fontSize: "1.6rem", opacity: 0.3 }}>💉</Typography>}
+                                        : <MedicalServices sx={{ fontSize: "1.6rem", opacity: 0.35, color: "#a36920" }} />}
                                     </Box>
                                     <Box sx={{
                                       position: "absolute", top: -6, left: -6, width: 24, height: 24, borderRadius: "50%",
@@ -5811,7 +5817,9 @@ const HistorialClinico = () => {
                             backgroundSize: "20px 20px",
                           }}
                         >
-                          <FacialMapMini points={ofertaFacialPoints} editable={false} height={420} />
+                          <React.Suspense fallback={<Box sx={{ height: 420, display: "flex", alignItems: "center", justifyContent: "center", color: "#ba9a63", fontSize: 13 }}>Cargando mapa 3D…</Box>}>
+                            <FacialMapMini points={ofertaFacialPoints} editable={false} height={420} />
+                          </React.Suspense>
                         </Box>
                         {ofertaFacialLeyenda.length > 0 ? (
                           <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 0.6 }}>
@@ -5861,7 +5869,7 @@ const HistorialClinico = () => {
                           variant="h6"
                           sx={{ color: "#a36920", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
                         >
-                          📋 Presupuestos del Paciente
+                          Presupuestos del Paciente
                         </Typography>
                         <BotonMinimizarTodos
                           ids={ofertas.map((o) => o.id)}
@@ -6223,12 +6231,12 @@ const HistorialClinico = () => {
                                           color: "white",
                                           fontSize: "1.5rem",
                                         }}>
-                                          🔍
+                                          <ZoomIn sx={{ fontSize: "inherit" }} />
                                         </Box>
                                       </>
                                     ) : (
                                       <Box sx={{ textAlign: "center", color: "#ba9a63" }}>
-                                        <Box sx={{ fontSize: "3.6rem", mb: 0.5 }}>💉</Box>
+                                        <MedicalServices sx={{ fontSize: "3.2rem", mb: 0.5, color: "#ba9a63" }} />
                                         <Typography variant="caption" sx={{ color: "#ba9a63", fontSize: "0.75rem" }}>
                                           Sin imagen
                                         </Typography>
@@ -6446,7 +6454,7 @@ const HistorialClinico = () => {
                                   "&:hover": { backgroundColor: "rgba(255, 152, 0, 0.1)" }
                                 }}
                               >
-                                {Number(o.descuento || 0) > 0 ? "✏️ Editar Dcto" : "➕ Agregar Dcto"}
+                                {Number(o.descuento || 0) > 0 ? "Editar Dcto" : "➕ Agregar Dcto"}
                               </Button>
                               <Button
                                 size="small"
@@ -6781,6 +6789,7 @@ const HistorialClinico = () => {
                                 disabled={!pacienteSeleccionado}
                                 onClick={async () => {
                                   if (pacienteSeleccionado) {
+                                    const { generarProformaPaquete } = await import("../utils/generarProformaPDF");
                                     await generarProformaPaquete(paquete, pacienteSeleccionado, 0);
                                     showToast({ severity: "success", message: "Proforma de paquete generada" });
                                   }
@@ -7175,7 +7184,7 @@ const HistorialClinico = () => {
                                 display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap"
                               }}>
                                 <Typography sx={{ fontSize: "0.82rem", color: "#845a72", flex: 1, minWidth: 200 }}>
-                                  💊 Este paciente ya pagó <strong>S/ {saldoDisp.toFixed(2)}</strong> de consulta
+                                  Este paciente ya pagó <strong>S/ {saldoDisp.toFixed(2)}</strong> de consulta
                                   {(saldoConsultas.disponibles || []).length > 1
                                     ? ` en ${saldoConsultas.disponibles.length} pagos`
                                     : ""}. Se puede descontar de este presupuesto.
@@ -7276,8 +7285,8 @@ const HistorialClinico = () => {
                                   {presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
                                     ? '✓ PAGADO' 
                                     : presupuesto.estado_pago === 'adelanto' 
-                                      ? '📝 ADELANTO' 
-                                      : '⏳ PENDIENTE PAGO'}
+                                      ? 'ADELANTO' 
+                                      : 'PENDIENTE PAGO'}
                                 </Typography>
                               </Box>
                             </Box>
@@ -7287,7 +7296,7 @@ const HistorialClinico = () => {
                               <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 1, border: "1px solid rgba(148,106,130, 0.3)" }}>
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                   <Typography variant="caption" sx={{ color: "#845a72", fontWeight: "bold" }}>
-                                    💊 Consulta Pagada
+                                    Consulta Pagada
                                   </Typography>
                                   <Typography variant="caption" sx={{ color: "#845a72", fontWeight: "bold" }}>
                                     S/ {(presupuesto.monto_consulta || 0).toFixed(2)}
@@ -7351,7 +7360,7 @@ const HistorialClinico = () => {
                                     }
                                   }}
                                 >
-                                  💊 Pagar Consulta
+                                  Pagar Consulta
                                 </Button>
                               )}
                               {presupuesto.estado_pago !== 'pagado' && presupuesto.pagado !== 1 && (
@@ -7376,7 +7385,7 @@ const HistorialClinico = () => {
                                     "&:hover": { backgroundColor: presupuesto.estado_pago === 'adelanto' ? "#b8742a" : "#4f6d44" }
                                   }}
                                 >
-                                  {presupuesto.estado_pago === 'adelanto' ? '💰 Pagar Saldo' : '💰 Registrar Pago'}
+                                  {presupuesto.estado_pago === 'adelanto' ? 'Pagar Saldo' : 'Registrar Pago'}
                                 </Button>
                               )}
                               {isMaster && presupuesto.monto_pagado > 0 && (
@@ -7400,7 +7409,7 @@ const HistorialClinico = () => {
                                     }
                                   }}
                                 >
-                                  ✏️ Editar Pago
+                                  Editar Pago
                                 </Button>
                               )}
                               {presupuesto.estado !== 'completado' && (
@@ -7416,7 +7425,7 @@ const HistorialClinico = () => {
                                     "&:hover": { backgroundColor: "#6a1b9a" }
                                   }}
                                 >
-                                  💉 Realizar Tratamiento
+                                  Realizar Tratamiento
                                 </Button>
                               )}
                               <Button
@@ -7710,8 +7719,8 @@ const HistorialClinico = () => {
                                   {paquete.estado_pago === 'pagado' || paquete.pagado === 1 
                                     ? '✓ PAGADO' 
                                     : paquete.estado_pago === 'adelanto' 
-                                      ? '📝 ADELANTO' 
-                                      : '⏳ PENDIENTE PAGO'}
+                                      ? 'ADELANTO' 
+                                      : 'PENDIENTE PAGO'}
                                 </Typography>
                               </Box>
                             </Box>
@@ -7721,7 +7730,7 @@ const HistorialClinico = () => {
                               <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 1, border: "1px solid rgba(148,106,130, 0.3)" }}>
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                   <Typography variant="caption" sx={{ color: "#845a72", fontWeight: "bold" }}>
-                                    💊 Consulta Pagada
+                                    Consulta Pagada
                                   </Typography>
                                   <Typography variant="caption" sx={{ color: "#845a72", fontWeight: "bold" }}>
                                     S/ {(paquete.monto_consulta || 0).toFixed(2)}
@@ -7785,7 +7794,7 @@ const HistorialClinico = () => {
                                     }
                                   }}
                                 >
-                                  💊 Pagar Consulta
+                                  Pagar Consulta
                                 </Button>
                               )}
                               {paquete.estado_pago !== 'pagado' && paquete.pagado !== 1 && (
@@ -7808,7 +7817,7 @@ const HistorialClinico = () => {
                                     "&:hover": { backgroundColor: paquete.estado_pago === 'adelanto' ? "#b8742a" : "#4f6d44" }
                                   }}
                                 >
-                                  {paquete.estado_pago === 'adelanto' ? '💰 Pagar Saldo' : '💰 Registrar Pago'}
+                                  {paquete.estado_pago === 'adelanto' ? 'Pagar Saldo' : 'Registrar Pago'}
                                 </Button>
                               )}
                               {isMaster && paquete.monto_pagado > 0 && (
@@ -7832,7 +7841,7 @@ const HistorialClinico = () => {
                                     }
                                   }}
                                 >
-                                  ✏️ Editar Pago
+                                  Editar Pago
                                 </Button>
                               )}
                               {paquete.estado === 'activo' && (
@@ -7848,7 +7857,7 @@ const HistorialClinico = () => {
                                     "&:hover": { backgroundColor: "#6a1b9a" }
                                   }}
                                 >
-                                  💉 Realizar Tratamiento
+                                  Realizar Tratamiento
                                 </Button>
                               )}
                               {paquete.estado === 'completado' && (
@@ -7864,7 +7873,7 @@ const HistorialClinico = () => {
                                     "&:hover": { backgroundColor: "#0d47a1" }
                                   }}
                                 >
-                                  🧾 Recibo
+                                  Recibo
                                 </Button>
                               )}
                               <Button
@@ -8900,6 +8909,7 @@ const HistorialClinico = () => {
                         await new Promise(resolve => setTimeout(resolve, 300));
                         
                         // Captura optimizada (balance calidad/tamaño)
+                        const html2canvas = await cargarHtml2canvas();
                         const canvas = await html2canvas(timelineElement, {
                           scale: 2, // Escala 2x = buena calidad sin exceso de peso
                           backgroundColor: '#FFF8F0',
@@ -8928,6 +8938,7 @@ const HistorialClinico = () => {
                   });
                   const itemsParaPDF = filtrados.length > 0 ? filtrados : allItems;
                   
+                  const { generarProformaPDF } = await import("../utils/generarProformaPDF");
                   await generarProformaPDF(
                     { ...presupuestoParaProforma, items: itemsParaPDF, descuento: Number(descuentoProforma) || 0 },
                     pacienteSeleccionado,
@@ -8956,7 +8967,7 @@ const HistorialClinico = () => {
       {/* Modal para Agregar/Editar Descuento de Presupuesto */}
       <Dialog open={modalDescuentoPresupuesto} onClose={() => setModalDescuentoPresupuesto(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ backgroundColor: "#c9862e", color: "white" }}>
-          💰 {Number(nuevoDescuento) > 0 ? "Editar" : "Agregar"} Descuento
+          {Number(nuevoDescuento) > 0 ? "Editar" : "Agregar"} Descuento
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {presupuestoParaDescuento && (
@@ -9007,7 +9018,7 @@ const HistorialClinico = () => {
       {/* Modal para Registrar Pago de Presupuesto */}
       <Dialog open={modalPagoPresupuesto} onClose={() => setModalPagoPresupuesto(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ backgroundColor: "#5f7f52", color: "white" }}>
-          💰 Registrar Pago
+          Registrar Pago
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {presupuestoParaPago && (
@@ -9035,10 +9046,10 @@ const HistorialClinico = () => {
                   }}
                   label="Tipo de Pago"
                 >
-                  <MenuItem value="total">💵 Pago Total</MenuItem>
-                  <MenuItem value="adelanto">📝 Adelanto</MenuItem>
+                  <MenuItem value="total">Pago Total</MenuItem>
+                  <MenuItem value="adelanto">Adelanto</MenuItem>
                   {(Math.max(0, (Number(presupuestoParaPago.precio_total) || 0) - (Number(presupuestoParaPago.descuento) || 0) - (Number(presupuestoParaPago.monto_pagado) || 0)) > 0 || presupuestoParaPago.estado_pago === 'adelanto') && (
-                    <MenuItem value="saldo">✅ Pagar Saldo Restante</MenuItem>
+                    <MenuItem value="saldo">Pagar Saldo Restante</MenuItem>
                   )}
                 </Select>
               </FormControl>
@@ -9134,7 +9145,7 @@ const HistorialClinico = () => {
       {/* Modal para Registrar Pago de Paquete */}
       <Dialog open={modalPagoPaquete} onClose={() => setModalPagoPaquete(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ backgroundColor: "#4f6b80", color: "white" }}>
-          💰 Registrar Pago de Paquete
+          Registrar Pago de Paquete
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {paqueteParaPago && (
@@ -9159,10 +9170,10 @@ const HistorialClinico = () => {
                   }}
                   label="Tipo de Pago"
                 >
-                  <MenuItem value="total">💵 Pago Total</MenuItem>
-                  <MenuItem value="adelanto">📝 Adelanto</MenuItem>
+                  <MenuItem value="total">Pago Total</MenuItem>
+                  <MenuItem value="adelanto">Adelanto</MenuItem>
                   {(Math.max(0, (Number(paqueteParaPago.precio_total) || 0) - (Number(paqueteParaPago.monto_pagado) || 0)) > 0 || paqueteParaPago.estado_pago === 'adelanto') && (
-                    <MenuItem value="saldo">✅ Pagar Saldo Restante</MenuItem>
+                    <MenuItem value="saldo">Pagar Saldo Restante</MenuItem>
                   )}
                 </Select>
               </FormControl>
@@ -9242,7 +9253,7 @@ const HistorialClinico = () => {
       {/* Modal para Registrar Pago de Consulta */}
       <Dialog open={modalPagoConsulta} onClose={() => setModalPagoConsulta(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ backgroundColor: "#946a82", color: "white" }}>
-          💊 Pagar Consulta
+          Pagar Consulta
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {paqueteParaConsulta && (
@@ -9284,7 +9295,7 @@ const HistorialClinico = () => {
               {/* Resumen de descuento */}
               <Box sx={{ p: 1.5, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#845a72", mb: 1 }}>
-                  📊 Resumen del Descuento
+                  Resumen del Descuento
                 </Typography>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">Precio original del paquete:</Typography>
@@ -9331,7 +9342,7 @@ const HistorialClinico = () => {
       {/* Modal para Registrar Pago de Consulta en Presupuesto */}
       <Dialog open={modalPagoConsultaPresupuesto} onClose={() => setModalPagoConsultaPresupuesto(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ backgroundColor: "#946a82", color: "white" }}>
-          💊 Pagar Consulta
+          Pagar Consulta
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {presupuestoParaConsulta && (
@@ -9373,7 +9384,7 @@ const HistorialClinico = () => {
               {/* Resumen de descuento */}
               <Box sx={{ p: 1.5, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#845a72", mb: 1 }}>
-                  📊 Resumen del Descuento
+                  Resumen del Descuento
                 </Typography>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">Subtotal:</Typography>
@@ -9424,7 +9435,7 @@ const HistorialClinico = () => {
       {/* Modal Global de Pagar Consulta (desde barra superior) */}
       <Dialog open={modalPagoConsultaGlobal} onClose={() => setModalPagoConsultaGlobal(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ backgroundColor: "#946a82", color: "white" }}>
-          💊 Pagar Consulta
+          Pagar Consulta
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {pacienteSeleccionado && (
@@ -9441,8 +9452,8 @@ const HistorialClinico = () => {
                   </Typography>
                   <Typography variant="body2" sx={{ color: "#4f6d44" }}>
                     {consultaGlobalSeleccion.tipo === 'paquete' 
-                      ? `📦 Paquete: ${consultaGlobalSeleccion.item?.paquete_nombre || 'Paquete'}`
-                      : `📋 Presupuesto #${consultaGlobalSeleccion.item?.id}`
+                      ? `Paquete: ${consultaGlobalSeleccion.item?.paquete_nombre || 'Paquete'}`
+                      : `Presupuesto #${consultaGlobalSeleccion.item?.id}`
                     }
                     {' — '}S/ {(consultaGlobalSeleccion.item?.precio_total || 0).toFixed(2)}
                     {consultaGlobalSeleccion.tipo === 'presupuesto' && (consultaGlobalSeleccion.item?.descuento || 0) > 0 
@@ -9455,7 +9466,7 @@ const HistorialClinico = () => {
               {consultaGlobalSeleccion?.tipo === 'directo' && (
                 <Box sx={{ p: 1.5, mb: 2, borderRadius: 2, backgroundColor: "rgba(148,106,130, 0.08)", border: "1px solid rgba(148,106,130, 0.3)" }}>
                   <Typography variant="body2" sx={{ color: "#845a72" }}>
-                    💰 No hay presupuestos ni paquetes pendientes. Se registrará como ingreso directo en caja.
+                    No hay presupuestos ni paquetes pendientes. Se registrará como ingreso directo en caja.
                   </Typography>
                 </Box>
               )}
@@ -9485,7 +9496,7 @@ const HistorialClinico = () => {
                         }}
                       >
                         <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
-                          📦 {paq.paquete_nombre} — S/ {(paq.precio_total || 0).toFixed(2)}
+                          {paq.paquete_nombre} — S/ {(paq.precio_total || 0).toFixed(2)}
                         </Typography>
                       </Box>
                     ))}
@@ -9503,7 +9514,7 @@ const HistorialClinico = () => {
                         }}
                       >
                         <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
-                          📋 Presupuesto #{pres.id} — S/ {(pres.precio_total || 0).toFixed(2)}
+                          Presupuesto #{pres.id} — S/ {(pres.precio_total || 0).toFixed(2)}
                         </Typography>
                       </Box>
                     ))}
@@ -9519,7 +9530,7 @@ const HistorialClinico = () => {
                       }}
                     >
                       <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
-                        💰 Pago directo (sin descontar)
+                        Pago directo (sin descontar)
                       </Typography>
                     </Box>
                   </Box>
@@ -9672,7 +9683,7 @@ const HistorialClinico = () => {
       {/* Modal para Editar Pago de Presupuesto (solo master) */}
       <Dialog open={modalEditarPagoPresupuesto} onClose={() => setModalEditarPagoPresupuesto(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ color: "#4f6b80", fontWeight: "bold" }}>
-          ✏️ Editar Pago de Presupuesto
+          Editar Pago de Presupuesto
         </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
           {presupuestoEditarPago && (
@@ -9717,7 +9728,7 @@ const HistorialClinico = () => {
       {/* Modal para Editar Fecha de Presupuesto */}
       <Dialog open={modalEditarFechaPresupuesto} onClose={() => setModalEditarFechaPresupuesto(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ color: "#a36920", fontWeight: "bold" }}>
-          📅 Editar Fecha del Presupuesto
+          Editar Fecha del Presupuesto
         </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
           {presupuestoEditarFecha && (
@@ -9752,7 +9763,7 @@ const HistorialClinico = () => {
       {/* Modal para Editar Fecha de Oferta/Presupuesto (Presupuestos del Paciente) */}
       <Dialog open={modalEditarFechaOferta} onClose={() => setModalEditarFechaOferta(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ color: "#a36920", fontWeight: "bold" }}>
-          📅 Editar Fecha del Presupuesto
+          Editar Fecha del Presupuesto
         </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
           {ofertaEditarFecha && (
@@ -9785,7 +9796,7 @@ const HistorialClinico = () => {
       {/* Modal para Editar Pago de Paquete (solo master) */}
       <Dialog open={modalEditarPagoPaquete} onClose={() => setModalEditarPagoPaquete(false)} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ color: "#4f6b80", fontWeight: "bold" }}>
-          ✏️ Editar Pago de Paquete
+          Editar Pago de Paquete
         </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
           {paqueteEditarPago && (
@@ -9841,7 +9852,7 @@ const HistorialClinico = () => {
           py: 1.5,
         }}>
           <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-            🏋️ Presupuesto Corporal — {pacienteSeleccionado?.nombre} {pacienteSeleccionado?.apellido}
+            Presupuesto Corporal — {pacienteSeleccionado?.nombre} {pacienteSeleccionado?.apellido}
           </Typography>
           <IconButton onClick={() => setModalCorporal(false)} sx={{ color: "white" }}>
             <Close />
@@ -9866,7 +9877,7 @@ const HistorialClinico = () => {
                 },
               }}
             >
-              📋 Evaluación
+              Evaluación
             </Button>
             <Button
               variant={corporalTipo === "tratamiento" ? "contained" : "outlined"}
@@ -9884,7 +9895,7 @@ const HistorialClinico = () => {
                 },
               }}
             >
-              💉 Tratamiento
+              Tratamiento
             </Button>
           </Box>
 
@@ -10066,7 +10077,7 @@ const HistorialClinico = () => {
           {/* Actividad Física */}
           <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e7dfd0" }}>
             <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#a36920", mb: 1.5 }}>
-              🏃 Actividad Física
+              Actividad Física
             </Typography>
             <TextField
               fullWidth
@@ -10087,7 +10098,7 @@ const HistorialClinico = () => {
           {/* Observaciones */}
           <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e7dfd0" }}>
             <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#a36920", mb: 1.5 }}>
-              📝 Observaciones
+              Observaciones
             </Typography>
             <TextField
               fullWidth
@@ -10138,7 +10149,7 @@ const HistorialClinico = () => {
 
           {/* Historial de registros corporales */}
           <Typography variant="h6" sx={{ fontWeight: "bold", color: "#555", mb: 2 }}>
-            📄 Registros guardados
+            Registros guardados
           </Typography>
           {corporalRegistros.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 3 }}>
@@ -10227,12 +10238,12 @@ const HistorialClinico = () => {
 
                 {reg.actividad_fisica && (
                   <Typography variant="caption" sx={{ display: "block", mt: 1, color: "#555" }}>
-                    <strong>🏃 Actividad:</strong> {reg.actividad_fisica}
+                    <strong>Actividad:</strong> {reg.actividad_fisica}
                   </Typography>
                 )}
                 {reg.observaciones && (
                   <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "#555" }}>
-                    <strong>📝 Observaciones:</strong> {reg.observaciones}
+                    <strong>Observaciones:</strong> {reg.observaciones}
                   </Typography>
                 )}
               </Paper>
@@ -10266,7 +10277,7 @@ const HistorialClinico = () => {
           }}
         >
           <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-            📸 {carruselNombre}
+            {carruselNombre}
           </Typography>
           <IconButton onClick={() => setModalCarrusel(false)} sx={{ color: "white" }}>
             <Close />
@@ -10466,7 +10477,7 @@ const HistorialClinico = () => {
                       {imgUrl ? (
                         <img src={imgUrl} alt={item.tratamiento_nombre} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       ) : (
-                        <Typography sx={{ fontSize: "2rem" }}>💉</Typography>
+                        <MedicalServices sx={{ fontSize: "2rem", color: "#ba9a63" }} />
                       )}
                     </Box>
                     {/* Info */}
@@ -10609,6 +10620,7 @@ const HistorialClinico = () => {
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 0, overflow: "hidden", height: "100%" }}>
+          <React.Suspense fallback={<Box sx={{ height: 420, display: "flex", alignItems: "center", justifyContent: "center", color: "#ba9a63", fontSize: 13 }}>Cargando mapa 3D…</Box>}>
           <FacialMap3D
             paciente={pacienteSeleccionado}
             registros={facialRegistros}
@@ -10618,6 +10630,7 @@ const HistorialClinico = () => {
             onCargar={cargarFacial}
             guardando={guardandoFacial}
           />
+          </React.Suspense>
         </DialogContent>
       </Dialog>
     </Box>

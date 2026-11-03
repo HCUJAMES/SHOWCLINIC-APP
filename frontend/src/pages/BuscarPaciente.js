@@ -26,7 +26,7 @@ import {
   Collapse,
   LinearProgress,
 } from "@mui/material";
-import { ArrowBack, Home, ExpandMore, ExpandLess } from "@mui/icons-material";
+import { ArrowBack, Home, ExpandMore, ExpandLess } from "../iconos";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { calcularEdad } from "../utils/dateUtils";

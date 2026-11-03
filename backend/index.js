@@ -1475,8 +1475,23 @@ app.use("/uploads/especialistas", express.static("uploads/especialistas"));
 
 // ✅ Servir frontend (React build) para acceso remoto (ej. iPad/iPhone)
 const frontendBuildPath = path.join(__dirname, "..", "frontend", "build");
-app.use(express.static(frontendBuildPath));
+// Los JS/CSS del build llevan un hash en el nombre: cada versión es un archivo
+// nuevo, así que el navegador puede guardarlos un año sin volver a pedirlos.
+app.use(
+  "/static",
+  express.static(path.join(frontendBuildPath, "static"), { maxAge: "1y", immutable: true })
+);
+// index.html nunca se guarda en caché, para que siempre apunte a la versión nueva.
+const sinCache = (res) => res.setHeader("Cache-Control", "no-cache");
+app.use(
+  express.static(frontendBuildPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith("index.html")) sinCache(res);
+    },
+  })
+);
 app.get(/^(?!\/api\/)(?!\/uploads\/).*/, (req, res) => {
+  sinCache(res);
   res.sendFile(path.join(frontendBuildPath, "index.html"));
 });
 

@@ -13,7 +13,7 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
-import { Print, Close } from "@mui/icons-material";
+import { Print, Close } from "../iconos";
 
 export default function ReciboModal({ open, onClose, datos }) {
   const handlePrint = () => {

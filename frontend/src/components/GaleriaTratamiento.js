@@ -11,7 +11,7 @@ import {
   ChevronRightRounded,
   CompareRounded,
   ImageRounded,
-} from "@mui/icons-material";
+} from "../iconos";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**

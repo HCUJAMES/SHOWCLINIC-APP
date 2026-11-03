@@ -15,7 +15,7 @@ import {
   CircularProgress,
   Divider,
 } from "@mui/material";
-import { Search, FileDownload, CalendarToday, QrCodeScanner } from "@mui/icons-material";
+import { Search, FileDownload, CalendarToday, QrCodeScanner } from "../iconos";
 import axios from "axios";
 
 const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}:4000`;

@@ -20,7 +20,7 @@ import {
   Add,
   Edit as EditIcon,
   Check,
-} from "@mui/icons-material";
+} from "../iconos";
 
 // =============================================
 // PALETA DE COLORES PARA PROTOCOLOS

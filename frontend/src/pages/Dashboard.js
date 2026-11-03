@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Typography,
   Box,
@@ -27,14 +27,14 @@ import {
   LocalHospital,
   Search,
   Close,
-  CalendarToday,
   SupervisorAccount,
-  QrCode2,
-  MonetizationOn,
+  QrCodeScanner,
+  ScienceRounded,
+  Crown,
   VideoLibrary,
   LogoutRounded,
   ChevronRight,
-} from "@mui/icons-material";
+} from "../iconos";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import PanelRecordatorios from "../components/PanelRecordatorios";
@@ -53,10 +53,10 @@ const moduleIcons = {
   Estadísticas: Insights,
   Gestionar: Settings,
   "Gestión Clínica": LocalHospital,
-  "Productos Aplicados": CalendarToday,
+  "Productos Aplicados": ScienceRounded,
   "Usuarios": SupervisorAccount,
-  "Códigos de Barras": QrCode2,
-  "Gestión CEO": MonetizationOn,
+  "Códigos de Barras": QrCodeScanner,
+  "Gestión CEO": Crown,
   "Antes y Después": VideoLibrary,
 };
 
@@ -251,18 +251,30 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
+  // La lista de pacientes se guarda un minuto: así escribir en el buscador no
+  // descarga todos los pacientes otra vez con cada letra.
+  const pacientesCacheRef = useRef({ datos: null, hora: 0 });
+  const obtenerPacientes = async () => {
+    const cache = pacientesCacheRef.current;
+    if (cache.datos && Date.now() - cache.hora < 60000) return cache.datos;
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${API_BASE}/api/pacientes/listar`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+    });
+    if (!response.ok) return null;
+    const datos = await response.json();
+    pacientesCacheRef.current = { datos, hora: Date.now() };
+    return datos;
+  };
+
   const buscarPacientes = async (query) => {
     setSearching(true);
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE}/api/pacientes/listar`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json"
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
+      const data = await obtenerPacientes();
+      if (data) {
 
         // Normalizar texto: quitar tildes, minúsculas, trim espacios múltiples
         const normalize = (str) => (str || "")

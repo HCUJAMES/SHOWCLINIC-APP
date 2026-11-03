@@ -59,7 +59,7 @@ const HistorialPaciente = () => {
           }}
         >
           <Typography variant="h5" align="center" sx={{ mb: 3, color: "#a36920", fontWeight: "bold" }}>
-            🧑‍⚕️ Historial Clínico del Paciente
+            Historial Clínico del Paciente
           </Typography>
 
           <Grid container spacing={2}>
@@ -82,7 +82,7 @@ const HistorialPaciente = () => {
           <Divider sx={{ my: 3 }} />
 
           <Typography variant="h6" sx={{ color: "#a36920", mb: 2 }}>
-            🧴 Tratamientos Realizados
+            Tratamientos Realizados
           </Typography>
 
           <Table>
@@ -117,7 +117,7 @@ const HistorialPaciente = () => {
             }}
             onClick={() => generarPDFPaciente(paciente, historial)}
           >
-            📄 Exportar PDF
+            Exportar PDF
           </Button>
         </Paper>
       </Container>

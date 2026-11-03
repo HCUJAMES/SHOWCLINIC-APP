@@ -18,7 +18,7 @@ import {
   Print,
   Add,
   Remove,
-} from "@mui/icons-material";
+} from "../iconos";
 import { useNavigate } from "react-router-dom";
 import bwipjs from "bwip-js";
 

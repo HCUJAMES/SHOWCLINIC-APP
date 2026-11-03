@@ -3,7 +3,7 @@ import {
   Box, Typography, Paper, IconButton, TextField, MenuItem, Select,
   FormControl, InputAdornment, Pagination, Button, Avatar,
 } from "@mui/material";
-import { ArrowBack, Home, Search, Description, Download } from "@mui/icons-material";
+import { ArrowBack, Home, Search, Description, Download } from "../iconos";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 

@@ -8,7 +8,7 @@ import {
   Typography,
   Divider,
 } from "@mui/material";
-import { Print, Close } from "@mui/icons-material";
+import { Print, Close } from "../iconos";
 
 export default function ReciboTicket({ open, onClose, datos }) {
   const handlePrint = () => {

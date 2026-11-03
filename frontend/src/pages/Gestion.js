@@ -1,7 +1,7 @@
 // Gestión del Sistema - Tratamientos huérfanos con diseño profesional
 import React, { useState } from "react";
 import { Container, Typography, Button, Paper, Box, IconButton, CircularProgress, Table, TableBody, TableCell, TableHead, TableRow, Chip } from "@mui/material";
-import { ArrowBack, Backup, PhotoLibrary, SearchOff, Delete, DeleteSweep } from "@mui/icons-material";
+import { ArrowBack, Backup, PhotoLibrary, SearchOff, Delete, DeleteSweep } from "../iconos";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import { useAuth } from "../hooks/useAuth";
@@ -433,7 +433,7 @@ const Gestion = () => {
                   transition: "all 0.3s ease",
                 }}
               >
-                {buscandoHuerfanos ? "Buscando tratamientos..." : "🔍 Buscar Tratamientos Huérfanos"}
+                {buscandoHuerfanos ? "Buscando tratamientos..." : "Buscar Tratamientos Huérfanos"}
               </Button>
 
               {huerfanos.length > 0 && (

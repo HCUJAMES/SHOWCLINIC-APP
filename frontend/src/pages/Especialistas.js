@@ -18,7 +18,7 @@ import {
   DialogActions,
   Grid,
 } from "@mui/material";
-import { Add, Delete, ArrowBack, Home } from "@mui/icons-material";
+import { Add, Delete, ArrowBack, Home } from "../iconos";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import axios from "axios";

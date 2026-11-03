@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Typography, Paper, IconButton, Grid, Avatar } from "@mui/material";
-import { ArrowBack, Home, AddCircle, PlayArrow, Spa } from "@mui/icons-material";
+import { ArrowBack, Home, AddCircle, PlayArrow, Spa } from "../../iconos";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { canCreateTreatments } from "../../utils/permissions";

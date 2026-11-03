@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, TextField, Typography, Chip, InputAdornment } from "@mui/material";
-import { SwapHorizRounded } from "@mui/icons-material";
+import { SwapHorizRounded } from "../iconos";
 
 /**
  * Descuento en monto y porcentaje a la vez, siempre sincronizados.

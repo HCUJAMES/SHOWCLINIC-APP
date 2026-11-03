@@ -34,7 +34,7 @@ import {
   CalendarMonth,
   EmojiEvents,
   PersonOutline,
-} from "@mui/icons-material";
+} from "../iconos";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
 import api from "../api/axios";

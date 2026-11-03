@@ -6,7 +6,7 @@ import {
   RadioButtonUncheckedRounded,
   CloseRounded,
   GroupsRounded,
-} from "@mui/icons-material";
+} from "../iconos";
 
 /**
  * Asignación de especialistas a los tratamientos de un presupuesto.
