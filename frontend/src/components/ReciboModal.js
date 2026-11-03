@@ -69,7 +69,7 @@ export default function ReciboModal({ open, onClose, datos }) {
               justifyContent: "space-between",
               mb: 4,
               pb: 3,
-              borderBottom: "3px solid #D4AF37",
+              borderBottom: "3px solid #ba9a63",
             }}
           >
             <Box>
@@ -77,7 +77,7 @@ export default function ReciboModal({ open, onClose, datos }) {
                 variant="h4"
                 sx={{
                   fontWeight: 800,
-                  color: "#D4AF37",
+                  color: "#ba9a63",
                   letterSpacing: 1,
                   mb: 0.5,
                 }}
@@ -94,7 +94,7 @@ export default function ReciboModal({ open, onClose, datos }) {
             <Box sx={{ textAlign: "right" }}>
               <Typography
                 variant="h6"
-                sx={{ fontWeight: 700, color: "#D4AF37", mb: 0.5 }}
+                sx={{ fontWeight: 700, color: "#ba9a63", mb: 0.5 }}
               >
                 RECIBO DE PAGO
               </Typography>
@@ -110,7 +110,7 @@ export default function ReciboModal({ open, onClose, datos }) {
               variant="subtitle1"
               sx={{
                 fontWeight: 700,
-                color: "#D4AF37",
+                color: "#ba9a63",
                 mb: 2,
                 textTransform: "uppercase",
                 letterSpacing: 0.5,
@@ -123,10 +123,10 @@ export default function ReciboModal({ open, onClose, datos }) {
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
                 gap: 2,
-                backgroundColor: "rgba(212,175,55,0.05)",
+                backgroundColor: "rgba(186,154,99,0.05)",
                 p: 2.5,
                 borderRadius: 2,
-                border: "1px solid rgba(212,175,55,0.2)",
+                border: "1px solid rgba(186,154,99,0.2)",
               }}
             >
               <Box>
@@ -182,7 +182,7 @@ export default function ReciboModal({ open, onClose, datos }) {
               variant="subtitle1"
               sx={{
                 fontWeight: 700,
-                color: "#D4AF37",
+                color: "#ba9a63",
                 mb: 2,
                 textTransform: "uppercase",
                 letterSpacing: 0.5,
@@ -192,13 +192,13 @@ export default function ReciboModal({ open, onClose, datos }) {
             </Typography>
             <Table
               sx={{
-                border: "1px solid rgba(212,175,55,0.2)",
+                border: "1px solid rgba(186,154,99,0.2)",
                 borderRadius: 2,
                 overflow: "hidden",
               }}
             >
               <TableHead>
-                <TableRow sx={{ backgroundColor: "#D4AF37" }}>
+                <TableRow sx={{ backgroundColor: "#ba9a63" }}>
                   <TableCell
                     sx={{
                       color: "white",
@@ -256,7 +256,7 @@ export default function ReciboModal({ open, onClose, datos }) {
                     key={idx}
                     sx={{
                       "&:nth-of-type(odd)": {
-                        backgroundColor: "rgba(212,175,55,0.03)",
+                        backgroundColor: "rgba(186,154,99,0.03)",
                       },
                     }}
                   >
@@ -272,7 +272,7 @@ export default function ReciboModal({ open, onClose, datos }) {
                     </TableCell>
                     <TableCell
                       align="right"
-                      sx={{ fontWeight: 600, color: "#D4AF37" }}
+                      sx={{ fontWeight: 600, color: "#ba9a63" }}
                     >
                       S/ {Number(trat.total || 0).toFixed(2)}
                     </TableCell>
@@ -288,10 +288,10 @@ export default function ReciboModal({ open, onClose, datos }) {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              backgroundColor: "rgba(212,175,55,0.1)",
+              backgroundColor: "rgba(186,154,99,0.1)",
               p: 3,
               borderRadius: 2,
-              border: "2px solid #D4AF37",
+              border: "2px solid #ba9a63",
               mb: 4,
             }}
           >
@@ -315,7 +315,7 @@ export default function ReciboModal({ open, onClose, datos }) {
               </Typography>
               <Typography
                 variant="h4"
-                sx={{ fontWeight: 800, color: "#D4AF37", mt: 0.5 }}
+                sx={{ fontWeight: 800, color: "#ba9a63", mt: 0.5 }}
               >
                 S/ {Number(totalGeneral || 0).toFixed(2)}
               </Typography>
@@ -323,7 +323,7 @@ export default function ReciboModal({ open, onClose, datos }) {
           </Box>
 
           {/* Footer */}
-          <Divider sx={{ mb: 3, borderColor: "rgba(212,175,55,0.3)" }} />
+          <Divider sx={{ mb: 3, borderColor: "rgba(186,154,99,0.3)" }} />
           <Box sx={{ textAlign: "center" }}>
             <Typography
               variant="body2"
@@ -360,7 +360,7 @@ export default function ReciboModal({ open, onClose, datos }) {
           variant="contained"
           startIcon={<Print />}
           sx={{
-            backgroundColor: "#D4AF37",
+            backgroundColor: "#ba9a63",
             "&:hover": { backgroundColor: "#B8941F" },
             fontWeight: 600,
           }}

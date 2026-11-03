@@ -848,7 +848,7 @@ const ComenzarTratamiento = () => {
             p: { xs: 3, sm: 5 },
             backgroundColor: "rgba(255,255,255,0.82)",
             borderRadius: 5,
-            border: "1px solid rgba(212,175,55,0.20)",
+            border: "1px solid rgba(186,154,99,0.20)",
             backdropFilter: "blur(10px)",
             boxShadow: "0 18px 48px rgba(0,0,0,0.14)",
           }}
@@ -871,7 +871,7 @@ const ComenzarTratamiento = () => {
           <Typography
             variant="body2"
             align="center"
-            sx={{ color: "rgba(46,46,46,0.75)", mb: 4 }}
+            sx={{ color: "rgba(43,34,25,0.75)", mb: 4 }}
           >
             Registra la sesión y el detalle de la venta
           </Typography>
@@ -963,7 +963,7 @@ const ComenzarTratamiento = () => {
                       borderRadius: 3,
                       backgroundColor: "rgba(255,255,255,0.95)",
                       "&:hover": {
-                        borderColor: "#8a541a",
+                        borderColor: "#8a5a1a",
                         backgroundColor: "rgba(163,105,32,0.08)",
                       },
                     }}
@@ -997,7 +997,7 @@ const ComenzarTratamiento = () => {
                       p: { xs: 2.5, sm: 3.5 },
                       borderRadius: 4,
                       backgroundColor: "rgba(255,255,255,0.90)",
-                      border: "1px solid rgba(212,175,55,0.18)",
+                      border: "1px solid rgba(186,154,99,0.18)",
                       boxShadow: "0 12px 28px rgba(0,0,0,0.08)",
                       mb: 2.5,
                       position: "relative",
@@ -1007,7 +1007,7 @@ const ComenzarTratamiento = () => {
                         position: "absolute",
                         inset: 0,
                         background:
-                          "radial-gradient(circle at top, rgba(212,175,55,0.14), transparent 55%)",
+                          "radial-gradient(circle at top, rgba(186,154,99,0.14), transparent 55%)",
                         pointerEvents: "none",
                       },
                       "& > *": { position: "relative", zIndex: 1 },
@@ -1056,7 +1056,7 @@ const ComenzarTratamiento = () => {
 
                     <Typography
                       variant="body2"
-                      sx={{ color: "rgba(46,46,46,0.70)", mb: 2.5 }}
+                      sx={{ color: "rgba(43,34,25,0.70)", mb: 2.5 }}
                     >
                       Completa los campos para registrar la sesión.
                     </Typography>
@@ -1076,7 +1076,7 @@ const ComenzarTratamiento = () => {
                                 return String(selected);
                               }
                               return (
-                                <Box component="span" sx={{ color: "rgba(46,46,46,0.55)" }}>
+                                <Box component="span" sx={{ color: "rgba(43,34,25,0.55)" }}>
                                   Selecciona tratamiento
                                 </Box>
                               );
@@ -1198,14 +1198,14 @@ const ComenzarTratamiento = () => {
                               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                                 {b.codigos && b.codigos.map((codigo, idx) => {
                                   const msgColor = codigo.mensajeTipo === "success"
-                                    ? "#2e7d32"
+                                    ? "#4f6d44"
                                     : codigo.mensajeTipo === "error"
-                                    ? "#d32f2f"
+                                    ? "#b3412e"
                                     : "#8a5a1a";
                                   const msgBg = codigo.mensajeTipo === "success"
-                                    ? "rgba(46,125,50,0.08)"
+                                    ? "rgba(79,109,68,0.08)"
                                     : codigo.mensajeTipo === "error"
-                                    ? "rgba(211,47,47,0.08)"
+                                    ? "rgba(179,65,46,0.08)"
                                     : "rgba(163,105,32,0.08)";
                                   return (
                                   <Box
@@ -1217,10 +1217,10 @@ const ComenzarTratamiento = () => {
                                       p: 1.2,
                                       borderRadius: 2,
                                       border: codigo.validado
-                                        ? "1px solid rgba(46,125,50,0.35)"
+                                        ? "1px solid rgba(79,109,68,0.35)"
                                         : "1px solid rgba(163,105,32,0.18)",
                                       backgroundColor: codigo.validado
-                                        ? "rgba(46,125,50,0.04)"
+                                        ? "rgba(79,109,68,0.04)"
                                         : "rgba(255,255,255,0.6)",
                                     }}
                                   >
@@ -1247,7 +1247,7 @@ const ComenzarTratamiento = () => {
                                       InputProps={{
                                         startAdornment: (
                                           <InputAdornment position="start">
-                                            <QrCodeScanner sx={{ color: codigo.validado ? "#2e7d32" : "#a36920" }} />
+                                            <QrCodeScanner sx={{ color: codigo.validado ? "#4f6d44" : "#a36920" }} />
                                           </InputAdornment>
                                         ),
                                         endAdornment: codigo.codigo ? (
@@ -1255,7 +1255,7 @@ const ComenzarTratamiento = () => {
                                             <Button
                                               size="small"
                                               onClick={() => validarCodigo(index, idx)}
-                                              sx={{ color: codigo.validado ? "#2e7d32" : "#a36920", fontWeight: 700, minWidth: "auto" }}
+                                              sx={{ color: codigo.validado ? "#4f6d44" : "#a36920", fontWeight: 700, minWidth: "auto" }}
                                             >
                                               {codigo.validado ? "Validado" : "Validar"}
                                             </Button>
@@ -1284,7 +1284,7 @@ const ComenzarTratamiento = () => {
                                       <IconButton
                                         size="small"
                                         onClick={() => eliminarCodigo(index, idx)}
-                                        sx={{ color: "#d32f2f" }}
+                                        sx={{ color: "#b3412e" }}
                                       >
                                         <Close fontSize="small" />
                                       </IconButton>
@@ -1402,7 +1402,7 @@ const ComenzarTratamiento = () => {
                     renderValue={(selected) => {
                       if (selected) return selected;
                       return (
-                        <Box component="span" sx={{ color: "rgba(46,46,46,0.55)" }}>
+                        <Box component="span" sx={{ color: "rgba(43,34,25,0.55)" }}>
                           Selecciona especialista
                         </Box>
                       );
@@ -1478,7 +1478,7 @@ const ComenzarTratamiento = () => {
           {/* Sección de Paquetes Contratados */}
           {paquetesPaciente.length > 0 && (
             <Box sx={{ mb: 3 }}>
-              <Typography sx={{ fontWeight: 700, color: "#1565c0", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography sx={{ fontWeight: 700, color: "#4f6b80", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
                 📦 Paquetes Contratados (En Curso)
               </Typography>
               <List sx={{ pt: 0 }}>
@@ -1491,21 +1491,21 @@ const ComenzarTratamiento = () => {
                       sx={{
                         borderRadius: 2,
                         mb: 1,
-                        border: "2px solid rgba(33, 150, 243, 0.4)",
-                        backgroundColor: "rgba(33, 150, 243, 0.05)",
+                        border: "2px solid rgba(95,127,150, 0.4)",
+                        backgroundColor: "rgba(95,127,150, 0.05)",
                         "&:hover": {
-                          backgroundColor: "rgba(33, 150, 243, 0.12)",
+                          backgroundColor: "rgba(95,127,150, 0.12)",
                         },
                       }}
                     >
                       <ListItemText
                         primary={
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Typography sx={{ fontWeight: 700, color: "#1565c0" }}>
+                            <Typography sx={{ fontWeight: 700, color: "#4f6b80" }}>
                               🎁 {paquete.paquete_nombre}
                             </Typography>
                             <Box sx={{ 
-                              backgroundColor: "#2196f3", 
+                              backgroundColor: "#5f7f96", 
                               color: "white", 
                               px: 1.5, 
                               py: 0.3, 
@@ -1519,16 +1519,16 @@ const ComenzarTratamiento = () => {
                         }
                         secondary={
                           <Box sx={{ mt: 0.5 }}>
-                            <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.6)" }}>
+                            <Typography variant="caption" sx={{ color: "rgba(43,34,25,0.6)" }}>
                               Progreso: {paquete.sesiones_completadas}/{paquete.sesiones_totales} sesiones
                             </Typography>
                             {sesionesPendientes.slice(0, 3).map((sesion, idx) => (
-                              <Typography key={idx} variant="body2" sx={{ color: "#1565c0" }}>
+                              <Typography key={idx} variant="body2" sx={{ color: "#4f6b80" }}>
                                 • {sesion.tratamiento_nombre} - Sesión {sesion.sesion_numero} (S/ {(sesion.precio_sesion || 0).toFixed(2)})
                               </Typography>
                             ))}
                             {sesionesPendientes.length > 3 && (
-                              <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.6)", fontStyle: "italic" }}>
+                              <Typography variant="body2" sx={{ color: "rgba(43,34,25,0.6)", fontStyle: "italic" }}>
                                 ... y {sesionesPendientes.length - 3} más
                               </Typography>
                             )}
@@ -1561,7 +1561,7 @@ const ComenzarTratamiento = () => {
                     sx={{
                       borderRadius: 2,
                       mb: 1,
-                      border: "1px solid rgba(212,175,55,0.25)",
+                      border: "1px solid rgba(186,154,99,0.25)",
                       "&:hover": {
                         backgroundColor: "rgba(163,105,32,0.08)",
                       },
@@ -1581,7 +1581,7 @@ const ComenzarTratamiento = () => {
                       secondary={
                         <Box sx={{ mt: 0.5 }}>
                           {(oferta.items || []).map((item, idx) => (
-                            <Typography key={idx} variant="body2" sx={{ color: "rgba(46,46,46,0.75)" }}>
+                            <Typography key={idx} variant="body2" sx={{ color: "rgba(43,34,25,0.75)" }}>
                               • {item.nombre || item.tratamiento || "Sin nombre"} - S/ {Number(item.precio || 0).toFixed(2)}
                             </Typography>
                           ))}
@@ -1596,7 +1596,7 @@ const ComenzarTratamiento = () => {
 
           {/* Mensaje si no hay nada */}
           {ofertasPaciente.length === 0 && paquetesPaciente.length === 0 && (
-            <Typography sx={{ color: "rgba(46,46,46,0.70)", py: 2, textAlign: "center" }}>
+            <Typography sx={{ color: "rgba(43,34,25,0.70)", py: 2, textAlign: "center" }}>
               Este paciente no tiene presupuestos ni paquetes registrados.
             </Typography>
           )}

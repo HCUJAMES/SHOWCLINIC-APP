@@ -215,7 +215,7 @@ export default function PacientesConDeudas() {
           p: { xs: 2.5, md: 4 },
           borderRadius: 4,
           backgroundColor: "rgba(255,255,255,0.88)",
-          border: "1px solid rgba(212,175,55,0.20)",
+          border: "1px solid rgba(186,154,99,0.20)",
           backdropFilter: "blur(10px)",
         }}
       >
@@ -354,7 +354,7 @@ export default function PacientesConDeudas() {
                     {role === "master" && (
                       <IconButton
                         size="small"
-                        sx={{ color: "#d32f2f" }}
+                        sx={{ color: "#b3412e" }}
                         title="Eliminar deuda"
                         onClick={() => {
                           setEliminarRow(r);
@@ -379,7 +379,7 @@ export default function PacientesConDeudas() {
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white", textAlign: "center" }}>
+        <DialogTitle sx={{ backgroundColor: "#b3412e", color: "white", textAlign: "center" }}>
           ⚠️ Eliminar Deuda
         </DialogTitle>
         <DialogContent sx={{ mt: 3, textAlign: "center" }}>
@@ -390,7 +390,7 @@ export default function PacientesConDeudas() {
             Tratamiento: <strong>{eliminarRow?.tratamiento_nombre || "—"}</strong>
           </Typography>
           <Typography variant="body2" sx={{ color: "#666", mb: 1 }}>
-            Saldo pendiente: <strong style={{ color: "#d32f2f" }}>S/ {Number(eliminarRow?.monto_saldo || 0).toFixed(2)}</strong>
+            Saldo pendiente: <strong style={{ color: "#b3412e" }}>S/ {Number(eliminarRow?.monto_saldo || 0).toFixed(2)}</strong>
           </Typography>
           <Typography variant="body2" sx={{ color: "#999", fontStyle: "italic", mt: 2 }}>
             {eliminarRow?.tipo_deuda === "tratamiento"
@@ -412,8 +412,8 @@ export default function PacientesConDeudas() {
             disabled={eliminandoDeuda}
             variant="contained"
             sx={{
-              backgroundColor: "#d32f2f",
-              "&:hover": { backgroundColor: "#b71c1c" },
+              backgroundColor: "#b3412e",
+              "&:hover": { backgroundColor: "#86301f" },
               borderRadius: 2,
               fontWeight: "bold",
             }}

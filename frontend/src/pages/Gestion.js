@@ -230,7 +230,7 @@ const Gestion = () => {
             p: { xs: 3, md: 5 },
             borderRadius: 4,
             backgroundColor: "rgba(255,255,255,0.88)",
-            border: "1px solid rgba(212,175,55,0.20)",
+            border: "1px solid rgba(186,154,99,0.20)",
             backdropFilter: "blur(10px)",
           }}
         >
@@ -246,7 +246,7 @@ const Gestion = () => {
             </Typography>
           </Box>
 
-          <Typography variant="body1" sx={{ mb: 4, color: "rgba(46,46,46,0.75)", textAlign: "center" }}>
+          <Typography variant="body1" sx={{ mb: 4, color: "rgba(43,34,25,0.75)", textAlign: "center" }}>
             Herramientas de administración exclusivas para el usuario master
           </Typography>
 
@@ -257,7 +257,7 @@ const Gestion = () => {
               sx={{
                 p: 3,
                 borderRadius: 3,
-                border: "1px solid rgba(212,175,55,0.25)",
+                border: "1px solid rgba(186,154,99,0.25)",
                 backgroundColor: "rgba(255,255,255,0.95)",
               }}
             >
@@ -267,16 +267,16 @@ const Gestion = () => {
                   <Typography variant="h6" sx={{ color: colorPrincipal, fontWeight: 700 }}>
                     Backup de Base de Datos
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.70)" }}>
+                  <Typography variant="body2" sx={{ color: "rgba(43,34,25,0.70)" }}>
                     Genera una copia de seguridad completa de toda la información del sistema
                   </Typography>
                 </Box>
               </Box>
               
-              <Typography variant="body2" sx={{ mb: 2, color: "rgba(46,46,46,0.65)" }}>
+              <Typography variant="body2" sx={{ mb: 2, color: "rgba(43,34,25,0.65)" }}>
                 El backup incluye:
               </Typography>
-              <ul style={{ margin: 0, paddingLeft: 20, color: "rgba(46,46,46,0.65)" }}>
+              <ul style={{ margin: 0, paddingLeft: 20, color: "rgba(43,34,25,0.65)" }}>
                 <li>Datos de pacientes y historial clínico</li>
                 <li>Tratamientos realizados y presupuestos</li>
                 <li>Inventario y movimientos de stock</li>
@@ -298,7 +298,7 @@ const Gestion = () => {
                   fontWeight: 700,
                   fontSize: "1rem",
                   borderRadius: 2,
-                  "&:hover": { backgroundColor: "#8a541a" },
+                  "&:hover": { backgroundColor: "#8a5a1a" },
                   "&:disabled": { backgroundColor: "rgba(163,105,32,0.5)" },
                 }}
               >
@@ -312,7 +312,7 @@ const Gestion = () => {
               sx={{
                 p: 3,
                 borderRadius: 3,
-                border: "1px solid rgba(212,175,55,0.25)",
+                border: "1px solid rgba(186,154,99,0.25)",
                 backgroundColor: "rgba(255,255,255,0.95)",
               }}
             >
@@ -322,16 +322,16 @@ const Gestion = () => {
                   <Typography variant="h6" sx={{ color: colorPrincipal, fontWeight: 700 }}>
                     Backup de Imágenes
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "rgba(46,46,46,0.70)" }}>
+                  <Typography variant="body2" sx={{ color: "rgba(43,34,25,0.70)" }}>
                     Descarga todas las fotos y archivos del sistema en un archivo ZIP
                   </Typography>
                 </Box>
               </Box>
               
-              <Typography variant="body2" sx={{ mb: 2, color: "rgba(46,46,46,0.65)" }}>
+              <Typography variant="body2" sx={{ mb: 2, color: "rgba(43,34,25,0.65)" }}>
                 El backup incluye:
               </Typography>
-              <ul style={{ margin: 0, paddingLeft: 20, color: "rgba(46,46,46,0.65)" }}>
+              <ul style={{ margin: 0, paddingLeft: 20, color: "rgba(43,34,25,0.65)" }}>
                 <li>Fotos de perfil de pacientes</li>
                 <li>Fotos de tratamientos realizados (antes/después)</li>
                 <li>Documentos PDF de inventario</li>
@@ -347,12 +347,12 @@ const Gestion = () => {
                 sx={{
                   mt: 3,
                   py: 1.5,
-                  backgroundColor: "#1976d2",
+                  backgroundColor: "#4f6b80",
                   fontWeight: 700,
                   fontSize: "1rem",
                   borderRadius: 2,
                   "&:hover": { backgroundColor: "#115293" },
-                  "&:disabled": { backgroundColor: "rgba(25,118,210,0.5)" },
+                  "&:disabled": { backgroundColor: "rgba(79,107,128,0.5)" },
                 }}
               >
                 {generandoBackupImagenes ? "Generando Backup..." : "Descargar Imágenes"}
@@ -365,8 +365,8 @@ const Gestion = () => {
                 p: 4,
                 borderRadius: 4,
                 background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(255,250,245,0.98) 100%)",
-                border: "2px solid rgba(211,47,47,0.12)",
-                boxShadow: "0 8px 32px rgba(211,47,47,0.08)",
+                border: "2px solid rgba(179,65,46,0.12)",
+                boxShadow: "0 8px 32px rgba(179,65,46,0.08)",
               }}
             >
               <Box sx={{ display: "flex", alignItems: "flex-start", gap: 3, mb: 3 }}>
@@ -384,7 +384,7 @@ const Gestion = () => {
                   <Typography 
                     variant="h5" 
                     sx={{ 
-                      color: "#d32f2f", 
+                      color: "#b3412e", 
                       fontWeight: 800,
                       mb: 0.5,
                       letterSpacing: "-0.5px"
@@ -395,7 +395,7 @@ const Gestion = () => {
                   <Typography 
                     variant="body2" 
                     sx={{ 
-                      color: "rgba(46,46,46,0.65)",
+                      color: "rgba(43,34,25,0.65)",
                       lineHeight: 1.6,
                       maxWidth: "600px"
                     }}
@@ -422,12 +422,12 @@ const Gestion = () => {
                   textTransform: "none",
                   boxShadow: "0 4px 20px rgba(238,90,111,0.25)",
                   "&:hover": { 
-                    background: "linear-gradient(135deg, #ee5a6f 0%, #d32f2f 100%)",
+                    background: "linear-gradient(135deg, #ee5a6f 0%, #b3412e 100%)",
                     boxShadow: "0 6px 28px rgba(238,90,111,0.35)",
                     transform: "translateY(-2px)",
                   },
                   "&:disabled": { 
-                    background: "rgba(211,47,47,0.3)",
+                    background: "rgba(179,65,46,0.3)",
                     color: "rgba(255,255,255,0.7)"
                   },
                   transition: "all 0.3s ease",
@@ -447,14 +447,14 @@ const Gestion = () => {
                       p: 2.5,
                       borderRadius: 3,
                       background: "linear-gradient(135deg, rgba(255,107,107,0.08) 0%, rgba(238,90,111,0.08) 100%)",
-                      border: "1px solid rgba(211,47,47,0.15)"
+                      border: "1px solid rgba(179,65,46,0.15)"
                     }}
                   >
                     <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 700, color: "#d32f2f", mb: 0.5 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 700, color: "#b3412e", mb: 0.5 }}>
                         {huerfanos.length} {huerfanos.length === 1 ? "Tratamiento" : "Tratamientos"} Encontrado{huerfanos.length === 1 ? "" : "s"}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.6)" }}>
+                      <Typography variant="caption" sx={{ color: "rgba(43,34,25,0.6)" }}>
                         Selecciona los tratamientos que deseas eliminar
                       </Typography>
                     </Box>
@@ -470,9 +470,9 @@ const Gestion = () => {
                         fontWeight: 700,
                         borderRadius: 2.5,
                         textTransform: "none",
-                        boxShadow: "0 4px 16px rgba(211,47,47,0.25)",
+                        boxShadow: "0 4px 16px rgba(179,65,46,0.25)",
                         "&:hover": {
-                          boxShadow: "0 6px 24px rgba(211,47,47,0.35)",
+                          boxShadow: "0 6px 24px rgba(179,65,46,0.35)",
                           transform: "translateY(-2px)",
                         },
                         transition: "all 0.3s ease",
@@ -486,7 +486,7 @@ const Gestion = () => {
                     sx={{ 
                       overflowX: "auto",
                       borderRadius: 3,
-                      border: "1px solid rgba(211,47,47,0.12)",
+                      border: "1px solid rgba(179,65,46,0.12)",
                       boxShadow: "0 2px 12px rgba(0,0,0,0.04)"
                     }}
                   >
@@ -494,17 +494,17 @@ const Gestion = () => {
                       <TableHead>
                         <TableRow 
                           sx={{ 
-                            background: "linear-gradient(135deg, rgba(211,47,47,0.12) 0%, rgba(238,90,111,0.12) 100%)"
+                            background: "linear-gradient(135deg, rgba(179,65,46,0.12) 0%, rgba(238,90,111,0.12) 100%)"
                           }}
                         >
-                          <TableCell sx={{ fontWeight: 800, color: "#d32f2f", fontSize: "0.85rem" }}>ID</TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: "#d32f2f", fontSize: "0.85rem" }}>Fecha</TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: "#d32f2f", fontSize: "0.85rem" }}>Tratamiento</TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: "#d32f2f", fontSize: "0.85rem" }}>Especialista</TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: "#d32f2f", fontSize: "0.85rem" }}>Precio</TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: "#d32f2f", fontSize: "0.85rem" }}>Sesión</TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: "#d32f2f", fontSize: "0.85rem" }}>Estado</TableCell>
-                          <TableCell sx={{ fontWeight: 800, color: "#d32f2f", fontSize: "0.85rem", textAlign: "center" }}>Acción</TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: "#b3412e", fontSize: "0.85rem" }}>ID</TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: "#b3412e", fontSize: "0.85rem" }}>Fecha</TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: "#b3412e", fontSize: "0.85rem" }}>Tratamiento</TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: "#b3412e", fontSize: "0.85rem" }}>Especialista</TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: "#b3412e", fontSize: "0.85rem" }}>Precio</TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: "#b3412e", fontSize: "0.85rem" }}>Sesión</TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: "#b3412e", fontSize: "0.85rem" }}>Estado</TableCell>
+                          <TableCell sx={{ fontWeight: 800, color: "#b3412e", fontSize: "0.85rem", textAlign: "center" }}>Acción</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -526,13 +526,13 @@ const Gestion = () => {
                                 size="small" 
                                 sx={{ 
                                   fontWeight: 700,
-                                  backgroundColor: "rgba(211,47,47,0.1)",
-                                  color: "#d32f2f"
+                                  backgroundColor: "rgba(179,65,46,0.1)",
+                                  color: "#b3412e"
                                 }}
                               />
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: "0.85rem", color: "rgba(46,46,46,0.8)" }}>
+                              <Typography variant="body2" sx={{ fontSize: "0.85rem", color: "rgba(43,34,25,0.8)" }}>
                                 {h.fecha ? new Date(h.fecha).toLocaleDateString("es-PE", { 
                                   day: "2-digit", 
                                   month: "short", 
@@ -544,14 +544,14 @@ const Gestion = () => {
                             </TableCell>
                             <TableCell>
                               <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: "#2e2e2e", mb: 0.3 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: "#2b2219", mb: 0.3 }}>
                                   {h.tratamiento_nombre}
                                 </Typography>
                                 {h.productos?.length > 0 && (
                                   <Typography 
                                     variant="caption" 
                                     sx={{ 
-                                      color: "rgba(46,46,46,0.55)",
+                                      color: "rgba(43,34,25,0.55)",
                                       display: "block",
                                       fontSize: "0.75rem"
                                     }}
@@ -562,12 +562,12 @@ const Gestion = () => {
                               </Box>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontSize: "0.85rem", color: "rgba(46,46,46,0.75)" }}>
+                              <Typography variant="body2" sx={{ fontSize: "0.85rem", color: "rgba(43,34,25,0.75)" }}>
                                 {h.especialista || "-"}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2" sx={{ fontWeight: 700, color: "#2e2e2e", fontSize: "0.9rem" }}>
+                              <Typography variant="body2" sx={{ fontWeight: 700, color: "#2b2219", fontSize: "0.9rem" }}>
                                 S/ {(h.precio_total || 0).toFixed(2)}
                               </Typography>
                             </TableCell>
@@ -587,8 +587,8 @@ const Gestion = () => {
                                 label={h.paciente_id == null ? "Sin Paciente" : h.paciente_id === 0 ? "ID: 0" : `ID: ${h.paciente_id} (Eliminado)`}
                                 size="small"
                                 sx={{
-                                  backgroundColor: "rgba(211,47,47,0.15)",
-                                  color: "#d32f2f",
+                                  backgroundColor: "rgba(179,65,46,0.15)",
+                                  color: "#b3412e",
                                   fontWeight: 700,
                                   fontSize: "0.75rem"
                                 }}
@@ -600,9 +600,9 @@ const Gestion = () => {
                                 onClick={() => eliminarHuerfano(h.id)}
                                 title="Eliminar este tratamiento y devolver productos al inventario"
                                 sx={{
-                                  backgroundColor: "rgba(211,47,47,0.08)",
+                                  backgroundColor: "rgba(179,65,46,0.08)",
                                   "&:hover": {
-                                    backgroundColor: "rgba(211,47,47,0.18)",
+                                    backgroundColor: "rgba(179,65,46,0.18)",
                                     transform: "scale(1.1)",
                                   },
                                   transition: "all 0.2s ease"

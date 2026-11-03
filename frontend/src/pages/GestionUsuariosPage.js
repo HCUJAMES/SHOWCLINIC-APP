@@ -82,14 +82,14 @@ const availableModules = [
 
 const defaultRoleConfig = {
   master: { label: "Master", color: "#a36920", icon: <Shield sx={{ fontSize: 16 }} /> },
-  admin: { label: "Admin", color: "#1976d2", icon: <AdminPanelSettings sx={{ fontSize: 16 }} /> },
-  doctor: { label: "Doctor", color: "#2e7d32", icon: <Person sx={{ fontSize: 16 }} /> },
-  doctora: { label: "Doctora", color: "#7b1fa2", icon: <Person sx={{ fontSize: 16 }} /> },
-  asistente: { label: "Asistente", color: "#ed6c02", icon: <SupervisorAccount sx={{ fontSize: 16 }} /> },
-  logistica: { label: "Logística", color: "#0288d1", icon: <SupervisorAccount sx={{ fontSize: 16 }} /> },
+  admin: { label: "Admin", color: "#4f6b80", icon: <AdminPanelSettings sx={{ fontSize: 16 }} /> },
+  doctor: { label: "Doctor", color: "#4f6d44", icon: <Person sx={{ fontSize: 16 }} /> },
+  doctora: { label: "Doctora", color: "#845a72", icon: <Person sx={{ fontSize: 16 }} /> },
+  asistente: { label: "Asistente", color: "#a8612a", icon: <SupervisorAccount sx={{ fontSize: 16 }} /> },
+  logistica: { label: "Logística", color: "#4f6b80", icon: <SupervisorAccount sx={{ fontSize: 16 }} /> },
 };
 
-const roleColors = ["#a36920", "#1976d2", "#2e7d32", "#7b1fa2", "#ed6c02", "#0288d1", "#d32f2f", "#388e3c", "#f57c00", "#5c6bc0"];
+const roleColors = ["#a36920", "#4f6b80", "#4f6d44", "#845a72", "#a8612a", "#4f6b80", "#b3412e", "#4f6d44", "#b8742a", "#5c6bc0"];
 
 export default function GestionUsuariosPage() {
   const navigate = useNavigate();
@@ -378,7 +378,7 @@ export default function GestionUsuariosPage() {
                 <ArrowBack sx={{ color: BRAND_COLORS.primary }} />
               </IconButton>
               <Box sx={{ flex: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2e2e2e", letterSpacing: "-0.5px" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2b2219", letterSpacing: "-0.5px" }}>
                   Gestión de Usuarios
                 </Typography>
                 <Typography variant="body2" sx={{ color: "#999", mt: 0.5 }}>
@@ -414,19 +414,19 @@ export default function GestionUsuariosPage() {
                   </Grid>
                   <Grid item xs={6} sm={3}>
                     <Paper sx={{ p: 2, textAlign: "center", borderRadius: 2, border: "1px solid #2e7d3220", backgroundColor: "white" }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: "#2e7d32" }}>{usuarios.filter(u => u.role === "doctor" || u.role === "doctora").length}</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: "#4f6d44" }}>{usuarios.filter(u => u.role === "doctor" || u.role === "doctora").length}</Typography>
                       <Typography variant="caption" sx={{ color: "#999" }}>Doctores</Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={6} sm={3}>
                     <Paper sx={{ p: 2, textAlign: "center", borderRadius: 2, border: "1px solid #ed6c0220", backgroundColor: "white" }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: "#ed6c02" }}>{usuarios.filter(u => u.role === "asistente").length}</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: "#a8612a" }}>{usuarios.filter(u => u.role === "asistente").length}</Typography>
                       <Typography variant="caption" sx={{ color: "#999" }}>Asistentes</Typography>
                     </Paper>
                   </Grid>
                   <Grid item xs={6} sm={3}>
                     <Paper sx={{ p: 2, textAlign: "center", borderRadius: 2, border: "1px solid #1976d220", backgroundColor: "white" }}>
-                      <Typography variant="h4" sx={{ fontWeight: 700, color: "#1976d2" }}>{usuarios.filter(u => u.role === "admin").length}</Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 700, color: "#4f6b80" }}>{usuarios.filter(u => u.role === "admin").length}</Typography>
                       <Typography variant="caption" sx={{ color: "#999" }}>Admins</Typography>
                     </Paper>
                   </Grid>
@@ -447,7 +447,7 @@ export default function GestionUsuariosPage() {
                                   {u.username.charAt(0).toUpperCase()}
                                 </Avatar>
                                 <Box>
-                                  <Typography sx={{ fontWeight: 700, color: "#2e2e2e", fontSize: "1rem", lineHeight: 1.2 }}>{u.username}</Typography>
+                                  <Typography sx={{ fontWeight: 700, color: "#2b2219", fontSize: "1rem", lineHeight: 1.2 }}>{u.username}</Typography>
                                   <Chip icon={rc.icon} label={rc.label} size="small" sx={{ mt: 0.5, height: 22, backgroundColor: `${rc.color}12`, color: rc.color, fontWeight: 600, fontSize: "0.7rem", border: `1px solid ${rc.color}30`, "& .MuiChip-icon": { color: rc.color } }} />
                                 </Box>
                               </Box>
@@ -460,7 +460,7 @@ export default function GestionUsuariosPage() {
                                       </IconButton>
                                     </Tooltip>
                                     <Tooltip title="Eliminar">
-                                      <IconButton size="small" onClick={() => eliminarUsuario(u.id, u.username)} sx={{ color: "#ccc", "&:hover": { color: "#d32f2f", backgroundColor: "#ffeaea" } }}>
+                                      <IconButton size="small" onClick={() => eliminarUsuario(u.id, u.username)} sx={{ color: "#ccc", "&:hover": { color: "#b3412e", backgroundColor: "#ffeaea" } }}>
                                         <Delete fontSize="small" />
                                       </IconButton>
                                     </Tooltip>
@@ -473,9 +473,9 @@ export default function GestionUsuariosPage() {
                               {activePerms.length > 0 ? (
                                 <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                                   {activePerms.slice(0, 4).map((perm, idx) => (
-                                    <Chip key={idx} label={availableModules.find(m => m.key === perm.module_name)?.name || perm.module_name} size="small" icon={perm.can_edit ? <CheckCircle sx={{ fontSize: "14px !important" }} /> : undefined} sx={{ height: 22, fontSize: "0.65rem", backgroundColor: perm.can_edit ? "#e8f5e9" : "#f5f1e4", color: perm.can_edit ? "#2e7d32" : "#8a5a1a", border: perm.can_edit ? "1px solid #c8e6c9" : "1px solid #e0d6c2", "& .MuiChip-icon": { color: "#2e7d32" } }} />
+                                    <Chip key={idx} label={availableModules.find(m => m.key === perm.module_name)?.name || perm.module_name} size="small" icon={perm.can_edit ? <CheckCircle sx={{ fontSize: "14px !important" }} /> : undefined} sx={{ height: 22, fontSize: "0.65rem", backgroundColor: perm.can_edit ? "#eef2ea" : "#f5f1e4", color: perm.can_edit ? "#4f6d44" : "#8a5a1a", border: perm.can_edit ? "1px solid #c8e6c9" : "1px solid #e0d6c2", "& .MuiChip-icon": { color: "#4f6d44" } }} />
                                   ))}
-                                  {activePerms.length > 4 && <Chip label={`+${activePerms.length - 4} más`} size="small" sx={{ height: 22, fontSize: "0.65rem", backgroundColor: "#f5f5f5", color: "#999" }} />}
+                                  {activePerms.length > 4 && <Chip label={`+${activePerms.length - 4} más`} size="small" sx={{ height: 22, fontSize: "0.65rem", backgroundColor: "#f5f2ea", color: "#999" }} />}
                                 </Box>
                               ) : (
                                 <Typography variant="caption" sx={{ color: "#ccc", fontStyle: "italic" }}>Sin permisos asignados</Typography>
@@ -559,7 +559,7 @@ export default function GestionUsuariosPage() {
                               <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                                 <Avatar sx={{ width: 40, height: 40, backgroundColor: `${color}15`, color }}><Badge /></Avatar>
                                 <Box>
-                                  <Typography sx={{ fontWeight: 700, color: "#2e2e2e" }}>{role.label}</Typography>
+                                  <Typography sx={{ fontWeight: 700, color: "#2b2219" }}>{role.label}</Typography>
                                   <Typography variant="caption" sx={{ color: "#999" }}>@{role.name} · {usersCount} usuario{usersCount !== 1 ? "s" : ""}</Typography>
                                 </Box>
                               </Box>
@@ -568,7 +568,7 @@ export default function GestionUsuariosPage() {
                                   <IconButton size="small" onClick={() => abrirEditarRol(role)} sx={{ color: "#bbb", "&:hover": { color } }}><Edit fontSize="small" /></IconButton>
                                 </Tooltip>
                                 <Tooltip title="Eliminar rol">
-                                  <IconButton size="small" onClick={() => eliminarRol(role.id, role.label)} sx={{ color: "#ccc", "&:hover": { color: "#d32f2f" } }}><Delete fontSize="small" /></IconButton>
+                                  <IconButton size="small" onClick={() => eliminarRol(role.id, role.label)} sx={{ color: "#ccc", "&:hover": { color: "#b3412e" } }}><Delete fontSize="small" /></IconButton>
                                 </Tooltip>
                               </Stack>
                             </Box>
@@ -592,7 +592,7 @@ export default function GestionUsuariosPage() {
 
       {/* Dialog: Crear Usuario */}
       <Dialog open={openCreateUser} onClose={() => { setOpenCreateUser(false); setShowCreatePassword(false); }} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #c48a3a 100%)`, color: "white", py: 2.5 }}>
+        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #a36920 100%)`, color: "white", py: 2.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <PersonAdd />
             <Box>
@@ -613,7 +613,7 @@ export default function GestionUsuariosPage() {
               {renderRoleSelect(newUser.role, (e) => setNewUser({ ...newUser, role: e.target.value }))}
             </Grid>
             <Grid item xs={12}>
-              <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 700, color: "#2e2e2e" }}>Permisos de Módulos</Typography>
+              <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 700, color: "#2b2219" }}>Permisos de Módulos</Typography>
               <Alert severity="info" sx={{ mb: 2, fontSize: "0.8rem" }}><strong>Acceso</strong> = puede ver el módulo | <strong>Editar</strong> = puede modificar datos</Alert>
               <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
                 <Table size="small">
@@ -629,7 +629,7 @@ export default function GestionUsuariosPage() {
                       <TableRow key={mod.key} hover>
                         <TableCell sx={{ fontWeight: 500 }}>{mod.name}</TableCell>
                         <TableCell align="center"><Checkbox checked={getNewUserPermission(mod.key, 'can_access')} onChange={() => toggleNewUserPermission(mod.key, 'can_access')} sx={{ color: BRAND_COLORS.secondary, "&.Mui-checked": { color: BRAND_COLORS.primary } }} /></TableCell>
-                        <TableCell align="center"><Checkbox checked={getNewUserPermission(mod.key, 'can_edit')} onChange={() => toggleNewUserPermission(mod.key, 'can_edit')} sx={{ color: BRAND_COLORS.secondary, "&.Mui-checked": { color: "#2e7d32" } }} /></TableCell>
+                        <TableCell align="center"><Checkbox checked={getNewUserPermission(mod.key, 'can_edit')} onChange={() => toggleNewUserPermission(mod.key, 'can_edit')} sx={{ color: BRAND_COLORS.secondary, "&.Mui-checked": { color: "#4f6d44" } }} /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -646,7 +646,7 @@ export default function GestionUsuariosPage() {
 
       {/* Dialog: Editar Usuario (nombre + rol) */}
       <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #c48a3a 100%)`, color: "white", py: 2.5 }}>
+        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #a36920 100%)`, color: "white", py: 2.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Edit />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Editar Usuario</Typography>
@@ -666,7 +666,7 @@ export default function GestionUsuariosPage() {
 
       {/* Dialog: Editar Permisos */}
       <Dialog open={openPermissionsDialog} onClose={() => setOpenPermissionsDialog(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #c48a3a 100%)`, color: "white", py: 2.5 }}>
+        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #a36920 100%)`, color: "white", py: 2.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <LockOpen />
             <Box>
@@ -689,8 +689,8 @@ export default function GestionUsuariosPage() {
                 {tempPermissions.map((perm) => (
                   <TableRow key={perm.module_name} hover>
                     <TableCell sx={{ fontWeight: 500 }}>{perm.module_label}</TableCell>
-                    <TableCell align="center"><IconButton size="small" onClick={() => togglePermission(perm.module_name, 'can_access')} sx={{ color: perm.can_access ? "#4caf50" : "#ddd" }}>{perm.can_access ? <CheckCircle /> : <Cancel />}</IconButton></TableCell>
-                    <TableCell align="center"><IconButton size="small" onClick={() => togglePermission(perm.module_name, 'can_edit')} sx={{ color: perm.can_edit ? "#4caf50" : "#ddd" }}>{perm.can_edit ? <CheckCircle /> : <Cancel />}</IconButton></TableCell>
+                    <TableCell align="center"><IconButton size="small" onClick={() => togglePermission(perm.module_name, 'can_access')} sx={{ color: perm.can_access ? "#5f7f52" : "#ddd" }}>{perm.can_access ? <CheckCircle /> : <Cancel />}</IconButton></TableCell>
+                    <TableCell align="center"><IconButton size="small" onClick={() => togglePermission(perm.module_name, 'can_edit')} sx={{ color: perm.can_edit ? "#5f7f52" : "#ddd" }}>{perm.can_edit ? <CheckCircle /> : <Cancel />}</IconButton></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -705,7 +705,7 @@ export default function GestionUsuariosPage() {
 
       {/* Dialog: Crear Rol */}
       <Dialog open={openCreateRole} onClose={() => setOpenCreateRole(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #c48a3a 100%)`, color: "white", py: 2.5 }}>
+        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #a36920 100%)`, color: "white", py: 2.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Add />
             <Box>
@@ -737,7 +737,7 @@ export default function GestionUsuariosPage() {
 
       {/* Dialog: Editar Rol */}
       <Dialog open={openEditRole} onClose={() => setOpenEditRole(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #c48a3a 100%)`, color: "white", py: 2.5 }}>
+        <DialogTitle sx={{ background: `linear-gradient(135deg, ${BRAND_COLORS.primary} 0%, #a36920 100%)`, color: "white", py: 2.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
             <Edit />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>Editar Rol</Typography>

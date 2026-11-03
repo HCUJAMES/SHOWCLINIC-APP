@@ -93,7 +93,7 @@ const AppLayout = () => {
               mx: 1.0,
               borderRadius: 2,
               "&.Mui-selected": {
-                backgroundColor: "rgba(212,175,55,0.18)",
+                backgroundColor: "rgba(186,154,99,0.18)",
               },
             }}
           >
@@ -127,8 +127,8 @@ const AppLayout = () => {
           zIndex: (theme) => theme.zIndex.drawer + 1,
           background: "rgba(255,255,255,0.78)",
           backdropFilter: "blur(10px)",
-          borderBottom: "1px solid rgba(212,175,55,0.22)",
-          color: "#2E2E2E",
+          borderBottom: "1px solid rgba(186,154,99,0.22)",
+          color: "#2b2219",
         }}
       >
         <Toolbar sx={{ gap: 1 }}>
@@ -178,7 +178,7 @@ const AppLayout = () => {
             "& .MuiDrawer-paper": {
               width: drawerWidth,
               boxSizing: "border-box",
-              borderRight: "1px solid rgba(212,175,55,0.22)",
+              borderRight: "1px solid rgba(186,154,99,0.22)",
               backgroundColor: "rgba(255,255,255,0.78)",
               backdropFilter: "blur(10px)",
             },

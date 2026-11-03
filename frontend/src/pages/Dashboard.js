@@ -3,7 +3,6 @@ import {
   Typography,
   Box,
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   Button,
@@ -14,8 +13,6 @@ import {
   ListItemButton,
   ListItemText,
   CircularProgress,
-  Collapse,
-  Paper,
 } from "@mui/material";
 import {
   People,
@@ -35,10 +32,13 @@ import {
   QrCode2,
   MonetizationOn,
   VideoLibrary,
+  LogoutRounded,
+  ChevronRight,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import PanelRecordatorios from "../components/PanelRecordatorios";
+import { BRAND, FONTS, LOGOS } from "../brand";
 
 const MotionBox = motion(Box);
 
@@ -86,9 +86,7 @@ const MODULO_VIDEOS = {
 // Con pocos módulos no vale la pena partir en secciones: se muestran juntos.
 const MINIMO_PARA_AGRUPAR = 7;
 
-const ORO = "#a36920";
-const ORO_CLARO = "#d4af37";
-const ORO_SUAVE = "#ba9a63";
+const ORO = BRAND.oro;
 
 const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
 
@@ -96,33 +94,9 @@ const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//
 
 const suave = [0.22, 1, 0.36, 1];
 
-const contenedor = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06, delayChildren: 0.15 } },
-};
-
 const subir = {
-  hidden: { opacity: 0, y: 22 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: suave } },
-};
-
-// Cada tarjeta se anima por su cuenta (no hereda del contenedor) y entra
-// escalonada según su posición, que llega por `custom`.
-const tarjeta = {
-  hidden: { opacity: 0, y: 26, scale: 0.97 },
-  show: (i = 0) => ({
-    opacity: 1, y: 0, scale: 1,
-    transition: { duration: 0.5, ease: suave, delay: 0.35 + Math.min(i, 12) * 0.06 },
-  }),
-  hover: { y: -6, transition: { type: "spring", stiffness: 320, damping: 22 } },
-};
-
-// Los hijos declaran también "hidden": si no, aparecen un instante en su
-// estado por defecto antes de que el padre termine de entrar.
-const iconoTarjeta = {
-  hidden: { rotate: 0, scale: 1 },
-  show: { rotate: 0, scale: 1 },
-  hover: { rotate: -6, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 16 } },
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: suave } },
 };
 
 export default function Dashboard() {
@@ -134,6 +108,10 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const fechaHoy = useMemo(
+    () => new Date().toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long" }),
+    []
+  );
 
   // Menú según rol
   const menuItemsByRole = {
@@ -257,35 +235,6 @@ export default function Dashboard() {
     return lista;
   }, [menuItems]);
 
-  // Cuantos más módulos tenga el rol, antes conviene compactar para que
-  // todo siga entrando en una pantalla.
-  const mqCompacto = `@media (max-height: ${menuItems.length >= 11 ? 1300 : 1150}px)`;
-  // Segundo escalón: la portada se encoge y el cuadro con ella, porque a
-  // partir de aquí el icono a tamaño normal ya no cabría dentro.
-  const altoMini = menuItems.length >= 11 ? 1180 : 980;
-  const mqMini = `@media (max-height: ${altoMini}px)`;
-  // El mismo escalón, pero sólo donde la rejilla es de cuatro columnas.
-  const mqMiniAncho = `@media (max-height: ${altoMini}px) and (min-width: 1200px)`;
-
-  // Las tarjetas son cuadradas, así que su alto lo manda el ancho de la
-  // columna. Para que todas las filas sigan entrando en una pantalla se
-  // limita el ancho de la rejilla en función del alto disponible.
-  const anchoRejilla = useMemo(() => {
-    const filas = Math.max(1, secciones.length);
-    const POR_SECCION = 50;   // rótulo de la sección y su separación
-    const GAP = 22;
-    // El suelo evita que en pantallas muy bajas el cuadro se encoja tanto que
-    // el icono y el texto no quepan; ahí se prefiere que la página desplace.
-    const formula = (cromo) =>
-      `max(600px, min(1300px, calc((100vh - ${cromo}px - ${filas * POR_SECCION}px) / ${filas} * 4 + ${GAP * 3}px)))`;
-    return {
-      // Con la portada completa (logo grande, nombre grande).
-      normal: formula(246),
-      // Con la portada encogida, que es la que se usa en pantallas bajas.
-      mini: formula(178),
-    };
-  }, [secciones.length]);
-
   const username = localStorage.getItem("username") || role;
   const hora = new Date().getHours();
   const saludo = hora < 12 ? "Buenos días" : hora < 18 ? "Buenas tardes" : "Buenas noches";
@@ -361,6 +310,18 @@ export default function Dashboard() {
     }
   };
 
+  const cerrarSesion = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    navigate("/", { replace: true });
+  };
+
+  const cerrarBusqueda = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
   /* ─────────────────────────── una tarjeta ─────────────────────────── */
   const renderTarjeta = (item, index = 0) => {
     const IconComponent = moduleIcons[item.title];
@@ -369,188 +330,112 @@ export default function Dashboard() {
     return (
       <MotionBox
         key={item.title}
-        custom={index}
-        initial="hidden"
-        animate="show"
-        variants={tarjeta}
-        whileHover={isLocked ? undefined : "hover"}
-        whileTap={isLocked ? undefined : { scale: 0.985 }}
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: suave, delay: 0.1 + Math.min(index, 12) * 0.04 }}
         onClick={() => abrirModulo(item)}
-        className="modulo-cuadro"
         role="button"
         tabIndex={0}
+        aria-disabled={isLocked || undefined}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrirModulo(item); } }}
         sx={{
           position: "relative",
           cursor: "pointer",
-          borderRadius: "22px",
-          // Cuadrado de verdad a partir de tablet. En móvil la rejilla es de
-          // una sola columna y un cuadrado ocuparía toda la pantalla.
-          aspectRatio: { xs: "auto", sm: "1 / 1" },
-          px: 1.5,
-          py: { xs: 2.5, sm: 1.5 },
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-          gap: 1.4,
-          [mqCompacto]: { gap: 0.9, px: 1.2 },
-          [mqMini]: { gap: 0.6, px: 1, py: 0.75 },
-          overflow: "hidden",
-          isolation: "isolate",
-          // Tarjeta clara y limpia: blanco roto con el dorado sólo como acento.
-          background: isLocked
-            ? "linear-gradient(165deg, #f4f1ec 0%, #ebe6dd 100%)"
-            : "linear-gradient(165deg, #ffffff 0%, #fdfaf5 100%)",
-          border: `1px solid ${isLocked ? "rgba(120,100,80,0.14)" : "rgba(163,105,32,0.16)"}`,
-          boxShadow: isLocked
-            ? "0 1px 2px rgba(90,66,44,0.04)"
-            : "0 1px 2px rgba(90,66,44,0.05), 0 12px 28px -20px rgba(90,66,44,0.45)",
-          opacity: isLocked ? 0.7 : 1,
-          transition: "box-shadow .35s ease, border-color .35s ease",
+          gap: 2,
+          p: { xs: 2, sm: 2.25 },
+          minHeight: { xs: 84, sm: 104 },
+          borderRadius: "16px",
+          backgroundColor: isLocked ? "#f1ece1" : BRAND.blanco,
+          border: `1px solid ${isLocked ? "rgba(107,93,77,0.14)" : BRAND.borde}`,
+          boxShadow: isLocked ? "none" : "0 1px 2px rgba(92,60,18,0.04)",
+          opacity: isLocked ? 0.75 : 1,
+          transition: "border-color .2s ease, box-shadow .2s ease, transform .2s ease",
           outline: "none",
-          "&:focus-visible": { boxShadow: `0 0 0 3px rgba(163,105,32,0.35)` },
           "&:hover": isLocked ? {} : {
-            borderColor: "rgba(163,105,32,0.42)",
-            boxShadow: "0 2px 6px rgba(90,66,44,0.07), 0 26px 46px -26px rgba(90,66,44,0.55)",
+            borderColor: BRAND.arena,
+            boxShadow: "0 12px 28px -18px rgba(92,60,18,0.45)",
+            transform: "translateY(-2px)",
           },
-          // Velo dorado muy tenue que sube desde el pie al pasar el cursor
-          "&::before": {
-            content: '""',
-            position: "absolute",
-            inset: 0,
-            background: "radial-gradient(120% 80% at 50% 118%, rgba(212,175,55,0.20) 0%, rgba(212,175,55,0) 62%)",
-            opacity: 0,
-            transition: "opacity .45s ease",
-            pointerEvents: "none",
-          },
-          "&:hover::before": isLocked ? {} : { opacity: 1 },
-          // Filo dorado que se dibuja en el borde superior
-          "&::after": {
-            content: '""',
-            position: "absolute",
-            top: 0,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 0,
-            height: 2,
-            borderRadius: 2,
-            background: `linear-gradient(90deg, rgba(212,175,55,0), ${ORO_CLARO} 50%, rgba(212,175,55,0))`,
-            transition: "width .5s cubic-bezier(.22,1,.36,1)",
-            pointerEvents: "none",
-          },
-          "&:hover::after": isLocked ? {} : { width: "70%" },
+          "&:hover .flecha": isLocked ? {} : { opacity: 1, transform: "translateX(0)" },
+          "&:hover .icono": isLocked ? {} : { backgroundColor: BRAND.oro, color: BRAND.crema },
+          "&:focus-visible": { boxShadow: `0 0 0 3px rgba(163,105,32,0.35)` },
         }}
       >
-        {/* Icono sobre placa champán */}
-        <MotionBox
-          variants={iconoTarjeta}
+        {/* Icono en círculo, como el isotipo */}
+        <Box
+          className="icono"
           sx={{
-            width: 78,
-            height: 78,
-            [mqCompacto]: { width: 68, height: 68 },
-            [mqMini]: { width: 50, height: 50, borderRadius: "16px" },
+            width: { xs: 46, sm: 52 },
+            height: { xs: 46, sm: 52 },
             flexShrink: 0,
-            borderRadius: "22px",
-            position: "relative",
+            borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: isLocked
-              ? "#e6e0d6"
-              : "linear-gradient(150deg, #fdf6e6 0%, #f4e6c8 100%)",
-            border: `1px solid ${isLocked ? "rgba(120,100,80,0.16)" : "rgba(212,175,55,0.42)"}`,
-            boxShadow: isLocked ? "none" : "inset 0 1px 0 rgba(255,255,255,0.9)",
-            transition: "background .35s ease, box-shadow .35s ease",
-            ".modulo-cuadro:hover &": isLocked ? {} : {
-              background: `linear-gradient(150deg, #f7e6bb 0%, ${ORO_CLARO} 120%)`,
-              boxShadow: "0 8px 18px -10px rgba(163,105,32,0.6)",
-            },
+            position: "relative",
+            backgroundColor: isLocked ? "#e4ddcf" : BRAND.crema,
+            color: isLocked ? BRAND.textoTenue : BRAND.oro,
+            border: `1px solid ${isLocked ? "transparent" : "rgba(186,154,99,0.45)"}`,
+            transition: "background-color .2s ease, color .2s ease",
           }}
         >
-          {IconComponent && (
-            <IconComponent
-              sx={{
-                fontSize: 37,
-                [mqCompacto]: { fontSize: 32 },
-                [mqMini]: { fontSize: 25 },
-                color: isLocked ? "rgba(80,64,48,0.45)" : "#4E362C",
-              }}
-            />
-          )}
+          {IconComponent && <IconComponent sx={{ fontSize: { xs: 22, sm: 25 } }} />}
           {isLocked && (
             <Box
               sx={{
-                position: "absolute",
-                top: -6,
-                right: -6,
-                backgroundColor: "#d32f2f",
-                borderRadius: "50%",
-                width: 18,
-                height: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "2px solid #ffffff",
+                position: "absolute", bottom: -2, right: -2,
+                width: 20, height: 20, borderRadius: "50%",
+                backgroundColor: BRAND.textoSuave, border: "2px solid #fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
               }}
             >
-              <Lock sx={{ fontSize: 10, color: "white" }} />
+              <Lock sx={{ fontSize: 11, color: "white" }} />
             </Box>
           )}
-        </MotionBox>
+        </Box>
 
-        {/* Nombre del módulo y su etiqueta */}
-        <Box sx={{ width: "100%", minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
-            // Con la variante por defecto, index.css fuerza Inter con
-            // !important sobre .MuiTypography-body1 y la serif no se aplicaría.
-            variant="h6"
             component="div"
             sx={{
-              // La serif con la que ya está escrito SHOWCLINIC. Ata cada módulo
-              // a la marca y se lee mucho más señorial que la sans de antes.
-              fontFamily: "'Cormorant Garamond', Georgia, serif",
-              fontWeight: 600,
-              color: isLocked ? "rgba(62,43,34,0.5)" : "#3E2B22",
-              // Cormorant tiene la caja baja pequeña, así que necesita ir un
-              // par de puntos por encima de lo que pediría una sans.
-              fontSize: "1.68rem",
-              [mqCompacto]: { fontSize: "1.5rem" },
-              [mqMini]: { fontSize: "1.14rem" },
-              lineHeight: 1.2,
-              letterSpacing: "0.3px",
-              // En un cuadro hay sitio para dos líneas, así que los nombres
-              // largos se parten en vez de cortarse con puntos suspensivos.
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              px: 0.5,
+              fontFamily: FONTS.titulo,
+              fontSize: { xs: "0.98rem", sm: "1rem" },
+              letterSpacing: "0.04em",
+              color: isLocked ? BRAND.textoTenue : BRAND.texto,
+              lineHeight: 1.25,
             }}
           >
             {item.title}
           </Typography>
           <Typography
-            noWrap
+            component="div"
             sx={{
-              mt: 0.9,
-              fontFamily: "'Inter', 'Poppins', sans-serif",
-              color: isLocked ? "rgba(62,43,34,0.4)" : "#8a6a2f",
-              fontSize: "0.6rem",
-              fontWeight: 600,
-              // El interletrado ancho deja un hueco de más al final; el sangrado
-              // lo compensa para que el texto quede centrado de verdad.
-              letterSpacing: "2.6px",
-              textIndent: "2.6px",
-              textTransform: "uppercase",
-              [mqCompacto]: { mt: 0.65 },
-              [mqMini]: { mt: 0.4, fontSize: "0.55rem", letterSpacing: "2.2px", textIndent: "2.2px" },
+              mt: 0.5,
+              fontSize: "0.76rem",
+              lineHeight: 1.45,
+              color: BRAND.textoSuave,
+              display: { xs: "none", sm: "-webkit-box" },
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
             }}
           >
-            {isLocked ? "BLOQUEADO" : item.tag}
+            {isLocked ? "Sin acceso para tu usuario" : item.description}
           </Typography>
         </Box>
+
+        <ChevronRight
+          className="flecha"
+          sx={{
+            color: BRAND.arena,
+            flexShrink: 0,
+            opacity: { xs: 1, sm: 0 },
+            transform: { xs: "none", sm: "translateX(-4px)" },
+            transition: "opacity .2s ease, transform .2s ease",
+          }}
+        />
       </MotionBox>
     );
   };
@@ -559,209 +444,188 @@ export default function Dashboard() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(160deg, #faf8f5 0%, #f0ebe0 40%, #e8dfd0 100%)",
+        backgroundColor: BRAND.cremaClara,
         position: "relative",
         display: "flex",
         flexDirection: "column",
         overflowX: "hidden",
       }}
     >
-      {/* Hilo dorado superior con brillo en movimiento */}
-      <MotionBox
-        animate={{ backgroundPosition: ["0% 50%", "200% 50%"] }}
-        transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+      {/* Isotipo de fondo, muy tenue, como en las piezas del manual */}
+      <Box
+        aria-hidden
+        component="img"
+        src={LOGOS.isotipoLinea}
+        alt=""
         sx={{
-          height: 4,
-          background: `linear-gradient(90deg, ${ORO} 0%, ${ORO_CLARO} 25%, #f3e2a8 50%, ${ORO_CLARO} 75%, ${ORO} 100%)`,
-          backgroundSize: "200% 100%",
-          position: "relative",
-          zIndex: 2,
+          position: "fixed",
+          right: { xs: "-45vw", md: "-12vw" },
+          bottom: { xs: "-10vh", md: "-22vh" },
+          width: { xs: "110vw", md: "62vw" },
+          maxWidth: 900,
+          opacity: 0.07,
+          pointerEvents: "none",
+          zIndex: 0,
         }}
       />
 
-      {/* Lupa flotante de búsqueda rápida */}
+      {/* ───── Barra superior ───── */}
       <Box
+        component="header"
         sx={{
-          position: "fixed",
-          top: 20,
-          left: 20,
-          zIndex: 1000,
+          position: "sticky",
+          top: 0,
+          zIndex: 1100,
+          height: 72,
           display: "flex",
           alignItems: "center",
-          gap: 1,
+          gap: { xs: 1, sm: 2 },
+          pl: { xs: 2, sm: 3 },
+          // Reserva el sitio de la campana de avisos, que es fija
+          pr: { xs: 8, sm: 10 },
+          backgroundColor: "rgba(250,248,241,0.88)",
+          backdropFilter: "blur(12px)",
+          borderBottom: `1px solid ${BRAND.borde}`,
         }}
       >
-        <IconButton
-          onClick={() => {
-            setSearchOpen(!searchOpen);
-            if (searchOpen) {
-              setSearchQuery("");
-              setSearchResults([]);
-            }
-          }}
-          sx={{
-            width: 44,
-            height: 44,
-            background: searchOpen
-              ? "rgba(211,47,47,0.85)"
-              : `linear-gradient(135deg, ${ORO_CLARO} 0%, ${ORO} 100%)`,
-            boxShadow: "0 6px 18px -4px rgba(163,105,32,0.45)",
-            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            "&:hover": {
-              transform: "scale(1.08)",
-              boxShadow: "0 10px 24px -6px rgba(163,105,32,0.55)",
-            },
-          }}
-        >
-          {searchOpen ? (
-            <Close sx={{ fontSize: 22, color: "white" }} />
-          ) : (
-            <Search sx={{ fontSize: 22, color: "white" }} />
-          )}
-        </IconButton>
-
-        <Collapse in={searchOpen} orientation="horizontal" timeout={300}>
-          <Paper
-            elevation={0}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexShrink: 0 }}>
+          <Box component="img" src={LOGOS.isotipo} alt="" sx={{ width: { xs: 32, sm: 38 }, height: { xs: 32, sm: 38 } }} />
+          <Typography
             sx={{
-              display: "flex",
-              alignItems: "center",
-              borderRadius: 50,
-              overflow: "hidden",
-              backgroundColor: "rgba(255,255,255,0.92)",
-              backdropFilter: "blur(12px)",
-              border: "1px solid rgba(163,105,32,0.22)",
-              boxShadow: "0 10px 30px -10px rgba(163,105,32,0.35)",
+              fontFamily: FONTS.titulo,
+              fontSize: { xs: "0.95rem", sm: "1.2rem" },
+              letterSpacing: { xs: "0.1em", sm: "0.14em" },
+              color: BRAND.oro,
+              display: { xs: searchOpen ? "none" : "block", sm: "block" },
             }}
           >
+            SHOWCLINIC
+          </Typography>
+        </Box>
+
+        {/* Búsqueda rápida de pacientes */}
+        <Box sx={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
+          <Box sx={{ position: "relative", width: "100%", maxWidth: 440, display: { xs: searchOpen ? "block" : "none", sm: "block" } }}>
             <TextField
-              autoFocus
-              placeholder="Buscar paciente..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              fullWidth
               size="small"
-              sx={{
-                width: 260,
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 50,
-                  "& fieldset": { border: "none" },
-                  pl: 2.5,
-                  pr: 1,
-                },
-                "& input": {
-                  fontSize: "0.85rem",
-                  color: "#2E2E2E",
-                  "&::placeholder": { color: "#999", opacity: 1 },
-                },
-              }}
+              placeholder="Buscar paciente por nombre o DNI"
+              value={searchQuery}
+              onFocus={() => setSearchOpen(true)}
+              onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+              onKeyDown={(e) => { if (e.key === "Escape") cerrarBusqueda(); }}
               InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search sx={{ color: BRAND.arena, fontSize: 20 }} />
+                  </InputAdornment>
+                ),
                 endAdornment: (
                   <InputAdornment position="end">
-                    {searching && <CircularProgress size={16} sx={{ color: ORO }} />}
+                    {searching ? (
+                      <CircularProgress size={16} sx={{ color: ORO }} />
+                    ) : searchQuery ? (
+                      <IconButton size="small" aria-label="Limpiar búsqueda" onClick={cerrarBusqueda}>
+                        <Close sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    ) : null}
                   </InputAdornment>
                 ),
               }}
+              sx={{
+                "& .MuiOutlinedInput-root": { borderRadius: "999px", backgroundColor: BRAND.blanco },
+                "& input": { fontSize: "0.85rem" },
+              }}
             />
-          </Paper>
-        </Collapse>
-      </Box>
 
-      {/* Resultados de búsqueda */}
-      <AnimatePresence>
-        {searchOpen && searchResults.length > 0 && (
-          <MotionBox
-            key="resultados"
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: suave }}
-            sx={{
-              position: "fixed",
-              top: 76,
-              left: 20,
-              width: 320,
-              maxHeight: 380,
-              overflowY: "auto",
-              zIndex: 999,
-              borderRadius: "18px",
-              backgroundColor: "rgba(255,255,255,0.94)",
-              backdropFilter: "blur(14px)",
-              border: "1px solid rgba(163,105,32,0.16)",
-              boxShadow: "0 18px 50px -14px rgba(163,105,32,0.35)",
-            }}
-          >
-            <List sx={{ p: 0.75 }}>
-              {searchResults.map((paciente) => (
-                <ListItemButton
-                  key={paciente.id}
-                  onClick={() => handleSelectPaciente(paciente)}
+            <AnimatePresence>
+              {searchOpen && searchQuery.trim().length >= 2 && !searching && (
+                <MotionBox
+                  key="resultados"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
                   sx={{
-                    borderRadius: "12px",
-                    py: 1.4,
-                    px: 1.75,
-                    transition: "all 0.2s ease",
-                    "&:hover": {
-                      backgroundColor: "rgba(163,105,32,0.07)",
-                      pl: 2.25,
-                    },
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    left: 0,
+                    right: 0,
+                    maxHeight: 380,
+                    overflowY: "auto",
+                    borderRadius: "16px",
+                    backgroundColor: BRAND.blanco,
+                    border: `1px solid ${BRAND.borde}`,
+                    boxShadow: "0 18px 40px -16px rgba(92,60,18,0.35)",
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg, rgba(163,105,32,0.12) 0%, rgba(212,175,55,0.24) 100%)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      mr: 2,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <People sx={{ fontSize: 18, color: ORO }} />
-                  </Box>
-                  <ListItemText
-                    primary={
-                      <Typography sx={{ fontSize: "0.9rem", fontWeight: 600, color: "#2E2E2E" }}>
-                        {paciente.nombre} {paciente.apellido}
-                      </Typography>
-                    }
-                    secondary={
-                      <Typography sx={{ fontSize: "0.75rem", color: "#999" }}>
-                        DNI: {paciente.dni || "Sin DNI"}
-                      </Typography>
-                    }
-                  />
-                </ListItemButton>
-              ))}
-            </List>
-          </MotionBox>
-        )}
-      </AnimatePresence>
+                  {searchResults.length === 0 ? (
+                    <Typography sx={{ p: 3, textAlign: "center", fontSize: "0.85rem", color: BRAND.textoSuave }}>
+                      No se encontraron pacientes
+                    </Typography>
+                  ) : (
+                    <List sx={{ p: 0.75 }}>
+                      {searchResults.map((paciente) => (
+                        <ListItemButton
+                          key={paciente.id}
+                          onClick={() => handleSelectPaciente(paciente)}
+                          sx={{ borderRadius: "12px", py: 1.1, px: 1.5, "&:hover": { backgroundColor: "rgba(163,105,32,0.06)" } }}
+                        >
+                          <Box
+                            sx={{
+                              width: 36, height: 36, borderRadius: "50%", mr: 1.5, flexShrink: 0,
+                              backgroundColor: BRAND.crema, color: ORO,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "0.8rem", fontWeight: 600,
+                            }}
+                          >
+                            {`${(paciente.nombre || "?")[0]}${(paciente.apellido || "")[0] || ""}`.toUpperCase()}
+                          </Box>
+                          <ListItemText
+                            primary={`${paciente.nombre} ${paciente.apellido}`}
+                            secondary={`DNI: ${paciente.dni || "Sin DNI"}`}
+                            primaryTypographyProps={{ fontSize: "0.88rem", fontWeight: 600, color: BRAND.texto }}
+                            secondaryTypographyProps={{ fontSize: "0.74rem", color: BRAND.textoTenue }}
+                          />
+                        </ListItemButton>
+                      ))}
+                    </List>
+                  )}
+                </MotionBox>
+              )}
+            </AnimatePresence>
+          </Box>
+        </Box>
 
-      {searchOpen && searchQuery.trim().length >= 2 && searchResults.length === 0 && !searching && (
-        <Paper
-          elevation={0}
+        {/* En móvil la búsqueda se abre con la lupa */}
+        <IconButton
+          aria-label={searchOpen ? "Cerrar búsqueda" : "Buscar paciente"}
+          onClick={() => (searchOpen ? cerrarBusqueda() : setSearchOpen(true))}
+          sx={{ display: { xs: "inline-flex", sm: "none" }, color: ORO }}
+        >
+          {searchOpen ? <Close /> : <Search />}
+        </IconButton>
+
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={cerrarSesion}
+          startIcon={<LogoutRounded sx={{ fontSize: 18 }} />}
           sx={{
-            position: "fixed",
-            top: 76,
-            left: 20,
-            width: 320,
-            zIndex: 999,
-            borderRadius: "18px",
-            backgroundColor: "rgba(255,255,255,0.94)",
-            backdropFilter: "blur(14px)",
-            border: "1px solid rgba(163,105,32,0.16)",
-            boxShadow: "0 18px 50px -14px rgba(163,105,32,0.35)",
-            p: 3,
-            textAlign: "center",
+            flexShrink: 0,
+            borderRadius: "999px",
+            display: { xs: searchOpen ? "none" : "inline-flex", sm: "inline-flex" },
+            "& .MuiButton-startIcon": { mr: { xs: 0, md: 1 } },
+            minWidth: 0,
           }}
         >
-          <Typography sx={{ fontSize: "0.85rem", color: "#999" }}>
-            No se encontraron pacientes
-          </Typography>
-        </Paper>
+          <Box component="span" sx={{ display: { xs: "none", md: "inline" } }}>Cerrar sesión</Box>
+        </Button>
+      </Box>
+
+      {/* Fondo que cierra la búsqueda al hacer clic fuera */}
+      {searchOpen && searchQuery.trim().length >= 2 && (
+        <Box onClick={cerrarBusqueda} sx={{ position: "fixed", inset: 0, zIndex: 1050 }} />
       )}
 
       {/* Avisos de retoque: pacientes que ya deben volver */}
@@ -771,346 +635,124 @@ export default function Dashboard() {
         onVerInventario={() => navigate("/inventario")}
       />
 
-      {/* Decorative model images */}
+      {/* ───── Contenido ───── */}
       <Box
-        component="img"
-        src="/images/modeloladoizquierdo.jpg"
-        alt=""
-        sx={{
-          position: "fixed",
-          left: 0,
-          top: 0,
-          height: "100vh",
-          width: "50vw",
-          opacity: 0.18,
-          pointerEvents: "none",
-          zIndex: 0,
-          objectFit: "cover",
-          objectPosition: "center top",
-          filter: "grayscale(45%) saturate(0.85)",
-          maskImage: "linear-gradient(to right, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
-          WebkitMaskImage: "linear-gradient(to right, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
-        }}
-      />
-      <Box
-        component="img"
-        src="/images/modelomodulosderecha.jpg"
-        alt=""
-        sx={{
-          position: "fixed",
-          right: 0,
-          top: "-10%",
-          height: "110vh",
-          width: "50vw",
-          opacity: 0.18,
-          pointerEvents: "none",
-          zIndex: 0,
-          objectFit: "cover",
-          objectPosition: "center top",
-          filter: "grayscale(45%) saturate(0.85)",
-          maskImage: "linear-gradient(to left, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
-          WebkitMaskImage: "linear-gradient(to left, rgba(0,0,0,1) 45%, rgba(0,0,0,0))",
-        }}
-      />
-
-      {/* Luces doradas que flotan despacio detrás de todo */}
-      {[
-        { size: 520, top: "-12%", left: "18%", dur: 26, dx: 40, dy: 30, op: 0.28 },
-        { size: 420, top: "48%", left: "62%", dur: 32, dx: -50, dy: 40, op: 0.22 },
-        { size: 300, top: "70%", left: "8%", dur: 22, dx: 30, dy: -35, op: 0.18 },
-      ].map((o, i) => (
-        <MotionBox
-          key={i}
-          aria-hidden
-          animate={{ x: [0, o.dx, 0], y: [0, o.dy, 0] }}
-          transition={{ duration: o.dur, repeat: Infinity, ease: "easeInOut" }}
-          sx={{
-            position: "fixed",
-            top: o.top, left: o.left,
-            width: o.size, height: o.size,
-            borderRadius: "50%",
-            background: `radial-gradient(circle, rgba(212,175,55,${o.op}) 0%, rgba(212,175,55,0) 70%)`,
-            filter: "blur(30px)",
-            pointerEvents: "none",
-            zIndex: 0,
-            willChange: "transform",
-          }}
-        />
-      ))}
-
-      {/* Main Content */}
-      <Box
+        component="main"
         sx={{
           flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          py: { xs: 3, sm: 4 },
-          px: 2,
           position: "relative",
           zIndex: 1,
-          // En pantallas bajas se recorta el aire para que igual entre todo
-          [mqCompacto]: { py: 2.5 },
-          [mqMini]: { py: 1.4 },
-          // En el móvil la campana de avisos está fija arriba a la derecha y
-          // se montaba sobre el nombre; se baja la cabecera para librarla.
-          "@media (max-width: 599.95px)": { pt: 6, pb: 3 },
+          width: "100%",
+          maxWidth: 1240,
+          mx: "auto",
+          px: { xs: 2, sm: 3, md: 4 },
+          pt: { xs: 3.5, sm: 5 },
+          pb: 5,
         }}
       >
-        <MotionBox
-          variants={contenedor}
-          initial="hidden"
-          animate="show"
-          sx={{ width: "100%", maxWidth: 1560 }}
-        >
-
-          {/* Header: el logo y el nombre van centrados y sueltos, como una
-              portada. El aire de alrededor es parte del diseño, no un hueco
-              desaprovechado. */}
-          <Box
+        <MotionBox variants={subir} initial="hidden" animate="show" sx={{ mb: { xs: 3.5, sm: 5 } }}>
+          <Typography
             sx={{
-              textAlign: "center",
-              mb: { xs: 3, sm: 5 },
-              [mqCompacto]: { mb: 3 },
-              [mqMini]: { mb: 1.6 },
+              fontSize: "0.78rem",
+              fontStyle: "italic",
+              color: BRAND.oro,
+              mb: 1,
+              textTransform: "capitalize",
             }}
           >
-            <MotionBox
-              variants={subir}
-              sx={{
-                display: "inline-block",
-                position: "relative",
-                mb: 2,
-                [mqCompacto]: { mb: 1.4 },
-                [mqMini]: { mb: 0.9 },
-              }}
-            >
-              {/* Halo que respira detrás del logo */}
-              <MotionBox
-                aria-hidden
-                animate={{ scale: [1, 1.18, 1], opacity: [0.45, 0.15, 0.45] }}
-                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
-                sx={{
-                  position: "absolute", inset: -10, borderRadius: "50%",
-                  border: `1.5px solid ${ORO_CLARO}`,
-                  pointerEvents: "none",
-                }}
-              />
-              <Box
-                component="img"
-                src="/logo-showclinic.png"
-                alt="ShowClinic"
-                sx={{
-                  width: 92,
-                  height: 92,
-                  [mqCompacto]: { width: 74, height: 74 },
-                  [mqMini]: { width: 52, height: 52, borderWidth: "2px" },
-                  objectFit: "cover",
-                  borderRadius: "50%",
-                  border: "3px solid rgba(255,255,255,0.9)",
-                  boxShadow: `0 0 0 2px rgba(163,105,32,0.35), 0 14px 34px -10px rgba(163,105,32,0.45)`,
-                  display: "block",
-                  position: "relative",
-                }}
-              />
-            </MotionBox>
-
-            <MotionBox variants={subir}>
-              <Typography
-                variant="h3"
-                sx={{
-                  fontFamily: "'Cormorant Garamond', Georgia, serif",
-                  fontWeight: 700,
-                  // El interletrado ancho es lo que le da el aire de portada.
-                  letterSpacing: { xs: 5, sm: 9 },
-                  textIndent: { xs: "5px", sm: "9px" },
-                  lineHeight: 1.05,
-                  fontSize: { xs: "1.8rem", sm: "2.4rem", md: "3rem" },
-                  [mqCompacto]: { fontSize: "2.5rem" },
-                  [mqMini]: { fontSize: "1.85rem", letterSpacing: 6, textIndent: "6px" },
-                  // Oro con relieve: degradado sobre el texto
-                  background: `linear-gradient(180deg, #c58a3a 0%, ${ORO} 55%, #7d5017 100%)`,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  display: "inline-block",
-                }}
-              >
-                SHOWCLINIC
-              </Typography>
-
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, mt: 1, [mqCompacto]: { mt: 0.75 } }}>
-                <Box sx={{ width: { xs: 22, sm: 46 }, height: 1, background: `linear-gradient(90deg, transparent, ${ORO_SUAVE})` }} />
-                <Typography
-                  sx={{
-                    fontFamily: "'Inter', 'Poppins', sans-serif",
-                    color: "#8a7247",
-                    letterSpacing: 3,
-                    textIndent: "3px",
-                    fontWeight: 500,
-                    fontSize: { xs: "0.7rem", sm: "0.76rem" },
-                  }}
-                >
-                  ESTÉTICA AVANZADA &amp; BIENESTAR
-                </Typography>
-                <Box sx={{ width: { xs: 22, sm: 46 }, height: 1, background: `linear-gradient(90deg, ${ORO_SUAVE}, transparent)` }} />
-              </Box>
-            </MotionBox>
-
-            {/* Saludo, sin caja: en una portada así, un recuadro más sobraba. */}
-            <MotionBox
-              variants={subir}
-              sx={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 1.1,
-                mt: 2.25,
-                [mqCompacto]: { mt: 1.5 },
-                [mqMini]: { mt: 0.9 },
-              }}
-            >
-              <Box sx={{ position: "relative", width: 8, height: 8 }}>
-                <Box sx={{ position: "absolute", inset: 0, borderRadius: "50%", backgroundColor: "#4CAF50" }} />
-                <MotionBox
-                  aria-hidden
-                  animate={{ scale: [1, 2.2], opacity: [0.6, 0] }}
-                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeOut" }}
-                  sx={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1.5px solid #4CAF50" }}
-                />
-              </Box>
-              <Typography
-                variant="body1"
-                sx={{
-                  fontFamily: "'Inter', 'Poppins', sans-serif",
-                  color: "#5f5348",
-                  fontWeight: 400,
-                  letterSpacing: "0.2px",
-                  fontSize: { xs: "0.9rem", sm: "0.95rem" },
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {saludo}, <strong style={{ color: ORO }}>{username}</strong>
-              </Typography>
-            </MotionBox>
-          </Box>
-
-          {/* Módulos, por secciones */}
-          <Box
+            | {fechaHoy}
+          </Typography>
+          <Typography
+            component="h1"
             sx={{
-              maxWidth: { xs: "100%", sm: 760, md: 980, lg: anchoRejilla.normal },
-              [mqMiniAncho]: { maxWidth: anchoRejilla.mini },
-              mx: "auto",
-              px: { xs: 0.5, sm: 2 },
+              fontFamily: FONTS.titulo,
+              fontSize: { xs: "1.6rem", sm: "2.1rem", md: "2.4rem" },
+              letterSpacing: "0.06em",
+              lineHeight: 1.2,
+              color: BRAND.texto,
             }}
           >
-            {secciones.map((sec) => (
-              <Box key={sec.id} sx={{ mb: { xs: 2.5, sm: 3 }, [mqCompacto]: { mb: 0.6 }, "&:last-of-type": { mb: 0 } }}>
-                {sec.label && (
-                  <MotionBox
-                    variants={subir}
-                    sx={{ display: "flex", alignItems: "center", gap: 1.4, mb: 1.5, px: 0.5, [mqCompacto]: { mb: 1 } }}
-                  >
-                    {/* Rombo dorado como marca de sección */}
-                    <Box
-                      aria-hidden
-                      sx={{
-                        width: 6, height: 6, flexShrink: 0,
-                        transform: "rotate(45deg)",
-                        background: `linear-gradient(135deg, ${ORO_CLARO}, ${ORO})`,
-                        boxShadow: "0 0 8px rgba(212,175,55,0.5)",
-                      }}
-                    />
-                    <Typography
-                      sx={{
-                        fontFamily: "'Inter', 'Poppins', sans-serif",
-                        // Un punto más oscuro que el dorado de marca para que
-                        // el rótulo se lea bien sobre el fondo claro.
-                        color: "#8a5a1c",
-                        fontSize: "0.68rem",
-                        fontWeight: 600,
-                        letterSpacing: "2.8px",
-                        textTransform: "uppercase",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {sec.label}
-                    </Typography>
-                    <Box sx={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(186,154,99,0.5), rgba(186,154,99,0))" }} />
-                  </MotionBox>
-                )}
-
-                <Box
-                  sx={{
-                    display: "grid",
-                    // Se aprovecha el ancho disponible para que todo entre en
-                    // una pantalla. El tope son 4 columnas: las secciones
-                    // tienen 3 o 4 módulos, así que con 5 quedaría un hueco
-                    // visible al final de cada fila.
-                    gridTemplateColumns: {
-                      xs: "1fr",
-                      sm: "repeat(2, 1fr)",
-                      md: "repeat(3, 1fr)",
-                      lg: "repeat(4, 1fr)",
-                    },
-                    gap: { xs: 1.75, sm: 2.75 },
-                  }}
-                >
-                  {sec.items.map(renderTarjeta)}
-                </Box>
-              </Box>
-            ))}
-          </Box>
-
-          {/* Session info */}
-          <MotionBox variants={subir} sx={{ mt: 2, [mqCompacto]: { mt: 0.6 }, textAlign: "center" }}>
-            <Typography variant="caption" sx={{ color: "#b9ad98", fontWeight: 400, fontSize: "0.75rem", letterSpacing: "0.3px" }}>
-              Panel de administración • Sesión activa
-            </Typography>
-          </MotionBox>
+            {saludo}, <Box component="span" sx={{ color: ORO }}>{username}</Box>
+          </Typography>
+          <Typography sx={{ mt: 1, color: BRAND.textoSuave, fontSize: { xs: "0.85rem", sm: "0.92rem" } }}>
+            ¿Con qué módulo quieres trabajar hoy?
+          </Typography>
         </MotionBox>
+
+        {secciones.map((sec, si) => (
+          <Box key={sec.id} sx={{ mb: { xs: 3, sm: 4 }, "&:last-of-type": { mb: 0 } }}>
+            {sec.label && (
+              <MotionBox
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, delay: 0.05 + si * 0.05 }}
+                sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}
+              >
+                <Typography
+                  component="h2"
+                  sx={{
+                    fontSize: "0.72rem",
+                    fontWeight: 600,
+                    color: BRAND.oroOscuro,
+                    letterSpacing: "0.22em",
+                    textTransform: "uppercase",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {sec.label}
+                </Typography>
+                <Box sx={{ flex: 1, height: "1px", backgroundColor: "rgba(186,154,99,0.35)" }} />
+              </MotionBox>
+            )}
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  md: "repeat(3, minmax(0, 1fr))",
+                  lg: "repeat(4, minmax(0, 1fr))",
+                },
+                gap: { xs: 1.25, sm: 2 },
+              }}
+            >
+              {sec.items.map((item, i) => renderTarjeta(item, si * 4 + i))}
+            </Box>
+          </Box>
+        ))}
       </Box>
 
       {/* Footer */}
       <Box
         component="footer"
         sx={{
-          py: 1.75,
-          px: 3,
-          [mqCompacto]: { py: 1.2 },
           position: "relative",
           zIndex: 1,
-          borderTop: "1px solid rgba(186,154,99,0.18)",
-          backgroundColor: "rgba(255,253,247,0.72)",
-          backdropFilter: "blur(10px)",
+          py: 2,
+          px: 3,
+          borderTop: `1px solid ${BRAND.borde}`,
         }}
       >
         <Box
           sx={{
-            maxWidth: 1200,
+            maxWidth: 1240,
             mx: "auto",
             display: "flex",
             flexDirection: { xs: "column", sm: "row" },
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 1,
+            gap: 0.5,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box
-              component="img"
-              src="/logo-showclinic.png"
-              alt="ShowClinic"
-              sx={{ width: 24, height: 24, borderRadius: "50%", opacity: 0.75, boxShadow: "0 0 0 1px rgba(163,105,32,0.25)" }}
-            />
-            <Typography variant="caption" sx={{ color: ORO_SUAVE, fontWeight: 600, letterSpacing: 0.5, fontSize: "0.72rem" }}>
-              ShowClinic
-            </Typography>
-          </Box>
-          <Typography variant="caption" sx={{ color: "#c4b89a", fontSize: "0.7rem" }}>
-            Estética Avanzada & Bienestar • Arequipa, Perú
+          <Typography sx={{ fontFamily: FONTS.titulo, color: BRAND.arena, letterSpacing: "0.14em", fontSize: "0.8rem" }}>
+            SHOWCLINIC
           </Typography>
-          <Typography variant="caption" sx={{ color: "#d0c8b8", fontSize: "0.68rem" }}>
-            © {new Date().getFullYear()} Todos los derechos reservados
+          <Typography sx={{ color: BRAND.textoTenue, fontSize: "0.72rem", fontStyle: "italic" }}>
+            Seguridad que se siente, belleza que se nota.
+          </Typography>
+          <Typography sx={{ color: BRAND.textoTenue, fontSize: "0.7rem" }}>
+            © {new Date().getFullYear()} · Arequipa, Perú
           </Typography>
         </Box>
       </Box>
@@ -1121,36 +763,26 @@ export default function Dashboard() {
         onClose={() => setOpenAccessDenied(false)}
         maxWidth="xs"
         fullWidth
-        PaperProps={{ sx: { borderRadius: "20px", overflow: "hidden" } }}
       >
-        <DialogTitle sx={{ background: "linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%)", color: "white", textAlign: "center", py: 2 }}>
-          Acceso Restringido
-        </DialogTitle>
-        <DialogContent sx={{ mt: 3, textAlign: "center", pb: 1 }}>
-          <Lock sx={{ fontSize: 48, color: "#d32f2f", mb: 1, opacity: 0.6 }} />
-          <Typography variant="h6" sx={{ mb: 1, color: "#333", fontWeight: 700 }}>
+        <DialogContent sx={{ pt: 4, textAlign: "center" }}>
+          <Box
+            sx={{
+              width: 64, height: 64, mx: "auto", mb: 2, borderRadius: "50%",
+              backgroundColor: BRAND.crema, color: ORO,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <Lock sx={{ fontSize: 30 }} />
+          </Box>
+          <Typography sx={{ fontFamily: FONTS.titulo, fontSize: "1.25rem", letterSpacing: "0.06em", mb: 1 }}>
             {deniedModule}
           </Typography>
-          <Typography variant="body2" sx={{ color: "#888" }}>
-            No tienes permisos para acceder a este módulo. Contacta al administrador.
+          <Typography variant="body2" sx={{ color: BRAND.textoSuave }}>
+            No tienes permisos para acceder a este módulo. Pide acceso al administrador.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2.5, justifyContent: "center" }}>
-          <Button
-            onClick={() => setOpenAccessDenied(false)}
-            variant="contained"
-            sx={{
-              backgroundColor: ORO,
-              "&:hover": { backgroundColor: "#8a5a1a" },
-              px: 5,
-              py: 1,
-              borderRadius: 2,
-              fontWeight: 600,
-              textTransform: "none",
-              fontSize: "0.9rem",
-              boxShadow: "none",
-            }}
-          >
+          <Button onClick={() => setOpenAccessDenied(false)} variant="contained" sx={{ px: 5 }}>
             Entendido
           </Button>
         </DialogActions>

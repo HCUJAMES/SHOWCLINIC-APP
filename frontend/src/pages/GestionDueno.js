@@ -57,55 +57,55 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
-// Design System ShowClinic — valores EXACTOS
+// Paleta del Manual de Identidad ShowClinic 2025 (#a36920 · #ba9a63 · #f5f1e4)
 const colors = {
-  primary: "#5D4037",
-  primaryDark: "#3E2A24",
-  gold: "#C8A96E",
-  goldSoft: "#E4D4B4",
-  cream: "#FFF8F0",
-  creamPanel: "#FBF3E9",
-  border: "#EADFCF",
+  primary: "#a36920",
+  primaryDark: "#5c3c12",
+  gold: "#ba9a63",
+  goldSoft: "#e2d4b6",
+  cream: "#faf8f1",
+  creamPanel: "#f5f1e4",
+  border: "#e7dcc6",
   white: "#FFFFFF",
-  hover: "#4E342E",
-  textBody: "#4A3B33",
-  textMuted: "#9A8778",
-  successText: "#5B8A6E",
-  successBg: "#E8F0EA",
-  successBorder: "#CDE0D3",
-  amberText: "#C08A3E",
-  amberBg: "#F7EEDC",
-  error: "#d32f2f",
-  // sidebar
-  sideBg: "#3E2A24",
-  sideBgDeep: "#2C1D18",
-  sideActive: "rgba(200,169,110,0.18)",
-  sideText: "#E9DDD0",
-  sideMuted: "#A88F7E"
+  hover: "#8a5a1a",
+  textBody: "#2b2219",
+  textMuted: "#8f8170",
+  successText: "#4f7a4a",
+  successBg: "#eaf0e6",
+  successBorder: "#cfdcc9",
+  amberText: "#a36920",
+  amberBg: "#f5f1e4",
+  error: "#b3412e",
+  // barra lateral
+  sideBg: "#3a2810",
+  sideBgDeep: "#2b1d0b",
+  sideActive: "rgba(186,154,99,0.20)",
+  sideText: "#f5f1e4",
+  sideMuted: "#b8a68a"
 };
 
-// gradientes premium (para íconos KPI y detalles)
+// Fondos de los íconos KPI: solo tonos de la marca
 const grads = {
-  gold: "linear-gradient(135deg, #D9BE86 0%, #B98F4E 100%)",
-  brown: "linear-gradient(135deg, #7A5140 0%, #4E342E 100%)",
-  green: "linear-gradient(135deg, #7FB49A 0%, #4F8069 100%)",
-  amber: "linear-gradient(135deg, #E6BE7C 0%, #C08A3E 100%)",
-  violet: "linear-gradient(135deg, #A88BC4 0%, #6E4E92 100%)"
+  gold: "#ba9a63",
+  brown: "#a36920",
+  green: "#8a5a1a",
+  amber: "#c9ad7c",
+  violet: "#5c3c12"
 };
 
 // paleta para segmentos de gráficos (tonos de marca)
-const chartPalette = ["#8B5E3C", "#C8A96E", "#A67C52", "#D9C29A", "#6B4226", "#E4D4B4", "#B98F4E"];
+const chartPalette = ["#a36920", "#ba9a63", "#5c3c12", "#d9c7a4", "#8a5a1a", "#e9dfc9", "#7d6a50"];
 
 const fonts = {
-  title: "'Cormorant Garamond', serif",
-  body: "'DM Sans', sans-serif"
+  title: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
+  body: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 };
 
 const cardSx = {
   bgcolor: colors.white,
   border: `1px solid ${colors.border}`,
   borderRadius: "18px",
-  boxShadow: "0 2px 10px rgba(93,64,55,0.06)"
+  boxShadow: "0 2px 10px rgba(92,60,18,0.06)"
 };
 
 // variantes de animación reutilizables
@@ -663,16 +663,14 @@ function SideBar({ tab, onTab, navigate }) {
       overflow: "hidden"
     }}>
       {/* decor */}
-      <Box sx={{ position: "absolute", bottom: -40, left: -30, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(200,169,110,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <Box sx={{ position: "absolute", bottom: -40, left: -30, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(186,154,99,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
 
       {/* Logo */}
       <Box sx={{ display: "flex", alignItems: "center", gap: "12px", mb: "30px", px: { xs: 0, md: "6px" }, justifyContent: { xs: "center", md: "flex-start" } }}>
-        <Box sx={{ width: 42, height: 42, borderRadius: "13px", background: grads.gold, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 12px rgba(0,0,0,0.25)" }}>
-          <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, color: "#fff", fontSize: 22, lineHeight: 1 }}>S</Typography>
-        </Box>
+        <Box component="img" src="/brand/isotipo-linea-crema.png" alt="" sx={{ width: 42, height: 42, flexShrink: 0 }} />
         <Box sx={{ display: { xs: "none", md: "block" }, lineHeight: 1.1 }}>
-          <Typography sx={{ fontFamily: fonts.title, fontWeight: 700, color: "#fff", fontSize: 20 }}>ShowClinic</Typography>
-          <Typography sx={{ fontFamily: fonts.body, color: colors.sideMuted, fontSize: 11, letterSpacing: "0.5px" }}>Clínica Estética</Typography>
+          <Typography sx={{ fontFamily: fonts.title, color: colors.sideText, fontSize: 18, letterSpacing: "0.12em" }}>SHOWCLINIC</Typography>
+          <Typography sx={{ fontFamily: fonts.body, color: colors.sideMuted, fontSize: 11, letterSpacing: "0.5px" }}>Estética avanzada</Typography>
         </Box>
       </Box>
 
@@ -731,7 +729,7 @@ function SideAction({ icon: Icon, label, onClick, danger }) {
         justifyContent: { xs: "center", md: "flex-start" },
         px: { xs: 0, md: "14px" }, py: "10px", borderRadius: "12px",
         transition: "background 0.2s",
-        "&:hover": { bgcolor: danger ? "rgba(211,47,47,0.15)" : "rgba(255,255,255,0.06)" }
+        "&:hover": { bgcolor: danger ? "rgba(179,65,46,0.15)" : "rgba(255,255,255,0.06)" }
       }}
     >
       <Icon sx={{ fontSize: 20, color: danger ? "#E8907E" : colors.sideMuted }} />
@@ -1164,7 +1162,7 @@ function PanelCard({ children, title, badge, i = 0, action }) {
     <MotionCard
       custom={i}
       variants={fadeUp}
-      whileHover={{ y: -3, boxShadow: "0 12px 28px rgba(93,64,55,0.12)" }}
+      whileHover={{ y: -3, boxShadow: "0 12px 28px rgba(92,60,18,0.12)" }}
       sx={{ ...cardSx, p: 0, height: "100%", display: "flex", flexDirection: "column" }}
     >
       <CardContent sx={{ p: "22px", flex: 1, "&:last-child": { pb: "22px" } }}>
@@ -1190,13 +1188,13 @@ function KPICard({ title, value, icon, grad, trend, trendLabel, caption, i = 0 }
     <MotionCard
       custom={i}
       variants={fadeUp}
-      whileHover={{ y: -4, boxShadow: "0 14px 30px rgba(93,64,55,0.14)" }}
+      whileHover={{ y: -4, boxShadow: "0 14px 30px rgba(92,60,18,0.14)" }}
       sx={{ ...cardSx, p: 0, position: "relative", overflow: "hidden" }}
     >
       <Box sx={{ position: "absolute", top: -30, right: -30, width: 110, height: 110, borderRadius: "50%", background: grad, opacity: 0.08 }} />
       <CardContent sx={{ p: "20px", "&:last-child": { pb: "20px" } }}>
         <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", mb: "14px" }}>
-          <Box sx={{ width: 52, height: 52, borderRadius: "15px", background: grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 6px 14px rgba(93,64,55,0.18)", "& svg": { fontSize: 26 } }}>
+          <Box sx={{ width: 52, height: 52, borderRadius: "15px", background: grad, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 6px 14px rgba(92,60,18,0.18)", "& svg": { fontSize: 26 } }}>
             {icon}
           </Box>
           {trend != null && (
@@ -1257,7 +1255,7 @@ function AreaChart({ data }) {
           return (
             <g key={i}>
               <line x1={padL} y1={y} x2={W - padR} y2={y} stroke={colors.border} strokeWidth="1" strokeDasharray="3 4" />
-              <text x={padL - 8} y={y + 3} textAnchor="end" fontSize="9.5" fill={colors.textMuted} fontFamily="'DM Sans', sans-serif">
+              <text x={padL - 8} y={y + 3} textAnchor="end" fontSize="9.5" fill={colors.textMuted} fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
                 {Math.round(gv / 1000)}k
               </text>
             </g>
@@ -1280,7 +1278,7 @@ function AreaChart({ data }) {
 
         {/* x labels */}
         {pts.map((p, i) => (
-          <text key={i} x={p.x} y={H - padB + 16} textAnchor="middle" fontSize="9.5" fill={colors.textMuted} fontFamily="'DM Sans', sans-serif">
+          <text key={i} x={p.x} y={H - padB + 16} textAnchor="middle" fontSize="9.5" fill={colors.textMuted} fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
             {p.label?.slice(5)}
           </text>
         ))}
@@ -1485,7 +1483,7 @@ function EspecialistaGrupo({ grupo, index, onSelectPresupuesto, sinAsignar }) {
             {lista.map((p) => (
               <Grid item xs={12} sm={6} lg={4} key={p.id}>
                 <MotionCard
-                  whileHover={{ y: -4, boxShadow: "0 10px 22px rgba(93,64,55,0.12)" }}
+                  whileHover={{ y: -4, boxShadow: "0 10px 22px rgba(92,60,18,0.12)" }}
                   onClick={() => onSelectPresupuesto(p.id)}
                   sx={{ ...cardSx, cursor: "pointer", p: 0, "&:hover": { borderColor: colors.gold } }}
                 >
@@ -1731,7 +1729,7 @@ function LineaCard({ linea, onCulminar, onRevertir, onEditComision }) {
       ...cardSx,
       mb: "10px",
       borderLeft: `4px solid ${leftColor}`,
-      "&:hover": { boxShadow: "0 2px 8px rgba(93,64,55,0.08)" },
+      "&:hover": { boxShadow: "0 2px 8px rgba(92,60,18,0.08)" },
       transition: "all 0.2s ease",
       p: 0
     }}>
@@ -1928,7 +1926,7 @@ function EspecialistasView({ especialistas, detalle, onSelect, onBack, onReloadE
       {especialistas.map((esp) => (
         <Grid item xs={12} sm={6} md={4} key={esp.id}>
           <Card
-            sx={{ ...cardSx, cursor: "pointer", "&:hover": { borderColor: colors.gold, boxShadow: "0 4px 12px rgba(93,64,55,0.1)" }, transition: "all 0.2s", p: 0 }}
+            sx={{ ...cardSx, cursor: "pointer", "&:hover": { borderColor: colors.gold, boxShadow: "0 4px 12px rgba(92,60,18,0.1)" }, transition: "all 0.2s", p: 0 }}
             onClick={() => onSelect(esp.id)}
           >
             <CardContent sx={{ p: "18px" }}>
@@ -2600,7 +2598,7 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
                       )}
                       <IconButton size="small" onClick={() => onEliminarPagoExtra(pg.id)}
                         title="Eliminar este pago extra"
-                        sx={{ color: colors.textMuted, "&:hover": { color: colors.error, bgcolor: "rgba(211,47,47,0.08)" } }}>
+                        sx={{ color: colors.textMuted, "&:hover": { color: colors.error, bgcolor: "rgba(179,65,46,0.08)" } }}>
                         <DeleteOutlineRounded sx={{ fontSize: 18 }} />
                       </IconButton>
                     </Box>
@@ -2795,7 +2793,7 @@ function PresupuestoComisionCard({ pres, index, pctDefault, onEditPct, onSaveOve
                   <Chip label="compartido" size="small" sx={{ bgcolor: "#EDE7F6", color: "#5E35B1", border: "1px solid #B39DDB", fontWeight: 700, fontFamily: fonts.body, height: 20, fontSize: "0.64rem" }} />
                 )}
                 {hasOverrides && <Chip label="editado" size="small" sx={{ height: 16, fontSize: "0.58rem", fontFamily: fonts.body, bgcolor: colors.goldSoft, color: colors.primaryDark, "& .MuiChip-label": { px: "5px" } }} />}
-                {isHidden && <Chip label="oculto" size="small" sx={{ height: 16, fontSize: "0.58rem", fontFamily: fonts.body, bgcolor: "#e0e0e0", color: "#777", "& .MuiChip-label": { px: "5px" } }} />}
+                {isHidden && <Chip label="oculto" size="small" sx={{ height: 16, fontSize: "0.58rem", fontFamily: fonts.body, bgcolor: "#e7dfd0", color: "#777", "& .MuiChip-label": { px: "5px" } }} />}
               </Box>
             </Box>
             <Box sx={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
@@ -3044,8 +3042,8 @@ function PagoExtraDialog({ open, especialista, pagoEditar, onClose, onSave }) {
 
         {valido && (
           <Box sx={{ mt: "14px", p: "12px", borderRadius: "12px",
-            bgcolor: descuenta ? "rgba(211,47,47,0.07)" : colors.successBg,
-            border: `1px solid ${descuenta ? "rgba(211,47,47,0.25)" : colors.border}` }}>
+            bgcolor: descuenta ? "rgba(179,65,46,0.07)" : colors.successBg,
+            border: `1px solid ${descuenta ? "rgba(179,65,46,0.25)" : colors.border}` }}>
             <Typography sx={{ fontFamily: fonts.body, fontSize: "12px", color: colors.textMuted }}>
               {descuenta ? "Se restará del pago del mes:" : "Se sumará al pago del mes:"}
             </Typography>
@@ -3205,7 +3203,7 @@ function ControlView({ data, filtro, onFiltro, buscar, onBuscar, onVerPaciente }
                   sx={{
                     ...cardSx, cursor: "pointer", height: "100%",
                     borderColor: activa ? colors.gold : colors.border,
-                    boxShadow: activa ? "0 6px 20px rgba(200,169,110,0.30)" : cardSx.boxShadow,
+                    boxShadow: activa ? "0 6px 20px rgba(186,154,99,0.30)" : cardSx.boxShadow,
                     transition: "border-color .2s ease, box-shadow .2s ease",
                   }}
                 >

@@ -4,13 +4,13 @@ import { Box, Typography } from "@mui/material";
 const C = {
   bg: "#FFFDF8",
   border: "#E8DFD0",
-  gold: "#B8860B",
-  goldLight: "#D4AF37",
+  gold: "#a36920",
+  goldLight: "#ba9a63",
   text: "#3B2F1E",
   muted: "#8B7D6B",
-  green: "#4caf50",
+  green: "#5f7f52",
   orange: "#E8910C",
-  blue: "#2196f3",
+  blue: "#5f7f96",
   purple: "#9575cd",
   white: "#fff",
 };
@@ -178,14 +178,14 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 2px 6px rgba(184,134,11,0.25)",
+            boxShadow: "0 2px 6px rgba(163,105,32,0.25)",
           }}>
             <svg width={mob ? "18" : "22"} height={mob ? "18" : "22"} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
           </Box>
           <Typography sx={{
-            fontFamily: "'Cormorant Garamond', serif", 
+            fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", 
             fontWeight: 700,
             fontSize: mob ? "1.1rem" : "1.35rem", 
             textTransform: "uppercase",
@@ -200,7 +200,7 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
         {/* Subtitle + progress */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1.5 }}>
           <Typography sx={{ 
-            fontFamily: "'DM Sans', sans-serif", 
+            fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", 
             fontSize: "0.82rem", 
             color: C.muted,
             fontWeight: 500,
@@ -215,11 +215,11 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
                 background: `linear-gradient(90deg, ${C.green} 0%, ${C.goldLight} 100%)`, 
                 borderRadius: 4, 
                 transition: "width 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
-                boxShadow: pct > 0 ? "0 0 8px rgba(76,175,80,0.3)" : "none",
+                boxShadow: pct > 0 ? "0 0 8px rgba(95,127,82,0.3)" : "none",
               }} />
             </Box>
             <Typography sx={{ 
-              fontFamily: "'DM Sans', sans-serif", 
+              fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", 
               fontSize: "0.85rem", 
               fontWeight: 700, 
               color: pct === 100 ? C.green : C.gold,
@@ -275,7 +275,7 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
                     <g>
                       <line x1={p.x} y1={p.y - r - 4} x2={p.x} y2={p.y - r - 20} stroke={C.orange} strokeWidth={1} strokeDasharray="3,2" />
                       <rect x={p.x - 36} y={p.y - r - 38} width={72} height={18} rx={9} fill={C.orange} />
-                      <text x={p.x} y={p.y - r - 26} textAnchor="middle" fill={C.white} fontSize={9} fontWeight={700} fontFamily="'DM Sans', sans-serif">
+                      <text x={p.x} y={p.y - r - 26} textAnchor="middle" fill={C.white} fontSize={9} fontWeight={700} fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
                         ESTÁS AQUÍ
                       </text>
                     </g>
@@ -292,7 +292,7 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
                   {/* Icon */}
                   <text x={p.x} y={p.y + 4} textAnchor="middle"
                     fill={p.status === "completed" ? C.white : meta.color}
-                    fontSize={p.status === "completed" ? 11 : 9} fontWeight={700} fontFamily="'DM Sans', sans-serif">
+                    fontSize={p.status === "completed" ? 11 : 9} fontWeight={700} fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
                     {p.status === "completed" ? "✓" : "○"}
                   </text>
 
@@ -307,10 +307,10 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
                       <g>
                         <rect x={tx} y={ty} width={tw} height={th} rx={8} fill="white" stroke={meta.color} strokeWidth={1} filter="drop-shadow(0 2px 6px rgba(0,0,0,0.12))" />
                         <circle cx={tx + 14} cy={ty + 15} r={5} fill={meta.color} />
-                        <text x={tx + 24} y={ty + 18} fill={C.text} fontSize={10} fontWeight={700} fontFamily="'DM Sans', sans-serif">
+                        <text x={tx + 24} y={ty + 18} fill={C.text} fontSize={10} fontWeight={700} fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
                           {meta.label}
                         </text>
-                        <text x={tx + 12} y={ty + 34} fill={C.muted} fontSize={9} fontFamily="'DM Sans', sans-serif">
+                        <text x={tx + 12} y={ty + 34} fill={C.muted} fontSize={9} fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
                           S/ {p.price.toFixed(2)} · {p.session} sesión
                         </text>
                       </g>
@@ -328,13 +328,13 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
                 <g key={`lb-${p.id}`}>
                   {lines.map((ln, li) => (
                     <text key={li} x={p.x} y={labelY + li * (lfs + 2)} textAnchor="middle"
-                      fill={C.text} fontSize={lfs} fontWeight={600} fontFamily="'DM Sans', sans-serif">
+                      fill={C.text} fontSize={lfs} fontWeight={600} fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
                       {ln}
                     </text>
                   ))}
                   {p.specialist && (
                     <text x={p.x} y={labelY + lines.length * (lfs + 2) + 2} textAnchor="middle"
-                      fill={C.muted} fontSize={mob ? 7.5 : 9} fontStyle="italic" fontFamily="'DM Sans', sans-serif">
+                      fill={C.muted} fontSize={mob ? 7.5 : 9} fontStyle="italic" fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
                       {p.specialist}
                     </text>
                   )}
@@ -346,7 +346,7 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
                     return (
                       <g>
                         <rect x={p.x - bw / 2} y={badgeY - 9} width={bw} height={17} rx={8.5} fill="none" stroke={C.border} strokeWidth={1} />
-                        <text x={p.x} y={badgeY + 3} textAnchor="middle" fill={C.muted} fontSize={mob ? 7 : 8} fontWeight={500} fontFamily="'DM Sans', sans-serif">
+                        <text x={p.x} y={badgeY + 3} textAnchor="middle" fill={C.muted} fontSize={mob ? 7 : 8} fontWeight={500} fontFamily="'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
                           {badgeText}
                         </text>
                       </g>
@@ -379,7 +379,7 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
               boxShadow: `0 0 0 2px ${v.color}20`,
             }} />
             <Typography sx={{ 
-              fontFamily: "'DM Sans', sans-serif", 
+              fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", 
               fontSize: mob ? "0.7rem" : "0.75rem", 
               color: C.text,
               fontWeight: 500,
@@ -398,24 +398,24 @@ const PatientJourneyChart = ({ presupuesto, especialistas = [], navigate }) => {
         return (
           <Box sx={{ mx: 2, mb: 2, p: 1.5, backgroundColor: `${meta.color}08`, border: `1px solid ${meta.color}25`, borderRadius: 2 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-              <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: "0.85rem", color: C.text }}>
+              <Typography sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontWeight: 700, fontSize: "0.85rem", color: C.text }}>
                 {nd.title}
               </Typography>
               <Box sx={{ px: 1, py: 0.2, borderRadius: 2, backgroundColor: `${meta.color}18`, border: `1px solid ${meta.color}35` }}>
-                <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.65rem", fontWeight: 700, color: meta.color }}>
+                <Typography sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontSize: "0.65rem", fontWeight: 700, color: meta.color }}>
                   {meta.label}
                 </Typography>
               </Box>
             </Box>
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 0.5 }}>
-              {nd.price > 0 && <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: C.muted }}><strong>Precio:</strong> S/ {nd.price.toFixed(2)}</Typography>}
-              <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: C.muted }}><strong>Sesión:</strong> {nd.session}/{nd.totalSessions}</Typography>
-              {nd.specialist && <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.75rem", color: C.muted }}><strong>Especialista:</strong> {nd.specialist}</Typography>}
+              {nd.price > 0 && <Typography sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontSize: "0.75rem", color: C.muted }}><strong>Precio:</strong> S/ {nd.price.toFixed(2)}</Typography>}
+              <Typography sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontSize: "0.75rem", color: C.muted }}><strong>Sesión:</strong> {nd.session}/{nd.totalSessions}</Typography>
+              {nd.specialist && <Typography sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontSize: "0.75rem", color: C.muted }}><strong>Especialista:</strong> {nd.specialist}</Typography>}
             </Box>
-            {nd.fecha && <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.72rem", color: C.green }}>Realizado: {nd.fecha.split(" ")[0]}</Typography>}
+            {nd.fecha && <Typography sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontSize: "0.72rem", color: C.green }}>Realizado: {nd.fecha.split(" ")[0]}</Typography>}
             {nd.status !== "completed" && !nd.isAuto && navigate && (
               <Box component="button" onClick={() => navigate(`/tratamientos/comenzar?paciente=${presupuesto.paciente_id}&presupuesto=${presupuesto.id}`)}
-                sx={{ mt: 0.8, fontFamily: "'DM Sans', sans-serif", fontSize: "0.72rem", fontWeight: 600, color: C.white, backgroundColor: C.gold, border: "none", borderRadius: 1.5, px: 1.5, py: 0.5, cursor: "pointer", "&:hover": { backgroundColor: C.goldLight } }}>
+                sx={{ mt: 0.8, fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontSize: "0.72rem", fontWeight: 600, color: C.white, backgroundColor: C.gold, border: "none", borderRadius: 1.5, px: 1.5, py: 0.5, cursor: "pointer", "&:hover": { backgroundColor: C.goldLight } }}>
                 Realizar Tratamiento
               </Box>
             )}

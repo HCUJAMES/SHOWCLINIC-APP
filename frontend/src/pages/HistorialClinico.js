@@ -82,12 +82,12 @@ const TarjetaFicha = ({ icono: Icono, titulo, subtitulo, extra, accion, onClick,
       borderRadius: "20px",
       backgroundColor: FICHA_FONDO_TARJETA,
       border: `1px solid ${FICHA_HAIRLINE}`,
-      boxShadow: "0 1px 2px rgba(93,64,55,0.04), 0 18px 36px -28px rgba(120,88,40,0.45)",
+      boxShadow: "0 1px 2px rgba(92,60,18,0.04), 0 18px 36px -28px rgba(120,88,40,0.45)",
       overflow: "hidden",
       transition: "box-shadow 0.25s ease, border-color 0.25s ease",
       "&:hover": {
         borderColor: FICHA_ORO_TENUE,
-        boxShadow: "0 1px 2px rgba(93,64,55,0.05), 0 22px 44px -28px rgba(120,88,40,0.55)",
+        boxShadow: "0 1px 2px rgba(92,60,18,0.05), 0 22px 44px -28px rgba(120,88,40,0.55)",
       },
       // Filete dorado en el borde superior: une las tarjetas a la banda de
       // identidad sin volver a enmarcarlas dos veces.
@@ -99,7 +99,7 @@ const TarjetaFicha = ({ icono: Icono, titulo, subtitulo, extra, accion, onClick,
         right: 24,
         height: 2,
         borderRadius: "0 0 2px 2px",
-        background: "linear-gradient(90deg, rgba(200,169,110,0) 0%, #C8A96E 50%, rgba(200,169,110,0) 100%)",
+        background: "linear-gradient(90deg, rgba(186,154,99,0) 0%, #ba9a63 50%, rgba(186,154,99,0) 100%)",
         opacity: 0.7,
         pointerEvents: "none",
       },
@@ -2368,7 +2368,7 @@ const HistorialClinico = () => {
     }
     *{box-sizing:border-box;margin:0;padding:0;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body{font-family:'Courier New',Courier,monospace;background:#e8e8e8;display:flex;flex-direction:column;align-items:center;padding:20px 10px;}
-    .toolbar{position:fixed;top:0;left:0;right:0;background:#1a1a1a;color:white!important;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+    .toolbar{position:fixed;top:0;left:0;right:0;background:#2b2219;color:white!important;padding:10px 18px;display:flex;justify-content:space-between;align-items:center;z-index:1000;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
     .toolbar *{color:white!important;}
     .toolbar button{background:#a36920;color:white!important;border:none;padding:7px 20px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;letter-spacing:0.5px;}
     .toolbar button:hover{background:#8a5a1a;}
@@ -3425,7 +3425,7 @@ const HistorialClinico = () => {
             // obliga a recomponer toda la capa en cada scroll. El degradado ya
             // es casi opaco, así que el efecto no se nota y el scroll va fluido.
             boxShadow:
-              "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(212,175,55,0.10)",
+              "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(186,154,99,0.10)",
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
@@ -3439,7 +3439,7 @@ const HistorialClinico = () => {
                 color: "#a36920", 
                 fontWeight: 700, 
                 textAlign: "center",
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
                 letterSpacing: 4,
                 textTransform: "uppercase"
               }}
@@ -3460,7 +3460,7 @@ const HistorialClinico = () => {
                     sx={{
                       fontSize: "1.75rem",
                       fontWeight: 400,
-                      color: "#2E2E2E",
+                      color: "#2b2219",
                       lineHeight: 1.2,
                       mb: 0.5,
                     }}
@@ -3508,7 +3508,7 @@ const HistorialClinico = () => {
                           fontSize: "0.65rem",
                           textTransform: "uppercase",
                           letterSpacing: 0.8,
-                          color: "#8b6914",
+                          color: "#8a5a1a",
                         }}
                       >
                         Total
@@ -3532,7 +3532,7 @@ const HistorialClinico = () => {
                           fontWeight: 300,
                           lineHeight: 1,
                           mb: 0.3,
-                          color: "#2E2E2E",
+                          color: "#2b2219",
                         }}
                       >
                         {(() => {
@@ -3562,8 +3562,8 @@ const HistorialClinico = () => {
                       sx={{
                         p: 2,
                         borderRadius: 3,
-                        backgroundColor: "rgba(46,125,50,0.08)",
-                        border: "1px solid rgba(46,125,50,0.2)",
+                        backgroundColor: "rgba(79,109,68,0.08)",
+                        border: "1px solid rgba(79,109,68,0.2)",
                         height: "100%",
                       }}
                     >
@@ -3573,7 +3573,7 @@ const HistorialClinico = () => {
                           fontWeight: 300,
                           lineHeight: 1,
                           mb: 0.3,
-                          color: "#2e7d32",
+                          color: "#4f6d44",
                         }}
                       >
                         {pacientesDelMes.filter(p => p.clasificacion === "Tratamiento").length}
@@ -3583,7 +3583,7 @@ const HistorialClinico = () => {
                           fontSize: "0.65rem",
                           textTransform: "uppercase",
                           letterSpacing: 0.8,
-                          color: "#2e7d32",
+                          color: "#4f6d44",
                         }}
                       >
                         Tratamiento
@@ -3596,8 +3596,8 @@ const HistorialClinico = () => {
                       sx={{
                         p: 2,
                         borderRadius: 3,
-                        backgroundColor: "rgba(123,31,162,0.08)",
-                        border: "1px solid rgba(123,31,162,0.2)",
+                        backgroundColor: "rgba(132,90,114,0.08)",
+                        border: "1px solid rgba(132,90,114,0.2)",
                         height: "100%",
                       }}
                     >
@@ -3607,7 +3607,7 @@ const HistorialClinico = () => {
                           fontWeight: 300,
                           lineHeight: 1,
                           mb: 0.3,
-                          color: "#7b1fa2",
+                          color: "#845a72",
                         }}
                       >
                         {pacientesDelMes.filter(p => p.clasificacion === "Convenio").length}
@@ -3617,7 +3617,7 @@ const HistorialClinico = () => {
                           fontSize: "0.65rem",
                           textTransform: "uppercase",
                           letterSpacing: 0.8,
-                          color: "#7b1fa2",
+                          color: "#845a72",
                         }}
                       >
                         Convenio
@@ -3630,8 +3630,8 @@ const HistorialClinico = () => {
                       sx={{
                         p: 2,
                         borderRadius: 3,
-                        backgroundColor: "rgba(2,136,209,0.08)",
-                        border: "1px solid rgba(2,136,209,0.2)",
+                        backgroundColor: "rgba(79,107,128,0.08)",
+                        border: "1px solid rgba(79,107,128,0.2)",
                         height: "100%",
                       }}
                     >
@@ -3641,7 +3641,7 @@ const HistorialClinico = () => {
                           fontWeight: 300,
                           lineHeight: 1,
                           mb: 0.3,
-                          color: "#0288d1",
+                          color: "#4f6b80",
                         }}
                       >
                         {pacientesDelMes.filter(p => p.clasificacion === "Código").length}
@@ -3651,7 +3651,7 @@ const HistorialClinico = () => {
                           fontSize: "0.65rem",
                           textTransform: "uppercase",
                           letterSpacing: 0.8,
-                          color: "#0288d1",
+                          color: "#4f6b80",
                         }}
                       >
                         Código
@@ -3664,8 +3664,8 @@ const HistorialClinico = () => {
                       sx={{
                         p: 2,
                         borderRadius: 3,
-                        backgroundColor: "rgba(239,108,0,0.08)",
-                        border: "1px solid rgba(239,108,0,0.2)",
+                        backgroundColor: "rgba(168,97,42,0.08)",
+                        border: "1px solid rgba(168,97,42,0.2)",
                         height: "100%",
                       }}
                     >
@@ -3675,7 +3675,7 @@ const HistorialClinico = () => {
                           fontWeight: 300,
                           lineHeight: 1,
                           mb: 0.3,
-                          color: "#ef6c00",
+                          color: "#a8612a",
                         }}
                       >
                         {pacientesDelMes.filter(p => p.clasificacion === "Reincorporado").length}
@@ -3685,7 +3685,7 @@ const HistorialClinico = () => {
                           fontSize: "0.65rem",
                           textTransform: "uppercase",
                           letterSpacing: 0.8,
-                          color: "#ef6c00",
+                          color: "#a8612a",
                         }}
                       >
                         Retorno
@@ -3846,7 +3846,7 @@ const HistorialClinico = () => {
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
                 {pacientesVisibles.map((pac) => {
                   const iniciales = `${pac.nombre?.charAt(0) || ""}${pac.apellido?.charAt(0) || ""}`.toUpperCase();
-                  const coloresAvatar = ["#5a3e1b", "#a36920", "#ba9a63", "#8b6914", "#6b4e1f"];
+                  const coloresAvatar = ["#5a3e1b", "#a36920", "#ba9a63", "#8a5a1a", "#6b4e1f"];
                   const colorAvatar = coloresAvatar[pac.id % coloresAvatar.length];
                   
                   return (
@@ -3889,7 +3889,7 @@ const HistorialClinico = () => {
                           <Typography
                             sx={{ 
                               fontWeight: 600, 
-                              color: "#2E2E2E", 
+                              color: "#2b2219", 
                               lineHeight: 1.3, 
                               fontSize: "1rem",
                               mb: 0.3,
@@ -3993,15 +3993,15 @@ const HistorialClinico = () => {
                             setAnchorElClasificacion(e.currentTarget);
                           }}
                           sx={{
-                            borderColor: pac.clasificacion === "Tratamiento" ? "#2e7d32" :
-                                      pac.clasificacion === "Convenio" ? "#7b1fa2" :
-                                      pac.clasificacion === "Código" ? "#0288d1" :
-                                      pac.clasificacion === "Reincorporado" ? "#ef6c00" :
+                            borderColor: pac.clasificacion === "Tratamiento" ? "#4f6d44" :
+                                      pac.clasificacion === "Convenio" ? "#845a72" :
+                                      pac.clasificacion === "Código" ? "#4f6b80" :
+                                      pac.clasificacion === "Reincorporado" ? "#a8612a" :
                                       pac.clasificacion ? "#a36920" : "rgba(163,105,32,0.2)",
-                            color: pac.clasificacion === "Tratamiento" ? "#2e7d32" :
-                                   pac.clasificacion === "Convenio" ? "#7b1fa2" :
-                                   pac.clasificacion === "Código" ? "#0288d1" :
-                                   pac.clasificacion === "Reincorporado" ? "#ef6c00" :
+                            color: pac.clasificacion === "Tratamiento" ? "#4f6d44" :
+                                   pac.clasificacion === "Convenio" ? "#845a72" :
+                                   pac.clasificacion === "Código" ? "#4f6b80" :
+                                   pac.clasificacion === "Reincorporado" ? "#a8612a" :
                                    pac.clasificacion ? "#a36920" : "#5a3e1b",
                             borderRadius: 8,
                             px: 2,
@@ -4009,21 +4009,21 @@ const HistorialClinico = () => {
                             fontWeight: 500,
                             textTransform: "none",
                             fontSize: "0.85rem",
-                            backgroundColor: pac.clasificacion === "Tratamiento" ? "rgba(46,125,50,0.08)" :
-                                             pac.clasificacion === "Convenio" ? "rgba(123,31,162,0.08)" :
-                                             pac.clasificacion === "Código" ? "rgba(2,136,209,0.08)" :
-                                             pac.clasificacion === "Reincorporado" ? "rgba(239,108,0,0.08)" :
+                            backgroundColor: pac.clasificacion === "Tratamiento" ? "rgba(79,109,68,0.08)" :
+                                             pac.clasificacion === "Convenio" ? "rgba(132,90,114,0.08)" :
+                                             pac.clasificacion === "Código" ? "rgba(79,107,128,0.08)" :
+                                             pac.clasificacion === "Reincorporado" ? "rgba(168,97,42,0.08)" :
                                              pac.clasificacion ? "rgba(163,105,32,0.08)" : "transparent",
                             "&:hover": { 
-                              borderColor: pac.clasificacion === "Tratamiento" ? "#2e7d32" :
-                                         pac.clasificacion === "Convenio" ? "#7b1fa2" :
-                                         pac.clasificacion === "Código" ? "#0288d1" :
-                                         pac.clasificacion === "Reincorporado" ? "#ef6c00" :
+                              borderColor: pac.clasificacion === "Tratamiento" ? "#4f6d44" :
+                                         pac.clasificacion === "Convenio" ? "#845a72" :
+                                         pac.clasificacion === "Código" ? "#4f6b80" :
+                                         pac.clasificacion === "Reincorporado" ? "#a8612a" :
                                          "#a36920",
-                              backgroundColor: pac.clasificacion === "Tratamiento" ? "rgba(46,125,50,0.12)" :
-                                               pac.clasificacion === "Convenio" ? "rgba(123,31,162,0.12)" :
-                                               pac.clasificacion === "Código" ? "rgba(2,136,209,0.12)" :
-                                               pac.clasificacion === "Reincorporado" ? "rgba(239,108,0,0.12)" :
+                              backgroundColor: pac.clasificacion === "Tratamiento" ? "rgba(79,109,68,0.12)" :
+                                               pac.clasificacion === "Convenio" ? "rgba(132,90,114,0.12)" :
+                                               pac.clasificacion === "Código" ? "rgba(79,107,128,0.12)" :
+                                               pac.clasificacion === "Reincorporado" ? "rgba(168,97,42,0.12)" :
                                                "rgba(163,105,32,0.12)",
                             },
                           }}
@@ -4040,8 +4040,8 @@ const HistorialClinico = () => {
                               setOpenConfirmarEliminarPaciente(true);
                             }}
                             sx={{
-                              color: "#d32f2f",
-                              "&:hover": { backgroundColor: "rgba(211,47,47,0.08)" },
+                              color: "#b3412e",
+                              "&:hover": { backgroundColor: "rgba(179,65,46,0.08)" },
                             }}
                           >
                             <DeleteForever fontSize="small" />
@@ -4231,11 +4231,11 @@ const HistorialClinico = () => {
                     variant="outlined"
                     size="small"
                     sx={{
-                      borderColor: "#9c27b0",
-                      color: "#9c27b0",
+                      borderColor: "#946a82",
+                      color: "#946a82",
                       "&:hover": { 
-                        borderColor: "#7b1fa2",
-                        backgroundColor: "rgba(156, 39, 176, 0.04)"
+                        borderColor: "#845a72",
+                        backgroundColor: "rgba(148,106,130, 0.04)"
                       },
                       borderRadius: 3,
                       fontWeight: "bold",
@@ -4283,7 +4283,7 @@ const HistorialClinico = () => {
                           position: "absolute",
                           top: -4,
                           right: -4,
-                          backgroundColor: "#e65100",
+                          backgroundColor: "#a8612a",
                           color: "white",
                           borderRadius: "50%",
                           width: 18,
@@ -4312,7 +4312,7 @@ const HistorialClinico = () => {
                         py: 0.25,
                         borderRadius: 1.5,
                         backgroundColor: "rgba(183,28,28,0.10)",
-                        color: "#b71c1c",
+                        color: "#86301f",
                         fontWeight: 800,
                       }}
                     >
@@ -4332,7 +4332,7 @@ const HistorialClinico = () => {
                   borderRadius: "28px",
                   backgroundColor: "#F4EADB",
                   border: `1px solid ${FICHA_ORO_TENUE}`,
-                  boxShadow: "0 2px 6px rgba(93,64,55,0.04), 0 30px 60px -40px rgba(120,88,40,0.45)"
+                  boxShadow: "0 2px 6px rgba(92,60,18,0.04), 0 30px 60px -40px rgba(120,88,40,0.45)"
                 }}
               >
                 {/* Banda de identidad: la imagen de marca detrás del nombre es
@@ -4388,12 +4388,12 @@ const HistorialClinico = () => {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontFamily: "'Cormorant Garamond', serif",
+                        fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
                         fontSize: "3rem",
                         fontWeight: 700,
                         color: "#E6C98A",
                         border: "4px solid #fff",
-                        boxShadow: `0 0 0 1.5px ${FICHA_ORO}, 0 0 0 6px rgba(230,201,138,0.25), 0 16px 32px -14px rgba(93,64,55,0.6)`,
+                        boxShadow: `0 0 0 1.5px ${FICHA_ORO}, 0 0 0 6px rgba(230,201,138,0.25), 0 16px 32px -14px rgba(92,60,18,0.6)`,
                       }}
                     >
                       {pacienteSeleccionado.fotoPerfil && fotoPerfilRota !== pacienteSeleccionado.fotoPerfil ? (
@@ -4459,7 +4459,7 @@ const HistorialClinico = () => {
                         variant="h4"
                         component="h2"
                         sx={{
-                          fontFamily: "'Cormorant Garamond', Georgia, serif",
+                          fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
                           fontSize: "2.3rem",
                           fontWeight: 700,
                           letterSpacing: "0.5px",
@@ -4572,7 +4572,8 @@ const HistorialClinico = () => {
                     const tratamientos = (pacienteSeleccionado.tratamientoInteres || "")
                       .split(/[,;\n]+/)
                       .map((t) => t.trim())
-                      .filter(Boolean);
+                      // La base guarda a veces el texto "null"/"undefined" en vez de vacío
+                      .filter((t) => t && !["null", "undefined", "-"].includes(t.toLowerCase()));
                     const hay = tratamientos.length > 0;
                     return (
                       <Box
@@ -4588,9 +4589,9 @@ const HistorialClinico = () => {
                           py: { xs: 2.5, sm: 3 },
                           borderRadius: "20px",
                           background: hay
-                            ? "linear-gradient(120deg, #3B2A22 0%, #5D4037 55%, #7A5440 100%)"
+                            ? "linear-gradient(120deg, #3B2A22 0%, #5c3c12 55%, #7A5440 100%)"
                             : FICHA_FONDO_TARJETA,
-                          border: hay ? "1px solid #C8A96E" : `1px dashed ${FICHA_ORO_TENUE}`,
+                          border: hay ? "1px solid #ba9a63" : `1px dashed ${FICHA_ORO_TENUE}`,
                           boxShadow: hay
                             ? "0 0 0 4px rgba(230,201,138,0.18), 0 24px 44px -26px rgba(59,42,34,0.75)"
                             : "none",
@@ -4620,7 +4621,7 @@ const HistorialClinico = () => {
                             alignItems: "center",
                             justifyContent: "center",
                             background: hay
-                              ? "linear-gradient(145deg, #F3DDA6 0%, #C8A96E 55%, #A9843E 100%)"
+                              ? "linear-gradient(145deg, #F3DDA6 0%, #ba9a63 55%, #A9843E 100%)"
                               : "#efe2c8",
                             boxShadow: hay ? "0 0 0 4px rgba(243,221,166,0.25), 0 8px 18px -6px rgba(0,0,0,0.45)" : "none",
                             position: "relative",
@@ -4893,7 +4894,7 @@ const HistorialClinico = () => {
                             borderRadius: "12px",
                             border: "1px solid #EADFCF"
                           }}>
-                            <Typography variant="subtitle2" sx={{ fontFamily: "'DM Sans', sans-serif", color: "#5D4037", mb: 1.5, fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                            <Typography variant="subtitle2" sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: "#5c3c12", mb: 1.5, fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                               Nueva observación
                             </Typography>
                             <TextField
@@ -4905,13 +4906,13 @@ const HistorialClinico = () => {
                               onChange={(e) => setNuevaObservacion(e.target.value)}
                               sx={{
                                 "& .MuiInputBase-root": {
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                                   backgroundColor: "#fff",
                                   borderRadius: "8px",
                                 },
                                 "& .MuiOutlinedInput-root": {
-                                  "&:hover fieldset": { borderColor: "#C8A96E" },
-                                  "&.Mui-focused fieldset": { borderColor: "#5D4037" },
+                                  "&:hover fieldset": { borderColor: "#ba9a63" },
+                                  "&.Mui-focused fieldset": { borderColor: "#5c3c12" },
                                 },
                               }}
                             />
@@ -4920,14 +4921,14 @@ const HistorialClinico = () => {
                                 variant="contained"
                                 size="medium"
                                 sx={{
-                                  fontFamily: "'DM Sans', sans-serif",
-                                  backgroundColor: "#5D4037",
+                                  fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                                  backgroundColor: "#5c3c12",
                                   "&:hover": { backgroundColor: "#4a332b" },
                                   borderRadius: "8px",
                                   fontWeight: 700,
                                   textTransform: "none",
                                   px: 3,
-                                  boxShadow: "0 2px 8px rgba(93, 64, 55, 0.2)"
+                                  boxShadow: "0 2px 8px rgba(92,60,18, 0.2)"
                                 }}
                                 disabled={guardandoObservaciones || !nuevaObservacion.trim()}
                                 onClick={guardarObservacion}
@@ -4942,7 +4943,7 @@ const HistorialClinico = () => {
                             <Box>
                               <Typography
                                 variant="subtitle2"
-                                sx={{ fontFamily: "'DM Sans', sans-serif", color: "#5D4037", mb: 2, fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}
+                                sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: "#5c3c12", mb: 2, fontWeight: 700, fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}
                               >
                                 Historial ({observaciones.length})
                               </Typography>
@@ -4966,8 +4967,8 @@ const HistorialClinico = () => {
                                       border: "1px solid #EADFCF",
                                       transition: "all 0.2s ease",
                                       "&:hover": {
-                                        borderColor: "#C8A96E",
-                                        boxShadow: "0 2px 8px rgba(93, 64, 55, 0.08)"
+                                        borderColor: "#ba9a63",
+                                        boxShadow: "0 2px 8px rgba(92,60,18, 0.08)"
                                       }
                                     }}
                                   >
@@ -4983,7 +4984,7 @@ const HistorialClinico = () => {
                                         <Typography
                                           variant="caption"
                                           sx={{
-                                            fontFamily: "'DM Sans', sans-serif",
+                                            fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                                             display: "block",
                                             color: "#999",
                                             mb: 1,
@@ -5005,18 +5006,18 @@ const HistorialClinico = () => {
                                             }
                                             sx={{
                                               "& .MuiInputBase-root": {
-                                                fontFamily: "'DM Sans', sans-serif",
+                                                fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                                                 backgroundColor: "#fff",
                                                 borderRadius: "8px",
                                               },
                                               "& .MuiOutlinedInput-root": {
-                                                "&:hover fieldset": { borderColor: "#C8A96E" },
-                                                "&.Mui-focused fieldset": { borderColor: "#5D4037" },
+                                                "&:hover fieldset": { borderColor: "#ba9a63" },
+                                                "&.Mui-focused fieldset": { borderColor: "#5c3c12" },
                                               },
                                             }}
                                           />
                                         ) : (
-                                          <Typography sx={{ fontFamily: "'DM Sans', sans-serif", whiteSpace: "pre-wrap", color: "#5D4037" }}>
+                                          <Typography sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", whiteSpace: "pre-wrap", color: "#5c3c12" }}>
                                             {o.texto}
                                           </Typography>
                                         )}
@@ -5029,8 +5030,8 @@ const HistorialClinico = () => {
                                               size="small"
                                               variant="contained"
                                               sx={{
-                                                fontFamily: "'DM Sans', sans-serif",
-                                                backgroundColor: "#5D4037",
+                                                fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                                                backgroundColor: "#5c3c12",
                                                 "&:hover": { backgroundColor: "#4a332b" },
                                                 borderRadius: "8px",
                                                 fontWeight: 700,
@@ -5045,9 +5046,9 @@ const HistorialClinico = () => {
                                               size="small"
                                               variant="outlined"
                                               sx={{
-                                                fontFamily: "'DM Sans', sans-serif",
-                                                borderColor: "#5D4037",
-                                                color: "#5D4037",
+                                                fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                                                borderColor: "#5c3c12",
+                                                color: "#5c3c12",
                                                 borderRadius: "8px",
                                                 fontWeight: 700,
                                                 textTransform: "none"
@@ -5065,13 +5066,13 @@ const HistorialClinico = () => {
                                             size="small"
                                             variant="outlined"
                                             sx={{
-                                              fontFamily: "'DM Sans', sans-serif",
-                                              borderColor: "#5D4037",
-                                              color: "#5D4037",
+                                              fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                                              borderColor: "#5c3c12",
+                                              color: "#5c3c12",
                                               borderRadius: "8px",
                                               fontWeight: 700,
                                               textTransform: "none",
-                                              "&:hover": { backgroundColor: "rgba(93, 64, 55, 0.08)", borderColor: "#5D4037" },
+                                              "&:hover": { backgroundColor: "rgba(92,60,18, 0.08)", borderColor: "#5c3c12" },
                                             }}
                                             onClick={() => {
                                               setObservacionEditId(o.id);
@@ -5105,17 +5106,17 @@ const HistorialClinico = () => {
                   sx={{
                     width: 42,
                     height: 42,
-                    backgroundColor: showOferta ? "#e0e0e0" : "#4caf50",
+                    backgroundColor: showOferta ? "#e7dfd0" : "#5f7f52",
                     color: "white",
-                    boxShadow: showOferta ? "none" : "0 2px 8px rgba(76,175,80,0.3)",
+                    boxShadow: showOferta ? "none" : "0 2px 8px rgba(95,127,82,0.3)",
                     transition: "all 0.2s ease",
                     "&:hover": { 
                       backgroundColor: showOferta ? "#d0d0d0" : "#45a049",
                       transform: showOferta ? "none" : "scale(1.05)",
-                      boxShadow: showOferta ? "none" : "0 4px 12px rgba(76,175,80,0.4)",
+                      boxShadow: showOferta ? "none" : "0 4px 12px rgba(95,127,82,0.4)",
                     },
                     "&.Mui-disabled": {
-                      backgroundColor: "#f5f5f5",
+                      backgroundColor: "#f5f2ea",
                       color: "#ccc",
                     },
                   }}
@@ -5163,7 +5164,7 @@ const HistorialClinico = () => {
                       transform: "translateY(-1px)",
                     },
                     "&.Mui-disabled": {
-                      backgroundColor: "#e0e0e0",
+                      backgroundColor: "#e7dfd0",
                       color: "#999",
                     },
                   }}
@@ -5198,7 +5199,7 @@ const HistorialClinico = () => {
                       transform: "translateY(-1px)",
                     },
                     "&.Mui-disabled": {
-                      borderColor: "#e0e0e0",
+                      borderColor: "#e7dfd0",
                       color: "#999",
                     },
                   }}
@@ -5228,7 +5229,7 @@ const HistorialClinico = () => {
                       transform: "translateY(-1px)",
                     },
                     "&.Mui-disabled": {
-                      borderColor: "#e0e0e0",
+                      borderColor: "#e7dfd0",
                       color: "#999",
                     },
                   }}
@@ -5252,7 +5253,7 @@ const HistorialClinico = () => {
                     boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
                   }}
                 >
-                  <Typography sx={{ mb: 0.5, fontWeight: 800, fontSize: "1.15rem", color: "#1a1a1a" }}>
+                  <Typography sx={{ mb: 0.5, fontWeight: 800, fontSize: "1.15rem", color: "#2b2219" }}>
                     {ofertaEditId ? "Editando presupuesto" : "Nuevo presupuesto"}
                   </Typography>
                   <Typography variant="body2" sx={{ color: "#999", mb: 2 }}>
@@ -5386,7 +5387,7 @@ const HistorialClinico = () => {
                                 backgroundColor: "white",
                                 boxShadow: isSelected
                                   ? "0 0 0 3px rgba(163,105,32,0.14), 0 6px 18px -10px rgba(163,105,32,0.5)"
-                                  : "0 1px 2px rgba(93,64,55,0.05)",
+                                  : "0 1px 2px rgba(92,60,18,0.05)",
                                 transition: "border-color .2s ease, box-shadow .2s ease",
                                 display: "flex",
                                 flexDirection: "column",
@@ -5486,13 +5487,13 @@ const HistorialClinico = () => {
                                       sx={{
                                         width: 32, height: 32, p: 0, border: "none", borderRadius: "50%",
                                         backgroundColor: count > 0 ? "#fff" : "transparent",
-                                        color: count > 0 ? "#c62828" : "#c9bba6",
+                                        color: count > 0 ? "#9e3626" : "#c9bba6",
                                         boxShadow: count > 0 ? "0 1px 4px rgba(0,0,0,0.12)" : "none",
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         cursor: count > 0 ? "pointer" : "default",
                                         fontSize: "1.25rem", fontWeight: 700, lineHeight: 1,
                                         transition: "background-color .15s ease, transform .1s ease",
-                                        "&:hover": count > 0 ? { backgroundColor: "#ffebee" } : {},
+                                        "&:hover": count > 0 ? { backgroundColor: "#f8ebe7" } : {},
                                         "&:active": count > 0 ? { transform: "scale(0.9)" } : {},
                                       }}
                                     >−</Box>
@@ -5581,7 +5582,7 @@ const HistorialClinico = () => {
                       }}>
                         {/* Cabecera */}
                         <Box sx={{ px: 2.5, py: 2, background: "linear-gradient(135deg, #a36920 0%, #8a5a1a 100%)", color: "#fff" }}>
-                          <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: "1.45rem", lineHeight: 1.15, color: "#fff" }}>
+                          <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontWeight: 600, fontSize: "1.45rem", lineHeight: 1.15, color: "#fff" }}>
                             Plan de tratamiento
                           </Typography>
                           {pacienteSeleccionado && (
@@ -5620,7 +5621,7 @@ const HistorialClinico = () => {
                                   backgroundColor: "#fff",
                                   borderRadius: "16px",
                                   border: "1px solid rgba(163,105,32,0.14)",
-                                  boxShadow: "0 2px 8px rgba(93,64,55,0.06)",
+                                  boxShadow: "0 2px 8px rgba(92,60,18,0.06)",
                                 }}
                               >
                                 {/* Foto + nombre + precio grande */}
@@ -5642,7 +5643,7 @@ const HistorialClinico = () => {
                                     }}>{idx + 1}</Box>
                                   </Box>
                                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                                    <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#3E2723", lineHeight: 1.25 }}>
+                                    <Typography sx={{ fontWeight: 700, fontSize: "1rem", color: "#2b2219", lineHeight: 1.25 }}>
                                       {t.nombre}
                                     </Typography>
                                     <Typography sx={{ fontSize: "0.8rem", color: "#8D7B70", mt: 0.2 }}>
@@ -5650,7 +5651,7 @@ const HistorialClinico = () => {
                                     </Typography>
                                   </Box>
                                   <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-                                    <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 700, fontSize: "1.15rem", color: "#a36920", lineHeight: 1.1 }}>
+                                    <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontWeight: 700, fontSize: "1.15rem", color: "#a36920", lineHeight: 1.1 }}>
                                       {soles(item?.precio)}
                                     </Typography>
                                     <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 0.25, mt: 0.3 }}>
@@ -5671,7 +5672,7 @@ const HistorialClinico = () => {
                                         size="small"
                                         onClick={() => removeOneOfertaItem(t)}
                                         title="Quitar del plan"
-                                        sx={{ width: 26, height: 26, color: "#c9a99a", "&:hover": { color: "#d32f2f", backgroundColor: "#ffebee" } }}
+                                        sx={{ width: 26, height: 26, color: "#c9a99a", "&:hover": { color: "#b3412e", backgroundColor: "#f8ebe7" } }}
                                       >
                                         <Close sx={{ fontSize: 16 }} />
                                       </IconButton>
@@ -5722,7 +5723,7 @@ const HistorialClinico = () => {
                         <Box sx={{ p: 2, borderTop: "1px solid rgba(163,105,32,0.15)", backgroundColor: "#faf6ee" }}>
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", mb: 1 }}>
                             <Typography sx={{ fontSize: "0.9rem", color: "#6b5a49", fontWeight: 600 }}>Subtotal</Typography>
-                            <Typography sx={{ fontSize: "1rem", color: "#3E2723", fontWeight: 700 }}>{soles(totalOferta)}</Typography>
+                            <Typography sx={{ fontSize: "1rem", color: "#2b2219", fontWeight: 700 }}>{soles(totalOferta)}</Typography>
                           </Box>
                           <Box sx={{ mb: 1.25 }}>
                             <Typography sx={{ fontSize: "0.8rem", color: "#6b5a49", mb: 0.6 }}>Descuento</Typography>
@@ -5735,17 +5736,17 @@ const HistorialClinico = () => {
                           </Box>
                           {descuento > 0 && (
                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", mb: 0.5 }}>
-                              <Typography sx={{ fontSize: "0.9rem", color: "#2e7d32", fontWeight: 600 }}>Ahorro</Typography>
-                              <Typography sx={{ fontSize: "1rem", color: "#2e7d32", fontWeight: 700 }}>− {soles(descuento)}</Typography>
+                              <Typography sx={{ fontSize: "0.9rem", color: "#4f6d44", fontWeight: 600 }}>Ahorro</Typography>
+                              <Typography sx={{ fontSize: "1rem", color: "#4f6d44", fontWeight: 700 }}>− {soles(descuento)}</Typography>
                             </Box>
                           )}
                           <Box sx={{
                             display: "flex", justifyContent: "space-between", alignItems: "center",
                             mt: 1, mb: 1.75, px: 1.75, py: 1.25, borderRadius: "14px",
-                            background: "linear-gradient(135deg, rgba(163,105,32,0.12), rgba(212,175,55,0.14))",
+                            background: "linear-gradient(135deg, rgba(163,105,32,0.12), rgba(186,154,99,0.14))",
                           }}>
                             <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: "#8a5a1a", letterSpacing: 0.5, textTransform: "uppercase" }}>Total</Typography>
-                            <Typography sx={{ fontFamily: "'Playfair Display', serif", fontSize: "1.9rem", fontWeight: 700, color: "#a36920", lineHeight: 1 }}>
+                            <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontSize: "1.9rem", fontWeight: 700, color: "#a36920", lineHeight: 1 }}>
                               {soles(totalOferta - descuento)}
                             </Typography>
                           </Box>
@@ -5755,8 +5756,8 @@ const HistorialClinico = () => {
                               <Button
                                 variant="outlined"
                                 sx={{
-                                  borderColor: "#e0e0e0", color: "#888", borderRadius: 3, textTransform: "none", fontSize: "0.9rem",
-                                  "&:hover": { backgroundColor: "#f5f5f5", borderColor: "#ccc" },
+                                  borderColor: "#e7dfd0", color: "#888", borderRadius: 3, textTransform: "none", fontSize: "0.9rem",
+                                  "&:hover": { backgroundColor: "#f5f2ea", borderColor: "#ccc" },
                                 }}
                                 onClick={() => {
                                   setOfertaEditId(null);
@@ -5792,12 +5793,12 @@ const HistorialClinico = () => {
                         alignSelf: "flex-start",
                         backgroundColor: "#2a2a2a",
                         borderRadius: "20px",
-                        border: "1px solid #3a3a3a",
+                        border: "1px solid #3a2f24",
                         overflow: "hidden",
                         boxShadow: "0 12px 32px -14px rgba(0,0,0,0.5)",
                       }}>
-                        <Box sx={{ p: 1.5, backgroundColor: "#1a1a1a", borderBottom: "1px solid #3a3a3a" }}>
-                          <Typography sx={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: "1rem", color: "#C8A96E", textAlign: "center" }}>
+                        <Box sx={{ p: 1.5, backgroundColor: "#2b2219", borderBottom: "1px solid #3a2f24" }}>
+                          <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontWeight: 700, fontSize: "1rem", color: "#ba9a63", textAlign: "center" }}>
                             Mapa Facial 3D
                           </Typography>
                         </Box>
@@ -5805,8 +5806,8 @@ const HistorialClinico = () => {
                           className="stage"
                           sx={{
                             position: "relative",
-                            backgroundColor: "#1a1a1a",
-                            backgroundImage: "radial-gradient(circle at center, rgba(200, 169, 110, 0.03) 1px, transparent 1px)",
+                            backgroundColor: "#2b2219",
+                            backgroundImage: "radial-gradient(circle at center, rgba(186,154,99, 0.03) 1px, transparent 1px)",
                             backgroundSize: "20px 20px",
                           }}
                         >
@@ -5820,7 +5821,7 @@ const HistorialClinico = () => {
                                 <Typography sx={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.85)", flex: 1, lineHeight: 1.2 }}>
                                   {l.nombre}
                                 </Typography>
-                                <Typography sx={{ fontSize: "0.7rem", color: l.count > 0 ? "#C8A96E" : "rgba(255,255,255,0.35)", fontWeight: 700 }}>
+                                <Typography sx={{ fontSize: "0.7rem", color: l.count > 0 ? "#ba9a63" : "rgba(255,255,255,0.35)", fontWeight: 700 }}>
                                   {l.count > 0 ? `${l.count} pts` : "sin puntos"}
                                 </Typography>
                               </Box>
@@ -5872,12 +5873,12 @@ const HistorialClinico = () => {
                   {/* Leyenda de estados */}
                   <Box sx={{ display: "flex", gap: 2, mb: 2, flexWrap: "wrap", alignItems: "center" }}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <Box sx={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: "#d4af37" }} />
-                      <Typography variant="caption" sx={{ color: "#b8860b", fontWeight: 600 }}>Se hará y se cobrará</Typography>
+                      <Box sx={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: "#ba9a63" }} />
+                      <Typography variant="caption" sx={{ color: "#a36920", fontWeight: 600 }}>Se hará y se cobrará</Typography>
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <Box sx={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: "#7b1fa2" }} />
-                      <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: 600 }}>Se hará pero aún no paga</Typography>
+                      <Box sx={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: "#845a72" }} />
+                      <Typography variant="caption" sx={{ color: "#845a72", fontWeight: 600 }}>Se hará pero aún no paga</Typography>
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <Box sx={{ width: 14, height: 14, borderRadius: "50%", backgroundColor: "#bdbdbd" }} />
@@ -5905,8 +5906,8 @@ const HistorialClinico = () => {
                           sx={{
                             p: 2,
                             borderRadius: 2,
-                            backgroundColor: yaAsignado ? "rgba(76, 175, 80, 0.08)" : "white",
-                            border: yaAsignado ? "1px solid rgba(76, 175, 80, 0.4)" : "1px solid rgba(163, 105, 32, 0.2)",
+                            backgroundColor: yaAsignado ? "rgba(95,127,82, 0.08)" : "white",
+                            border: yaAsignado ? "1px solid rgba(95,127,82, 0.4)" : "1px solid rgba(163, 105, 32, 0.2)",
                             transition: "all 0.3s ease",
                           }}
                         >
@@ -5948,12 +5949,12 @@ const HistorialClinico = () => {
                                 disabled={yaAsignado || asignandoPresupuesto}
                                 sx={{
                                   color: "#a36920",
-                                  "&.Mui-checked": { color: "#4caf50" },
+                                  "&.Mui-checked": { color: "#5f7f52" },
                                   p: 0,
                                 }}
                               />
                               <Box>
-                                <Typography sx={{ fontWeight: "bold", color: yaAsignado ? "#2e7d32" : "#333" }}>
+                                <Typography sx={{ fontWeight: "bold", color: yaAsignado ? "#4f6d44" : "#333" }}>
                                   {yaAsignado ? "Presupuesto Asignado" : "Presupuesto"}
                                 </Typography>
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -5997,8 +5998,8 @@ const HistorialClinico = () => {
                                 size="small"
                                 onClick={() => eliminarOferta(o.id)}
                                 sx={{
-                                  color: "#f44336",
-                                  "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" }
+                                  color: "#c0533e",
+                                  "&:hover": { backgroundColor: "rgba(192,83,62, 0.1)" }
                                 }}
                               >
                                 <Close fontSize="small" />
@@ -6037,11 +6038,11 @@ const HistorialClinico = () => {
                                   label={`Especialista: ${presAsig.especialista_nombre}`}
                                   size="small"
                                   sx={{ 
-                                    backgroundColor: "rgba(76,175,80,0.15)", 
-                                    color: "#2e7d32",
+                                    backgroundColor: "rgba(95,127,82,0.15)", 
+                                    color: "#4f6d44",
                                     fontWeight: 600,
                                     fontSize: "0.75rem",
-                                    '& .MuiChip-icon': { color: '#2e7d32' }
+                                    '& .MuiChip-icon': { color: '#4f6d44' }
                                   }}
                                 />
                               </Box>
@@ -6052,11 +6053,11 @@ const HistorialClinico = () => {
                                   label="Sin especialista asignado"
                                   size="small"
                                   sx={{
-                                    backgroundColor: "rgba(244,67,54,0.12)",
-                                    color: "#c62828",
+                                    backgroundColor: "rgba(192,83,62,0.12)",
+                                    color: "#9e3626",
                                     fontWeight: 600,
                                     fontSize: "0.75rem",
-                                    '& .MuiChip-icon': { color: '#c62828' }
+                                    '& .MuiChip-icon': { color: '#9e3626' }
                                   }}
                                 />
                                 <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -6150,12 +6151,12 @@ const HistorialClinico = () => {
                                     e.currentTarget.style.boxShadow = "0 0 0 3px rgba(163,105,32,0.3)";
                                   }}
                                   onDragLeave={(e) => {
-                                    e.currentTarget.style.borderColor = marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(163, 105, 32, 0.2)';
+                                    e.currentTarget.style.borderColor = marca === "gold" ? '#ba9a63' : marca === "purple" ? '#845a72' : 'rgba(163, 105, 32, 0.2)';
                                     e.currentTarget.style.boxShadow = "";
                                   }}
                                   onDrop={(e) => {
                                     e.preventDefault();
-                                    e.currentTarget.style.borderColor = marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(163, 105, 32, 0.2)';
+                                    e.currentTarget.style.borderColor = marca === "gold" ? '#ba9a63' : marca === "purple" ? '#845a72' : 'rgba(163, 105, 32, 0.2)';
                                     e.currentTarget.style.boxShadow = "";
                                     try {
                                       const data = JSON.parse(e.dataTransfer.getData("text/plain"));
@@ -6166,7 +6167,7 @@ const HistorialClinico = () => {
                                   }}
                                   sx={{
                                     borderRadius: 2.5,
-                                    border: `2px solid ${marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(163, 105, 32, 0.2)'}`,
+                                    border: `2px solid ${marca === "gold" ? '#ba9a63' : marca === "purple" ? '#845a72' : 'rgba(163, 105, 32, 0.2)'}`,
                                     backgroundColor: "#fff",
                                     overflow: "hidden",
                                     display: "flex",
@@ -6175,9 +6176,9 @@ const HistorialClinico = () => {
                                     cursor: "grab",
                                     transition: "border-color 0.2s, box-shadow 0.2s, opacity 0.2s",
                                     boxShadow: marca === "gold" 
-                                      ? "0 0 0 2px rgba(212,175,55,0.25)" 
+                                      ? "0 0 0 2px rgba(186,154,99,0.25)" 
                                       : marca === "purple" 
-                                        ? "0 0 0 2px rgba(123,31,162,0.25)" 
+                                        ? "0 0 0 2px rgba(132,90,114,0.25)" 
                                         : "0 1px 4px rgba(0,0,0,0.08)",
                                     "&:active": { cursor: "grabbing" },
                                   }}
@@ -6252,8 +6253,8 @@ const HistorialClinico = () => {
                                         right: 6,
                                         zIndex: 2,
                                         width: 26, height: 26, borderRadius: "50%",
-                                        backgroundColor: marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : 'rgba(255,255,255,0.9)',
-                                        border: `2px solid ${marca === "gold" ? '#d4af37' : marca === "purple" ? '#7b1fa2' : '#bdbdbd'}`,
+                                        backgroundColor: marca === "gold" ? '#ba9a63' : marca === "purple" ? '#845a72' : 'rgba(255,255,255,0.9)',
+                                        border: `2px solid ${marca === "gold" ? '#ba9a63' : marca === "purple" ? '#845a72' : '#bdbdbd'}`,
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         fontSize: "0.75rem",
                                         color: marca === "purple" ? 'white' : marca === "gold" ? '#3e2c0a' : '#bdbdbd',
@@ -6278,10 +6279,10 @@ const HistorialClinico = () => {
                                           top: 6,
                                           left: 6,
                                           backgroundColor: "rgba(255,255,255,0.85)",
-                                          color: "#d32f2f",
+                                          color: "#b3412e",
                                           p: 0.3,
                                           zIndex: 2,
-                                          "&:hover": { backgroundColor: "rgba(211,47,47,0.15)" },
+                                          "&:hover": { backgroundColor: "rgba(179,65,46,0.15)" },
                                         }}
                                         title="Eliminar tratamiento"
                                       >
@@ -6295,7 +6296,7 @@ const HistorialClinico = () => {
                                       fontWeight: "600",
                                       fontSize: "1rem",
                                       lineHeight: 1.3,
-                                      color: marca === "gold" ? "#b8860b" : marca === "purple" ? "#7b1fa2" : "#333",
+                                      color: marca === "gold" ? "#a36920" : marca === "purple" ? "#845a72" : "#333",
                                       mb: 0.5,
                                       display: "-webkit-box",
                                       WebkitLineClamp: 2,
@@ -6322,12 +6323,12 @@ const HistorialClinico = () => {
                                           />
                                           <Typography 
                                             component="span" variant="caption" 
-                                            sx={{ color: "#4caf50", cursor: "pointer", fontWeight: "bold", "&:hover": { color: "#2e7d32" } }}
+                                            sx={{ color: "#5f7f52", cursor: "pointer", fontWeight: "bold", "&:hover": { color: "#4f6d44" } }}
                                             onClick={(e) => { e.stopPropagation(); editarSesionesOferta(o.id, idx, editandoSesiones.sesiones); }}
                                           >✓</Typography>
                                           <Typography 
                                             component="span" variant="caption" 
-                                            sx={{ color: "#f44336", cursor: "pointer", fontWeight: "bold", "&:hover": { color: "#c62828" } }}
+                                            sx={{ color: "#c0533e", cursor: "pointer", fontWeight: "bold", "&:hover": { color: "#9e3626" } }}
                                             onClick={(e) => { e.stopPropagation(); setEditandoSesiones(null); }}
                                           >✕</Typography>
                                         </Box>
@@ -6363,11 +6364,11 @@ const HistorialClinico = () => {
                                         size="small"
                                         onClick={(e) => { e.stopPropagation(); agregarAlCarrito(it, `card-${o.id}-${idx}`); }}
                                         sx={{
-                                          color: carritoAnimacion === `card-${o.id}-${idx}` ? "#4caf50" : "#ba9a63",
+                                          color: carritoAnimacion === `card-${o.id}-${idx}` ? "#5f7f52" : "#ba9a63",
                                           p: 0.4,
                                           transition: "all 0.3s ease",
                                           transform: carritoAnimacion === `card-${o.id}-${idx}` ? "scale(1.4)" : "scale(1)",
-                                          backgroundColor: carritoAnimacion === `card-${o.id}-${idx}` ? "rgba(76,175,80,0.1)" : "transparent",
+                                          backgroundColor: carritoAnimacion === `card-${o.id}-${idx}` ? "rgba(95,127,82,0.1)" : "transparent",
                                           "&:hover": { color: "#a36920", backgroundColor: "rgba(163,105,32,0.1)" },
                                         }}
                                         title="Agregar al carrito (para después)"
@@ -6386,7 +6387,7 @@ const HistorialClinico = () => {
                           })()}
 
                           {/* Total del presupuesto y botones */}
-                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e7dfd0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
                             <Box>
                               {hayMarcados ? (
                                 <>
@@ -6440,8 +6441,8 @@ const HistorialClinico = () => {
                                   fontSize: "0.7rem",
                                   py: 0.5,
                                   borderRadius: 2,
-                                  borderColor: "#ff9800",
-                                  color: "#ff9800",
+                                  borderColor: "#c9862e",
+                                  color: "#c9862e",
                                   "&:hover": { backgroundColor: "rgba(255, 152, 0, 0.1)" }
                                 }}
                               >
@@ -6654,8 +6655,8 @@ const HistorialClinico = () => {
                     mb: 3,
                     p: 2.5,
                     borderRadius: 3,
-                    backgroundColor: "rgba(76, 175, 80, 0.08)",
-                    border: "1px solid rgba(76, 175, 80, 0.3)",
+                    backgroundColor: "rgba(95,127,82, 0.08)",
+                    border: "1px solid rgba(95,127,82, 0.3)",
                   }}
                 >
                   <Box
@@ -6670,16 +6671,16 @@ const HistorialClinico = () => {
                     }}
                   >
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                      <CardGiftcard sx={{ color: "#2e7d32", fontSize: 24 }} />
+                      <CardGiftcard sx={{ color: "#4f6d44", fontSize: 24 }} />
                       <Typography
                         variant="h6"
-                        sx={{ color: "#2e7d32", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
+                        sx={{ color: "#4f6d44", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
                       >
                         Paquetes Promocionales Disponibles
-                        <Chip label={`${paquetesActivos.length}`} size="small" sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold", ml: 1 }} />
+                        <Chip label={`${paquetesActivos.length}`} size="small" sx={{ backgroundColor: "#eef2ea", color: "#4f6d44", fontWeight: "bold", ml: 1 }} />
                       </Typography>
                     </Box>
-                    <IconButton size="small" sx={{ color: "#2e7d32" }}>
+                    <IconButton size="small" sx={{ color: "#4f6d44" }}>
                       {paquetesPromoExpanded ? <ExpandLess /> : <ExpandMore />}
                     </IconButton>
                   </Box>
@@ -6707,12 +6708,12 @@ const HistorialClinico = () => {
                             p: 2,
                             borderRadius: 2,
                             backgroundColor: "white",
-                            border: "1px solid rgba(76, 175, 80, 0.2)",
+                            border: "1px solid rgba(95,127,82, 0.2)",
                           }}
                         >
                           {/* Imagen Promocional */}
                           {(paquete.tiene_imagen || paquete.imagen_promocional) && (
-                            <Box sx={{ mb: 2, borderRadius: 2, overflow: "hidden", backgroundColor: "#f5f5f5" }}>
+                            <Box sx={{ mb: 2, borderRadius: 2, overflow: "hidden", backgroundColor: "#f5f2ea" }}>
                               <img
                                 loading="lazy"
                                 src={paquete.imagen_promocional || `${API_BASE_URL}/api/paquetes/${paquete.id}/imagen`}
@@ -6732,7 +6733,7 @@ const HistorialClinico = () => {
                               {paquete.nombre}
                             </Typography>
                             <Box sx={{ 
-                              backgroundColor: "#ff9800", 
+                              backgroundColor: "#c9862e", 
                               color: "white", 
                               px: 1.5, 
                               py: 0.5, 
@@ -6768,7 +6769,7 @@ const HistorialClinico = () => {
                               <Typography variant="caption" sx={{ textDecoration: "line-through", color: "#999" }}>
                                 S/ {paquete.precio_regular?.toFixed(2)}
                               </Typography>
-                              <Typography sx={{ fontWeight: "bold", color: "#2e7d32", fontSize: "1.1rem" }}>
+                              <Typography sx={{ fontWeight: "bold", color: "#4f6d44", fontSize: "1.1rem" }}>
                                 S/ {paquete.precio_paquete?.toFixed(2)}
                               </Typography>
                             </Box>
@@ -6800,8 +6801,8 @@ const HistorialClinico = () => {
                                 disabled={asignandoPaquete || !pacienteSeleccionado}
                                 onClick={() => asignarPaquete(paquete)}
                                 sx={{
-                                  backgroundColor: "#4caf50",
-                                  "&:hover": { backgroundColor: "#388e3c" },
+                                  backgroundColor: "#5f7f52",
+                                  "&:hover": { backgroundColor: "#4f6d44" },
                                   fontWeight: "bold",
                                   borderRadius: 2,
                                 }}
@@ -6858,7 +6859,7 @@ const HistorialClinico = () => {
                             p: 2,
                             borderRadius: 2,
                             backgroundColor: "white",
-                            border: `1px solid ${presupuesto.estado === 'completado' ? '#4caf50' : presupuesto.estado === 'cancelado' ? '#f44336' : '#a36920'}`,
+                            border: `1px solid ${presupuesto.estado === 'completado' ? '#5f7f52' : presupuesto.estado === 'cancelado' ? '#c0533e' : '#a36920'}`,
                           }}
                         >
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
@@ -6886,7 +6887,7 @@ const HistorialClinico = () => {
                             </Box>
                             <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                               <Box sx={{ 
-                                backgroundColor: presupuesto.estado === 'completado' ? '#4caf50' : presupuesto.estado === 'cancelado' ? '#f44336' : '#a36920',
+                                backgroundColor: presupuesto.estado === 'completado' ? '#5f7f52' : presupuesto.estado === 'cancelado' ? '#c0533e' : '#a36920',
                                 color: "white", 
                                 px: 1.5, 
                                 py: 0.5, 
@@ -6901,8 +6902,8 @@ const HistorialClinico = () => {
                                 size="small"
                                 onClick={() => generarReciboPresupuesto(presupuesto)}
                                 sx={{
-                                  color: "#d4af37",
-                                  "&:hover": { backgroundColor: "rgba(212,175,55,0.1)" }
+                                  color: "#ba9a63",
+                                  "&:hover": { backgroundColor: "rgba(186,154,99,0.1)" }
                                 }}
                                 title="Imprimir recibo"
                               >
@@ -6930,14 +6931,14 @@ const HistorialClinico = () => {
                             </Box>
                             <Box sx={{ 
                               height: 8, 
-                              backgroundColor: "#e0e0e0", 
+                              backgroundColor: "#e7dfd0", 
                               borderRadius: 4,
                               overflow: "hidden"
                             }}>
                               <Box sx={{ 
                                 height: "100%", 
                                 width: `${progreso}%`,
-                                backgroundColor: presupuesto.estado === 'completado' ? '#4caf50' : '#a36920',
+                                backgroundColor: presupuesto.estado === 'completado' ? '#5f7f52' : '#a36920',
                                 borderRadius: 4,
                                 transition: "width 0.3s ease"
                               }} />
@@ -6959,9 +6960,9 @@ const HistorialClinico = () => {
                                       alignItems: "center",
                                       justifyContent: "space-between",
                                       p: 1,
-                                      backgroundColor: sesion.estado === 'completada' ? "rgba(76, 175, 80, 0.1)" : "rgba(0,0,0,0.02)",
+                                      backgroundColor: sesion.estado === 'completada' ? "rgba(95,127,82, 0.1)" : "rgba(0,0,0,0.02)",
                                       borderRadius: 1,
-                                      border: `1px solid ${sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0'}`,
+                                      border: `1px solid ${sesion.estado === 'completada' ? '#5f7f52' : '#e7dfd0'}`,
                                     }}
                                   >
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -6990,11 +6991,11 @@ const HistorialClinico = () => {
                                           height: 22,
                                           borderRadius: "50%",
                                           backgroundColor: sesion.estado === 'completada' 
-                                            ? '#4caf50' 
+                                            ? '#5f7f52' 
                                             : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold" 
-                                              ? '#d4af37' 
+                                              ? '#ba9a63' 
                                               : tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple"
-                                                ? '#7b1fa2'
+                                                ? '#845a72'
                                                 : '#bdbdbd',
                                           display: "flex",
                                           alignItems: "center",
@@ -7011,9 +7012,9 @@ const HistorialClinico = () => {
                                           cursor: sesion.estado !== 'completada' ? "pointer" : "default",
                                           transition: "all 0.2s ease",
                                           boxShadow: sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold"
-                                            ? "0 0 0 2px #d4af37, 0 0 0 4px rgba(212,175,55,0.35)" 
+                                            ? "0 0 0 2px #ba9a63, 0 0 0 4px rgba(186,154,99,0.35)" 
                                             : sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple"
-                                              ? "0 0 0 2px #7b1fa2, 0 0 0 4px rgba(123,31,162,0.35)"
+                                              ? "0 0 0 2px #845a72, 0 0 0 4px rgba(132,90,114,0.35)"
                                               : "none",
                                           "&:hover": sesion.estado !== 'completada' ? { 
                                             transform: "scale(1.15)",
@@ -7027,8 +7028,8 @@ const HistorialClinico = () => {
                                       </Box>
                                       <Typography variant="body2" sx={{
                                         fontWeight: tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] && sesion.estado !== 'completada' ? "bold" : "normal",
-                                        color: sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold" ? "#b8860b" 
-                                          : sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple" ? "#7b1fa2"
+                                        color: sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "gold" ? "#a36920" 
+                                          : sesion.estado !== 'completada' && tratamientosMarcados[`asig-${presupuesto.id}-${sesion.id}`] === "purple" ? "#845a72"
                                           : "inherit",
                                       }}>
                                         {sesion.tratamiento_nombre}
@@ -7083,9 +7084,9 @@ const HistorialClinico = () => {
                                             fontSize: "0.7rem",
                                             py: 0.25,
                                             px: 1,
-                                            borderColor: "#4caf50",
-                                            color: "#4caf50",
-                                            "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" }
+                                            borderColor: "#5f7f52",
+                                            color: "#5f7f52",
+                                            "&:hover": { backgroundColor: "rgba(95,127,82, 0.1)" }
                                           }}
                                         >
                                           Completar
@@ -7121,8 +7122,8 @@ const HistorialClinico = () => {
                                             py: 0,
                                             px: 0.5,
                                             minWidth: "auto",
-                                            color: "#f44336",
-                                            "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" }
+                                            color: "#c0533e",
+                                            "&:hover": { backgroundColor: "rgba(192,83,62, 0.1)" }
                                           }}
                                         >
                                           Deshacer
@@ -7164,16 +7165,16 @@ const HistorialClinico = () => {
                               (c) => c.estado === "aplicada" && c.presupuesto_aplicado_id === presupuesto.id
                             );
                             return (
-                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0" }}>
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e7dfd0" }}>
                             {/* Saldo a favor por consultas prepagadas */}
                             {saldoDisp > 0 && (
                               <Box sx={{
                                 mb: 1.5, p: 1.25, borderRadius: 2,
-                                backgroundColor: "rgba(156,39,176,0.07)",
-                                border: "1px solid rgba(156,39,176,0.3)",
+                                backgroundColor: "rgba(148,106,130,0.07)",
+                                border: "1px solid rgba(148,106,130,0.3)",
                                 display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap"
                               }}>
-                                <Typography sx={{ fontSize: "0.82rem", color: "#7b1fa2", flex: 1, minWidth: 200 }}>
+                                <Typography sx={{ fontSize: "0.82rem", color: "#845a72", flex: 1, minWidth: 200 }}>
                                   💊 Este paciente ya pagó <strong>S/ {saldoDisp.toFixed(2)}</strong> de consulta
                                   {(saldoConsultas.disponibles || []).length > 1
                                     ? ` en ${saldoConsultas.disponibles.length} pagos`
@@ -7184,7 +7185,7 @@ const HistorialClinico = () => {
                                   variant="contained"
                                   onClick={() => aplicarSaldoConsulta(presupuesto.id)}
                                   sx={{
-                                    backgroundColor: "#7b1fa2", textTransform: "none",
+                                    backgroundColor: "#845a72", textTransform: "none",
                                     fontSize: "0.75rem", fontWeight: 600,
                                     "&:hover": { backgroundColor: "#6a1b9a" }
                                   }}
@@ -7207,8 +7208,8 @@ const HistorialClinico = () => {
                                     title="Quitar este descuento y devolverlo a saldo disponible"
                                     sx={{
                                       height: 22, fontSize: "0.7rem", fontWeight: 600,
-                                      backgroundColor: "rgba(156,39,176,0.12)", color: "#7b1fa2",
-                                      "& .MuiChip-deleteIcon": { color: "#7b1fa2", "&:hover": { color: "#4a148c" } }
+                                      backgroundColor: "rgba(148,106,130,0.12)", color: "#845a72",
+                                      "& .MuiChip-deleteIcon": { color: "#845a72", "&:hover": { color: "#4a148c" } }
                                     }}
                                   />
                                 ))}
@@ -7217,12 +7218,12 @@ const HistorialClinico = () => {
                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1 }}>
                               <Box>
                                 {hayMarcas && totalGoldP > 0 && (
-                                  <Typography variant="body2" sx={{ color: "#b8860b", fontSize: "0.85rem" }}>
+                                  <Typography variant="body2" sx={{ color: "#a36920", fontSize: "0.85rem" }}>
                                     Pagado (dorado): S/ {totalGoldP.toFixed(2)}
                                   </Typography>
                                 )}
                                 {hayMarcas && totalPurpleP > 0 && (
-                                  <Typography variant="body2" sx={{ color: "#7b1fa2", fontSize: "0.85rem" }}>
+                                  <Typography variant="body2" sx={{ color: "#845a72", fontSize: "0.85rem" }}>
                                     Pendiente (morado): S/ {totalPurpleP.toFixed(2)}
                                   </Typography>
                                 )}
@@ -7238,7 +7239,7 @@ const HistorialClinico = () => {
                                   </Typography>
                                 )}
                                 {Number(presupuesto.monto_consulta) > 0 && (
-                                  <Typography variant="body2" sx={{ fontSize: "0.85rem", color: "#7b1fa2" }}>
+                                  <Typography variant="body2" sx={{ fontSize: "0.85rem", color: "#845a72" }}>
                                     (incluye consulta pagada: S/ {Number(presupuesto.monto_consulta).toFixed(2)})
                                   </Typography>
                                 )}
@@ -7253,23 +7254,23 @@ const HistorialClinico = () => {
                                 py: 0.5, 
                                 borderRadius: 2,
                                 backgroundColor: presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
-                                  ? '#e8f5e9' 
+                                  ? '#eef2ea' 
                                   : presupuesto.estado_pago === 'adelanto' 
-                                    ? '#fff3e0' 
-                                    : '#ffebee',
+                                    ? '#f8efe0' 
+                                    : '#f8ebe7',
                                 border: `1px solid ${presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
-                                  ? '#4caf50' 
+                                  ? '#5f7f52' 
                                   : presupuesto.estado_pago === 'adelanto' 
-                                    ? '#ff9800' 
-                                    : '#f44336'}`
+                                    ? '#c9862e' 
+                                    : '#c0533e'}`
                               }}>
                                 <Typography variant="caption" sx={{ 
                                   fontWeight: "bold", 
                                   color: presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
-                                    ? '#2e7d32' 
+                                    ? '#4f6d44' 
                                     : presupuesto.estado_pago === 'adelanto' 
-                                      ? '#e65100' 
-                                      : '#c62828',
+                                      ? '#a8612a' 
+                                      : '#9e3626',
                                   textTransform: "uppercase"
                                 }}>
                                   {presupuesto.estado_pago === 'pagado' || presupuesto.pagado === 1 
@@ -7283,12 +7284,12 @@ const HistorialClinico = () => {
                             
                             {/* Información de Consulta Pagada */}
                             {presupuesto.consulta_pagada === 1 && (
-                              <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 1, border: "1px solid rgba(156, 39, 176, 0.3)" }}>
+                              <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 1, border: "1px solid rgba(148,106,130, 0.3)" }}>
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                  <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: "bold" }}>
+                                  <Typography variant="caption" sx={{ color: "#845a72", fontWeight: "bold" }}>
                                     💊 Consulta Pagada
                                   </Typography>
-                                  <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: "bold" }}>
+                                  <Typography variant="caption" sx={{ color: "#845a72", fontWeight: "bold" }}>
                                     S/ {(presupuesto.monto_consulta || 0).toFixed(2)}
                                   </Typography>
                                 </Box>
@@ -7305,14 +7306,14 @@ const HistorialClinico = () => {
                               <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(0,0,0,0.02)", borderRadius: 1 }}>
                                 <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                   <Typography variant="caption" color="text.secondary">Pagado:</Typography>
-                                  <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
+                                  <Typography variant="caption" sx={{ color: "#5f7f52", fontWeight: "bold" }}>
                                     S/ {(presupuesto.monto_pagado || 0).toFixed(2)}
                                   </Typography>
                                 </Box>
                                 {presupuesto.estado_pago !== 'pagado' && presupuesto.pagado !== 1 && (
                                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                     <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
-                                    <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                                    <Typography variant="caption" sx={{ color: "#b8742a", fontWeight: "bold" }}>
                                       S/ {Math.max(0, (Number(presupuesto.precio_total) || 0) - (Number(presupuesto.descuento) || 0) - (Number(presupuesto.monto_pagado) || 0)).toFixed(2)}
                                     </Typography>
                                   </Box>
@@ -7342,11 +7343,11 @@ const HistorialClinico = () => {
                                     fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    borderColor: "#9c27b0",
-                                    color: "#9c27b0",
+                                    borderColor: "#946a82",
+                                    color: "#946a82",
                                     "&:hover": { 
-                                      backgroundColor: "rgba(156, 39, 176, 0.08)",
-                                      borderColor: "#7b1fa2"
+                                      backgroundColor: "rgba(148,106,130, 0.08)",
+                                      borderColor: "#845a72"
                                     }
                                   }}
                                 >
@@ -7371,8 +7372,8 @@ const HistorialClinico = () => {
                                     fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    backgroundColor: presupuesto.estado_pago === 'adelanto' ? "#ff9800" : "#4caf50",
-                                    "&:hover": { backgroundColor: presupuesto.estado_pago === 'adelanto' ? "#f57c00" : "#388e3c" }
+                                    backgroundColor: presupuesto.estado_pago === 'adelanto' ? "#c9862e" : "#5f7f52",
+                                    "&:hover": { backgroundColor: presupuesto.estado_pago === 'adelanto' ? "#b8742a" : "#4f6d44" }
                                   }}
                                 >
                                   {presupuesto.estado_pago === 'adelanto' ? '💰 Pagar Saldo' : '💰 Registrar Pago'}
@@ -7391,8 +7392,8 @@ const HistorialClinico = () => {
                                     fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    borderColor: "#1565c0",
-                                    color: "#1565c0",
+                                    borderColor: "#4f6b80",
+                                    color: "#4f6b80",
                                     "&:hover": { 
                                       backgroundColor: "rgba(21, 101, 192, 0.08)",
                                       borderColor: "#0d47a1"
@@ -7411,7 +7412,7 @@ const HistorialClinico = () => {
                                     fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    backgroundColor: "#7b1fa2",
+                                    backgroundColor: "#845a72",
                                     "&:hover": { backgroundColor: "#6a1b9a" }
                                   }}
                                 >
@@ -7452,15 +7453,15 @@ const HistorialClinico = () => {
                     mb: 3,
                     p: 2.5,
                     borderRadius: 3,
-                    backgroundColor: "rgba(33, 150, 243, 0.08)",
-                    border: "1px solid rgba(33, 150, 243, 0.3)",
+                    backgroundColor: "rgba(95,127,150, 0.08)",
+                    border: "1px solid rgba(95,127,150, 0.3)",
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2 }}>
-                    <Inventory sx={{ color: "#1565c0", fontSize: 24 }} />
+                    <Inventory sx={{ color: "#4f6b80", fontSize: 24 }} />
                     <Typography
                       variant="h6"
-                      sx={{ color: "#1565c0", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
+                      sx={{ color: "#4f6b80", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}
                     >
                       Paquetes del Paciente
                     </Typography>
@@ -7468,7 +7469,7 @@ const HistorialClinico = () => {
                       ids={paquetesPaciente.map((p) => p.id)}
                       minimizados={paquetesColapsados}
                       fijarVarios={fijarPaquetesMin}
-                      color="#1565c0"
+                      color="#4f6b80"
                     />
                   </Box>
                   <Box sx={{ display: "grid", gap: 2 }}>
@@ -7485,7 +7486,7 @@ const HistorialClinico = () => {
                             p: 2,
                             borderRadius: 2,
                             backgroundColor: "white",
-                            border: `1px solid ${paquete.estado === 'completado' ? '#4caf50' : paquete.estado === 'cancelado' ? '#f44336' : '#2196f3'}`,
+                            border: `1px solid ${paquete.estado === 'completado' ? '#5f7f52' : paquete.estado === 'cancelado' ? '#c0533e' : '#5f7f96'}`,
                           }}
                         >
                           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
@@ -7499,7 +7500,7 @@ const HistorialClinico = () => {
                             </Box>
                             <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
                               <Box sx={{ 
-                                backgroundColor: paquete.estado === 'completado' ? '#4caf50' : paquete.estado === 'cancelado' ? '#f44336' : '#2196f3',
+                                backgroundColor: paquete.estado === 'completado' ? '#5f7f52' : paquete.estado === 'cancelado' ? '#c0533e' : '#5f7f96',
                                 color: "white", 
                                 px: 1.5, 
                                 py: 0.5, 
@@ -7514,8 +7515,8 @@ const HistorialClinico = () => {
                                 size="small"
                                 onClick={() => generarReciboPaquete(paquete)}
                                 sx={{
-                                  color: "#d4af37",
-                                  "&:hover": { backgroundColor: "rgba(212,175,55,0.1)" }
+                                  color: "#ba9a63",
+                                  "&:hover": { backgroundColor: "rgba(186,154,99,0.1)" }
                                 }}
                                 title="Imprimir recibo"
                               >
@@ -7524,7 +7525,7 @@ const HistorialClinico = () => {
                               <BotonMinimizar
                                 minimizado={!!paquetesColapsados[paquete.id]}
                                 onClick={() => alternarPaqueteMin(paquete.id)}
-                                color="#1565c0"
+                                color="#4f6b80"
                               />
                             </Box>
                           </Box>
@@ -7538,20 +7539,20 @@ const HistorialClinico = () => {
                               <Typography variant="caption" color="text.secondary">
                                 Progreso: {paquete.sesiones_completadas}/{paquete.sesiones_totales} sesiones
                               </Typography>
-                              <Typography variant="caption" sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                              <Typography variant="caption" sx={{ fontWeight: "bold", color: "#4f6b80" }}>
                                 {progreso}%
                               </Typography>
                             </Box>
                             <Box sx={{ 
                               height: 8, 
-                              backgroundColor: "#e0e0e0", 
+                              backgroundColor: "#e7dfd0", 
                               borderRadius: 4,
                               overflow: "hidden"
                             }}>
                               <Box sx={{ 
                                 height: "100%", 
                                 width: `${progreso}%`,
-                                backgroundColor: paquete.estado === 'completado' ? '#4caf50' : '#2196f3',
+                                backgroundColor: paquete.estado === 'completado' ? '#5f7f52' : '#5f7f96',
                                 borderRadius: 4,
                                 transition: "width 0.3s ease"
                               }} />
@@ -7573,9 +7574,9 @@ const HistorialClinico = () => {
                                       alignItems: "center",
                                       justifyContent: "space-between",
                                       p: 1,
-                                      backgroundColor: sesion.estado === 'completada' ? "rgba(76, 175, 80, 0.1)" : "rgba(0,0,0,0.02)",
+                                      backgroundColor: sesion.estado === 'completada' ? "rgba(95,127,82, 0.1)" : "rgba(0,0,0,0.02)",
                                       borderRadius: 1,
-                                      border: `1px solid ${sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0'}`,
+                                      border: `1px solid ${sesion.estado === 'completada' ? '#5f7f52' : '#e7dfd0'}`,
                                     }}
                                   >
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -7583,7 +7584,7 @@ const HistorialClinico = () => {
                                         width: 20,
                                         height: 20,
                                         borderRadius: "50%",
-                                        backgroundColor: sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0',
+                                        backgroundColor: sesion.estado === 'completada' ? '#5f7f52' : '#e7dfd0',
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
@@ -7632,9 +7633,9 @@ const HistorialClinico = () => {
                                             fontSize: "0.7rem",
                                             py: 0.25,
                                             px: 1,
-                                            borderColor: "#4caf50",
-                                            color: "#4caf50",
-                                            "&:hover": { backgroundColor: "rgba(76, 175, 80, 0.1)" }
+                                            borderColor: "#5f7f52",
+                                            color: "#5f7f52",
+                                            "&:hover": { backgroundColor: "rgba(95,127,82, 0.1)" }
                                           }}
                                         >
                                           Completar
@@ -7655,8 +7656,8 @@ const HistorialClinico = () => {
                                             py: 0,
                                             px: 0.5,
                                             minWidth: "auto",
-                                            color: "#f44336",
-                                            "&:hover": { backgroundColor: "rgba(244, 67, 54, 0.1)" }
+                                            color: "#c0533e",
+                                            "&:hover": { backgroundColor: "rgba(192,83,62, 0.1)" }
                                           }}
                                         >
                                           Deshacer
@@ -7670,13 +7671,13 @@ const HistorialClinico = () => {
                           )}
 
                           {/* Total del paquete y estado de pago */}
-                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0" }}>
+                          <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e7dfd0" }}>
                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 1 }}>
                               <Box>
                                 <Typography variant="body2" color="text.secondary">
                                   Total del paquete:
                                 </Typography>
-                                <Typography sx={{ fontWeight: "bold", color: "#1565c0", fontSize: "1.1rem" }}>
+                                <Typography sx={{ fontWeight: "bold", color: "#4f6b80", fontSize: "1.1rem" }}>
                                   S/ {paquete.precio_total?.toFixed(2)}
                                 </Typography>
                               </Box>
@@ -7687,23 +7688,23 @@ const HistorialClinico = () => {
                                 py: 0.5, 
                                 borderRadius: 2,
                                 backgroundColor: paquete.estado_pago === 'pagado' || paquete.pagado === 1 
-                                  ? '#e8f5e9' 
+                                  ? '#eef2ea' 
                                   : paquete.estado_pago === 'adelanto' 
-                                    ? '#fff3e0' 
-                                    : '#ffebee',
+                                    ? '#f8efe0' 
+                                    : '#f8ebe7',
                                 border: `1px solid ${paquete.estado_pago === 'pagado' || paquete.pagado === 1 
-                                  ? '#4caf50' 
+                                  ? '#5f7f52' 
                                   : paquete.estado_pago === 'adelanto' 
-                                    ? '#ff9800' 
-                                    : '#f44336'}`
+                                    ? '#c9862e' 
+                                    : '#c0533e'}`
                               }}>
                                 <Typography variant="caption" sx={{ 
                                   fontWeight: "bold", 
                                   color: paquete.estado_pago === 'pagado' || paquete.pagado === 1 
-                                    ? '#2e7d32' 
+                                    ? '#4f6d44' 
                                     : paquete.estado_pago === 'adelanto' 
-                                      ? '#e65100' 
-                                      : '#c62828',
+                                      ? '#a8612a' 
+                                      : '#9e3626',
                                   textTransform: "uppercase"
                                 }}>
                                   {paquete.estado_pago === 'pagado' || paquete.pagado === 1 
@@ -7717,12 +7718,12 @@ const HistorialClinico = () => {
                             
                             {/* Información de Consulta Pagada */}
                             {paquete.consulta_pagada === 1 && (
-                              <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 1, border: "1px solid rgba(156, 39, 176, 0.3)" }}>
+                              <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 1, border: "1px solid rgba(148,106,130, 0.3)" }}>
                                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                  <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: "bold" }}>
+                                  <Typography variant="caption" sx={{ color: "#845a72", fontWeight: "bold" }}>
                                     💊 Consulta Pagada
                                   </Typography>
-                                  <Typography variant="caption" sx={{ color: "#7b1fa2", fontWeight: "bold" }}>
+                                  <Typography variant="caption" sx={{ color: "#845a72", fontWeight: "bold" }}>
                                     S/ {(paquete.monto_consulta || 0).toFixed(2)}
                                   </Typography>
                                 </Box>
@@ -7739,14 +7740,14 @@ const HistorialClinico = () => {
                               <Box sx={{ mt: 1, p: 1, backgroundColor: "rgba(0,0,0,0.02)", borderRadius: 1 }}>
                                 <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                   <Typography variant="caption" color="text.secondary">Pagado:</Typography>
-                                  <Typography variant="caption" sx={{ color: "#4caf50", fontWeight: "bold" }}>
+                                  <Typography variant="caption" sx={{ color: "#5f7f52", fontWeight: "bold" }}>
                                     S/ {(paquete.monto_pagado || 0).toFixed(2)}
                                   </Typography>
                                 </Box>
                                 {paquete.estado_pago !== 'pagado' && paquete.pagado !== 1 && (
                                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                                     <Typography variant="caption" color="text.secondary">Saldo pendiente:</Typography>
-                                    <Typography variant="caption" sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                                    <Typography variant="caption" sx={{ color: "#b8742a", fontWeight: "bold" }}>
                                       S/ {Math.max(0, (Number(paquete.precio_total) || 0) - (Number(paquete.monto_pagado) || 0)).toFixed(2)}
                                     </Typography>
                                   </Box>
@@ -7776,11 +7777,11 @@ const HistorialClinico = () => {
                                     fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    borderColor: "#9c27b0",
-                                    color: "#9c27b0",
+                                    borderColor: "#946a82",
+                                    color: "#946a82",
                                     "&:hover": { 
-                                      backgroundColor: "rgba(156, 39, 176, 0.08)",
-                                      borderColor: "#7b1fa2"
+                                      backgroundColor: "rgba(148,106,130, 0.08)",
+                                      borderColor: "#845a72"
                                     }
                                   }}
                                 >
@@ -7803,8 +7804,8 @@ const HistorialClinico = () => {
                                     fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    backgroundColor: paquete.estado_pago === 'adelanto' ? "#ff9800" : "#4caf50",
-                                    "&:hover": { backgroundColor: paquete.estado_pago === 'adelanto' ? "#f57c00" : "#388e3c" }
+                                    backgroundColor: paquete.estado_pago === 'adelanto' ? "#c9862e" : "#5f7f52",
+                                    "&:hover": { backgroundColor: paquete.estado_pago === 'adelanto' ? "#b8742a" : "#4f6d44" }
                                   }}
                                 >
                                   {paquete.estado_pago === 'adelanto' ? '💰 Pagar Saldo' : '💰 Registrar Pago'}
@@ -7823,8 +7824,8 @@ const HistorialClinico = () => {
                                     fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    borderColor: "#1565c0",
-                                    color: "#1565c0",
+                                    borderColor: "#4f6b80",
+                                    color: "#4f6b80",
                                     "&:hover": { 
                                       backgroundColor: "rgba(21, 101, 192, 0.08)",
                                       borderColor: "#0d47a1"
@@ -7843,7 +7844,7 @@ const HistorialClinico = () => {
                                     fontSize: "0.75rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    backgroundColor: "#7b1fa2",
+                                    backgroundColor: "#845a72",
                                     "&:hover": { backgroundColor: "#6a1b9a" }
                                   }}
                                 >
@@ -7859,7 +7860,7 @@ const HistorialClinico = () => {
                                     fontSize: "0.7rem",
                                     py: 0.5,
                                     borderRadius: 2,
-                                    backgroundColor: "#1565c0",
+                                    backgroundColor: "#4f6b80",
                                     "&:hover": { backgroundColor: "#0d47a1" }
                                   }}
                                 >
@@ -7911,12 +7912,12 @@ const HistorialClinico = () => {
                           size="small"
                           startIcon={<Receipt />}
                           sx={{
-                            borderColor: "#D4AF37",
-                            color: "#D4AF37",
+                            borderColor: "#ba9a63",
+                            color: "#ba9a63",
                             fontWeight: 600,
                             borderRadius: 2,
                             "&:hover": {
-                              backgroundColor: "rgba(212,175,55,0.1)",
+                              backgroundColor: "rgba(186,154,99,0.1)",
                               borderColor: "#B8941F",
                             },
                           }}
@@ -7939,7 +7940,7 @@ const HistorialClinico = () => {
                     sx={{
                       borderRadius: 3,
                       overflow: "auto",
-                      border: "1px solid rgba(212,175,55,0.18)",
+                      border: "1px solid rgba(186,154,99,0.18)",
                       backgroundColor: "rgba(255,255,255,0.68)",
                     }}
                   >
@@ -8098,9 +8099,9 @@ const HistorialClinico = () => {
                               <IconButton
                                 size="small"
                                 sx={{
-                                  color: "#D4AF37",
+                                  color: "#ba9a63",
                                   "&:hover": {
-                                    backgroundColor: "rgba(212,175,55,0.1)",
+                                    backgroundColor: "rgba(186,154,99,0.1)",
                                   },
                                   p: 0.5,
                                 }}
@@ -8118,9 +8119,9 @@ const HistorialClinico = () => {
                                   <IconButton
                                     size="small"
                                     sx={{
-                                      color: "#1976d2",
+                                      color: "#4f6b80",
                                       "&:hover": {
-                                        backgroundColor: "rgba(25,118,210,0.1)",
+                                        backgroundColor: "rgba(79,107,128,0.1)",
                                       },
                                       p: 0.5,
                                     }}
@@ -8132,9 +8133,9 @@ const HistorialClinico = () => {
                                   <IconButton
                                     size="small"
                                     sx={{
-                                      color: "#d32f2f",
+                                      color: "#b3412e",
                                       "&:hover": {
-                                        backgroundColor: "rgba(211,47,47,0.1)",
+                                        backgroundColor: "rgba(179,65,46,0.1)",
                                       },
                                       p: 0.5,
                                     }}
@@ -8175,7 +8176,7 @@ const HistorialClinico = () => {
                   p: 2.5,
                   borderRadius: 3,
                   backgroundColor: "rgba(255,255,255,0.68)",
-                  border: "1px solid rgba(212,175,55,0.18)",
+                  border: "1px solid rgba(186,154,99,0.18)",
                 }}
               >
                 {/* Subir fotos */}
@@ -8193,7 +8194,7 @@ const HistorialClinico = () => {
                     sx={{
                       mb: 1.5,
                       "& .MuiInputBase-root": {
-                        backgroundColor: "rgba(212, 175, 55, 0.10)",
+                        backgroundColor: "rgba(186,154,99, 0.10)",
                         borderRadius: 2,
                       },
                       "& .MuiOutlinedInput-root": {
@@ -8348,9 +8349,9 @@ const HistorialClinico = () => {
                                 onClick={() => eliminarFotoPaciente(foto.id)}
                                 sx={{
                                   mt: 0.3,
-                                  color: "#d32f2f",
+                                  color: "#b3412e",
                                   padding: "2px",
-                                  "&:hover": { backgroundColor: "rgba(211,47,47,0.08)" },
+                                  "&:hover": { backgroundColor: "rgba(179,65,46,0.08)" },
                                 }}
                               >
                                 <Delete sx={{ fontSize: 16 }} />
@@ -8727,7 +8728,7 @@ const HistorialClinico = () => {
 
       {/* Modal de Confirmación para Cancelar Tratamiento */}
       <Dialog open={openConfirmarCancelar} onClose={() => setOpenConfirmarCancelar(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white" }}>
+        <DialogTitle sx={{ backgroundColor: "#b3412e", color: "white" }}>
           Confirmar Cancelación
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -8735,14 +8736,14 @@ const HistorialClinico = () => {
             ¿Estás seguro de que deseas cancelar este tratamiento?
           </Typography>
           {tratamientoCancelar && (
-            <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
+            <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f2ea", borderRadius: 1 }}>
               <Typography variant="body2"><strong>Tratamiento:</strong> {tratamientoCancelar.nombreTratamiento}</Typography>
               <Typography variant="body2"><strong>Fecha:</strong> {tratamientoCancelar.fecha?.split(" ")[0]}</Typography>
               <Typography variant="body2"><strong>Especialista:</strong> {tratamientoCancelar.especialista}</Typography>
               <Typography variant="body2"><strong>Total:</strong> S/ {tratamientoCancelar.precio_total?.toFixed(2)}</Typography>
             </Box>
           )}
-          <Typography sx={{ mt: 2, color: "#d32f2f", fontWeight: "bold" }}>
+          <Typography sx={{ mt: 2, color: "#b3412e", fontWeight: "bold" }}>
             Esta acción no se puede deshacer.
           </Typography>
         </DialogContent>
@@ -8754,8 +8755,8 @@ const HistorialClinico = () => {
             onClick={cancelarTratamiento}
             variant="contained"
             sx={{
-              backgroundColor: "#d32f2f",
-              "&:hover": { backgroundColor: "#b71c1c" },
+              backgroundColor: "#b3412e",
+              "&:hover": { backgroundColor: "#86301f" },
             }}
           >
             Sí, cancelar tratamiento
@@ -8774,7 +8775,7 @@ const HistorialClinico = () => {
               <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
                 Presupuesto Seleccionado
               </Typography>
-              <Box sx={{ mb: 3, p: 2, backgroundColor: "#f5f5f5", borderRadius: 2 }}>
+              <Box sx={{ mb: 3, p: 2, backgroundColor: "#f5f2ea", borderRadius: 2 }}>
                 {(() => {
                   const allItems = presupuestoParaProforma.items || [];
                   const ofertaId = presupuestoParaProforma.id;
@@ -8804,10 +8805,10 @@ const HistorialClinico = () => {
                               {estado && (
                                 <Box sx={{
                                   width: 10, height: 10, borderRadius: "50%",
-                                  backgroundColor: estado === "gold" ? "#d4af37" : "#7b1fa2",
+                                  backgroundColor: estado === "gold" ? "#ba9a63" : "#845a72",
                                 }} />
                               )}
-                              <Typography sx={{ color: estado === "purple" ? "#7b1fa2" : "inherit" }}>
+                              <Typography sx={{ color: estado === "purple" ? "#845a72" : "inherit" }}>
                                 {item.nombre}
                               </Typography>
                             </Box>
@@ -8840,7 +8841,7 @@ const HistorialClinico = () => {
                 sx={{ mb: 2 }}
               />
 
-              <Box sx={{ p: 2, backgroundColor: "#e8f5e9", borderRadius: 2 }}>
+              <Box sx={{ p: 2, backgroundColor: "#eef2ea", borderRadius: 2 }}>
                 {(() => {
                   const allItems = presupuestoParaProforma.items || [];
                   const ofertaId = presupuestoParaProforma.id;
@@ -8853,10 +8854,10 @@ const HistorialClinico = () => {
                   return (
                     <>
                       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <Typography variant="h6" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                        <Typography variant="h6" sx={{ fontWeight: "bold", color: "#4f6d44" }}>
                           Total Final:
                         </Typography>
-                        <Typography variant="h5" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                        <Typography variant="h5" sx={{ fontWeight: "bold", color: "#4f6d44" }}>
                           S/ {totalFinal.toFixed(2)}
                         </Typography>
                       </Box>
@@ -8954,7 +8955,7 @@ const HistorialClinico = () => {
 
       {/* Modal para Agregar/Editar Descuento de Presupuesto */}
       <Dialog open={modalDescuentoPresupuesto} onClose={() => setModalDescuentoPresupuesto(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#ff9800", color: "white" }}>
+        <DialogTitle sx={{ backgroundColor: "#c9862e", color: "white" }}>
           💰 {Number(nuevoDescuento) > 0 ? "Editar" : "Agregar"} Descuento
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -8974,11 +8975,11 @@ const HistorialClinico = () => {
                 onChange={(monto) => setNuevoDescuento(monto ? String(monto) : "")}
               />
 
-              <Box sx={{ mt: 2.5, p: 2, backgroundColor: "#fff3e0", borderRadius: 2 }}>
+              <Box sx={{ mt: 2.5, p: 2, backgroundColor: "#f8efe0", borderRadius: 2 }}>
                 <Typography variant="body2" color="text.secondary">
                   Total con descuento:
                 </Typography>
-                <Typography variant="h5" sx={{ fontWeight: "bold", color: "#ff9800" }}>
+                <Typography variant="h5" sx={{ fontWeight: "bold", color: "#c9862e" }}>
                   S/ {(Number(presupuestoParaDescuento.total || 0) - Number(nuevoDescuento || 0)).toFixed(2)}
                 </Typography>
               </Box>
@@ -8994,8 +8995,8 @@ const HistorialClinico = () => {
             onClick={guardarDescuentoPresupuesto}
             disabled={Number(nuevoDescuento) < 0 || Number(nuevoDescuento) > (presupuestoParaDescuento?.total || 0)}
             sx={{
-              backgroundColor: "#ff9800",
-              "&:hover": { backgroundColor: "#f57c00" },
+              backgroundColor: "#c9862e",
+              "&:hover": { backgroundColor: "#b8742a" },
             }}
           >
             Guardar Descuento
@@ -9005,7 +9006,7 @@ const HistorialClinico = () => {
 
       {/* Modal para Registrar Pago de Presupuesto */}
       <Dialog open={modalPagoPresupuesto} onClose={() => setModalPagoPresupuesto(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#4caf50", color: "white" }}>
+        <DialogTitle sx={{ backgroundColor: "#5f7f52", color: "white" }}>
           💰 Registrar Pago
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -9068,7 +9069,7 @@ const HistorialClinico = () => {
               </FormControl>
               
               {/* Resumen de pago */}
-              <Box sx={{ mt: 2, p: 1.5, backgroundColor: "rgba(76, 175, 80, 0.1)", borderRadius: 2 }}>
+              <Box sx={{ mt: 2, p: 1.5, backgroundColor: "rgba(95,127,82, 0.1)", borderRadius: 2 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">Subtotal:</Typography>
                   <Typography sx={{ fontWeight: "bold" }}>S/ {Number(presupuestoParaPago.precio_total || 0).toFixed(2)}</Typography>
@@ -9076,7 +9077,7 @@ const HistorialClinico = () => {
                 {Number(presupuestoParaPago.descuento || 0) > 0 && (
                   <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                     <Typography variant="body2" color="error">Descuento:</Typography>
-                    <Typography sx={{ color: "#f44336", fontWeight: "bold" }}>-S/ {Number(presupuestoParaPago.descuento).toFixed(2)}</Typography>
+                    <Typography sx={{ color: "#c0533e", fontWeight: "bold" }}>-S/ {Number(presupuestoParaPago.descuento).toFixed(2)}</Typography>
                   </Box>
                 )}
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1, pt: 1, borderTop: "1px dashed #ccc" }}>
@@ -9088,7 +9089,7 @@ const HistorialClinico = () => {
                 {(presupuestoParaPago.monto_pagado > 0) && (
                   <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                     <Typography variant="body2" color="text.secondary">Ya pagado:</Typography>
-                    <Typography sx={{ color: "#4caf50", fontWeight: "bold" }}>S/ {(presupuestoParaPago.monto_pagado || 0).toFixed(2)}</Typography>
+                    <Typography sx={{ color: "#5f7f52", fontWeight: "bold" }}>S/ {(presupuestoParaPago.monto_pagado || 0).toFixed(2)}</Typography>
                   </Box>
                 )}
                 {(() => {
@@ -9097,7 +9098,7 @@ const HistorialClinico = () => {
                   return saldoPendiente > 0 && (
                     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                       <Typography variant="body2" color="text.secondary">Saldo pendiente:</Typography>
-                      <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                      <Typography sx={{ color: "#b8742a", fontWeight: "bold" }}>
                         S/ {saldoPendiente.toFixed(2)}
                       </Typography>
                     </Box>
@@ -9121,8 +9122,8 @@ const HistorialClinico = () => {
               }
             }}
             sx={{
-              backgroundColor: "#4caf50",
-              "&:hover": { backgroundColor: "#388e3c" },
+              backgroundColor: "#5f7f52",
+              "&:hover": { backgroundColor: "#4f6d44" },
             }}
           >
             {tipoPago === 'adelanto' ? 'Registrar Adelanto' : tipoPago === 'saldo' ? 'Pagar Saldo' : 'Confirmar Pago'}
@@ -9132,7 +9133,7 @@ const HistorialClinico = () => {
 
       {/* Modal para Registrar Pago de Paquete */}
       <Dialog open={modalPagoPaquete} onClose={() => setModalPagoPaquete(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#1565c0", color: "white" }}>
+        <DialogTitle sx={{ backgroundColor: "#4f6b80", color: "white" }}>
           💰 Registrar Pago de Paquete
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -9192,7 +9193,7 @@ const HistorialClinico = () => {
               </FormControl>
               
               {/* Resumen de pago */}
-              <Box sx={{ mt: 2, p: 1.5, backgroundColor: "rgba(33, 150, 243, 0.1)", borderRadius: 2 }}>
+              <Box sx={{ mt: 2, p: 1.5, backgroundColor: "rgba(95,127,150, 0.1)", borderRadius: 2 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                   <Typography variant="body2" color="text.secondary">Total del paquete:</Typography>
                   <Typography sx={{ fontWeight: "bold" }}>S/ {paqueteParaPago.precio_total?.toFixed(2)}</Typography>
@@ -9200,13 +9201,13 @@ const HistorialClinico = () => {
                 {(paqueteParaPago.monto_pagado > 0) && (
                   <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
                     <Typography variant="body2" color="text.secondary">Ya pagado:</Typography>
-                    <Typography sx={{ color: "#4caf50", fontWeight: "bold" }}>S/ {(paqueteParaPago.monto_pagado || 0).toFixed(2)}</Typography>
+                    <Typography sx={{ color: "#5f7f52", fontWeight: "bold" }}>S/ {(paqueteParaPago.monto_pagado || 0).toFixed(2)}</Typography>
                   </Box>
                 )}
                 {(Math.max(0, (Number(paqueteParaPago.precio_total) || 0) - (Number(paqueteParaPago.monto_pagado) || 0)) > 0) && (
                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                     <Typography variant="body2" color="text.secondary">Saldo pendiente:</Typography>
-                    <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>
+                    <Typography sx={{ color: "#b8742a", fontWeight: "bold" }}>
                       S/ {Math.max(0, (Number(paqueteParaPago.precio_total) || 0) - (Number(paqueteParaPago.monto_pagado) || 0)).toFixed(2)}
                     </Typography>
                   </Box>
@@ -9229,7 +9230,7 @@ const HistorialClinico = () => {
               }
             }}
             sx={{
-              backgroundColor: "#1565c0",
+              backgroundColor: "#4f6b80",
               "&:hover": { backgroundColor: "#0d47a1" },
             }}
           >
@@ -9240,7 +9241,7 @@ const HistorialClinico = () => {
 
       {/* Modal para Registrar Pago de Consulta */}
       <Dialog open={modalPagoConsulta} onClose={() => setModalPagoConsulta(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#9c27b0", color: "white" }}>
+        <DialogTitle sx={{ backgroundColor: "#946a82", color: "white" }}>
           💊 Pagar Consulta
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -9250,7 +9251,7 @@ const HistorialClinico = () => {
                 {paqueteParaConsulta.paquete_nombre}
               </Typography>
               
-              <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
+              <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 2, color: "#845a72" }}>
                 ℹ️ El monto de la consulta se descontará automáticamente del precio total del paquete.
               </Typography>
 
@@ -9281,8 +9282,8 @@ const HistorialClinico = () => {
               </FormControl>
               
               {/* Resumen de descuento */}
-              <Box sx={{ p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#7b1fa2", mb: 1 }}>
+              <Box sx={{ p: 1.5, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#845a72", mb: 1 }}>
                   📊 Resumen del Descuento
                 </Typography>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
@@ -9291,12 +9292,12 @@ const HistorialClinico = () => {
                 </Box>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">Monto de consulta:</Typography>
-                  <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {Number(montoConsulta).toFixed(2)}</Typography>
+                  <Typography sx={{ color: "#946a82", fontWeight: "bold" }}>- S/ {Number(montoConsulta).toFixed(2)}</Typography>
                 </Box>
                 <Divider sx={{ my: 1 }} />
                 <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                   <Typography variant="body2" sx={{ fontWeight: "bold" }}>Nuevo precio del paquete:</Typography>
-                  <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
+                  <Typography sx={{ color: "#5f7f52", fontWeight: "bold", fontSize: "1.1rem" }}>
                     S/ {(paqueteParaConsulta.precio_total - Number(montoConsulta)).toFixed(2)}
                   </Typography>
                 </Box>
@@ -9318,8 +9319,8 @@ const HistorialClinico = () => {
               }
             }}
             sx={{
-              backgroundColor: "#9c27b0",
-              "&:hover": { backgroundColor: "#7b1fa2" },
+              backgroundColor: "#946a82",
+              "&:hover": { backgroundColor: "#845a72" },
             }}
           >
             Confirmar Pago de Consulta
@@ -9329,7 +9330,7 @@ const HistorialClinico = () => {
 
       {/* Modal para Registrar Pago de Consulta en Presupuesto */}
       <Dialog open={modalPagoConsultaPresupuesto} onClose={() => setModalPagoConsultaPresupuesto(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#9c27b0", color: "white" }}>
+        <DialogTitle sx={{ backgroundColor: "#946a82", color: "white" }}>
           💊 Pagar Consulta
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -9339,7 +9340,7 @@ const HistorialClinico = () => {
                 Presupuesto del paciente
               </Typography>
               
-              <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2, color: "#7b1fa2" }}>
+              <Typography variant="body2" sx={{ mb: 2, p: 1.5, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 2, color: "#845a72" }}>
                 ℹ️ El monto de la consulta se sumará al descuento del presupuesto.
               </Typography>
 
@@ -9370,8 +9371,8 @@ const HistorialClinico = () => {
               </FormControl>
               
               {/* Resumen de descuento */}
-              <Box sx={{ p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.1)", borderRadius: 2 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#7b1fa2", mb: 1 }}>
+              <Box sx={{ p: 1.5, backgroundColor: "rgba(148,106,130, 0.1)", borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#845a72", mb: 1 }}>
                   📊 Resumen del Descuento
                 </Typography>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
@@ -9380,16 +9381,16 @@ const HistorialClinico = () => {
                 </Box>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">Descuento anterior:</Typography>
-                  <Typography sx={{ color: "#f57c00", fontWeight: "bold" }}>- S/ {(presupuestoParaConsulta.descuento || 0).toFixed(2)}</Typography>
+                  <Typography sx={{ color: "#b8742a", fontWeight: "bold" }}>- S/ {(presupuestoParaConsulta.descuento || 0).toFixed(2)}</Typography>
                 </Box>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                   <Typography variant="body2" color="text.secondary">Consulta:</Typography>
-                  <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {Number(montoConsultaPresupuesto).toFixed(2)}</Typography>
+                  <Typography sx={{ color: "#946a82", fontWeight: "bold" }}>- S/ {Number(montoConsultaPresupuesto).toFixed(2)}</Typography>
                 </Box>
                 <Divider sx={{ my: 1 }} />
                 <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                   <Typography variant="body2" sx={{ fontWeight: "bold" }}>Total a pagar:</Typography>
-                  <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
+                  <Typography sx={{ color: "#5f7f52", fontWeight: "bold", fontSize: "1.1rem" }}>
                     S/ {(presupuestoParaConsulta.precio_total - (presupuestoParaConsulta.descuento || 0) - Number(montoConsultaPresupuesto)).toFixed(2)}
                   </Typography>
                 </Box>
@@ -9411,8 +9412,8 @@ const HistorialClinico = () => {
               }
             }}
             sx={{
-              backgroundColor: "#9c27b0",
-              "&:hover": { backgroundColor: "#7b1fa2" },
+              backgroundColor: "#946a82",
+              "&:hover": { backgroundColor: "#845a72" },
             }}
           >
             Confirmar Pago de Consulta
@@ -9422,7 +9423,7 @@ const HistorialClinico = () => {
 
       {/* Modal Global de Pagar Consulta (desde barra superior) */}
       <Dialog open={modalPagoConsultaGlobal} onClose={() => setModalPagoConsultaGlobal(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#9c27b0", color: "white" }}>
+        <DialogTitle sx={{ backgroundColor: "#946a82", color: "white" }}>
           💊 Pagar Consulta
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -9434,11 +9435,11 @@ const HistorialClinico = () => {
 
               {/* Info automática: dónde se aplicará */}
               {consultaGlobalSeleccion && consultaGlobalSeleccion.tipo !== 'directo' && (
-                <Box sx={{ p: 1.5, mb: 2, borderRadius: 2, backgroundColor: "rgba(76, 175, 80, 0.08)", border: "1px solid rgba(76, 175, 80, 0.3)" }}>
-                  <Typography variant="body2" sx={{ fontWeight: "bold", color: "#2e7d32", mb: 0.5 }}>
+                <Box sx={{ p: 1.5, mb: 2, borderRadius: 2, backgroundColor: "rgba(95,127,82, 0.08)", border: "1px solid rgba(95,127,82, 0.3)" }}>
+                  <Typography variant="body2" sx={{ fontWeight: "bold", color: "#4f6d44", mb: 0.5 }}>
                     ✓ Se descontará automáticamente de:
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "#2e7d32" }}>
+                  <Typography variant="body2" sx={{ color: "#4f6d44" }}>
                     {consultaGlobalSeleccion.tipo === 'paquete' 
                       ? `📦 Paquete: ${consultaGlobalSeleccion.item?.paquete_nombre || 'Paquete'}`
                       : `📋 Presupuesto #${consultaGlobalSeleccion.item?.id}`
@@ -9452,8 +9453,8 @@ const HistorialClinico = () => {
               )}
 
               {consultaGlobalSeleccion?.tipo === 'directo' && (
-                <Box sx={{ p: 1.5, mb: 2, borderRadius: 2, backgroundColor: "rgba(156, 39, 176, 0.08)", border: "1px solid rgba(156, 39, 176, 0.3)" }}>
-                  <Typography variant="body2" sx={{ color: "#7b1fa2" }}>
+                <Box sx={{ p: 1.5, mb: 2, borderRadius: 2, backgroundColor: "rgba(148,106,130, 0.08)", border: "1px solid rgba(148,106,130, 0.3)" }}>
+                  <Typography variant="body2" sx={{ color: "#845a72" }}>
                     💰 No hay presupuestos ni paquetes pendientes. Se registrará como ingreso directo en caja.
                   </Typography>
                 </Box>
@@ -9477,10 +9478,10 @@ const HistorialClinico = () => {
                         sx={{
                           p: 1, mb: 0.5, borderRadius: 1.5, cursor: "pointer",
                           border: consultaGlobalSeleccion?.tipo === 'paquete' && consultaGlobalSeleccion?.item?.id === paq.id
-                            ? "2px solid #9c27b0" : "1px solid #e0e0e0",
+                            ? "2px solid #946a82" : "1px solid #e7dfd0",
                           backgroundColor: consultaGlobalSeleccion?.tipo === 'paquete' && consultaGlobalSeleccion?.item?.id === paq.id
-                            ? "rgba(156, 39, 176, 0.08)" : "transparent",
-                          "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                            ? "rgba(148,106,130, 0.08)" : "transparent",
+                          "&:hover": { backgroundColor: "rgba(148,106,130, 0.04)" },
                         }}
                       >
                         <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
@@ -9495,10 +9496,10 @@ const HistorialClinico = () => {
                         sx={{
                           p: 1, mb: 0.5, borderRadius: 1.5, cursor: "pointer",
                           border: consultaGlobalSeleccion?.tipo === 'presupuesto' && consultaGlobalSeleccion?.item?.id === pres.id
-                            ? "2px solid #9c27b0" : "1px solid #e0e0e0",
+                            ? "2px solid #946a82" : "1px solid #e7dfd0",
                           backgroundColor: consultaGlobalSeleccion?.tipo === 'presupuesto' && consultaGlobalSeleccion?.item?.id === pres.id
-                            ? "rgba(156, 39, 176, 0.08)" : "transparent",
-                          "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                            ? "rgba(148,106,130, 0.08)" : "transparent",
+                          "&:hover": { backgroundColor: "rgba(148,106,130, 0.04)" },
                         }}
                       >
                         <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
@@ -9511,10 +9512,10 @@ const HistorialClinico = () => {
                       sx={{
                         p: 1, mb: 0.5, borderRadius: 1.5, cursor: "pointer",
                         border: consultaGlobalSeleccion?.tipo === 'directo'
-                          ? "2px solid #9c27b0" : "1px solid #e0e0e0",
+                          ? "2px solid #946a82" : "1px solid #e7dfd0",
                         backgroundColor: consultaGlobalSeleccion?.tipo === 'directo'
-                          ? "rgba(156, 39, 176, 0.08)" : "transparent",
-                        "&:hover": { backgroundColor: "rgba(156, 39, 176, 0.04)" },
+                          ? "rgba(148,106,130, 0.08)" : "transparent",
+                        "&:hover": { backgroundColor: "rgba(148,106,130, 0.04)" },
                       }}
                     >
                       <Typography variant="body2" sx={{ fontWeight: "bold", fontSize: "0.85rem" }}>
@@ -9552,7 +9553,7 @@ const HistorialClinico = () => {
 
               {/* Resumen visual */}
               {consultaGlobalSeleccion && consultaGlobalSeleccion.tipo !== 'directo' && (
-                <Box sx={{ p: 1.5, backgroundColor: "rgba(156, 39, 176, 0.08)", borderRadius: 2 }}>
+                <Box sx={{ p: 1.5, backgroundColor: "rgba(148,106,130, 0.08)", borderRadius: 2 }}>
                   <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                     <Typography variant="body2" color="text.secondary">Precio actual:</Typography>
                     <Typography sx={{ fontWeight: "bold" }}>
@@ -9564,12 +9565,12 @@ const HistorialClinico = () => {
                   </Box>
                   <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                     <Typography variant="body2" color="text.secondary">Consulta:</Typography>
-                    <Typography sx={{ color: "#9c27b0", fontWeight: "bold" }}>- S/ {Number(montoConsultaGlobal || 0).toFixed(2)}</Typography>
+                    <Typography sx={{ color: "#946a82", fontWeight: "bold" }}>- S/ {Number(montoConsultaGlobal || 0).toFixed(2)}</Typography>
                   </Box>
                   <Divider sx={{ my: 0.5 }} />
                   <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                     <Typography variant="body2" sx={{ fontWeight: "bold" }}>Nuevo saldo a pagar:</Typography>
-                    <Typography sx={{ color: "#4caf50", fontWeight: "bold", fontSize: "1.1rem" }}>
+                    <Typography sx={{ color: "#5f7f52", fontWeight: "bold", fontSize: "1.1rem" }}>
                       S/ {Math.max(0,
                         (consultaGlobalSeleccion.item?.precio_total || 0)
                         - (consultaGlobalSeleccion.tipo === 'presupuesto' ? (consultaGlobalSeleccion.item?.descuento || 0) : 0)
@@ -9614,8 +9615,8 @@ const HistorialClinico = () => {
               }
             }}
             sx={{
-              backgroundColor: "#9c27b0",
-              "&:hover": { backgroundColor: "#7b1fa2" },
+              backgroundColor: "#946a82",
+              "&:hover": { backgroundColor: "#845a72" },
             }}
           >
             Confirmar Pago
@@ -9633,7 +9634,7 @@ const HistorialClinico = () => {
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle sx={{ color: "#d32f2f", fontWeight: 700 }}>
+        <DialogTitle sx={{ color: "#b3412e", fontWeight: 700 }}>
           Eliminar Paciente Completo
         </DialogTitle>
         <DialogContent>
@@ -9641,7 +9642,7 @@ const HistorialClinico = () => {
             ¿Estás seguro de que deseas eliminar permanentemente al paciente{" "}
             <strong>{pacienteEliminar?.nombre} {pacienteEliminar?.apellido}</strong>?
           </Typography>
-          <Typography variant="body2" sx={{ color: "#d32f2f", fontWeight: 600 }}>
+          <Typography variant="body2" sx={{ color: "#b3412e", fontWeight: 600 }}>
             Esta acción eliminará todos sus datos: tratamientos, deudas, pagos, observaciones, ofertas, paquetes y presupuestos. No se puede deshacer.
           </Typography>
         </DialogContent>
@@ -9659,8 +9660,8 @@ const HistorialClinico = () => {
             variant="contained"
             onClick={handleEliminarPaciente}
             sx={{
-              backgroundColor: "#d32f2f",
-              "&:hover": { backgroundColor: "#b71c1c" },
+              backgroundColor: "#b3412e",
+              "&:hover": { backgroundColor: "#86301f" },
             }}
           >
             Eliminar Permanentemente
@@ -9670,7 +9671,7 @@ const HistorialClinico = () => {
 
       {/* Modal para Editar Pago de Presupuesto (solo master) */}
       <Dialog open={modalEditarPagoPresupuesto} onClose={() => setModalEditarPagoPresupuesto(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ color: "#1565c0", fontWeight: "bold" }}>
+        <DialogTitle sx={{ color: "#4f6b80", fontWeight: "bold" }}>
           ✏️ Editar Pago de Presupuesto
         </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
@@ -9685,7 +9686,7 @@ const HistorialClinico = () => {
               <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
                 <strong>Monto pagado actual:</strong> S/ {Number(presupuestoEditarPago.monto_pagado || 0).toFixed(2)}
               </Typography>
-              <Typography variant="body2" sx={{ color: "#f57c00", mb: 1 }}>
+              <Typography variant="body2" sx={{ color: "#b8742a", mb: 1 }}>
                 <strong>Saldo pendiente:</strong> S/ {Math.max(0, (Number(presupuestoEditarPago.precio_total) || 0) - (Number(presupuestoEditarPago.descuento) || 0) - (Number(presupuestoEditarPago.monto_pagado) || 0)).toFixed(2)}
               </Typography>
             </Box>
@@ -9706,7 +9707,7 @@ const HistorialClinico = () => {
             variant="contained"
             onClick={guardarEditarPagoPresupuesto}
             disabled={guardandoEditPago}
-            sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
+            sx={{ backgroundColor: "#4f6b80", "&:hover": { backgroundColor: "#0d47a1" } }}
           >
             {guardandoEditPago ? "Guardando..." : "Guardar Cambio"}
           </Button>
@@ -9741,7 +9742,7 @@ const HistorialClinico = () => {
             variant="contained"
             onClick={guardarEditarFechaPresupuesto}
             disabled={guardandoEditFecha}
-            sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a541a" } }}
+            sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" } }}
           >
             {guardandoEditFecha ? "Guardando..." : "Guardar Cambio"}
           </Button>
@@ -9774,7 +9775,7 @@ const HistorialClinico = () => {
             variant="contained"
             onClick={guardarEditarFechaOferta}
             disabled={guardandoEditFechaOferta}
-            sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a541a" } }}
+            sx={{ backgroundColor: "#a36920", "&:hover": { backgroundColor: "#8a5a1a" } }}
           >
             {guardandoEditFechaOferta ? "Guardando..." : "Guardar Cambio"}
           </Button>
@@ -9783,7 +9784,7 @@ const HistorialClinico = () => {
 
       {/* Modal para Editar Pago de Paquete (solo master) */}
       <Dialog open={modalEditarPagoPaquete} onClose={() => setModalEditarPagoPaquete(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ color: "#1565c0", fontWeight: "bold" }}>
+        <DialogTitle sx={{ color: "#4f6b80", fontWeight: "bold" }}>
           ✏️ Editar Pago de Paquete
         </DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "16px !important" }}>
@@ -9795,7 +9796,7 @@ const HistorialClinico = () => {
               <Typography variant="body2" sx={{ color: "#555", mb: 1 }}>
                 <strong>Monto pagado actual:</strong> S/ {Number(paqueteEditarPago.monto_pagado || 0).toFixed(2)}
               </Typography>
-              <Typography variant="body2" sx={{ color: "#f57c00", mb: 1 }}>
+              <Typography variant="body2" sx={{ color: "#b8742a", mb: 1 }}>
                 <strong>Saldo pendiente:</strong> S/ {((paqueteEditarPago.precio_total || 0) - (paqueteEditarPago.monto_pagado || 0)).toFixed(2)}
               </Typography>
             </Box>
@@ -9816,7 +9817,7 @@ const HistorialClinico = () => {
             variant="contained"
             onClick={guardarEditarPagoPaquete}
             disabled={guardandoEditPagoPaquete}
-            sx={{ backgroundColor: "#1565c0", "&:hover": { backgroundColor: "#0d47a1" } }}
+            sx={{ backgroundColor: "#4f6b80", "&:hover": { backgroundColor: "#0d47a1" } }}
           >
             {guardandoEditPagoPaquete ? "Guardando..." : "Guardar Cambio"}
           </Button>
@@ -9889,7 +9890,7 @@ const HistorialClinico = () => {
 
           {/* Tablas de mediciones */}
           {corporalTablas.map((tabla, tIdx) => (
-            <Paper key={tIdx} elevation={1} sx={{ mb: 3, borderRadius: 3, overflow: "hidden", border: "1px solid #e0e0e0" }}>
+            <Paper key={tIdx} elevation={1} sx={{ mb: 3, borderRadius: 3, overflow: "hidden", border: "1px solid #e7dfd0" }}>
               <Box sx={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 px: 2, py: 1.5,
@@ -9912,7 +9913,7 @@ const HistorialClinico = () => {
                     <IconButton
                       size="small"
                       onClick={() => setCorporalTablas(prev => prev.filter((_, i) => i !== tIdx))}
-                      sx={{ color: "#f44336" }}
+                      sx={{ color: "#c0533e" }}
                     >
                       <Delete fontSize="small" />
                     </IconButton>
@@ -9922,7 +9923,7 @@ const HistorialClinico = () => {
               <TableContainer>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+                    <TableRow sx={{ backgroundColor: "#f5f2ea" }}>
                       <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Cintura</TableCell>
                       <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Cadera</TableCell>
                       <TableCell sx={{ fontWeight: "bold", color: "#a36920", fontSize: "0.8rem", minWidth: 80 }}>Muslos</TableCell>
@@ -10013,7 +10014,7 @@ const HistorialClinico = () => {
                                 nuevo[tIdx].filas = nuevo[tIdx].filas.filter((_, i) => i !== fIdx);
                                 setCorporalTablas(nuevo);
                               }}
-                              sx={{ color: "#bbb", "&:hover": { color: "#f44336" } }}
+                              sx={{ color: "#bbb", "&:hover": { color: "#c0533e" } }}
                             >
                               <Close fontSize="small" />
                             </IconButton>
@@ -10063,7 +10064,7 @@ const HistorialClinico = () => {
           </Button>
 
           {/* Actividad Física */}
-          <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
+          <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e7dfd0" }}>
             <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#a36920", mb: 1.5 }}>
               🏃 Actividad Física
             </Typography>
@@ -10084,7 +10085,7 @@ const HistorialClinico = () => {
           </Paper>
 
           {/* Observaciones */}
-          <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e0e0e0" }}>
+          <Paper elevation={1} sx={{ p: 2.5, mb: 3, borderRadius: 3, border: "1px solid #e7dfd0" }}>
             <Typography variant="subtitle1" sx={{ fontWeight: "bold", color: "#a36920", mb: 1.5 }}>
               📝 Observaciones
             </Typography>
@@ -10177,7 +10178,7 @@ const HistorialClinico = () => {
                     <IconButton size="small" onClick={() => editarCorporal(reg)} sx={{ color: "#a36920" }}>
                       <Edit fontSize="small" />
                     </IconButton>
-                    <IconButton size="small" onClick={() => eliminarCorporal(reg.id)} sx={{ color: "#f44336" }}>
+                    <IconButton size="small" onClick={() => eliminarCorporal(reg.id)} sx={{ color: "#c0533e" }}>
                       <Delete fontSize="small" />
                     </IconButton>
                   </Box>
@@ -10250,7 +10251,7 @@ const HistorialClinico = () => {
           sx: {
             borderRadius: 4,
             overflow: "hidden",
-            backgroundColor: "#1a1a1a",
+            backgroundColor: "#2b2219",
           },
         }}
       >
@@ -10271,7 +10272,7 @@ const HistorialClinico = () => {
             <Close />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ p: 0, position: "relative", backgroundColor: "#1a1a1a" }}>
+        <DialogContent sx={{ p: 0, position: "relative", backgroundColor: "#2b2219" }}>
           {carruselImagenes.length > 0 && (
             <Box sx={{ position: "relative", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
               {/* Flecha izquierda */}
@@ -10405,7 +10406,7 @@ const HistorialClinico = () => {
             <IconButton 
               onClick={() => setModalCarrito(false)} 
               sx={{ 
-                backgroundColor: "#f5f5f5", 
+                backgroundColor: "#f5f2ea", 
                 width: 38, 
                 height: 38,
                 "&:hover": { backgroundColor: "#eeeeee" } 
@@ -10426,14 +10427,14 @@ const HistorialClinico = () => {
                   color: "#e57373", 
                   cursor: "pointer",
                   fontWeight: 500,
-                  "&:hover": { color: "#d32f2f" },
+                  "&:hover": { color: "#b3412e" },
                 }}
               >
                 Vaciar todo
               </Typography>
             )}
           </Box>
-          <Typography sx={{ fontWeight: 800, fontSize: "1.6rem", color: "#1a1a1a", mt: 1 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: "1.6rem", color: "#2b2219", mt: 1 }}>
             Tratamiento oferta
           </Typography>
           <Typography sx={{ color: "#999", fontSize: "0.85rem", mb: 1 }}>
@@ -10473,7 +10474,7 @@ const HistorialClinico = () => {
                       <Typography sx={{ 
                         fontWeight: 700, 
                         fontSize: "1rem", 
-                        color: "#1a1a1a",
+                        color: "#2b2219",
                         lineHeight: 1.3,
                         mb: 0.3,
                       }}>
@@ -10483,7 +10484,7 @@ const HistorialClinico = () => {
                         {item.sesiones > 1 ? `${item.sesiones} sesiones` : "Tratamiento"}
                       </Typography>
                       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 1 }}>
-                        <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: "#1a1a1a" }}>
+                        <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", color: "#2b2219" }}>
                           S/{Number(item.precio || 0).toFixed(0)}
                         </Typography>
                         <IconButton
@@ -10509,7 +10510,7 @@ const HistorialClinico = () => {
             </Box>
           ) : (
             <Box sx={{ textAlign: "center", py: 10, px: 4 }}>
-              <ShoppingCart sx={{ fontSize: 64, color: "#e0e0e0", mb: 2 }} />
+              <ShoppingCart sx={{ fontSize: 64, color: "#e7dfd0", mb: 2 }} />
               <Typography sx={{ fontWeight: 700, fontSize: "1.2rem", color: "#bbb", mb: 0.5 }}>
                 Carrito vacío
               </Typography>
@@ -10528,7 +10529,7 @@ const HistorialClinico = () => {
               <Typography sx={{ fontWeight: 600, fontSize: "1.1rem", color: "#666" }}>
                 Total
               </Typography>
-              <Typography sx={{ fontWeight: 900, fontSize: "1.5rem", color: "#1a1a1a" }}>
+              <Typography sx={{ fontWeight: 900, fontSize: "1.5rem", color: "#2b2219" }}>
                 S/{carritoActivo.items.reduce((sum, it) => sum + Number(it.precio || 0), 0).toFixed(0)}
               </Typography>
             </Box>
@@ -10537,7 +10538,7 @@ const HistorialClinico = () => {
               variant="contained"
               onClick={() => setModalCarrito(false)}
               sx={{
-                backgroundColor: "#1a1a1a",
+                backgroundColor: "#2b2219",
                 color: "white",
                 borderRadius: 4,
                 py: 1.8,

@@ -268,7 +268,7 @@ const GestionUsuarios = () => {
                       <IconButton
                         size="small"
                         onClick={() => eliminarUsuario(u.id, u.username)}
-                        sx={{ color: "#d32f2f" }}
+                        sx={{ color: "#b3412e" }}
                       >
                         <Delete fontSize="small" />
                       </IconButton>

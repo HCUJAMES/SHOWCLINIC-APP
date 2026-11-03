@@ -287,10 +287,10 @@ export default function BuscarPaciente() {
           borderRadius: 4,
           background:
             "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
-          border: "1px solid rgba(212,175,55,0.22)",
+          border: "1px solid rgba(186,154,99,0.22)",
           backdropFilter: "blur(10px)",
           boxShadow:
-            "0 16px 40px rgba(0,0,0,0.10), 0 0 0 1px rgba(212,175,55,0.10)",
+            "0 16px 40px rgba(0,0,0,0.10), 0 0 0 1px rgba(186,154,99,0.10)",
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
@@ -334,7 +334,7 @@ export default function BuscarPaciente() {
                     label={pacientesEnTratamiento.length} 
                     size="small" 
                     sx={{ 
-                      backgroundColor: "#4caf50", 
+                      backgroundColor: "#5f7f52", 
                       color: "white",
                       height: 20,
                       fontSize: "0.7rem"
@@ -431,7 +431,7 @@ export default function BuscarPaciente() {
             variant="contained"
             sx={{
               backgroundColor: colorPrincipal,
-              "&:hover": { backgroundColor: "#8a541a" },
+              "&:hover": { backgroundColor: "#8a5a1a" },
               color: "white",
               px: 4,
               py: 1.2,
@@ -489,7 +489,7 @@ export default function BuscarPaciente() {
                           backgroundColor: colorPrincipal,
                           color: "white",
                           mr: 1,
-                          "&:hover": { backgroundColor: "#8a541a" },
+                          "&:hover": { backgroundColor: "#8a5a1a" },
                         }}
                         onClick={() => handleEdit(p)}
                       >
@@ -612,12 +612,12 @@ export default function BuscarPaciente() {
                         <Chip
                           label={`${paciente.paquetes_activos} paquete(s)`}
                           size="small"
-                          sx={{ backgroundColor: "#2196f3", color: "white" }}
+                          sx={{ backgroundColor: "#5f7f96", color: "white" }}
                         />
                         <Chip
                           label={`${paciente.sesiones_pendientes} sesiones pendientes`}
                           size="small"
-                          sx={{ backgroundColor: "#ff9800", color: "white" }}
+                          sx={{ backgroundColor: "#c9862e", color: "white" }}
                         />
                         <Button
                           size="small"
@@ -652,12 +652,12 @@ export default function BuscarPaciente() {
                                 p: 2,
                                 mb: 2,
                                 borderRadius: 2,
-                                backgroundColor: "rgba(33, 150, 243, 0.05)",
-                                border: "1px solid rgba(33, 150, 243, 0.2)",
+                                backgroundColor: "rgba(95,127,150, 0.05)",
+                                border: "1px solid rgba(95,127,150, 0.2)",
                               }}
                             >
                               <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                                <Typography sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                                <Typography sx={{ fontWeight: "bold", color: "#4f6b80" }}>
                                   {paquete.paquete_nombre}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
@@ -671,7 +671,7 @@ export default function BuscarPaciente() {
                                   <Typography variant="caption" color="text.secondary">
                                     Progreso: {paquete.sesiones_completadas}/{paquete.sesiones_totales} sesiones
                                   </Typography>
-                                  <Typography variant="caption" sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                                  <Typography variant="caption" sx={{ fontWeight: "bold", color: "#4f6b80" }}>
                                     {progreso}%
                                   </Typography>
                                 </Box>
@@ -681,9 +681,9 @@ export default function BuscarPaciente() {
                                   sx={{
                                     height: 8,
                                     borderRadius: 4,
-                                    backgroundColor: "#e0e0e0",
+                                    backgroundColor: "#e7dfd0",
                                     "& .MuiLinearProgress-bar": {
-                                      backgroundColor: "#2196f3",
+                                      backgroundColor: "#5f7f96",
                                       borderRadius: 4,
                                     },
                                   }}
@@ -700,9 +700,9 @@ export default function BuscarPaciente() {
                                       alignItems: "center",
                                       justifyContent: "space-between",
                                       p: 1,
-                                      backgroundColor: sesion.estado === 'completada' ? "rgba(76, 175, 80, 0.1)" : "rgba(255,255,255,0.8)",
+                                      backgroundColor: sesion.estado === 'completada' ? "rgba(95,127,82, 0.1)" : "rgba(255,255,255,0.8)",
                                       borderRadius: 1,
-                                      border: `1px solid ${sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0'}`,
+                                      border: `1px solid ${sesion.estado === 'completada' ? '#5f7f52' : '#e7dfd0'}`,
                                     }}
                                   >
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -711,7 +711,7 @@ export default function BuscarPaciente() {
                                           width: 20,
                                           height: 20,
                                           borderRadius: "50%",
-                                          backgroundColor: sesion.estado === 'completada' ? '#4caf50' : '#e0e0e0',
+                                          backgroundColor: sesion.estado === 'completada' ? '#5f7f52' : '#e7dfd0',
                                           display: "flex",
                                           alignItems: "center",
                                           justifyContent: "center",
@@ -733,8 +733,8 @@ export default function BuscarPaciente() {
                               </Box>
 
                               {/* Total */}
-                              <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e0e0e0", display: "flex", justifyContent: "flex-end" }}>
-                                <Typography sx={{ fontWeight: "bold", color: "#1565c0" }}>
+                              <Box sx={{ mt: 2, pt: 1, borderTop: "1px dashed #e7dfd0", display: "flex", justifyContent: "flex-end" }}>
+                                <Typography sx={{ fontWeight: "bold", color: "#4f6b80" }}>
                                   Total: S/ {paquete.precio_total?.toFixed(2)}
                                 </Typography>
                               </Box>

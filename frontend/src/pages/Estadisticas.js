@@ -50,7 +50,7 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const rankColors = ["#D4AF37", "#A0A0A0", "#CD7F32"];
+const rankColors = ["#ba9a63", "#A0A0A0", "#CD7F32"];
 
 export default function Estadisticas() {
   const navigate = useNavigate();
@@ -109,7 +109,7 @@ export default function Estadisticas() {
   for (let y = currentYear; y >= currentYear - 5; y--) yearOptions.push(y);
 
   const colorPrincipal = "#A36920";
-  const numFont = "'DM Sans', 'Inter', -apple-system, sans-serif";
+  const numFont = "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
   const kpiCardStyle = {
     p: { xs: 2, sm: 2.5 },
@@ -166,7 +166,7 @@ export default function Estadisticas() {
             mb: 3,
             borderRadius: 4,
             background: "linear-gradient(135deg, rgba(163,105,32,0.95), rgba(139,84,10,0.95))",
-            border: "1px solid rgba(212,175,55,0.25)",
+            border: "1px solid rgba(186,154,99,0.25)",
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
@@ -187,7 +187,7 @@ export default function Estadisticas() {
             <Typography
               variant="h5"
               sx={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
                 fontWeight: 700,
                 color: "#fff",
                 letterSpacing: 0.5,
@@ -278,14 +278,14 @@ export default function Estadisticas() {
                 <Box sx={kpiIconBox("rgba(163,105,32,0.10)")}>
                   <TrendingUp sx={{ color: colorPrincipal, fontSize: 22 }} />
                 </Box>
-                <Typography sx={{ fontWeight: 700, color: "rgba(46,46,46,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                <Typography sx={{ fontWeight: 700, color: "rgba(43,34,25,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   Sesiones
                 </Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontFamily: numFont, fontWeight: 900, color: "#2E2E2E", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+              <Typography variant="h4" sx={{ fontFamily: numFont, fontWeight: 900, color: "#2b2219", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {loading ? "—" : Number(kpi?.sesiones || 0)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
+              <Typography variant="caption" sx={{ color: "rgba(43,34,25,0.50)", mt: 0.5, display: "block" }}>
                 Tratamientos realizados
               </Typography>
             </Paper>
@@ -297,14 +297,14 @@ export default function Estadisticas() {
                 <Box sx={kpiIconBox("rgba(52,152,219,0.10)")}>
                   <People sx={{ color: "#3498db", fontSize: 22 }} />
                 </Box>
-                <Typography sx={{ fontWeight: 700, color: "rgba(46,46,46,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                <Typography sx={{ fontWeight: 700, color: "rgba(43,34,25,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   Pacientes
                 </Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontFamily: numFont, fontWeight: 900, color: "#2E2E2E", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+              <Typography variant="h4" sx={{ fontFamily: numFont, fontWeight: 900, color: "#2b2219", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {loading ? "—" : Number(kpi?.pacientes_unicos || 0)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
+              <Typography variant="caption" sx={{ color: "rgba(43,34,25,0.50)", mt: 0.5, display: "block" }}>
                 Pacientes atendidos
               </Typography>
             </Paper>
@@ -316,14 +316,14 @@ export default function Estadisticas() {
                 <Box sx={kpiIconBox("rgba(39,174,96,0.10)")}>
                   <AccountBalanceWallet sx={{ color: "#27ae60", fontSize: 22 }} />
                 </Box>
-                <Typography sx={{ fontWeight: 700, color: "rgba(46,46,46,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                <Typography sx={{ fontWeight: 700, color: "rgba(43,34,25,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   Ingresos
                 </Typography>
               </Box>
               <Typography variant="h5" sx={{ fontFamily: numFont, fontWeight: 900, color: "#27ae60", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {loading ? "—" : money(ingresosBruto)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
+              <Typography variant="caption" sx={{ color: "rgba(43,34,25,0.50)", mt: 0.5, display: "block" }}>
                 Total facturado
               </Typography>
             </Paper>
@@ -335,14 +335,14 @@ export default function Estadisticas() {
                 <Box sx={kpiIconBox("rgba(192,57,43,0.08)")}>
                   <CreditCard sx={{ color: "#c0392b", fontSize: 22 }} />
                 </Box>
-                <Typography sx={{ fontWeight: 700, color: "rgba(46,46,46,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                <Typography sx={{ fontWeight: 700, color: "rgba(43,34,25,0.65)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   Comisión POS
                 </Typography>
               </Box>
               <Typography variant="h5" sx={{ fontFamily: numFont, fontWeight: 900, color: "#c0392b", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
                 {loading ? "—" : money(comisionPos)}
               </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.50)", mt: 0.5, display: "block" }}>
+              <Typography variant="caption" sx={{ color: "rgba(43,34,25,0.50)", mt: 0.5, display: "block" }}>
                 4% en pagos con tarjeta
               </Typography>
             </Paper>
@@ -367,7 +367,7 @@ export default function Estadisticas() {
         >
           <MedicalServices sx={{ color: colorPrincipal, fontSize: 28 }} />
           <Box sx={{ textAlign: "center" }}>
-            <Typography variant="caption" sx={{ color: "rgba(46,46,46,0.60)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
+            <Typography variant="caption" sx={{ color: "rgba(43,34,25,0.60)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>
               Ticket Promedio por Sesión
             </Typography>
             <Typography variant="h5" sx={{ fontFamily: numFont, fontWeight: 900, color: colorPrincipal, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
@@ -390,8 +390,8 @@ export default function Estadisticas() {
               }}
             >
               <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-                <EmojiEvents sx={{ color: "#D4AF37", fontSize: 22 }} />
-                <Typography sx={{ fontWeight: 800, color: "#2E2E2E", fontSize: 15 }}>
+                <EmojiEvents sx={{ color: "#ba9a63", fontSize: 22 }} />
+                <Typography sx={{ fontWeight: 800, color: "#2b2219", fontSize: 15 }}>
                   Top Tratamientos
                 </Typography>
               </Box>
@@ -400,15 +400,15 @@ export default function Estadisticas() {
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ backgroundColor: "rgba(163,105,32,0.04)" }}>
-                      <TableCell sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>#</TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Tratamiento</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Sesiones</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "rgba(43,34,25,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>#</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "rgba(43,34,25,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Tratamiento</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: "rgba(43,34,25,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Sesiones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {(data?.top_tratamientos || []).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ py: 4, color: "rgba(46,46,46,0.45)" }}>
+                        <TableCell colSpan={3} align="center" sx={{ py: 4, color: "rgba(43,34,25,0.45)" }}>
                           {loading ? "Cargando..." : "Sin datos en este periodo"}
                         </TableCell>
                       </TableRow>
@@ -431,7 +431,7 @@ export default function Estadisticas() {
                                 alignItems: "center",
                                 justifyContent: "center",
                                 backgroundColor: idx < 3 ? `${rankColors[idx]}18` : "rgba(0,0,0,0.04)",
-                                color: idx < 3 ? rankColors[idx] : "rgba(46,46,46,0.50)",
+                                color: idx < 3 ? rankColors[idx] : "rgba(43,34,25,0.50)",
                                 fontWeight: 800,
                                 fontSize: 12,
                               }}
@@ -439,7 +439,7 @@ export default function Estadisticas() {
                               {idx + 1}
                             </Box>
                           </TableCell>
-                          <TableCell sx={{ fontWeight: idx < 3 ? 700 : 500, color: "#2E2E2E", py: 1.5 }}>
+                          <TableCell sx={{ fontWeight: idx < 3 ? 700 : 500, color: "#2b2219", py: 1.5 }}>
                             {r.tratamiento || "(No especificado)"}
                           </TableCell>
                           <TableCell align="center" sx={{ py: 1.5 }}>
@@ -477,7 +477,7 @@ export default function Estadisticas() {
             >
               <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2.5, pb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
                 <PersonOutline sx={{ color: "#3498db", fontSize: 22 }} />
-                <Typography sx={{ fontWeight: 800, color: "#2E2E2E", fontSize: 15 }}>
+                <Typography sx={{ fontWeight: 800, color: "#2b2219", fontSize: 15 }}>
                   Pacientes Frecuentes
                 </Typography>
               </Box>
@@ -486,15 +486,15 @@ export default function Estadisticas() {
                 <Table size="small">
                   <TableHead>
                     <TableRow sx={{ backgroundColor: "rgba(163,105,32,0.04)" }}>
-                      <TableCell sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>#</TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Paciente</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, color: "rgba(46,46,46,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Sesiones</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "rgba(43,34,25,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>#</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "rgba(43,34,25,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Paciente</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 700, color: "rgba(43,34,25,0.55)", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, py: 1.2 }}>Sesiones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {(data?.pacientes_frecuentes || []).length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={3} align="center" sx={{ py: 4, color: "rgba(46,46,46,0.45)" }}>
+                        <TableCell colSpan={3} align="center" sx={{ py: 4, color: "rgba(43,34,25,0.45)" }}>
                           {loading ? "Cargando..." : "Sin datos en este periodo"}
                         </TableCell>
                       </TableRow>
@@ -517,7 +517,7 @@ export default function Estadisticas() {
                                 alignItems: "center",
                                 justifyContent: "center",
                                 backgroundColor: idx < 3 ? `${rankColors[idx]}18` : "rgba(0,0,0,0.04)",
-                                color: idx < 3 ? rankColors[idx] : "rgba(46,46,46,0.50)",
+                                color: idx < 3 ? rankColors[idx] : "rgba(43,34,25,0.50)",
                                 fontWeight: 800,
                                 fontSize: 12,
                               }}
@@ -525,7 +525,7 @@ export default function Estadisticas() {
                               {idx + 1}
                             </Box>
                           </TableCell>
-                          <TableCell sx={{ fontWeight: idx < 3 ? 700 : 500, color: "#2E2E2E", py: 1.5 }}>
+                          <TableCell sx={{ fontWeight: idx < 3 ? 700 : 500, color: "#2b2219", py: 1.5 }}>
                             {r.paciente || "(No especificado)"}
                           </TableCell>
                           <TableCell align="center" sx={{ py: 1.5 }}>

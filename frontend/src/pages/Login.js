@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { TextField, Button, Typography, Box, InputAdornment, IconButton } from "@mui/material";
+import { TextField, Button, Typography, Box, InputAdornment, IconButton, CircularProgress } from "@mui/material";
 import { Visibility, VisibilityOff, PersonOutline, LockOutlined } from "@mui/icons-material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "../components/ToastProvider";
+import { BRAND, FONTS, LOGOS } from "../brand";
 
 const API_BASE =
   process.env.REACT_APP_API_URL ||
@@ -14,11 +15,12 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [enviando, setEnviando] = useState(false);
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  // Imagen de fondo fija
-  const backgroundImage = "/images/imagenlogin2.jpg";
+  // Foto de fondo a pantalla completa
+  const backgroundImage = "/images/login-fondo.jpg";
 
   const handleLogin = async () => {
     try {
@@ -29,9 +31,7 @@ export default function Login() {
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("role", res.data.role);
       localStorage.setItem("username", username.trim());
-      const hora = new Date().getHours();
-      const saludo = hora < 12 ? "Buenos días" : hora < 18 ? "Buenas tardes" : "Buenas noches";
-      showToast({ severity: "success", message: `${saludo}, ${username.trim()}` });
+      // El saludo ya aparece en la cabecera del Dashboard
       navigate("/dashboard");
     } catch (e) {
       const status = e.response?.status;
@@ -47,421 +47,233 @@ export default function Login() {
     }
   };
 
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (enviando) return;
+    setEnviando(true);
+    try {
+      await handleLogin();
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  // Campos sobre vidrio: blancos semitransparentes que dejan ver el fondo
+  const campo = {
+    "& .MuiOutlinedInput-root": {
+      backgroundColor: "rgba(255,255,255,0.72)",
+      borderRadius: "14px",
+      transition: "background-color .2s ease",
+      "& input": { py: { xs: 1.6, md: 1.9 }, color: BRAND.texto, fontSize: "0.95rem" },
+      "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.6)" },
+      "&:hover": { backgroundColor: "rgba(255,255,255,0.85)" },
+      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.9)" },
+      "&.Mui-focused": { backgroundColor: "rgba(255,255,255,0.92)" },
+      "&.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: BRAND.oro, borderWidth: 1.5 },
+    },
+  };
+
+  const etiqueta = {
+    display: "block",
+    fontSize: "0.8rem",
+    fontWeight: 600,
+    color: "#fff",
+    mb: 1,
+    letterSpacing: "0.06em",
+    textShadow: "0 1px 6px rgba(60,35,10,0.35)",
+  };
+
   return (
     <Box
       sx={{
-        display: "flex",
+        position: "relative",
         minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: { xs: "center", md: "flex-end" },
+        px: { xs: 2, sm: 4, md: "7vw" },
+        py: 4,
         overflow: "hidden",
+        backgroundColor: "#b48a66",
         backgroundImage: `url('${backgroundImage}')`,
         backgroundSize: "cover",
-        backgroundPosition: "center",
+        // La cara queda a la izquierda y el panel a la derecha
+        backgroundPosition: { xs: "28% center", md: "35% center" },
         backgroundRepeat: "no-repeat",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          // Oscurece un poco solo el lado del formulario para que se lea bien
+          background: {
+            xs: "rgba(70,45,20,0.25)",
+            md: "linear-gradient(90deg, rgba(70,45,20,0) 40%, rgba(70,45,20,0.28) 100%)",
+          },
+        },
       }}
     >
-      {/* LADO IZQUIERDO - Welcome Back */}
+      {/* Marca arriba a la izquierda, sobre la foto */}
       <Box
+        component="img"
+        src={LOGOS.imagotipoBlanco}
+        alt=""
         sx={{
-          flex: 1,
-          position: "relative",
-          display: { xs: "none", md: "flex" },
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "flex-start",
-          px: 8,
-          "&::before": {
-            content: '""',
-            position: "absolute",
-            inset: 0,
-            background: "linear-gradient(135deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 100%)",
-          },
+          position: "absolute",
+          top: { xs: 24, md: 36 },
+          left: { xs: "50%", md: 40 },
+          transform: { xs: "translateX(-50%)", md: "none" },
+          width: { xs: 120, md: 140 },
+          display: { xs: "none", sm: "block" },
+          filter: "drop-shadow(0 2px 8px rgba(60,35,10,0.35))",
+        }}
+      />
+      <Typography
+        sx={{
+          position: "absolute",
+          left: 40,
+          bottom: 36,
+          display: { xs: "none", md: "block" },
+          fontFamily: FONTS.titulo,
+          color: "#fff",
+          fontSize: { md: "1.2rem", lg: "1.45rem" },
+          letterSpacing: "0.08em",
+          lineHeight: 1.4,
+          textShadow: "0 2px 12px rgba(60,35,10,0.45)",
         }}
       >
-        <Box sx={{ position: "relative", zIndex: 1 }}>
-          <Typography
-            variant="h2"
-            sx={{
-              color: "white",
-              fontFamily: "'Playfair Display', 'Cormorant Garamond', Georgia, 'Times New Roman', serif",
-              fontWeight: 600,
-              fontStyle: "italic",
-              mb: 2,
-              fontSize: { md: "3.2rem", lg: "3.8rem" },
-              lineHeight: 1.15,
-              letterSpacing: "0.5px",
-              textShadow: "0 2px 20px rgba(0,0,0,0.25)",
-            }}
-          >
-            Bienvenido
-            <br />
-            de Vuelta
-          </Typography>
-          <Typography
-            variant="body1"
-            sx={{
-              color: "rgba(255,255,255,0.85)",
-              maxWidth: 400,
-              mb: 4,
-              lineHeight: 1.6,
-            }}
-          >
-            Sistema de gestión clínica para ShowClinic. Inicia sesión para acceder a tu panel de control, creado para ti.
-          </Typography>
-        </Box>
-      </Box>
+        Seguridad que se siente,
+        <br />
+        belleza que se nota.
+      </Typography>
 
-      {/* LADO DERECHO - Sign In Form */}
+      {/* Panel de acceso: vidrio esmerilado */}
       <Box
+        component="form"
+        onSubmit={onSubmit}
+        noValidate
         sx={{
-          flex: { xs: 1, md: 0.8 },
+          position: "relative",
+          zIndex: 1,
+          width: "100%",
+          // Proporción cercana a 4:5, más presente en pantalla
+          maxWidth: { xs: 440, md: 500, xl: 540 },
+          minHeight: { md: "min(660px, 82vh)" },
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          alignItems: "center",
-          px: { xs: 3, sm: 6, md: 8 },
-          py: 4,
-          background: "rgba(255, 255, 255, 0.15)",
-          backdropFilter: "blur(30px) saturate(180%)",
-          boxShadow: "-8px 0 32px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.3)",
-          border: "1px solid rgba(255, 255, 255, 0.2)",
-          animation: "slideInRight 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
-          "@keyframes slideInRight": {
-            "0%": {
-              opacity: 0,
-              transform: "translateX(40px)",
-            },
-            "100%": {
-              opacity: 1,
-              transform: "translateX(0)",
-            },
+          px: { xs: 3.5, sm: 6, md: 7 },
+          py: { xs: 5, sm: 6 },
+          borderRadius: "32px",
+          backgroundColor: "rgba(255,248,238,0.16)",
+          backdropFilter: "blur(22px) saturate(140%)",
+          WebkitBackdropFilter: "blur(22px) saturate(140%)",
+          border: "1px solid rgba(255,255,255,0.38)",
+          boxShadow: "0 30px 60px -20px rgba(60,35,10,0.45), inset 0 1px 0 rgba(255,255,255,0.35)",
+          animation: "entrarPanel .7s cubic-bezier(.22,1,.36,1) both",
+          "@keyframes entrarPanel": {
+            from: { opacity: 0, transform: "translateY(16px)" },
+            to: { opacity: 1, transform: "none" },
           },
         }}
       >
-        <Box sx={{ width: "100%", maxWidth: 420 }}>
-          {/* Logo */}
-          <Box 
-            sx={{ 
-              textAlign: "center", 
-              mb: 5,
-              animation: "fadeInScale 1s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both",
-              "@keyframes fadeInScale": {
-                "0%": {
-                  opacity: 0,
-                  transform: "scale(0.8)",
-                },
-                "100%": {
-                  opacity: 1,
-                  transform: "scale(1)",
-                },
-              },
-            }}
-          >
-            <Box
-              sx={{
-                position: "relative",
-                display: "inline-block",
-                "&::before": {
-                  content: '""',
-                  position: "absolute",
-                  inset: -8,
-                  background: "linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(212, 175, 55, 0.05))",
-                  borderRadius: "50%",
-                  animation: "pulse 3s ease-in-out infinite",
-                },
-                "@keyframes pulse": {
-                  "0%, 100%": {
-                    opacity: 0.5,
-                    transform: "scale(1)",
-                  },
-                  "50%": {
-                    opacity: 1,
-                    transform: "scale(1.05)",
-                  },
-                },
-              }}
-            >
-              <img
-                src="/logo-showclinic.png"
-                alt="ShowClinic"
-                style={{
-                  width: 110,
-                  height: 110,
-                  objectFit: "cover",
-                  borderRadius: "50%",
-                  backgroundColor: "white",
-                  border: "4px solid #D4AF37",
-                  boxShadow: "0 8px 24px rgba(212,175,55,0.3), 0 0 0 8px rgba(212,175,55,0.05)",
-                  position: "relative",
-                }}
-              />
-            </Box>
-          </Box>
-
-          {/* Título */}
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 700,
-              mb: 2,
-              color: "white",
-              textAlign: "center",
-              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.3s both",
-              "@keyframes fadeInUp": {
-                "0%": {
-                  opacity: 0,
-                  transform: "translateY(20px)",
-                },
-                "100%": {
-                  opacity: 1,
-                  transform: "translateY(0)",
-                },
-              },
-            }}
-          >
-            INICIAR SESIÓN
-          </Typography>
+        <Box sx={{ textAlign: "center", mb: { xs: 4, md: 5 } }}>
           <Box
-            sx={{
-              width: 60,
-              height: 3,
-              background: "linear-gradient(90deg, #D4AF37, #F4D03F)",
-              margin: "0 auto 16px",
-              borderRadius: 2,
-              boxShadow: "0 2px 8px rgba(212,175,55,0.3)",
-              animation: "expandWidth 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.5s both",
-              "@keyframes expandWidth": {
-                "0%": {
-                  width: 0,
-                  opacity: 0,
-                },
-                "100%": {
-                  width: 60,
-                  opacity: 1,
-                },
-              },
-            }}
+            component="img"
+            src={LOGOS.isotipoLineaCrema}
+            alt="ShowClinic"
+            sx={{ width: { xs: 76, md: 92 }, height: { xs: 76, md: 92 }, display: "block", mx: "auto", mb: 2, filter: "drop-shadow(0 2px 8px rgba(60,35,10,0.3))" }}
           />
           <Typography
-            variant="body2"
+            component="h1"
             sx={{
-              mb: 5,
-              color: "rgba(255,255,255,0.9)",
-              textAlign: "center",
-              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both",
+              fontFamily: FONTS.titulo,
+              fontSize: { xs: "1.55rem", md: "1.9rem" },
+              letterSpacing: "0.14em",
+              color: "#fff",
+              textShadow: "0 2px 10px rgba(60,35,10,0.35)",
             }}
           >
+            Iniciar sesión
+          </Typography>
+          <Typography sx={{ color: "rgba(255,255,255,0.9)", fontSize: { xs: "0.88rem", md: "0.95rem" }, mt: 1, textShadow: "0 1px 6px rgba(60,35,10,0.35)" }}>
             Ingresa tu usuario y contraseña
           </Typography>
-
-          {/* Campo Usuario */}
-          <Typography
-            variant="body2"
-            sx={{ 
-              mb: 1, 
-              fontWeight: 600, 
-              color: "white", 
-              textAlign: "center",
-              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.5s both",
-            }}
-          >
-            Usuario
-          </Typography>
-          <TextField
-            fullWidth
-            placeholder="Ingresa tu usuario"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <PersonOutline sx={{ color: "rgba(212,175,55,0.6)" }} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{
-              mb: 3.5,
-              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.6s both",
-              "& .MuiOutlinedInput-root": {
-                backgroundColor: "rgba(250, 250, 250, 0.7)",
-                backdropFilter: "blur(10px)",
-                borderRadius: 3,
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                "& fieldset": {
-                  borderColor: "rgba(212,175,55,0.15)",
-                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                },
-                "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.9)",
-                  boxShadow: "0 4px 12px rgba(212,175,55,0.15)",
-                  transform: "translateY(-2px)",
-                },
-                "&:hover fieldset": {
-                  borderColor: "rgba(212,175,55,0.4)",
-                },
-                "&.Mui-focused": {
-                  backgroundColor: "rgba(255, 255, 255, 0.95)",
-                  boxShadow: "0 6px 20px rgba(212,175,55,0.2)",
-                  transform: "translateY(-2px)",
-                },
-                "&.Mui-focused fieldset": {
-                  borderColor: "#D4AF37",
-                  borderWidth: 2,
-                },
-              },
-            }}
-          />
-
-          {/* Campo Contraseña */}
-          <Typography
-            variant="body2"
-            sx={{ 
-              mb: 1, 
-              fontWeight: 600, 
-              color: "white", 
-              textAlign: "center",
-              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.7s both",
-            }}
-          >
-            Contraseña
-          </Typography>
-          <TextField
-            fullWidth
-            type={showPassword ? "text" : "password"}
-            placeholder="Ingresa tu contraseña"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <LockOutlined sx={{ color: "rgba(212,175,55,0.6)" }} />
-                </InputAdornment>
-              ),
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    onClick={() => setShowPassword(!showPassword)}
-                    edge="end"
-                    sx={{ 
-                      color: "rgba(212,175,55,0.6)",
-                      transition: "all 0.3s ease",
-                      "&:hover": {
-                        color: "#D4AF37",
-                        transform: "scale(1.1)",
-                      },
-                    }}
-                  >
-                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-            sx={{
-              mb: 3,
-              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.8s both",
-              "& .MuiOutlinedInput-root": {
-                backgroundColor: "rgba(250, 250, 250, 0.7)",
-                backdropFilter: "blur(10px)",
-                borderRadius: 3,
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                "& fieldset": {
-                  borderColor: "rgba(212,175,55,0.15)",
-                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                },
-                "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.9)",
-                  boxShadow: "0 4px 12px rgba(212,175,55,0.15)",
-                  transform: "translateY(-2px)",
-                },
-                "&:hover fieldset": {
-                  borderColor: "rgba(212,175,55,0.4)",
-                },
-                "&.Mui-focused": {
-                  backgroundColor: "rgba(255, 255, 255, 0.95)",
-                  boxShadow: "0 6px 20px rgba(212,175,55,0.2)",
-                  transform: "translateY(-2px)",
-                },
-                "&.Mui-focused fieldset": {
-                  borderColor: "#D4AF37",
-                  borderWidth: 2,
-                },
-              },
-            }}
-          />
-
-          <Box sx={{ mb: 4 }} />
-
-          {/* Botón Sign In */}
-          <Button
-            fullWidth
-            variant="contained"
-            onClick={handleLogin}
-            sx={{
-              py: 2,
-              borderRadius: 3,
-              background: "linear-gradient(135deg, #D4AF37 0%, #F4D03F 100%)",
-              color: "white",
-              fontWeight: 700,
-              fontSize: "1.05rem",
-              textTransform: "none",
-              letterSpacing: "0.5px",
-              boxShadow: "0 6px 20px rgba(212,175,55,0.4), 0 0 0 0 rgba(212,175,55,0.5)",
-              position: "relative",
-              overflow: "hidden",
-              animation: "fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 1s both",
-              transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-              "&::before": {
-                content: '""',
-                position: "absolute",
-                top: 0,
-                left: "-100%",
-                width: "100%",
-                height: "100%",
-                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-                transition: "left 0.5s ease",
-              },
-              "&:hover": {
-                background: "linear-gradient(135deg, #F4D03F 0%, #D4AF37 100%)",
-                boxShadow: "0 8px 28px rgba(212,175,55,0.5), 0 0 0 4px rgba(212,175,55,0.1)",
-                transform: "translateY(-3px)",
-              },
-              "&:hover::before": {
-                left: "100%",
-              },
-              "&:active": {
-                transform: "translateY(-1px)",
-                boxShadow: "0 4px 16px rgba(212,175,55,0.4)",
-              },
-            }}
-          >
-            Iniciar Sesión
-          </Button>
-
-          {/* Footer */}
-          <Typography
-            variant="caption"
-            sx={{
-              display: "block",
-              textAlign: "center",
-              mt: 5,
-              color: "rgba(255,255,255,0.7)",
-              animation: "fadeIn 1s ease-out 1.2s both",
-              "@keyframes fadeIn": {
-                "0%": {
-                  opacity: 0,
-                },
-                "100%": {
-                  opacity: 1,
-                },
-              },
-            }}
-          >
-            ShowClinic CRM © 2026
-          </Typography>
         </Box>
+
+        <Typography component="label" htmlFor="login-usuario" sx={etiqueta}>
+          Usuario
+        </Typography>
+        <TextField
+          id="login-usuario"
+          fullWidth
+          autoFocus
+          autoComplete="username"
+          placeholder="Tu usuario"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <PersonOutline sx={{ color: BRAND.oro }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ ...campo, mb: 3 }}
+        />
+
+        <Typography component="label" htmlFor="login-clave" sx={etiqueta}>
+          Contraseña
+        </Typography>
+        <TextField
+          id="login-clave"
+          fullWidth
+          autoComplete="current-password"
+          type={showPassword ? "text" : "password"}
+          placeholder="Tu contraseña"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <LockOutlined sx={{ color: BRAND.oro }} />
+              </InputAdornment>
+            ),
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  onClick={() => setShowPassword(!showPassword)}
+                  edge="end"
+                  sx={{ color: BRAND.oro }}
+                >
+                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={{ ...campo, mb: 4.5 }}
+        />
+
+        <Button
+          type="submit"
+          fullWidth
+          variant="contained"
+          disabled={enviando}
+          sx={{
+            py: { xs: 1.7, md: 2 },
+            borderRadius: "14px",
+            fontSize: "1rem",
+            letterSpacing: "0.08em",
+            boxShadow: "0 10px 24px -10px rgba(92,60,18,0.6)",
+            "&.Mui-disabled": { backgroundColor: BRAND.oroOscuro, color: "#fff" },
+          }}
+        >
+          {enviando ? <CircularProgress size={22} sx={{ color: "white" }} /> : "Ingresar"}
+        </Button>
+
+        <Typography sx={{ textAlign: "center", mt: 5, color: "rgba(255,255,255,0.8)", fontSize: "0.7rem", letterSpacing: "0.12em" }}>
+          SHOWCLINIC © {new Date().getFullYear()}
+        </Typography>
       </Box>
     </Box>
   );

@@ -108,7 +108,7 @@ const SectionCard = ({ number, title, children }) => (
       </Box>
       <Typography
         sx={{
-          fontFamily: "'Cormorant Garamond', serif",
+          fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
           fontSize: 19,
           fontWeight: 600,
           color: C.text,
@@ -329,7 +329,7 @@ export default function RegistrarPaciente() {
           <Box sx={{ flex: 1, textAlign: "center" }}>
             <Typography
               sx={{
-                fontFamily: "'Cormorant Garamond', serif",
+                fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
                 fontSize: { xs: 24, md: 30 },
                 fontWeight: 700,
                 color: C.gold,

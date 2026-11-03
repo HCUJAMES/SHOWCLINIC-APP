@@ -53,14 +53,14 @@ import { generarReporteComisionPDF } from "../utils/generarReporteComisionPDF";
 const API_BASE_URL = process.env.REACT_APP_API_URL || `${window.location.protocol}//${window.location.hostname}:4000`;
 
 const BRAND_COLORS = {
-  primary: '#854F0B',
+  primary: '#8a5a1a',
   secondary: '#FAEEDA',
   primaryDark: '#6B3F08',
   secondaryLight: '#FDF8F0',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  error: '#D32F2F',
-  info: '#2196F3'
+  success: '#5f7f52',
+  warning: '#c9862e',
+  error: '#b3412e',
+  info: '#5f7f96'
 };
 
 const AVATAR_COLORS = ['#F4C430', '#9B7EBD', '#7FB3D5', '#F8B4B4', '#B4E7CE'];
@@ -436,14 +436,14 @@ const GestionPersonalCards = () => {
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4, backgroundColor: '#f5f1e4', minHeight: '100vh', py: 4 }}>
       {/* Header */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
-        <Typography variant="h4" sx={{ color: '#854F0B', fontWeight: 600 }}>
+        <Typography variant="h4" sx={{ color: '#8a5a1a', fontWeight: 600 }}>
           Gestión de personal clínico
         </Typography>
         <Button
           variant="outlined"
           startIcon={<Home />}
           onClick={() => navigate("/dashboard")}
-          sx={{ borderColor: '#854F0B', color: '#854F0B', '&:hover': { borderColor: '#6B3F08', backgroundColor: '#FDF8F0' } }}
+          sx={{ borderColor: '#8a5a1a', color: '#8a5a1a', '&:hover': { borderColor: '#6B3F08', backgroundColor: '#FDF8F0' } }}
         >
           Volver
         </Button>
@@ -584,7 +584,7 @@ const GestionPersonalCards = () => {
 
                   {/* Info */}
                   <Box sx={{ px: 1.5, pb: 2, mt: -2.5, position: 'relative', zIndex: 1 }}>
-                    <Typography sx={{ color: '#1a1a1a', fontWeight: 700, fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.3, mb: 0.2 }}>
+                    <Typography sx={{ color: '#2b2219', fontWeight: 700, fontSize: '0.85rem', textAlign: 'center', lineHeight: 1.3, mb: 0.2 }}>
                       {stat.especialista_nombre}
                     </Typography>
                     <Typography sx={{ color: '#999', fontSize: '0.65rem', textAlign: 'center', mb: 1.5, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
@@ -593,7 +593,7 @@ const GestionPersonalCards = () => {
 
                     <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
                       <Box sx={{ textAlign: 'center' }}>
-                        <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#854F0B' }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#8a5a1a' }}>
                           S/ {Number(stat.pago_fijo || 0).toLocaleString('es-PE', { minimumFractionDigits: 0 })}
                         </Typography>
                         <Typography sx={{ color: '#bbb', fontSize: '0.58rem' }}>pago fijo</Typography>
@@ -633,11 +633,11 @@ const GestionPersonalCards = () => {
                 <Button
                   startIcon={<Close />}
                   onClick={cerrarDetalle}
-                  sx={{ color: '#854F0B' }}
+                  sx={{ color: '#8a5a1a' }}
                 >
                   Volver al equipo
                 </Button>
-                <IconButton onClick={cerrarDetalle} sx={{ color: '#854F0B' }}>
+                <IconButton onClick={cerrarDetalle} sx={{ color: '#8a5a1a' }}>
                   <Close />
                 </IconButton>
               </Box>
@@ -653,7 +653,7 @@ const GestionPersonalCards = () => {
                     backgroundColor: AVATAR_COLORS[trabajadorActual.especialista_id % AVATAR_COLORS.length],
                     fontSize: '1.8rem',
                     fontWeight: 'bold',
-                    color: '#2D2D2D'
+                    color: '#2b2219'
                   }}
                 >
                   {trabajadorActual.especialista_nombre.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
@@ -666,11 +666,11 @@ const GestionPersonalCards = () => {
                     {trabajadorActual.tipo === 'doctor' ? 'Medicina estética' : trabajadorActual.tipo === 'asistente' ? 'Asistente clínica' : 'Recepción'}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                    <Chip label={trabajadorActual.tipo || 'Doctor'} size="small" sx={{ backgroundColor: '#FAEEDA', color: '#854F0B', fontWeight: 600, textTransform: 'capitalize' }} />
+                    <Chip label={trabajadorActual.tipo || 'Doctor'} size="small" sx={{ backgroundColor: '#FAEEDA', color: '#8a5a1a', fontWeight: 600, textTransform: 'capitalize' }} />
                     <Chip 
                       label={trabajadorActual.pago_fijo > 0 && trabajadorActual.comision_porcentaje > 0 ? 'Fijo + comisión' : trabajadorActual.pago_fijo > 0 ? 'Fijo' : 'Comisión'} 
                       size="small" 
-                      sx={{ backgroundColor: '#FAEEDA', color: '#854F0B', fontWeight: 600 }} 
+                      sx={{ backgroundColor: '#FAEEDA', color: '#8a5a1a', fontWeight: 600 }} 
                     />
                   </Box>
                 </Box>
@@ -698,7 +698,7 @@ const GestionPersonalCards = () => {
                     <Grid item xs={4}>
                       <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
                         <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Comisión ({comisionPct.toFixed(0)}%)</Typography>
-                        <Typography variant="h6" sx={{ color: '#854F0B', fontWeight: 600, fontSize: '1.05rem' }}>
+                        <Typography variant="h6" sx={{ color: '#8a5a1a', fontWeight: 600, fontSize: '1.05rem' }}>
                           S/ {comisionCalculada.toFixed(2)}
                         </Typography>
                         <Typography variant="caption" sx={{ color: '#999', fontSize: '0.6rem' }}>
@@ -719,7 +719,7 @@ const GestionPersonalCards = () => {
                     </Grid>
                   </Grid>
                   {/* Cuadro informativo: Total a pagar */}
-                  <Paper sx={{ p: 2, mb: 3, background: 'linear-gradient(135deg, #854F0B 0%, #6B3F08 100%)', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Paper sx={{ p: 2, mb: 3, background: 'linear-gradient(135deg, #8a5a1a 0%, #6B3F08 100%)', borderRadius: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
                       <Typography variant="caption" sx={{ color: '#FAEEDA', fontSize: '0.75rem' }}>Total a pagar</Typography>
                       <Typography variant="caption" sx={{ color: '#FAEEDA', fontSize: '0.65rem', display: 'block' }}>
@@ -738,7 +738,7 @@ const GestionPersonalCards = () => {
               <Box sx={{ mb: 2, textAlign: 'center' }}>
                 <Chip 
                   label={`${trabajadorActual.total_atenciones || 0} tratamientos realizados`}
-                  sx={{ backgroundColor: '#FAEEDA', color: '#854F0B', fontWeight: 600 }}
+                  sx={{ backgroundColor: '#FAEEDA', color: '#8a5a1a', fontWeight: 600 }}
                 />
               </Box>
 
@@ -749,7 +749,7 @@ const GestionPersonalCards = () => {
                   fullWidth
                   startIcon={<Payment />}
                   onClick={() => abrirModalPago(trabajadorActual)}
-                  sx={{ backgroundColor: '#854F0B', '&:hover': { backgroundColor: '#6B3F08' } }}
+                  sx={{ backgroundColor: '#8a5a1a', '&:hover': { backgroundColor: '#6B3F08' } }}
                 >
                   Registrar pago
                 </Button>
@@ -767,7 +767,7 @@ const GestionPersonalCards = () => {
                   fullWidth
                   startIcon={<PictureAsPdf />}
                   onClick={() => exportarPDF(trabajadorActual)}
-                  sx={{ borderColor: '#D32F2F', color: '#D32F2F', '&:hover': { borderColor: '#B71C1C', backgroundColor: '#FFEBEE' } }}
+                  sx={{ borderColor: '#b3412e', color: '#b3412e', '&:hover': { borderColor: '#86301f', backgroundColor: '#f8ebe7' } }}
                 >
                   Exportar PDF
                 </Button>
@@ -776,7 +776,7 @@ const GestionPersonalCards = () => {
                   fullWidth
                   startIcon={<FileDownload />}
                   onClick={() => exportarExcel(trabajadorActual)}
-                  sx={{ borderColor: '#854F0B', color: '#854F0B', '&:hover': { borderColor: '#6B3F08', backgroundColor: '#FDF8F0' } }}
+                  sx={{ borderColor: '#8a5a1a', color: '#8a5a1a', '&:hover': { borderColor: '#6B3F08', backgroundColor: '#FDF8F0' } }}
                 >
                   Exportar Excel
                 </Button>
@@ -789,8 +789,8 @@ const GestionPersonalCards = () => {
                   onChange={(_, v) => setTabDetalle(v)}
                   sx={{ 
                     '& .MuiTab-root': { color: '#666', fontSize: '0.85rem', textTransform: 'none', fontWeight: 600 }, 
-                    '& .Mui-selected': { color: '#854F0B' },
-                    '& .MuiTabs-indicator': { backgroundColor: '#854F0B' }
+                    '& .Mui-selected': { color: '#8a5a1a' },
+                    '& .MuiTabs-indicator': { backgroundColor: '#8a5a1a' }
                   }}
                 >
                   <Tab label="Presupuestos asignados" />
@@ -801,7 +801,7 @@ const GestionPersonalCards = () => {
 
               {loadingDetalle ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress size={40} sx={{ color: '#854F0B' }} />
+                  <CircularProgress size={40} sx={{ color: '#8a5a1a' }} />
                 </Box>
               ) : (
                 <>
@@ -818,7 +818,7 @@ const GestionPersonalCards = () => {
                             const descuento = Number(pres.descuento || 0);
                             const pagado = Number(pres.monto_pagado || 0);
                             const saldo = Math.max(0, precioTotal - descuento - pagado);
-                            const estadoColor = pres.estado === 'completado' ? '#4CAF50' : pres.estado === 'activo' ? '#FF9800' : '#999';
+                            const estadoColor = pres.estado === 'completado' ? '#5f7f52' : pres.estado === 'activo' ? '#c9862e' : '#999';
                             
                             return (
                               <Paper key={pres.id} sx={{ p: 2, backgroundColor: '#FDF8F0', borderRadius: 2, border: `1px solid ${estadoColor}40` }}>
@@ -835,7 +835,7 @@ const GestionPersonalCards = () => {
                                     <Chip 
                                       label={`${pres.sesiones_completadas || 0}/${pres.sesiones_totales || 0} sesiones`}
                                       size="small"
-                                      sx={{ backgroundColor: '#FAEEDA', color: '#854F0B', fontSize: '0.7rem', fontWeight: 600 }}
+                                      sx={{ backgroundColor: '#FAEEDA', color: '#8a5a1a', fontSize: '0.7rem', fontWeight: 600 }}
                                     />
                                     <Chip 
                                       label={pres.estado === 'completado' ? 'Completado' : pres.estado === 'activo' ? 'Activo' : pres.estado}
@@ -853,7 +853,7 @@ const GestionPersonalCards = () => {
                                         {trat.nombre || trat.tratamiento || 'Tratamiento'}
                                         {trat.sesiones > 1 ? ` (${trat.sesiones} ses.)` : ''}
                                       </Typography>
-                                      <Typography variant="body2" sx={{ color: '#854F0B', fontWeight: 600, fontSize: '0.8rem' }}>
+                                      <Typography variant="body2" sx={{ color: '#8a5a1a', fontWeight: 600, fontSize: '0.8rem' }}>
                                         S/ {Number(trat.precio || 0).toFixed(2)}
                                       </Typography>
                                     </Box>
@@ -869,16 +869,16 @@ const GestionPersonalCards = () => {
                                   {descuento > 0 && (
                                     <Box sx={{ flex: 1, textAlign: 'center', backgroundColor: 'white', p: 1, borderRadius: 1, border: '1px solid #FAEEDA' }}>
                                       <Typography variant="caption" sx={{ color: '#666' }}>Descuento</Typography>
-                                      <Typography variant="body2" sx={{ color: '#f44336', fontWeight: 600 }}>-S/ {descuento.toFixed(2)}</Typography>
+                                      <Typography variant="body2" sx={{ color: '#c0533e', fontWeight: 600 }}>-S/ {descuento.toFixed(2)}</Typography>
                                     </Box>
                                   )}
                                   <Box sx={{ flex: 1, textAlign: 'center', backgroundColor: 'white', p: 1, borderRadius: 1, border: '1px solid #FAEEDA' }}>
                                     <Typography variant="caption" sx={{ color: '#666' }}>Pagado</Typography>
-                                    <Typography variant="body2" sx={{ color: '#4CAF50', fontWeight: 600 }}>S/ {pagado.toFixed(2)}</Typography>
+                                    <Typography variant="body2" sx={{ color: '#5f7f52', fontWeight: 600 }}>S/ {pagado.toFixed(2)}</Typography>
                                   </Box>
                                   <Box sx={{ flex: 1, textAlign: 'center', backgroundColor: 'white', p: 1, borderRadius: 1, border: '1px solid #FAEEDA' }}>
                                     <Typography variant="caption" sx={{ color: '#666' }}>Saldo</Typography>
-                                    <Typography variant="body2" sx={{ color: saldo > 0 ? '#ff9800' : '#4CAF50', fontWeight: 600 }}>S/ {saldo.toFixed(2)}</Typography>
+                                    <Typography variant="body2" sx={{ color: saldo > 0 ? '#c9862e' : '#5f7f52', fontWeight: 600 }}>S/ {saldo.toFixed(2)}</Typography>
                                   </Box>
                                 </Box>
                               </Paper>
@@ -899,27 +899,27 @@ const GestionPersonalCards = () => {
                           <Table size="small">
                             <TableHead>
                               <TableRow sx={{ backgroundColor: '#FAEEDA' }}>
-                                <TableCell sx={{ color: '#854F0B', fontWeight: 600 }}>Tratamiento</TableCell>
-                                <TableCell align="center" sx={{ color: '#854F0B', fontWeight: 600 }}>Sesiones</TableCell>
-                                <TableCell align="right" sx={{ color: '#854F0B', fontWeight: 600 }}>Ingresos</TableCell>
+                                <TableCell sx={{ color: '#8a5a1a', fontWeight: 600 }}>Tratamiento</TableCell>
+                                <TableCell align="center" sx={{ color: '#8a5a1a', fontWeight: 600 }}>Sesiones</TableCell>
+                                <TableCell align="right" sx={{ color: '#8a5a1a', fontWeight: 600 }}>Ingresos</TableCell>
                               </TableRow>
                             </TableHead>
                             <TableBody>
                               {detalleData.tratamientos.map((trat, idx) => (
                                 <TableRow key={idx} sx={{ '&:hover': { backgroundColor: '#FAEEDA' } }}>
                                   <TableCell sx={{ color: '#333' }}>{trat.tratamiento_nombre}</TableCell>
-                                  <TableCell align="center" sx={{ color: '#854F0B', fontWeight: 600 }}>{trat.total_sesiones}</TableCell>
-                                  <TableCell align="right" sx={{ color: '#854F0B', fontWeight: 600 }}>
+                                  <TableCell align="center" sx={{ color: '#8a5a1a', fontWeight: 600 }}>{trat.total_sesiones}</TableCell>
+                                  <TableCell align="right" sx={{ color: '#8a5a1a', fontWeight: 600 }}>
                                     S/ {Number(trat.total_ingresos || 0).toFixed(2)}
                                   </TableCell>
                                 </TableRow>
                               ))}
                               <TableRow sx={{ backgroundColor: '#FAEEDA' }}>
-                                <TableCell sx={{ color: '#854F0B', fontWeight: 700 }}>Total</TableCell>
-                                <TableCell align="center" sx={{ color: '#854F0B', fontWeight: 700 }}>
+                                <TableCell sx={{ color: '#8a5a1a', fontWeight: 700 }}>Total</TableCell>
+                                <TableCell align="center" sx={{ color: '#8a5a1a', fontWeight: 700 }}>
                                   {detalleData.tratamientos.reduce((s, t) => s + t.total_sesiones, 0)}
                                 </TableCell>
-                                <TableCell align="right" sx={{ color: '#854F0B', fontWeight: 700 }}>
+                                <TableCell align="right" sx={{ color: '#8a5a1a', fontWeight: 700 }}>
                                   S/ {Number(detalleData.totales?.total_ingresos || 0).toFixed(2)}
                                 </TableCell>
                               </TableRow>
@@ -940,24 +940,24 @@ const GestionPersonalCards = () => {
                           <Table size="small">
                             <TableHead>
                               <TableRow sx={{ backgroundColor: '#FAEEDA' }}>
-                                <TableCell sx={{ color: '#854F0B', fontWeight: 600 }}>Fecha</TableCell>
-                                <TableCell align="right" sx={{ color: '#854F0B', fontWeight: 600 }}>Monto</TableCell>
-                                <TableCell sx={{ color: '#854F0B', fontWeight: 600 }}>Método</TableCell>
-                                <TableCell sx={{ color: '#854F0B', fontWeight: 600 }}>Referencia</TableCell>
-                                <TableCell sx={{ color: '#854F0B', fontWeight: 600 }}>Estado</TableCell>
+                                <TableCell sx={{ color: '#8a5a1a', fontWeight: 600 }}>Fecha</TableCell>
+                                <TableCell align="right" sx={{ color: '#8a5a1a', fontWeight: 600 }}>Monto</TableCell>
+                                <TableCell sx={{ color: '#8a5a1a', fontWeight: 600 }}>Método</TableCell>
+                                <TableCell sx={{ color: '#8a5a1a', fontWeight: 600 }}>Referencia</TableCell>
+                                <TableCell sx={{ color: '#8a5a1a', fontWeight: 600 }}>Estado</TableCell>
                               </TableRow>
                             </TableHead>
                             <TableBody>
                               {historialPagos.map((pago) => (
                                 <TableRow key={pago.id} sx={{ '&:hover': { backgroundColor: '#FAEEDA' } }}>
                                   <TableCell sx={{ color: '#333' }}>{pago.fecha_pago}</TableCell>
-                                  <TableCell align="right" sx={{ color: '#4CAF50', fontWeight: 600 }}>
+                                  <TableCell align="right" sx={{ color: '#5f7f52', fontWeight: 600 }}>
                                     S/ {Number(pago.monto || 0).toFixed(2)}
                                   </TableCell>
                                   <TableCell sx={{ color: '#555', textTransform: 'capitalize' }}>{pago.metodo_pago || '-'}</TableCell>
                                   <TableCell sx={{ color: '#555' }}>{pago.referencia || '-'}</TableCell>
                                   <TableCell>
-                                    <Chip label={pago.estado || 'pagado'} size="small" sx={{ backgroundColor: '#4CAF5020', color: '#4CAF50', fontSize: '0.7rem', fontWeight: 600, textTransform: 'capitalize' }} />
+                                    <Chip label={pago.estado || 'pagado'} size="small" sx={{ backgroundColor: '#4CAF5020', color: '#5f7f52', fontSize: '0.7rem', fontWeight: 600, textTransform: 'capitalize' }} />
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -981,7 +981,7 @@ const GestionPersonalCards = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ color: '#854F0B', fontWeight: 600 }}>
+        <DialogTitle sx={{ color: '#8a5a1a', fontWeight: 600 }}>
           Registrar pago - {modalPago.trabajador?.especialista_nombre}
         </DialogTitle>
         <DialogContent>
@@ -1032,7 +1032,7 @@ const GestionPersonalCards = () => {
           <Button 
             variant="contained" 
             onClick={registrarPago}
-            sx={{ backgroundColor: '#854F0B', '&:hover': { backgroundColor: '#6B3F08' } }}
+            sx={{ backgroundColor: '#8a5a1a', '&:hover': { backgroundColor: '#6B3F08' } }}
           >
             Registrar pago
           </Button>
@@ -1046,7 +1046,7 @@ const GestionPersonalCards = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ color: '#854F0B', fontWeight: 600 }}>
+        <DialogTitle sx={{ color: '#8a5a1a', fontWeight: 600 }}>
           Editar datos - {modalEditarCard.trabajador?.especialista_nombre}
         </DialogTitle>
         <DialogContent>
@@ -1066,7 +1066,7 @@ const GestionPersonalCards = () => {
                   component="label"
                   size="small"
                   disabled={subiendoFoto}
-                  sx={{ borderColor: '#854F0B', color: '#854F0B' }}
+                  sx={{ borderColor: '#8a5a1a', color: '#8a5a1a' }}
                 >
                   {subiendoFoto ? 'Subiendo...' : 'Subir foto'}
                   <input
@@ -1150,7 +1150,7 @@ const GestionPersonalCards = () => {
           <Button 
             variant="contained" 
             onClick={guardarEdicionCard}
-            sx={{ backgroundColor: '#854F0B', '&:hover': { backgroundColor: '#6B3F08' } }}
+            sx={{ backgroundColor: '#8a5a1a', '&:hover': { backgroundColor: '#6B3F08' } }}
           >
             Guardar cambios
           </Button>

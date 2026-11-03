@@ -5,11 +5,11 @@ const API = `${window.location.protocol}//${window.location.hostname}:4000`;
 
 // ─── Paleta de colores ShowClinic Premium ───
 const COLORS = {
-  brownMain: "#5D4037",
-  brownDark: "#3E2723",
+  brownMain: "#5c3c12",
+  brownDark: "#2b2219",
   brownMedium: "#7A5A2E",
   brownLight: "#A68869",
-  gold: "#C8A96E",
+  gold: "#ba9a63",
   creamMain: "#FFF8F0",
   creamSoft: "#FAF3E8",
   creamMedium: "#F5EDDF",
@@ -21,7 +21,7 @@ const COLORS = {
 const CATEGORY_COLORS = {
   corporal: "#5F938A",
   facial: "#C0846D",
-  armonizacion: "#C8A96E",
+  armonizacion: "#ba9a63",
 };
 const laneColor = (key) => CATEGORY_COLORS[key] || COLORS.gold;
 
@@ -36,8 +36,8 @@ const hexToRgba = (hex, alpha) => {
 
 // ─── Tipografía ───
 const FONTS = {
-  serif: "'Cormorant Garamond', Georgia, serif",
-  sans: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  serif: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
+  sans: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
 };
 
 // ─── Constantes de layout ───
@@ -257,7 +257,7 @@ const TreatmentTimelineMatrix = ({
       style={{
         background: COLORS.creamMain,
         borderRadius: 16,
-        border: `1px solid rgba(200,169,110,0.3)`,
+        border: `1px solid rgba(186,154,99,0.3)`,
         overflow: "hidden",
         fontFamily: FONTS.sans,
       }}
@@ -349,8 +349,8 @@ const TreatmentTimelineMatrix = ({
           {onDelete && (
             <button
               onClick={onDelete}
-              style={{ background: "transparent", border: `0.5px solid #d32f2f`, borderRadius: 6, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontFamily: FONTS.sans, fontWeight: 700, color: "#d32f2f", cursor: "pointer", transition: "all 0.2s", lineHeight: 1 }}
-              onMouseEnter={(e) => { e.target.style.background = "rgba(211,47,47,0.08)"; }}
+              style={{ background: "transparent", border: `0.5px solid #b3412e`, borderRadius: 6, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontFamily: FONTS.sans, fontWeight: 700, color: "#b3412e", cursor: "pointer", transition: "all 0.2s", lineHeight: 1 }}
+              onMouseEnter={(e) => { e.target.style.background = "rgba(179,65,46,0.08)"; }}
               onMouseLeave={(e) => { e.target.style.background = "transparent"; }}
               title="Eliminar gráfico"
             >
@@ -366,8 +366,8 @@ const TreatmentTimelineMatrix = ({
           <span style={{ fontFamily: FONTS.sans, fontSize: 10, opacity: 0.55, letterSpacing: "1px", textTransform: "uppercase", color: COLORS.brownMain }}>AVANCE</span>
           <span style={{ fontFamily: FONTS.serif, fontSize: 16, fontWeight: 500, color: COLORS.gold }}>{budget.progress || 0}%</span>
         </div>
-        <div style={{ height: 4, borderRadius: 2, background: "rgba(93, 64, 55, 0.08)", overflow: "hidden" }}>
-          <div style={{ height: "100%", width: `${budget.progress || 0}%`, background: "linear-gradient(90deg, #8D6E63 0%, #C8A96E 100%)", borderRadius: 2, transition: "width 0.4s ease" }} />
+        <div style={{ height: 4, borderRadius: 2, background: "rgba(92,60,18, 0.08)", overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${budget.progress || 0}%`, background: "linear-gradient(90deg, #8D6E63 0%, #ba9a63 100%)", borderRadius: 2, transition: "width 0.4s ease" }} />
         </div>
       </div>
 
@@ -386,14 +386,14 @@ const TreatmentTimelineMatrix = ({
             zIndex: 2,
             background: COLORS.creamMain,
             paddingTop: HEADER_HEIGHT,
-            borderRight: `1px solid rgba(200,169,110,0.15)`,
+            borderRight: `1px solid rgba(186,154,99,0.15)`,
           }}
         >
           {categories.map((cat) => {
             const cColor = laneColor(cat.key);
             return (
               <div key={cat.key} style={{ height: LANE_HEIGHT, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 20px" }}>
-                <div style={{ width: 180, height: 64, borderRadius: 10, background: COLORS.creamMain, border: `0.8px solid rgba(200,169,110,0.4)`, borderLeft: `4px solid ${cColor}`, display: "flex", alignItems: "center", padding: "0 12px", gap: 10, boxShadow: "0 2px 8px rgba(93,64,55,0.04)" }}>
+                <div style={{ width: 180, height: 64, borderRadius: 10, background: COLORS.creamMain, border: `0.8px solid rgba(186,154,99,0.4)`, borderLeft: `4px solid ${cColor}`, display: "flex", alignItems: "center", padding: "0 12px", gap: 10, boxShadow: "0 2px 8px rgba(92,60,18,0.04)" }}>
                   <div style={{ width: 28, height: 28, minWidth: 28, borderRadius: "50%", background: cColor, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <span style={{ fontFamily: FONTS.sans, fontSize: 13, fontWeight: 700, color: COLORS.creamMain }}>{cat.initial}</span>
                   </div>
@@ -410,7 +410,7 @@ const TreatmentTimelineMatrix = ({
         {/* ─── Right Panel (Scrollable Matrix) ─── */}
         <div
           ref={scrollContainerRef}
-          style={{ flex: 1, overflowX: "auto", overflowY: "hidden", position: "relative", scrollbarWidth: "thin", scrollbarColor: "rgba(200,169,110,0.4) rgba(245,237,223,0.5)" }}
+          style={{ flex: 1, overflowX: "auto", overflowY: "hidden", position: "relative", scrollbarWidth: "thin", scrollbarColor: "rgba(186,154,99,0.4) rgba(245,237,223,0.5)" }}
           className="timeline-matrix-scroll"
         >
           <div ref={matrixContainerRef} style={{ width: contentWidth, minWidth: "100%", height: contentHeight + 28, position: "relative", paddingBottom: 28 }}>
@@ -509,7 +509,7 @@ const TreatmentTimelineMatrix = ({
                   top: HEADER_HEIGHT - 8,
                   height: lanesHeight + 8,
                   width: 0,
-                  borderLeft: "3px solid #4CAF50",
+                  borderLeft: "3px solid #5f7f52",
                   transformOrigin: "top center",
                   zIndex: 5,
                   pointerEvents: "none",
@@ -522,7 +522,7 @@ const TreatmentTimelineMatrix = ({
                     left: 0,
                     top: -14,
                     transform: "translateX(-50%)",
-                    background: "#4CAF50",
+                    background: "#5f7f52",
                     color: "#FFFFFF",
                     fontFamily: FONTS.sans,
                     fontSize: 10,
@@ -531,7 +531,7 @@ const TreatmentTimelineMatrix = ({
                     textTransform: "uppercase",
                     padding: "3px 12px",
                     borderRadius: 12,
-                    boxShadow: "0 2px 8px rgba(76,175,80,0.35)",
+                    boxShadow: "0 2px 8px rgba(95,127,82,0.35)",
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -547,8 +547,8 @@ const TreatmentTimelineMatrix = ({
                     width: 9,
                     height: 9,
                     borderRadius: "50%",
-                    background: "#4CAF50",
-                    boxShadow: "0 0 0 3px rgba(76,175,80,0.18)",
+                    background: "#5f7f52",
+                    boxShadow: "0 0 0 3px rgba(95,127,82,0.18)",
                   }}
                 />
               </motion.div>
@@ -737,7 +737,7 @@ const TreatmentTimelineMatrix = ({
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            boxShadow: "0 2px 6px rgba(93,64,55,0.12)",
+                            boxShadow: "0 2px 6px rgba(92,60,18,0.12)",
                           }}
                         >
                           {n.status === "completed" && (
@@ -755,7 +755,7 @@ const TreatmentTimelineMatrix = ({
                             width: 154,
                           }}
                         >
-                          <div style={{ width: "100%", minHeight: 44, borderRadius: 8, background: COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${hexToRgba(color, 0.55)}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "6px 7px", boxShadow: "0 2px 8px rgba(93,64,55,0.08)" }}>
+                          <div style={{ width: "100%", minHeight: 44, borderRadius: 8, background: COLORS.creamMain, border: `1px ${n.status === "pending" ? "dashed" : "solid"} ${hexToRgba(color, 0.55)}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "6px 7px", boxShadow: "0 2px 8px rgba(92,60,18,0.08)" }}>
                             {/* Treatment name */}
                             <div style={{ fontFamily: FONTS.serif, fontSize: 13.5, fontWeight: 600, color: COLORS.brownDark, textAlign: "center", lineHeight: 1.25, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>
                               {n.name}
@@ -824,7 +824,7 @@ const TreatmentTimelineMatrix = ({
 
           {/* Scroll hint */}
           {showScrollHint && weeks.length > 4 && (
-            <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", width: 32, height: 60, background: "linear-gradient(90deg, transparent, rgba(200,169,110,0.15))", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <div style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)", width: 32, height: 60, background: "linear-gradient(90deg, transparent, rgba(186,154,99,0.15))", display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
               <span style={{ fontSize: 18, color: COLORS.gold, opacity: 0.7 }}>›</span>
             </div>
           )}
@@ -832,7 +832,7 @@ const TreatmentTimelineMatrix = ({
       </div>
 
       {/* ═══ LEGEND ═══ */}
-      <div style={{ padding: "14px 24px", borderTop: `0.5px solid rgba(200,169,110,0.3)`, display: "flex", justifyContent: "center", gap: 24 }}>
+      <div style={{ padding: "14px 24px", borderTop: `0.5px solid rgba(186,154,99,0.3)`, display: "flex", justifyContent: "center", gap: 24 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ width: 12, height: 12, borderRadius: "50%", background: COLORS.brownMedium }} />
           <span style={{ fontFamily: FONTS.sans, fontSize: 11, letterSpacing: "0.8px", color: COLORS.brownMain, opacity: 0.85 }}>Completado</span>
@@ -846,7 +846,7 @@ const TreatmentTimelineMatrix = ({
           <span style={{ fontFamily: FONTS.sans, fontSize: 11, letterSpacing: "0.8px", color: COLORS.brownMain, opacity: 0.85 }}>Pendiente</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ width: 4, height: 14, borderRadius: 2, background: "#4CAF50" }} />
+          <div style={{ width: 4, height: 14, borderRadius: 2, background: "#5f7f52" }} />
           <span style={{ fontFamily: FONTS.sans, fontSize: 11, letterSpacing: "0.8px", color: COLORS.brownMain, opacity: 0.85 }}>Alta</span>
         </div>
       </div>
@@ -856,8 +856,8 @@ const TreatmentTimelineMatrix = ({
       <style>{`
         .timeline-matrix-scroll::-webkit-scrollbar { height: 6px; }
         .timeline-matrix-scroll::-webkit-scrollbar-track { background: rgba(245,237,223,0.5); border-radius: 3px; }
-        .timeline-matrix-scroll::-webkit-scrollbar-thumb { background: rgba(200,169,110,0.4); border-radius: 3px; }
-        .timeline-matrix-scroll::-webkit-scrollbar-thumb:hover { background: rgba(200,169,110,0.6); }
+        .timeline-matrix-scroll::-webkit-scrollbar-thumb { background: rgba(186,154,99,0.4); border-radius: 3px; }
+        .timeline-matrix-scroll::-webkit-scrollbar-thumb:hover { background: rgba(186,154,99,0.6); }
       `}</style>
     </div>
   );

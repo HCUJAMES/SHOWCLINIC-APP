@@ -22,7 +22,7 @@ import {
   DialogActions,
   Tooltip,
 } from "@mui/material";
-import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney, CalendarMonth, SwapVert } from "@mui/icons-material";
+import { ArrowBack, Home, CheckCircle, Delete, Edit, AttachMoney, CalendarMonth, SwapVert, Today, DateRange, PointOfSale, TrendingDown, Search } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import jsPDF from "jspdf";
@@ -803,14 +803,15 @@ const Finanzas = () => {
             {/* Accesos rápidos — arriba, prominentes */}
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2.5 }}>
               {[
-                { label: "📅 Hoy", key: "hoy", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("hoy"); } },
-                { label: "📆 Esta semana", key: "semana", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorSemana(); setFiltroRapido("semana"); } },
-                { label: "🗓️ Este mes", key: "mes", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorMes(); setFiltroRapido("mes"); } },
+                { label: "Hoy", icon: <Today sx={{ fontSize: 17 }} />, key: "hoy", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("hoy"); } },
+                { label: "Esta semana", icon: <DateRange sx={{ fontSize: 17 }} />, key: "semana", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorSemana(); setFiltroRapido("semana"); } },
+                { label: "Este mes", icon: <CalendarMonth sx={{ fontSize: 17 }} />, key: "mes", action: () => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorMes(); setFiltroRapido("mes"); } },
               ].map((btn) => (
                 <Button
                   key={btn.key}
                   variant={filtroRapido === btn.key ? "contained" : "outlined"}
                   size="small"
+                  startIcon={btn.icon}
                   onClick={btn.action}
                   sx={{
                     backgroundColor: filtroRapido === btn.key ? colorPrincipal : "#fffdf7",
@@ -836,11 +837,12 @@ const Finanzas = () => {
               <Button
                 variant={filtroRapido === "caja" ? "contained" : "outlined"}
                 size="small"
+                startIcon={<PointOfSale sx={{ fontSize: 17 }} />}
                 onClick={() => { setFiltroDia(""); setFiltroMes(""); setFiltroAnio(""); filtrarPorDia(); setFiltroRapido("caja"); }}
                 sx={{
-                  backgroundColor: filtroRapido === "caja" ? "#ba9a63" : "#fffdf7",
-                  borderColor: filtroRapido === "caja" ? "#ba9a63" : "#ba9a63",
-                  color: filtroRapido === "caja" ? "#fff" : "#ba9a63",
+                  backgroundColor: filtroRapido === "caja" ? colorPrincipal : "#fffdf7",
+                  borderColor: filtroRapido === "caja" ? colorPrincipal : "#ba9a63",
+                  color: filtroRapido === "caja" ? "#f5f1e4" : colorPrincipal,
                   fontWeight: 700,
                   fontSize: "0.8rem",
                   px: 2.5,
@@ -848,22 +850,23 @@ const Finanzas = () => {
                   borderRadius: 2.5,
                   textTransform: "none",
                   boxShadow: filtroRapido === "caja" ? "0 2px 8px rgba(186,154,99,0.35)" : "0 1px 3px rgba(186,154,99,0.15)",
-                  "&:hover": { backgroundColor: filtroRapido === "caja" ? "#a38b55" : "#f5f1e4", borderColor: "#a36920" },
+                  "&:hover": { backgroundColor: filtroRapido === "caja" ? "#8a5a1a" : "#f5f1e4", borderColor: "#a36920" },
                 }}
               >
-                💰 Cierre de caja
+                Cierre de caja
               </Button>
               <Button
                 variant="outlined"
                 size="small"
                 onClick={abrirModalEgresos}
                 disabled={!canDoActions}
+                startIcon={<TrendingDown sx={{ fontSize: 17 }} />}
                 sx={{
                   backgroundColor: "#fffdf7",
                   borderColor: "#ba9a63",
-                  color: "#ba9a63",
+                  color: colorPrincipal,
                   fontWeight: 700,
-                  fontSize: "0.75rem",
+                  fontSize: "0.8rem",
                   px: 2,
                   py: 0.8,
                   borderRadius: 2.5,
@@ -873,7 +876,7 @@ const Finanzas = () => {
                   "&:disabled": { backgroundColor: "#eee", borderColor: "#ccc", color: "#999" },
                 }}
               >
-                💸 Egresos
+                Egresos
               </Button>
             </Box>
 
@@ -1043,6 +1046,7 @@ const Finanzas = () => {
                 variant="contained"
                 size="small"
                 onClick={obtenerReporte}
+                startIcon={<Search />}
                 sx={{
                   backgroundColor: colorPrincipal,
                   color: "white",
@@ -1055,7 +1059,7 @@ const Finanzas = () => {
                   "&:hover": { backgroundColor: "#8a5a1a", boxShadow: "0 3px 12px rgba(163,105,32,0.4)" },
                 }}
               >
-                🔍 Buscar
+                Buscar
               </Button>
             </Box>
           </Paper>
@@ -1090,7 +1094,7 @@ const Finanzas = () => {
                         {Number(r.deuda_pendiente || 0) > 0 ? (
                           <Typography
                             component="span"
-                            sx={{ ml: 1, fontSize: 12, color: "#b71c1c", fontWeight: 700 }}
+                            sx={{ ml: 1, fontSize: 12, color: "#86301f", fontWeight: 700 }}
                           >
                             (Deuda: S/ {Number(r.deuda_pendiente || 0).toFixed(2)})
                           </Typography>
@@ -1109,8 +1113,8 @@ const Finanzas = () => {
                             px: 1.5,
                             py: 0.5,
                             borderRadius: 1,
-                            backgroundColor: r.estado_pago === "Deuda" ? "#ffebee" : "#e8f5e9",
-                            color: r.estado_pago === "Deuda" ? "#c62828" : "#2e7d32",
+                            backgroundColor: r.estado_pago === "Deuda" ? "#f8ebe7" : "#eef2ea",
+                            color: r.estado_pago === "Deuda" ? "#9e3626" : "#4f6d44",
                             fontWeight: "bold",
                             fontSize: "0.75rem"
                           }}
@@ -1220,7 +1224,7 @@ const Finanzas = () => {
                       <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Total Bruto
                       </Typography>
-                      <Typography variant="h5" sx={{ fontFamily: "'DM Sans', 'Inter', sans-serif", fontWeight: "bold", color: "#ba9a63", mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
+                      <Typography variant="h5" sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontWeight: "bold", color: "#ba9a63", mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
                         S/ {Number(totalBruto || 0).toFixed(2)}
                       </Typography>
                     </Paper>
@@ -1244,7 +1248,7 @@ const Finanzas = () => {
                       <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Total Neto
                       </Typography>
-                      <Typography variant="h5" sx={{ fontFamily: "'DM Sans', 'Inter', sans-serif", fontWeight: "bold", color: colorPrincipal, mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
+                      <Typography variant="h5" sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontWeight: "bold", color: colorPrincipal, mt: 0.5, fontVariantNumeric: "tabular-nums" }}>
                         S/ {Number(totalGeneral || 0).toFixed(2)}
                       </Typography>
                     </Paper>
@@ -1268,7 +1272,7 @@ const Finanzas = () => {
                       <Typography variant="caption" sx={{ color: "#555", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Comisión POS (4%)
                       </Typography>
-                      <Typography variant="h5" sx={{ fontFamily: "'DM Sans', 'Inter', sans-serif", fontWeight: "bold", color: "#a36920", mt: 0.5, fontSize: "1.3rem", fontVariantNumeric: "tabular-nums" }}>
+                      <Typography variant="h5" sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontWeight: "bold", color: "#a36920", mt: 0.5, fontSize: "1.3rem", fontVariantNumeric: "tabular-nums" }}>
                         S/ {Number(totalComision || 0).toFixed(2)}
                       </Typography>
                     </Paper>
@@ -1321,12 +1325,12 @@ const Finanzas = () => {
                     variant="outlined"
                     onClick={exportarExcel}
                     sx={{
-                      borderColor: "#2e7d32",
-                      color: "#2e7d32",
+                      borderColor: "#4f6d44",
+                      color: "#4f6d44",
                       fontWeight: "bold",
                       px: 3,
                       "&:hover": { 
-                        backgroundColor: "#e8f5e9",
+                        backgroundColor: "#eef2ea",
                         borderColor: "#1b5e20",
                       },
                     }}
@@ -1511,7 +1515,7 @@ const Finanzas = () => {
           }}
         >
           <DialogTitle sx={{ color: colorPrincipal, fontWeight: "bold", backgroundColor: "#f5f1e4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>💸 Gestión de Egresos</span>
+            <span>Gestión de egresos</span>
             <IconButton onClick={() => setEgresosDialogOpen(false)} size="small">
               <Delete sx={{ fontSize: 20 }} />
             </IconButton>
@@ -1783,7 +1787,7 @@ const Finanzas = () => {
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Eliminar">
-                                <IconButton size="small" onClick={() => eliminarEgreso(egreso)} sx={{ color: "#f44336" }}>
+                                <IconButton size="small" onClick={() => eliminarEgreso(egreso)} sx={{ color: "#c0533e" }}>
                                   <Delete sx={{ fontSize: 16 }} />
                                 </IconButton>
                               </Tooltip>
@@ -1798,7 +1802,7 @@ const Finanzas = () => {
                     <Typography variant="h6" sx={{ fontWeight: 700, color: colorPrincipal }}>
                       TOTAL EGRESOS:
                     </Typography>
-                    <Typography variant="h5" sx={{ fontFamily: "'DM Sans', 'Inter', sans-serif", fontWeight: 700, color: colorPrincipal, fontVariantNumeric: "tabular-nums" }}>
+                    <Typography variant="h5" sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontWeight: 700, color: colorPrincipal, fontVariantNumeric: "tabular-nums" }}>
                       S/ {Number(totalEgresos).toFixed(2)}
                     </Typography>
                   </Box>

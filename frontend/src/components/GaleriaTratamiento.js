@@ -27,7 +27,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const ORO = "#A36920";
 const ORO_OSCURO = "#8A5A1A";
-const CAFE = "#3E2723";
+const CAFE = "#2b2219";
 
 const MotionBox = motion(Box);
 
@@ -94,7 +94,7 @@ function SelectorFoto({ etiqueta, archivo, onElegir }) {
       )}
       <Box sx={{
         position: "absolute", top: 10, left: 10, px: 1.1, py: 0.3, borderRadius: "999px",
-        background: etiqueta === "Antes" ? "rgba(62,39,35,0.80)" : `linear-gradient(135deg, ${ORO}, ${ORO_OSCURO})`,
+        background: etiqueta === "Antes" ? "rgba(43,34,25,0.80)" : `linear-gradient(135deg, ${ORO}, ${ORO_OSCURO})`,
       }}>
         <Typography sx={{ fontSize: 11, color: "#fff", fontWeight: 800, letterSpacing: 0.6 }}>{etiqueta.toUpperCase()}</Typography>
       </Box>
@@ -119,7 +119,7 @@ function FotoComparada({ src, etiqueta }) {
       <img src={src} alt={etiqueta} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
       <Box sx={{
         position: "absolute", top: 10, left: 10, px: 1.1, py: 0.3, borderRadius: "999px",
-        background: etiqueta === "Antes" ? "rgba(62,39,35,0.80)" : `linear-gradient(135deg, ${ORO}, ${ORO_OSCURO})`,
+        background: etiqueta === "Antes" ? "rgba(43,34,25,0.80)" : `linear-gradient(135deg, ${ORO}, ${ORO_OSCURO})`,
       }}>
         <Typography sx={{ fontSize: 11, color: "#fff", fontWeight: 800, letterSpacing: 0.6 }}>{etiqueta.toUpperCase()}</Typography>
       </Box>
@@ -182,8 +182,8 @@ function CasosClinicos({ casos, apiBase, tratamientoId, puedeEditar, onRecargar 
   };
 
   const mensaje = aviso && (
-    <Box sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: "10px", background: "rgba(211,47,47,0.08)", border: "1px solid rgba(211,47,47,0.25)", flexShrink: 0 }}>
-      <Typography sx={{ fontSize: 12.5, color: "#B71C1C" }}>{aviso}</Typography>
+    <Box sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: "10px", background: "rgba(179,65,46,0.08)", border: "1px solid rgba(179,65,46,0.25)", flexShrink: 0 }}>
+      <Typography sx={{ fontSize: 12.5, color: "#86301f" }}>{aviso}</Typography>
     </Box>
   );
 
@@ -330,7 +330,7 @@ function CasosClinicos({ casos, apiBase, tratamientoId, puedeEditar, onRecargar 
                     position: "absolute", top: 2, right: 2, p: 0.2,
                     background: "rgba(0,0,0,0.55)", color: "#fff",
                     opacity: 0, transition: "opacity .18s ease",
-                    "&:hover": { background: "#D32F2F" },
+                    "&:hover": { background: "#b3412e" },
                   }}
                 >
                   <DeleteOutlineRounded sx={{ fontSize: 14 }} />
@@ -503,7 +503,7 @@ export default function GaleriaTratamiento({
       }}>
         <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: 20, lineHeight: 1.2 }} noWrap>
+            <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontWeight: 600, fontSize: 20, lineHeight: 1.2 }} noWrap>
               {tratamiento?.nombre || "Tratamiento"}
             </Typography>
             <Typography sx={{ fontSize: 11.5, opacity: 0.9 }}>
@@ -558,8 +558,8 @@ export default function GaleriaTratamiento({
       {/* Contenido */}
       <Box sx={{ p: 2.5, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {aviso && (
-          <Box sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: "10px", background: "rgba(211,47,47,0.08)", border: "1px solid rgba(211,47,47,0.25)" }}>
-            <Typography sx={{ fontSize: 12.5, color: "#B71C1C" }}>{aviso}</Typography>
+          <Box sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: "10px", background: "rgba(179,65,46,0.08)", border: "1px solid rgba(179,65,46,0.25)" }}>
+            <Typography sx={{ fontSize: 12.5, color: "#86301f" }}>{aviso}</Typography>
           </Box>
         )}
 
@@ -677,7 +677,7 @@ export default function GaleriaTratamiento({
                           position: "absolute", top: 2, right: 2, p: 0.2,
                           background: "rgba(0,0,0,0.55)", color: "#fff",
                           opacity: 0, transition: "opacity .18s ease",
-                          "&:hover": { background: "#D32F2F" },
+                          "&:hover": { background: "#b3412e" },
                         }}
                       >
                         <DeleteOutlineRounded sx={{ fontSize: 14 }} />

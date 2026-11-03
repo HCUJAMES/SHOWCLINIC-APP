@@ -82,19 +82,22 @@ const fechaCorta = (f) => {
   return d.toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+// Inventario es la excepción a la paleta sobria de la marca: aquí cada
+// producto y categoría lleva su propio color para distinguirlos de un vistazo.
+// Son tonos joya, con la misma luminosidad, que conviven con el dorado.
 const chartPalette = [
-  "#8A5A1A", // dorado profundo
-  "#A36920", // dorado marca
-  "#B8823C", // dorado medio
-  "#C4944A", // dorado claro
-  "#D4AF37", // oro
-  "#6D4C41", // marrón cálido
-  "#8D6E63", // marrón suave
-  "#4E342E", // café oscuro
-  "#BCAAA4", // arena
-  "#A1887F", // topo
-  "#D7CCC8", // beige
-  "#E0C9A6", // champagne
+  "#a36920", // dorado marca
+  "#2f8f8a", // turquesa
+  "#c2577a", // rosa
+  "#5b6fc4", // índigo
+  "#6f9a3f", // oliva
+  "#d9892b", // ámbar
+  "#8a5ab8", // lavanda
+  "#3a8fc0", // celeste
+  "#c4663b", // terracota
+  "#3f9a74", // jade
+  "#b0487f", // magenta
+  "#7a6a4f", // topo
 ];
 
 // ===== Sistema de diseño ShowClinic (solo presentación) =====
@@ -118,6 +121,8 @@ function FotoProducto({ producto, tam = 46, radio = 12, editable = false, onCamb
 
   const src = urlFoto(producto?.imagen);
   const inicial = String(producto?.variante || producto?.marca || "?").trim().charAt(0).toUpperCase() || "?";
+  // Sin foto, cada producto lleva su color para no verse todos iguales
+  const tono = colorProducto(producto?.variante || producto?.marca || "");
 
   const token = localStorage.getItem("token");
 
@@ -164,7 +169,7 @@ function FotoProducto({ producto, tam = 46, radio = 12, editable = false, onCamb
       <Box
         sx={{
           width: "100%", height: "100%", borderRadius: `${radio}px`, overflow: "hidden",
-          border: `1px solid ${T.border}`, background: src ? "#fff" : T.goldSoft,
+          border: `1px solid ${T.border}`, background: src ? "#fff" : `${tono}1f`,
           display: "flex", alignItems: "center", justifyContent: "center",
           transition: "border-color .2s ease",
         }}
@@ -180,7 +185,7 @@ function FotoProducto({ producto, tam = 46, radio = 12, editable = false, onCamb
           />
         ) : (
           <Typography sx={{
-            fontFamily: T.fontTitle, fontWeight: 700, color: T.gold,
+            fontFamily: T.fontTitle, fontWeight: 700, color: tono,
             fontSize: Math.max(13, Math.round(tam * 0.4)), lineHeight: 1,
           }}>
             {inicial}
@@ -247,18 +252,18 @@ function FotoProducto({ producto, tam = 46, radio = 12, editable = false, onCamb
 const T = {
   pageBg: "#FAF8F5",        // crema muy claro
   surface: "#FFFFFF",
-  surface2: "#F5EDE3",      // champagne
-  text1: "#3E2723",         // café oscuro (títulos)
+  surface2: "#f5f1e4",      // champagne
+  text1: "#2b2219",         // café oscuro (títulos)
   text2: "#6B6B6B",         // gris medio
   text3: "#A1958A",         // gris cálido
   border: "rgba(163,105,32,0.14)",
   borderHover: "rgba(163,105,32,0.30)",
   gold: "#A36920",          // dorado principal
   goldDark: "#8A5A1A",
-  goldLight: "#C4944A",
-  goldSoft: "#F5EDE3",
-  font: "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  fontTitle: "'Playfair Display', 'Poppins', serif",
+  goldLight: "#ba9a63",
+  goldSoft: "#f5f1e4",
+  font: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  fontTitle: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
   shadow: "0 4px 20px rgba(163,105,32,0.10)",
   shadowHover: "0 10px 30px rgba(163,105,32,0.18)",
 };
@@ -266,16 +271,17 @@ const semantic = {
   green: { bg: "#EDF5E9", text: "#3B6D11", num: "#27500A" },
   amber: { bg: "#FBF0DC", text: "#8A5A1A", num: "#633806" },
   red: { bg: "#FBEAE7", text: "#A32D2D", num: "#791F1F" },
-  neutral: { bg: "#F5EDE3", text: "#8A5A1A", num: "#3E2723" },
+  neutral: { bg: "#f5f1e4", text: "#8A5A1A", num: "#2b2219" },
 };
-const categoriaColorMap = {
-  Toxina: "#8A5A1A",
-  Filler: "#A36920",
-  "Bioestim.": "#B8823C",
-  Skincare: "#C4944A",
-  Enzima: "#D4AF37",
-  Otro: "#8D6E63",
+const CATEGORIAS = {
+  Toxina:     { color: "#5b6fc4", bg: "#eceffa" },
+  Filler:     { color: "#c2577a", bg: "#f9ebf0" },
+  "Bioestim.": { color: "#2f8f8a", bg: "#e6f3f2" },
+  Enzima:     { color: "#d9892b", bg: "#fbf1e3" },
+  Skincare:   { color: "#6f9a3f", bg: "#eef4e6" },
+  Otro:       { color: "#8a7a62", bg: "#f3efe8" },
 };
+const categoriaColorMap = Object.fromEntries(Object.entries(CATEGORIAS).map(([k, v]) => [k, v.color]));
 const catColor = (label, idx = 0) => categoriaColorMap[label] || chartPalette[idx % chartPalette.length];
 
 // Color estable por producto: el mismo producto conserva su tono entre recargas
@@ -326,26 +332,20 @@ const inferirCategoria = (marca, variante) => {
 };
 
 const getCategoriaColor = (cat) => {
-  switch (cat) {
-    case "Toxina": return { bg: "#fef3e2", text: "#a36920" };
-    case "Filler": return { bg: "#e8f5e9", text: "#2e7d32" };
-    case "Bioestim.": return { bg: "#e3f2fd", text: "#1565c0" };
-    case "Enzima": return { bg: "#fce4ec", text: "#c62828" };
-    case "Skincare": return { bg: "#f3e5f5", text: "#7b1fa2" };
-    default: return { bg: "#f5f5f5", text: "#616161" };
-  }
+  const c = CATEGORIAS[cat] || CATEGORIAS.Otro;
+  return { bg: c.bg, text: c.color, main: c.color };
 };
 
 const getEstadoInfo = (disponible, vencimiento) => {
-  if (disponible <= 0) return { label: "Agotado", color: "#d32f2f", dot: "#d32f2f" };
+  if (disponible <= 0) return { label: "Agotado", color: "#b3412e", dot: "#b3412e" };
   if (vencimiento) {
     const today = new Date();
     const venc = new Date(vencimiento);
     const diffDays = Math.ceil((venc - today) / (1000 * 60 * 60 * 24));
-    if (diffDays <= 30 && diffDays > 0) return { label: `Por vencer (${diffDays}d)`, color: "#f57c00", dot: "#f57c00" };
+    if (diffDays <= 30 && diffDays > 0) return { label: `Por vencer (${diffDays}d)`, color: "#b8742a", dot: "#b8742a" };
   }
-  if (disponible <= 3) return { label: "Bajo", color: "#f57c00", dot: "#f57c00" };
-  return { label: "Óptimo", color: "#2e7d32", dot: "#2e7d32" };
+  if (disponible <= 3) return { label: "Bajo", color: "#b8742a", dot: "#b8742a" };
+  return { label: "Óptimo", color: "#4f6d44", dot: "#4f6d44" };
 };
 
 const generarCodigoBarras = async (codigo) => {
@@ -1148,7 +1148,7 @@ export default function Inventario() {
                     <Chip
                       label={`Categoría: ${cat} · Unidad: ${v.unidad_base || "unidad"}`}
                       size="small"
-                      sx={{ mt: 1, background: "#e8f5e9", color: "#2e7d32", fontWeight: 500 }}
+                      sx={{ mt: 1, background: "#eef2ea", color: "#4f6d44", fontWeight: 500 }}
                       icon={<Category sx={{ fontSize: 14 }} />}
                     />
                   );
@@ -1249,26 +1249,26 @@ export default function Inventario() {
             const lastCode = `${codigoPreview.prefijo}${String(endCorr).padStart(4, "0")}`;
             return (
             <Box sx={{ background: "#f0f7ff", border: "1px solid #bbdefb", borderRadius: 2, p: 2, mb: 2 }}>
-              <Typography variant="caption" sx={{ color: "#1565c0", fontWeight: 700, textTransform: "uppercase", mb: 1, display: "block" }}>
+              <Typography variant="caption" sx={{ color: "#4f6b80", fontWeight: 700, textTransform: "uppercase", mb: 1, display: "block" }}>
                 {numCajas > 1 ? `Códigos de barras (${numCajas} stickers)` : "Código de barras generado"}
               </Typography>
               <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                 <Box sx={{ flex: 1 }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
                     <Typography variant="body2" sx={{ color: "#666" }}>Prefijo:</Typography>
-                    <Chip label={codigoPreview.prefijo} size="small" sx={{ fontWeight: 700, fontFamily: "monospace", background: "#e3f2fd", color: "#1565c0" }} />
+                    <Chip label={codigoPreview.prefijo} size="small" sx={{ fontWeight: 700, fontFamily: "monospace", background: "#e3f2fd", color: "#4f6b80" }} />
                     <Typography variant="body2" sx={{ color: "#666" }}>Nº:</Typography>
-                    <Chip label={numCajas > 1 ? `${codigoPreview.correlativo} → ${String(endCorr).padStart(4, "0")}` : codigoPreview.correlativo} size="small" sx={{ fontWeight: 700, fontFamily: "monospace", background: "#e8f5e9", color: "#2e7d32" }} />
-                    {numCajas > 1 && <Chip label={`${numCajas} cajas`} size="small" sx={{ fontWeight: 600, background: "#fff3e0", color: "#e65100" }} />}
+                    <Chip label={numCajas > 1 ? `${codigoPreview.correlativo} → ${String(endCorr).padStart(4, "0")}` : codigoPreview.correlativo} size="small" sx={{ fontWeight: 700, fontFamily: "monospace", background: "#eef2ea", color: "#4f6d44" }} />
+                    {numCajas > 1 && <Chip label={`${numCajas} cajas`} size="small" sx={{ fontWeight: 600, background: "#f8efe0", color: "#a8612a" }} />}
                   </Box>
                   {numCajas > 1 ? (
                     <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 800, fontFamily: "monospace", letterSpacing: 2, color: "#2d2d2d" }}>
+                      <Typography variant="h6" sx={{ fontWeight: 800, fontFamily: "monospace", letterSpacing: 2, color: "#2b2219" }}>
                         {codigoPreview.codigo} ... {lastCode}
                       </Typography>
                     </Box>
                   ) : (
-                    <Typography variant="h6" sx={{ fontWeight: 800, fontFamily: "monospace", letterSpacing: 2, color: "#2d2d2d" }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, fontFamily: "monospace", letterSpacing: 2, color: "#2b2219" }}>
                       {codigoPreview.codigo}
                     </Typography>
                   )}
@@ -1501,11 +1501,11 @@ export default function Inventario() {
                   </Box>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="body2" sx={{ color: "#666" }}>Activos</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#2e7d32" }}>{codigosProducto.activos || 0}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#4f6d44" }}>{codigosProducto.activos || 0}</Typography>
                   </Box>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="body2" sx={{ color: "#666" }}>Usados</Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#d32f2f" }}>{codigosProducto.usados || 0}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800, color: "#b3412e" }}>{codigosProducto.usados || 0}</Typography>
                   </Box>
                 </Box>
 
@@ -1521,8 +1521,8 @@ export default function Inventario() {
                           p: 1.5,
                           mb: 1,
                           borderRadius: 2,
-                          backgroundColor: code.status === "active" ? "rgba(46,125,50,0.08)" : "rgba(211,47,47,0.08)",
-                          border: code.status === "active" ? "1px solid rgba(46,125,50,0.2)" : "1px solid rgba(211,47,47,0.2)",
+                          backgroundColor: code.status === "active" ? "rgba(79,109,68,0.08)" : "rgba(179,65,46,0.08)",
+                          border: code.status === "active" ? "1px solid rgba(79,109,68,0.2)" : "1px solid rgba(179,65,46,0.2)",
                         }}
                       >
                         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1538,7 +1538,7 @@ export default function Inventario() {
                           label={code.status === "active" ? "Activo" : "Usado"}
                           size="small"
                           sx={{
-                            backgroundColor: code.status === "active" ? "#2e7d32" : "#d32f2f",
+                            backgroundColor: code.status === "active" ? "#4f6d44" : "#b3412e",
                             color: "white",
                             fontWeight: 600,
                             fontSize: "0.75rem",
@@ -1566,7 +1566,7 @@ export default function Inventario() {
                         <IconButton
                           size="small"
                           onClick={() => handleEliminarCodigo(code.id)}
-                          sx={{ color: "#d32f2f", ml: 0.5 }}
+                          sx={{ color: "#b3412e", ml: 0.5 }}
                         >
                           <Delete fontSize="small" />
                         </IconButton>
@@ -1587,7 +1587,7 @@ export default function Inventario() {
                 size="small"
                 startIcon={<Delete />}
                 onClick={() => handleEliminarTodosCodigos("all")}
-                sx={{ color: "#d32f2f", fontWeight: 600, fontSize: "0.8rem" }}
+                sx={{ color: "#b3412e", fontWeight: 600, fontSize: "0.8rem" }}
                 disabled={!codigosProducto.codes || codigosProducto.codes.length === 0}
               >
                 Eliminar todos
@@ -2270,10 +2270,12 @@ export default function Inventario() {
               />
               {categorias.map(({ label, count }) => (
                 <Chip key={label} label={`${label} (${count})`} onClick={() => setFiltroCategoria(label)}
+                  icon={<Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", background: filtroCategoria === label ? "#fff" : getCategoriaColor(label).main, ml: "10px !important" }} />}
                   sx={{ fontFamily: T.font, fontWeight: 600, fontSize: 12.5, borderRadius: "999px", transition: "all .2s ease",
-                    background: filtroCategoria === label ? T.gold : "#fff", color: filtroCategoria === label ? "#fff" : T.text2,
-                    border: filtroCategoria === label ? "none" : `1px solid ${T.border}`,
-                    "&:hover": { background: filtroCategoria === label ? T.goldDark : T.goldSoft, transform: "translateY(-1px)" } }}
+                    background: filtroCategoria === label ? getCategoriaColor(label).main : getCategoriaColor(label).bg,
+                    color: filtroCategoria === label ? "#fff" : getCategoriaColor(label).main,
+                    border: `1px solid ${filtroCategoria === label ? getCategoriaColor(label).main : "transparent"}`,
+                    "&:hover": { background: filtroCategoria === label ? getCategoriaColor(label).main : getCategoriaColor(label).bg, borderColor: getCategoriaColor(label).main, transform: "translateY(-1px)" } }}
                 />
               ))}
             </Box>
@@ -2291,7 +2293,7 @@ export default function Inventario() {
                     px: 2, py: 1.6, alignItems: "center", borderBottom: `1px solid ${T.border}`, background: rowBg, borderRadius: "10px",
                     transition: "background .18s ease, transform .18s ease",
                     "&:hover": { background: T.goldSoft, transform: "translateX(3px)" },
-                    borderLeft: agotado ? "3px solid #d32f2f" : "3px solid transparent", cursor: "pointer",
+                    borderLeft: `4px solid ${agotado ? "#b3412e" : catColor.main}`, cursor: "pointer",
                   }}
                     onClick={() => { setProductoDetalle(p); setVista("detalle"); }}
                   >
@@ -2303,10 +2305,10 @@ export default function Inventario() {
                       </Box>
                     </Box>
                     <Box>
-                      <Chip label={p.categoria} size="small" sx={{ background: catColor.bg, color: catColor.text, fontWeight: 600, fontSize: 11, height: 24 }} />
+                      <Chip label={p.categoria} size="small" sx={{ background: catColor.bg, color: catColor.text, border: `1px solid ${catColor.main}33`, fontWeight: 700, fontSize: 11, height: 24 }} />
                     </Box>
                     <Box>
-                      <Typography sx={{ fontFamily: T.font, fontSize: 13.5, fontWeight: 600, color: agotado ? "#d32f2f" : T.text1 }}>
+                      <Typography sx={{ fontFamily: T.font, fontSize: 13.5, fontWeight: 600, color: agotado ? "#b3412e" : T.text1 }}>
                         {formatStock(p.stock, p.unidad_base)}
                       </Typography>
                       {(() => {
@@ -2361,7 +2363,7 @@ export default function Inventario() {
                       <IconButton size="small" onClick={() => { setProductoDetalle(p); setVista("detalle"); }} sx={{ color: "#888" }}>
                         <Edit fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" onClick={() => eliminarProducto(p.variante_id, p.variante)} sx={{ color: "#d32f2f" }}>
+                      <IconButton size="small" onClick={() => eliminarProducto(p.variante_id, p.variante)} sx={{ color: "#b3412e" }}>
                         <Delete fontSize="small" />
                       </IconButton>
                     </Box>
@@ -2384,7 +2386,8 @@ export default function Inventario() {
                     onClick={() => { setProductoDetalle(p); setVista("detalle"); }}
                     sx={{
                       cursor: "pointer", borderRadius: "16px", overflow: "hidden",
-                      background: "#fff", border: `1px solid ${agotado ? "rgba(211,47,47,0.30)" : T.border}`,
+                      background: "#fff", border: `1px solid ${agotado ? "rgba(179,65,46,0.30)" : T.border}`,
+                      borderTop: `4px solid ${agotado ? "#b3412e" : catColor.main}`,
                       boxShadow: T.shadow, display: "flex", flexDirection: "column",
                       transition: "box-shadow .2s ease, border-color .2s ease",
                       "&:hover": { boxShadow: T.shadowHover, borderColor: T.borderHover },
@@ -2393,7 +2396,7 @@ export default function Inventario() {
                     {/* Foto grande */}
                     <Box sx={{
                       position: "relative", width: "100%", pt: "72%",
-                      background: p.imagen ? "#fff" : `linear-gradient(135deg, ${T.goldSoft} 0%, #EFE3D2 100%)`,
+                      background: p.imagen ? "#fff" : `linear-gradient(135deg, ${catColor.bg} 0%, ${catColor.main}26 100%)`,
                       borderBottom: `1px solid ${T.border}`,
                     }}>
                       <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -2431,7 +2434,7 @@ export default function Inventario() {
                           label="Agotado"
                           size="small"
                           sx={{ position: "absolute", top: 8, left: 8, height: 21, fontSize: 10, fontWeight: 700,
-                            background: "#d32f2f", color: "#fff" }}
+                            background: "#b3412e", color: "#fff" }}
                         />
                       )}
                     </Box>
@@ -2457,7 +2460,7 @@ export default function Inventario() {
                       </Box>
 
                       <Box sx={{ mt: "auto", pt: 0.8 }}>
-                        <Typography sx={{ fontFamily: T.font, fontSize: 14, fontWeight: 700, color: agotado ? "#d32f2f" : T.text1 }}>
+                        <Typography sx={{ fontFamily: T.font, fontSize: 14, fontWeight: 700, color: agotado ? "#b3412e" : T.text1 }}>
                           {formatStock(p.stock, p.unidad_base)}
                         </Typography>
                         {frascos && (
@@ -2493,9 +2496,9 @@ export default function Inventario() {
                 <>
                   {/* ===== Productos con stock ===== */}
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#2e7d32" }} />
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#4f6d44" }} />
                     <Typography sx={{ fontFamily: T.font, fontWeight: 700, color: T.text1, fontSize: 14.5 }}>Disponibles</Typography>
-                    <Chip label={conStock.length} size="small" sx={{ background: "#e8f5e9", color: "#2e7d32", fontWeight: 700, height: 22 }} />
+                    <Chip label={conStock.length} size="small" sx={{ background: "#eef2ea", color: "#4f6d44", fontWeight: 700, height: 22 }} />
                   </Box>
                   {modoGaleria ? (
                     conStock.length > 0
@@ -2516,9 +2519,9 @@ export default function Inventario() {
                   {/* ===== Productos sin stock ===== */}
                   <Divider sx={{ my: 3 }} />
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#d32f2f" }} />
+                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#b3412e" }} />
                     <Typography sx={{ fontFamily: T.font, fontWeight: 700, color: T.text1, fontSize: 14.5 }}>Sin stock</Typography>
-                    <Chip label={sinStock.length} size="small" sx={{ background: "#ffebee", color: "#d32f2f", fontWeight: 700, height: 22 }} />
+                    <Chip label={sinStock.length} size="small" sx={{ background: "#f8ebe7", color: "#b3412e", fontWeight: 700, height: 22 }} />
                   </Box>
                   {modoGaleria ? (
                     sinStock.length > 0
@@ -2565,9 +2568,9 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
   const categoria = inferirCategoria(productoDetalle.marca, productoDetalle.variante);
 
   const getLoteEstado = (lote) => {
-    if (lote.disponible <= 0) return { label: "Agotado", color: "#d32f2f" };
-    if (lote.cantidad_reservada_unidades > 0) return { label: "Abierto", color: "#f57c00" };
-    return { label: "Activo", color: "#2e7d32" };
+    if (lote.disponible <= 0) return { label: "Agotado", color: "#b3412e" };
+    if (lote.cantidad_reservada_unidades > 0) return { label: "Abierto", color: "#b8742a" };
+    return { label: "Activo", color: "#4f6d44" };
   };
 
   return (
@@ -2580,7 +2583,7 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
           <Typography variant="body2" sx={{ color: "#999" }}>/</Typography>
           <Typography variant="body2" sx={{ color: "#999", cursor: "pointer" }} onClick={onVolver}>Productos</Typography>
           <Typography variant="body2" sx={{ color: "#999" }}>/</Typography>
-          <Typography variant="body2" sx={{ color: "#2d2d2d", fontWeight: 600 }}>{productoDetalle.variante}</Typography>
+          <Typography variant="body2" sx={{ color: "#2b2219", fontWeight: 600 }}>{productoDetalle.variante}</Typography>
         </Box>
 
         {/* Product Info */}
@@ -2589,7 +2592,7 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
             <Box sx={{ display: "flex", gap: 1, mb: 1.5 }}>
               <Chip label={categoria} size="small" sx={{ background: getCategoriaColor(categoria).bg, color: getCategoriaColor(categoria).text, fontWeight: 700, fontSize: 11 }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d", mb: 0.5 }}>{productoDetalle.variante}</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: "#2b2219", mb: 0.5 }}>{productoDetalle.variante}</Typography>
             <Typography variant="body2" sx={{ color: "#888", mb: 2 }}>
               {productoDetalle.marca} · {productoDetalle.unidad_base || "Unidad"}
               {productoDetalle.fecha_registro ? ` · Registrado el ${fechaCorta(productoDetalle.fecha_registro)}` : ""}
@@ -2608,17 +2611,17 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
             <Grid container spacing={3} sx={{ mt: 2 }}>
               <Grid item xs={4}>
                 <Typography variant="caption" sx={{ color: "#888", textTransform: "uppercase", fontWeight: 600 }}>Stock Total</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d" }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2b2219" }}>
                   {stockTotal} <Typography component="span" variant="body2" sx={{ color: "#888" }}>{productoDetalle.unidad_base || "u"}</Typography>
                 </Typography>
               </Grid>
               <Grid item xs={4}>
                 <Typography variant="caption" sx={{ color: "#888", textTransform: "uppercase", fontWeight: 600 }}>Lotes Activos</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d" }}>{lotesActivos.length}</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2b2219" }}>{lotesActivos.length}</Typography>
               </Grid>
               <Grid item xs={4}>
                 <Typography variant="caption" sx={{ color: "#888", textTransform: "uppercase", fontWeight: 600 }}>Total Lotes</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2d2d2d" }}>{lotesDelProducto.length}</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: "#2b2219" }}>{lotesDelProducto.length}</Typography>
               </Grid>
             </Grid>
           </CardContent>
@@ -2663,7 +2666,7 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
                       </Box>
                       <Box sx={{ textAlign: "right" }}>
                         <Typography variant="caption" sx={{ color: "#888", textTransform: "uppercase", fontWeight: 600 }}>Disponible</Typography>
-                        <Typography variant="h5" sx={{ fontWeight: 800, color: "#2d2d2d" }}>
+                        <Typography variant="h5" sx={{ fontWeight: 800, color: "#2b2219" }}>
                           {lote.disponible}<Typography component="span" variant="body2" sx={{ color: "#888" }}> / {lote.cantidad_original} {productoDetalle.unidad_base || "u"}</Typography>
                         </Typography>
                       </Box>
@@ -2673,7 +2676,7 @@ function DetalleProducto({ productoDetalle, lotesDelProducto, onVolver, onNuevoL
                       mt: 1.5, mb: 1.5, height: 6, borderRadius: 3, background: "#f0e8dc",
                       "& .MuiLinearProgress-bar": {
                         borderRadius: 3,
-                        background: lote.porcentaje > 50 ? `linear-gradient(90deg, ${colorPrincipal}, ${colorSecundario})` : lote.porcentaje > 20 ? "#f57c00" : "#d32f2f",
+                        background: lote.porcentaje > 50 ? `linear-gradient(90deg, ${colorPrincipal}, ${colorSecundario})` : lote.porcentaje > 20 ? "#b8742a" : "#b3412e",
                       },
                     }} />
 

@@ -52,9 +52,9 @@ export const generarProformaPDF = async (presupuesto, paciente, tipo = "presupue
     const pageHeight = doc.internal.pageSize.getHeight();
 
     // Paleta de marca ShowClinic
-    const marron = [93, 64, 55]; // #5D4037
+    const marron = [93, 64, 55]; // #5c3c12
     const bronce = [169, 113, 46]; // #A9712E
-    const dorado = [200, 169, 110]; // #C8A96E
+    const dorado = [200, 169, 110]; // #ba9a63
     const crema = [255, 252, 247]; // #FFFCF7
     const blanco = [255, 255, 255];
     const grisTexto = [80, 80, 80];

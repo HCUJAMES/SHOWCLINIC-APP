@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Box, Button } from "@mui/material";
 import { useToast } from "./ToastProvider";
 
 const ProtectedRoute = ({ children, requiredRole, allowedRoles }) => {
@@ -39,43 +38,8 @@ const ProtectedRoute = ({ children, requiredRole, allowedRoles }) => {
 
   if (!checkRole()) return null;
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    showToast({ severity: "success", message: "Sesión cerrada" });
-    navigate("/", { replace: true });
-  };
-
-  // Mostrar el botón de cerrar sesión solo en el Dashboard
-  const showLogoutButton = location.pathname === "/dashboard";
-
-  return (
-    <>
-      {showLogoutButton && (
-        <Box
-          sx={{
-            position: "fixed",
-            top: 12,
-            right: 12,
-            zIndex: 1400,
-          }}
-        >
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={logout}
-            sx={{
-              textTransform: "none",
-              fontWeight: 700,
-            }}
-          >
-            Cerrar sesión
-          </Button>
-        </Box>
-      )}
-      {children}
-    </>
-  );
+  // El botón de cerrar sesión vive en la barra superior del Dashboard
+  return <>{children}</>;
 };
 
 export default ProtectedRoute;

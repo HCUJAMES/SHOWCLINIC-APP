@@ -42,8 +42,8 @@ import { motion, AnimatePresence } from "framer-motion";
 const ORO = "#A36920";
 const ORO_OSCURO = "#8A5A1A";
 const CREMA = "#FAF8F5";
-const CAFE = "#3E2723";
-const VERDE = "#2E7D32";
+const CAFE = "#2b2219";
+const VERDE = "#4f6d44";
 
 const MotionBox = motion(Box);
 
@@ -135,7 +135,7 @@ function BotonCheck({ hecho, onClick, titulo }) {
           color: hecho ? "#fff" : "rgba(163,105,32,0.55)",
           transition: "background .2s ease, border-color .2s ease, color .2s ease",
           "&:hover": {
-            background: hecho ? VERDE : "rgba(46,125,50,0.12)",
+            background: hecho ? VERDE : "rgba(79,109,68,0.12)",
             borderColor: VERDE,
             color: hecho ? "#fff" : VERDE,
           },
@@ -170,10 +170,10 @@ function SeccionMarcados({ marcados, esCumples, esSeguimiento, abiertaLista, onA
         sx={{
           display: "flex", alignItems: "center", gap: 0.7,
           px: 1.2, py: 0.85, borderRadius: "12px", cursor: "pointer",
-          background: abiertaLista ? "rgba(46,125,50,0.10)" : "transparent",
-          border: "1px dashed rgba(46,125,50,0.35)",
+          background: abiertaLista ? "rgba(79,109,68,0.10)" : "transparent",
+          border: "1px dashed rgba(79,109,68,0.35)",
           transition: "background .2s ease",
-          "&:hover": { background: "rgba(46,125,50,0.10)" },
+          "&:hover": { background: "rgba(79,109,68,0.10)" },
         }}
       >
         <CheckRounded sx={{ fontSize: 15, color: VERDE }} />
@@ -214,8 +214,8 @@ function SeccionMarcados({ marcados, esCumples, esSeguimiento, abiertaLista, onA
                     sx={{
                       display: "flex", alignItems: "center", gap: 1,
                       p: 1, mb: 0.6, borderRadius: "12px",
-                      background: "rgba(46,125,50,0.06)",
-                      border: "1px solid rgba(46,125,50,0.16)",
+                      background: "rgba(79,109,68,0.06)",
+                      border: "1px solid rgba(79,109,68,0.16)",
                       opacity: ocupado ? 0.5 : 1,
                       transition: "opacity .2s ease",
                     }}
@@ -223,8 +223,8 @@ function SeccionMarcados({ marcados, esCumples, esSeguimiento, abiertaLista, onA
                     <Box sx={{
                       width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      background: "rgba(46,125,50,0.16)", color: VERDE,
-                      fontSize: 10.5, fontWeight: 700, fontFamily: "'Poppins', sans-serif",
+                      background: "rgba(79,109,68,0.16)", color: VERDE,
+                      fontSize: 10.5, fontWeight: 700, fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                     }}>
                       {iniciales(m.nombre, m.apellido)}
                     </Box>
@@ -642,7 +642,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
         initial={{ opacity: 0, scale: 0.6 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        sx={{ position: "fixed", top: 78, right: 22, zIndex: 1200 }}
+        // Va dentro de la barra superior del Dashboard (alto 72px)
+        sx={{ position: "fixed", top: 14, right: { xs: 12, sm: 20 }, zIndex: 1300 }}
       >
         <Tooltip title={totalStock > 0 ? `Avisos · ${totalStock} producto${totalStock === 1 ? "" : "s"} con poco stock` : "Avisos"} arrow placement="left">
           <Badge
@@ -651,7 +652,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
             invisible={totalAvisos === 0 || abierto}
             sx={{
               "& .MuiBadge-badge": {
-                bgcolor: "#D32F2F", color: "#fff", fontWeight: 700, fontSize: 11,
+                bgcolor: "#b3412e", color: "#fff", fontWeight: 700, fontSize: 11,
                 boxShadow: "0 0 0 2px #fff",
               },
             }}
@@ -659,14 +660,11 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
             <IconButton
               onClick={() => setAbierto((v) => !v)}
               sx={{
-                width: 48, height: 48,
-                background: abierto
-                  ? "rgba(211,47,47,0.92)"
-                  : `linear-gradient(135deg, ${ORO} 0%, ${ORO_OSCURO} 100%)`,
+                width: 44, height: 44,
+                background: abierto ? ORO_OSCURO : ORO,
                 color: "#fff",
-                boxShadow: "0 6px 20px rgba(163,105,32,0.35)",
-                transition: "transform .25s cubic-bezier(.4,0,.2,1), background .25s ease",
-                "&:hover": { transform: "scale(1.08)", boxShadow: "0 8px 26px rgba(163,105,32,0.45)" },
+                transition: "background .2s ease",
+                "&:hover": { background: ORO_OSCURO },
               }}
             >
               {abierto ? <CloseRounded /> : <NotificationsActiveRounded />}
@@ -703,8 +701,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
               width: { xs: "calc(100vw - 32px)", sm: 360 },
               borderRadius: "18px", overflow: "hidden",
               background: "#fff",
-              border: "1px solid rgba(211,47,47,0.25)",
-              boxShadow: "0 18px 44px rgba(62,39,35,0.28)",
+              border: "1px solid rgba(179,65,46,0.25)",
+              boxShadow: "0 18px 44px rgba(43,34,25,0.28)",
             }}
           >
             <Box sx={{
@@ -724,10 +722,10 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
               {popupStock.slice(0, 4).map((p) => (
                 <Box key={p.variante_id} sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.45 }}>
                   <Box sx={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-                    background: p.codigos_activos <= 0 ? "#D32F2F" : "#E08A1E" }} />
+                    background: p.codigos_activos <= 0 ? "#b3412e" : "#E08A1E" }} />
                   <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography sx={{ fontSize: 13, fontWeight: 700, color: CAFE }} noWrap>{p.variante}</Typography>
-                    <Typography sx={{ fontSize: 11.5, color: p.codigos_activos <= 0 ? "#C62828" : "#9A5B0C", fontWeight: 600 }} noWrap>
+                    <Typography sx={{ fontSize: 11.5, color: p.codigos_activos <= 0 ? "#9e3626" : "#9A5B0C", fontWeight: 600 }} noWrap>
                       {textoStock(p)}
                     </Typography>
                   </Box>
@@ -765,14 +763,14 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
             exit={{ opacity: 0, scale: 0.94 }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             sx={{
-              position: "fixed", top: 136, right: 22, zIndex: 1200,
+              position: "fixed", top: 80, right: 22, zIndex: 1250,
               width: { xs: "calc(100vw - 40px)", sm: 370 },
-              maxHeight: "calc(100vh - 168px)",
+              maxHeight: "calc(100vh - 104px)",
               display: "flex", flexDirection: "column",
               borderRadius: "20px", overflow: "hidden", transformOrigin: "top right",
               background: CREMA,
               border: "1px solid rgba(163,105,32,0.20)",
-              boxShadow: "0 20px 50px rgba(62,39,35,0.22)",
+              boxShadow: "0 20px 50px rgba(43,34,25,0.22)",
             }}
           >
             {/* Cabecera */}
@@ -785,7 +783,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                 <>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <Inventory2Rounded sx={{ fontSize: 20 }} />
-                    <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
+                    <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
                       Stock bajo
                     </Typography>
                   </Box>
@@ -811,7 +809,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                 <>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CakeRounded sx={{ fontSize: 20 }} />
-                    <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
+                    <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
                       Cumpleaños
                     </Typography>
                   </Box>
@@ -848,7 +846,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                 <>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <HandshakeRounded sx={{ fontSize: 20 }} />
-                    <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
+                    <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
                       Seguimiento
                     </Typography>
                   </Box>
@@ -875,7 +873,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                 <>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <EventRepeatRounded sx={{ fontSize: 20 }} />
-                    <Typography sx={{ fontFamily: "'Playfair Display', serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
+                    <Typography sx={{ fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", fontWeight: 600, fontSize: 18, flex: 1 }}>
                       Retoques pendientes
                     </Typography>
                   </Box>
@@ -999,8 +997,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                             display: "flex", alignItems: "center", gap: 1.2,
                             p: 1.3, mb: 0.9, borderRadius: "14px", cursor: onVerInventario ? "pointer" : "default",
                             background: "#fff",
-                            border: `1px solid ${agotado ? "rgba(211,47,47,0.22)" : "rgba(163,105,32,0.14)"}`,
-                            borderLeft: `3px solid ${agotado ? "#D32F2F" : "#E08A1E"}`,
+                            border: `1px solid ${agotado ? "rgba(179,65,46,0.22)" : "rgba(163,105,32,0.14)"}`,
+                            borderLeft: `3px solid ${agotado ? "#b3412e" : "#E08A1E"}`,
                             transition: "box-shadow .2s ease",
                             "&:hover": { boxShadow: hecho ? "none" : "0 6px 18px rgba(163,105,32,0.16)" },
                           }}
@@ -1009,7 +1007,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                             width: 38, height: 38, borderRadius: "12px", flexShrink: 0,
                             display: "flex", alignItems: "center", justifyContent: "center",
                             background: agotado
-                              ? "linear-gradient(135deg,#D32F2F,#B71C1C)"
+                              ? "linear-gradient(135deg,#b3412e,#86301f)"
                               : "linear-gradient(135deg,#E9A13B,#C77A12)",
                             color: "#fff",
                           }}>
@@ -1026,8 +1024,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                             <Typography sx={{
                               display: "inline-block", mt: 0.35,
                               fontSize: 10.5, fontWeight: 700,
-                              color: agotado ? "#C62828" : "#9A5B0C",
-                              background: agotado ? "rgba(211,47,47,0.10)" : "rgba(224,138,30,0.14)",
+                              color: agotado ? "#9e3626" : "#9A5B0C",
+                              background: agotado ? "rgba(179,65,46,0.10)" : "rgba(224,138,30,0.14)",
                               px: 0.8, py: 0.15, borderRadius: "6px",
                             }}>
                               {textoStock(p)}
@@ -1154,8 +1152,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                             display: "flex", alignItems: "center", gap: 1.2,
                             p: 1.2, mb: 0.9, borderRadius: "14px", cursor: "pointer",
                             background: hecho ? "#EDF7EE" : c.es_hoy ? "#FFF8E7" : "#fff",
-                            border: `1px solid ${hecho ? "rgba(46,125,50,0.35)" : c.es_hoy ? "rgba(212,175,55,0.55)" : "rgba(163,105,32,0.14)"}`,
-                            borderLeft: `3px solid ${hecho ? VERDE : c.es_hoy ? "#D4AF37" : c.ya_paso ? "#DDD3C4" : ORO}`,
+                            border: `1px solid ${hecho ? "rgba(79,109,68,0.35)" : c.es_hoy ? "rgba(186,154,99,0.55)" : "rgba(163,105,32,0.14)"}`,
+                            borderLeft: `3px solid ${hecho ? VERDE : c.es_hoy ? "#ba9a63" : c.ya_paso ? "#DDD3C4" : ORO}`,
                             opacity: c.ya_paso && !hecho ? 0.72 : 1,
                             transition: "background .25s ease, border-color .25s ease, box-shadow .2s ease, opacity .2s ease",
                             "&:hover": { boxShadow: hecho ? "none" : "0 6px 18px rgba(163,105,32,0.16)", opacity: 1 },
@@ -1166,7 +1164,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                             width: 42, height: 42, borderRadius: "12px", flexShrink: 0,
                             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                             background: c.es_hoy
-                              ? "linear-gradient(135deg,#D4AF37,#A36920)"
+                              ? "linear-gradient(135deg,#ba9a63,#A36920)"
                               : c.ya_paso ? "#EFE9E0" : `linear-gradient(135deg, ${ORO}, ${ORO_OSCURO})`,
                             color: c.ya_paso ? "#9C8B7D" : "#fff",
                           }}>
@@ -1190,7 +1188,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                               <Typography sx={{
                                 fontSize: 10.5, fontWeight: 700,
                                 color: c.es_hoy ? "#8A6D1B" : c.ya_paso ? "#9C8B7D" : ORO_OSCURO,
-                                background: c.es_hoy ? "rgba(212,175,55,0.20)" : c.ya_paso ? "rgba(0,0,0,0.04)" : "rgba(163,105,32,0.10)",
+                                background: c.es_hoy ? "rgba(186,154,99,0.20)" : c.ya_paso ? "rgba(0,0,0,0.04)" : "rgba(163,105,32,0.10)",
                                 px: 0.8, py: 0.15, borderRadius: "6px",
                               }}>
                                 {c.es_hoy ? "¡Es hoy!" : c.ya_paso ? "ya pasó" : c.dias_faltan != null ? `en ${c.dias_faltan} ${c.dias_faltan === 1 ? "día" : "días"}` : `${c.dia} de ${mesNombre}`}
@@ -1270,8 +1268,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                             display: "flex", alignItems: "center", gap: 1.2,
                             p: 1.3, mb: 0.9, borderRadius: "14px", cursor: "pointer",
                             background: hecho ? "#EDF7EE" : "#fff",
-                            border: `1px solid ${hecho ? "rgba(46,125,50,0.35)" : frio ? "rgba(211,47,47,0.22)" : "rgba(163,105,32,0.14)"}`,
-                            borderLeft: `3px solid ${hecho ? VERDE : frio ? "#D32F2F" : ORO}`,
+                            border: `1px solid ${hecho ? "rgba(79,109,68,0.35)" : frio ? "rgba(179,65,46,0.22)" : "rgba(163,105,32,0.14)"}`,
+                            borderLeft: `3px solid ${hecho ? VERDE : frio ? "#b3412e" : ORO}`,
                             transition: "background .25s ease, border-color .25s ease, box-shadow .2s ease",
                             "&:hover": { boxShadow: hecho ? "none" : "0 6px 18px rgba(163,105,32,0.16)" },
                           }}
@@ -1280,10 +1278,10 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                             width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
                             display: "flex", alignItems: "center", justifyContent: "center",
                             background: frio
-                              ? "linear-gradient(135deg,#D32F2F,#B71C1C)"
+                              ? "linear-gradient(135deg,#b3412e,#86301f)"
                               : `linear-gradient(135deg, ${ORO}, ${ORO_OSCURO})`,
                             color: "#fff", fontWeight: 700, fontSize: 13.5,
-                            fontFamily: "'Poppins', sans-serif",
+                            fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                           }}>
                             {iniciales(s.nombre, s.apellido)}
                           </Box>
@@ -1294,7 +1292,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                                 {nombreCompleto(s)}
                               </Typography>
                               {s.reaparecio && (
-                                <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#C62828", background: "rgba(211,47,47,0.10)", px: 0.5, borderRadius: "5px" }}
+                                <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#9e3626", background: "rgba(179,65,46,0.10)", px: 0.5, borderRadius: "5px" }}
                                   title="Ya se le contactó antes y sigue sin empezar">
                                   2ª vez
                                 </Typography>
@@ -1324,8 +1322,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                             <Box sx={{ display: "flex", alignItems: "center", gap: 0.9, mt: 0.35, flexWrap: "wrap" }}>
                               <Typography sx={{
                                 fontSize: 10.5, fontWeight: 700,
-                                color: frio ? "#C62828" : ORO_OSCURO,
-                                background: frio ? "rgba(211,47,47,0.10)" : "rgba(163,105,32,0.10)",
+                                color: frio ? "#9e3626" : ORO_OSCURO,
+                                background: frio ? "rgba(179,65,46,0.10)" : "rgba(163,105,32,0.10)",
                                 px: 0.8, py: 0.15, borderRadius: "6px",
                               }}>
                                 {tiempoDesdeConsulta(s.dias_desde_consulta)}
@@ -1367,7 +1365,7 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                                   borderRadius: "999px", background: "transparent",
                                   border: "1.5px solid rgba(163,105,32,0.25)", color: "#B08A8A",
                                   transition: "background .2s ease, border-color .2s ease, color .2s ease",
-                                  "&:hover": { background: "rgba(211,47,47,0.10)", borderColor: "#D32F2F", color: "#C62828" },
+                                  "&:hover": { background: "rgba(179,65,46,0.10)", borderColor: "#b3412e", color: "#9e3626" },
                                 }}
                               >
                                 <DescartarRounded sx={{ fontSize: 14 }} />
@@ -1424,8 +1422,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                           display: "flex", alignItems: "center", gap: 1.2,
                           p: 1.3, mb: 0.9, borderRadius: "14px", cursor: "pointer",
                           background: hecho ? "#EDF7EE" : "#fff",
-                          border: `1px solid ${hecho ? "rgba(46,125,50,0.35)" : r.vencido ? "rgba(211,47,47,0.22)" : "rgba(163,105,32,0.14)"}`,
-                          borderLeft: `3px solid ${hecho ? VERDE : r.vencido ? "#D32F2F" : ORO}`,
+                          border: `1px solid ${hecho ? "rgba(79,109,68,0.35)" : r.vencido ? "rgba(179,65,46,0.22)" : "rgba(163,105,32,0.14)"}`,
+                          borderLeft: `3px solid ${hecho ? VERDE : r.vencido ? "#b3412e" : ORO}`,
                           transition: "background .25s ease, border-color .25s ease, box-shadow .2s ease",
                           "&:hover": { boxShadow: hecho ? "none" : "0 6px 18px rgba(163,105,32,0.16)" },
                         }}
@@ -1435,10 +1433,10 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                           width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
                           display: "flex", alignItems: "center", justifyContent: "center",
                           background: r.vencido
-                            ? "linear-gradient(135deg,#D32F2F,#B71C1C)"
+                            ? "linear-gradient(135deg,#b3412e,#86301f)"
                             : `linear-gradient(135deg, ${ORO}, ${ORO_OSCURO})`,
                           color: "#fff", fontWeight: 700, fontSize: 13.5,
-                          fontFamily: "'Poppins', sans-serif",
+                          fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                         }}>
                           {iniciales(r.nombre, r.apellido)}
                         </Box>
@@ -1453,8 +1451,8 @@ export default function PanelRecordatorios({ apiBase, onVerPaciente, onVerInvent
                           <Box sx={{ display: "flex", alignItems: "center", gap: 0.9, mt: 0.35, flexWrap: "wrap" }}>
                             <Typography sx={{
                               fontSize: 10.5, fontWeight: 700,
-                              color: r.vencido ? "#C62828" : ORO_OSCURO,
-                              background: r.vencido ? "rgba(211,47,47,0.10)" : "rgba(163,105,32,0.10)",
+                              color: r.vencido ? "#9e3626" : ORO_OSCURO,
+                              background: r.vencido ? "rgba(179,65,46,0.10)" : "rgba(163,105,32,0.10)",
                               px: 0.8, py: 0.15, borderRadius: "6px",
                             }}>
                               {textoPlazo(r.dias_restantes)}

@@ -27,7 +27,7 @@ import {
 // Tonos de la paleta ShowClinic (marrón/dorado) para distinguir personas
 // sin salirse de la identidad de la marca. Se asignan por posición en la lista
 // para que dos especialistas nunca compartan color.
-const TONOS = ["#8A5A1A", "#C4944A", "#4E342E", "#B8823C", "#6D4C41", "#A36920", "#8D6E63", "#D4AF37"];
+const TONOS = ["#8A5A1A", "#ba9a63", "#4E342E", "#B8823C", "#6D4C41", "#A36920", "#8D6E63", "#ba9a63"];
 
 // Quita el tratamiento ("Dr.", "Dra.", "Lic.") para quedarnos con el nombre
 const sinTratamiento = (nombre = "") => nombre.replace(/^(Dr|Dra|Lic)\.?\s+/i, "").trim();
@@ -85,7 +85,7 @@ function BotonEspecialista({ esp, tono, etiqueta, compacto, onClick, title }) {
           sx={{
             fontSize: compacto ? "0.72rem" : "0.78rem",
             fontWeight: 700,
-            color: "#3E2723",
+            color: "#2b2219",
             whiteSpace: "nowrap",
             transition: "color .15s ease",
           }}
@@ -180,7 +180,7 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
         }}
       >
         <GroupsRounded sx={{ fontSize: 19, color: "#A36920" }} />
-        <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: "#5D4037", flex: 1 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: "#5c3c12", flex: 1 }}>
           ¿Quién realizará los tratamientos?
         </Typography>
         <Chip
@@ -191,9 +191,9 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
             height: 22,
             fontSize: "0.68rem",
             fontWeight: 700,
-            backgroundColor: completo ? "rgba(76,175,80,0.16)" : "rgba(255,152,0,0.16)",
-            color: completo ? "#2e7d32" : "#e65100",
-            "& .MuiChip-icon": { color: "#2e7d32" },
+            backgroundColor: completo ? "rgba(95,127,82,0.16)" : "rgba(255,152,0,0.16)",
+            color: completo ? "#4f6d44" : "#a8612a",
+            "& .MuiChip-icon": { color: "#4f6d44" },
           }}
         />
       </Box>
@@ -254,12 +254,12 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                   border: marcado
                     ? "1.5px solid #A36920"
                     : asignado
-                      ? "1.5px solid rgba(76,175,80,0.35)"
+                      ? "1.5px solid rgba(95,127,82,0.35)"
                       : "1.5px solid transparent",
                   backgroundColor: marcado
                     ? "rgba(163,105,32,0.10)"
                     : asignado
-                      ? "rgba(76,175,80,0.07)"
+                      ? "rgba(95,127,82,0.07)"
                       : "rgba(255,152,0,0.06)",
                   transition: "background-color .15s ease, border-color .15s ease",
                   "&:hover": { backgroundColor: "rgba(163,105,32,0.07)" },
@@ -288,7 +288,7 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                     flex: 1,
                     minWidth: 0,
                     fontSize: "0.78rem",
-                    color: asignado ? "#2e7d32" : "#3E2723",
+                    color: asignado ? "#4f6d44" : "#2b2219",
                     fontWeight: asignado ? 600 : 400,
                   }}
                   noWrap
@@ -308,9 +308,9 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                     onClick={(e) => e.stopPropagation()}
                   >
                     {/* Check verde: este tratamiento ya tiene responsable */}
-                    <CheckCircleRounded sx={{ fontSize: 16, color: "#4caf50" }} titleAccess="Ya asignado" />
+                    <CheckCircleRounded sx={{ fontSize: 16, color: "#5f7f52" }} titleAccess="Ya asignado" />
                     <Box sx={{ width: 9, height: 9, borderRadius: "50%", backgroundColor: tonoDe(esp.id), flexShrink: 0 }} />
-                    <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#3E2723" }} title={esp.nombre}>
+                    <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#2b2219" }} title={esp.nombre}>
                       {etiquetaDe(esp.id)}
                     </Typography>
                     <Tooltip title="Quitar" arrow>
@@ -320,7 +320,7 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                           fontSize: 15,
                           color: "#bdbdbd",
                           cursor: "pointer",
-                          "&:hover": { color: "#e53935" },
+                          "&:hover": { color: "#b3412e" },
                         }}
                       />
                     </Tooltip>
@@ -328,7 +328,7 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
                 ) : (
                   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
                     <RadioButtonUncheckedRounded sx={{ fontSize: 15, color: "#ffb74d" }} />
-                    <Typography sx={{ fontSize: "0.7rem", color: "#e65100", fontWeight: 600 }}>
+                    <Typography sx={{ fontSize: "0.7rem", color: "#a8612a", fontWeight: 600 }}>
                       sin asignar
                     </Typography>
                   </Box>
@@ -349,7 +349,7 @@ export default function AsignacionEspecialistas({ items = [], especialistas = []
             alignItems: "center",
             gap: 1,
             flexWrap: "wrap",
-            backgroundColor: "#3E2723",
+            backgroundColor: "#2b2219",
           }}
         >
           <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#fff" }}>

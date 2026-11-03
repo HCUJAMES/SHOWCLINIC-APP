@@ -32,23 +32,23 @@ const API_BASE = process.env.REACT_APP_API_URL || `${window.location.protocol}//
 const T = {
   pageBg: "#FAF8F5",
   surface: "#FFFFFF",
-  surface2: "#F5EDE3",
-  text1: "#3E2723",
+  surface2: "#f5f1e4",
+  text1: "#2b2219",
   text2: "#6B6B6B",
   text3: "#A1958A",
   border: "rgba(163,105,32,0.14)",
   borderHover: "rgba(163,105,32,0.30)",
   gold: "#A36920",
   goldDark: "#8A5A1A",
-  goldLight: "#C4944A",
-  goldSoft: "#F5EDE3",
-  font: "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-  fontTitle: "'Playfair Display', 'Poppins', serif",
+  goldLight: "#ba9a63",
+  goldSoft: "#f5f1e4",
+  font: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  fontTitle: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
   shadow: "0 4px 20px rgba(163,105,32,0.10)",
   shadowHover: "0 10px 30px rgba(163,105,32,0.18)",
-  green: "#2E7D32",
+  green: "#4f6d44",
   greenSoft: "#EDF5E9",
-  red: "#C62828",
+  red: "#9e3626",
   redSoft: "#FBEAE7",
   amber: "#B26A00",
   amberSoft: "#FBF0DC",
@@ -218,7 +218,7 @@ function EspacioVideo({ tipo, video, subiendo, progreso, onElegir, onBorrar, onA
   const [encima, setEncima] = useState(false);
   const [noReproduce, setNoReproduce] = useState(false);
   const etiqueta = tipo === "antes" ? "Antes" : "Después";
-  const colorEtiqueta = tipo === "antes" ? "rgba(62,39,35,0.85)" : `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`;
+  const colorEtiqueta = tipo === "antes" ? "rgba(43,34,25,0.85)" : `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`;
 
   useEffect(() => { setNoReproduce(false); }, [video?.archivo]);
 
@@ -246,7 +246,7 @@ function EspacioVideo({ tipo, video, subiendo, progreso, onElegir, onBorrar, onA
       {video && !subiendo ? (
         <>
           {noReproduce ? (
-            <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", px: 2.5, color: "#F5EDE3" }}>
+            <Box sx={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", px: 2.5, color: "#f5f1e4" }}>
               <ErrorOutlineRounded sx={{ fontSize: 30, color: T.goldLight }} />
               <Typography sx={{ fontFamily: T.font, fontSize: 12, mt: 0.8, lineHeight: 1.4 }}>
                 Este navegador no puede reproducir este formato (suele pasar con videos HEVC de iPhone).
@@ -277,7 +277,7 @@ function EspacioVideo({ tipo, video, subiendo, progreso, onElegir, onBorrar, onA
               <Tooltip key={titulo} title={titulo} arrow>
                 <IconButton size="small" onClick={accion} sx={{
                   width: 30, height: 30, color: "#fff", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)",
-                  "&:hover": { background: peligro ? "#C62828" : "rgba(0,0,0,0.7)" },
+                  "&:hover": { background: peligro ? "#9e3626" : "rgba(0,0,0,0.7)" },
                 }}>
                   <Icono sx={{ fontSize: 17 }} />
                 </IconButton>
@@ -451,10 +451,10 @@ function VisorComparar({ datos, onCerrar }) {
       PaperProps={{ sx: { width: "min(1400px, 96vw)", maxWidth: "96vw", borderRadius: "22px", overflow: "hidden", background: "#17110D" } }}>
       {t && (
         <Box sx={{ p: { xs: 1.5, sm: 2.5 } }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, color: "#F5EDE3" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, color: "#f5f1e4" }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontFamily: T.fontTitle, fontSize: 21, fontWeight: 600, color: "#F5EDE3" }} noWrap>{t.tratamiento_nombre}</Typography>
-              <Typography sx={{ fontFamily: T.font, fontSize: 12, opacity: 0.7, color: "#F5EDE3" }}>
+              <Typography sx={{ fontFamily: T.fontTitle, fontSize: 21, fontWeight: 600, color: "#f5f1e4" }} noWrap>{t.tratamiento_nombre}</Typography>
+              <Typography sx={{ fontFamily: T.font, fontSize: 12, opacity: 0.7, color: "#f5f1e4" }}>
                 {datos.paciente ? `${nombreCompleto(datos.paciente)} · ` : ""}{fechaBonita(t.fecha)}{t.sesion ? ` · Sesión ${t.sesion}` : ""}
               </Typography>
             </Box>
@@ -465,7 +465,7 @@ function VisorComparar({ datos, onCerrar }) {
                 {reproduciendo ? "Pausar ambos" : "Reproducir ambos"}
               </Button>
             )}
-            <IconButton onClick={onCerrar} sx={{ color: "#F5EDE3", "&:hover": { background: "rgba(255,255,255,0.1)" } }}>
+            <IconButton onClick={onCerrar} sx={{ color: "#f5f1e4", "&:hover": { background: "rgba(255,255,255,0.1)" } }}>
               <CloseRounded />
             </IconButton>
           </Box>
@@ -473,7 +473,7 @@ function VisorComparar({ datos, onCerrar }) {
             {tipos.map((tipo) => t[tipo] && (
               <Box key={tipo} sx={{ position: "relative", flex: 1, minWidth: 0, borderRadius: "14px", overflow: "hidden", background: "#000" }}>
                 <Box sx={{ position: "absolute", top: 12, left: 12, zIndex: 1, px: 1.2, py: 0.35, borderRadius: "999px",
-                  background: tipo === "antes" ? "rgba(62,39,35,0.85)" : `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, pointerEvents: "none" }}>
+                  background: tipo === "antes" ? "rgba(43,34,25,0.85)" : `linear-gradient(135deg, ${T.gold}, ${T.goldDark})`, pointerEvents: "none" }}>
                   <Typography sx={{ fontFamily: T.font, fontSize: 11, fontWeight: 800, letterSpacing: 0.8, color: "#fff" }}>
                     {tipo === "antes" ? "ANTES" : "DESPUÉS"}
                   </Typography>
@@ -636,7 +636,7 @@ export default function AntesDespues() {
   const TONOS = {
     dorado: { fuerte: T.gold, oscuro: T.goldDark, suave: T.goldSoft, sombra: "rgba(163,105,32,0.35)" },
     rojo: { fuerte: "#D9822B", oscuro: "#B5541B", suave: T.amberSoft, sombra: "rgba(181,84,27,0.35)" },
-    verde: { fuerte: "#43A047", oscuro: "#2E7D32", suave: T.greenSoft, sombra: "rgba(46,125,50,0.30)" },
+    verde: { fuerte: "#5f7f52", oscuro: "#4f6d44", suave: T.greenSoft, sombra: "rgba(79,109,68,0.30)" },
   };
 
   return (
@@ -868,7 +868,7 @@ export default function AntesDespues() {
             sx={{
               position: "fixed", bottom: 24, left: "50%", zIndex: 1500,
               display: "flex", alignItems: "center", gap: 1, px: 2.2, py: 1.2, borderRadius: "14px",
-              background: aviso.tipo === "ok" ? "#2E7D32" : "#C62828", color: "#fff",
+              background: aviso.tipo === "ok" ? "#4f6d44" : "#9e3626", color: "#fff",
               boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
             }}
           >

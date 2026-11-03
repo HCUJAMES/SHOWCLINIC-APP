@@ -404,7 +404,7 @@ const Paquetes = () => {
     <Box
       sx={{
         minHeight: "100vh",
-        backgroundColor: "#f5f5f5",
+        backgroundColor: "#f5f2ea",
         py: 3,
       }}
     >
@@ -461,7 +461,7 @@ const Paquetes = () => {
           <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Chip
               label={`${paquetes.length} paquete${paquetes.length !== 1 ? 's' : ''} registrado${paquetes.length !== 1 ? 's' : ''}`}
-              sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32", fontWeight: "bold" }}
+              sx={{ backgroundColor: "#eef2ea", color: "#4f6d44", fontWeight: "bold" }}
             />
           </Box>
           {canWrite && (
@@ -535,7 +535,7 @@ const Paquetes = () => {
                       <TableCell>{paquete.sesiones}</TableCell>
                       <TableCell>S/ {paquete.precio_regular?.toFixed(2)}</TableCell>
                       <TableCell>
-                        <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#2e7d32" }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: "bold", color: "#4f6d44" }}>
                           S/ {paquete.precio_paquete?.toFixed(2)}
                         </Typography>
                       </TableCell>
@@ -543,7 +543,7 @@ const Paquetes = () => {
                         <Chip
                           label={`${((paquete.precio_regular - paquete.precio_paquete) / paquete.precio_regular * 100).toFixed(1)}%`}
                           size="small"
-                          sx={{ backgroundColor: "#e8f5e9", color: "#2e7d32" }}
+                          sx={{ backgroundColor: "#eef2ea", color: "#4f6d44" }}
                         />
                       </TableCell>
                       <TableCell>
@@ -561,14 +561,14 @@ const Paquetes = () => {
                           onClick={(e) => { e.stopPropagation(); cambiarEstado(paquete); }}
                           disabled={!paquete || !paquete.id}
                           sx={{
-                            backgroundColor: (paquete?.estado || "activo") === "activo" ? "#e8f5e9" : "#ffebee",
-                            color: (paquete?.estado || "activo") === "activo" ? "#2e7d32" : "#c62828",
-                            borderColor: (paquete?.estado || "activo") === "activo" ? "#4caf50" : "#f44336",
+                            backgroundColor: (paquete?.estado || "activo") === "activo" ? "#eef2ea" : "#f8ebe7",
+                            color: (paquete?.estado || "activo") === "activo" ? "#4f6d44" : "#9e3626",
+                            borderColor: (paquete?.estado || "activo") === "activo" ? "#5f7f52" : "#c0533e",
                             "&:hover": {
                               backgroundColor: (paquete?.estado || "activo") === "activo" ? "#c8e6c9" : "#ffcdd2",
                             },
                             "&:disabled": {
-                              backgroundColor: "#f5f5f5",
+                              backgroundColor: "#f5f2ea",
                               color: "#999",
                               borderColor: "#ccc",
                             },
@@ -584,7 +584,7 @@ const Paquetes = () => {
                           {canWrite && (
                             <IconButton
                               size="small"
-                              sx={{ color: "#1976d2", mr: 1 }}
+                              sx={{ color: "#4f6b80", mr: 1 }}
                               onClick={(e) => { e.stopPropagation(); abrirModalEditar(paquete); }}
                               title="Editar paquete"
                             >
@@ -594,7 +594,7 @@ const Paquetes = () => {
                           {canDelete && (
                             <IconButton
                               size="small"
-                              sx={{ color: "#d32f2f" }}
+                              sx={{ color: "#b3412e" }}
                               onClick={(e) => { e.stopPropagation(); abrirConfirmarEliminar(paquete); }}
                               title="Eliminar paquete"
                             >
@@ -666,7 +666,7 @@ const Paquetes = () => {
         <DialogContent sx={{ p: 0 }}>
           <Grid container>
             {/* Columna izquierda - Información básica */}
-            <Grid item xs={12} md={6} sx={{ p: 4, borderRight: { md: "1px solid #e0e0e0" } }}>
+            <Grid item xs={12} md={6} sx={{ p: 4, borderRight: { md: "1px solid #e7dfd0" } }}>
               <Typography variant="h6" sx={{ mb: 3, color: "#a36920", fontWeight: "bold", display: "flex", alignItems: "center", gap: 1 }}>
                 📋 Información del Paquete
               </Typography>
@@ -712,7 +712,7 @@ const Paquetes = () => {
                       borderColor: "#a36920",
                       color: "#a36920",
                       "&:hover": {
-                        borderColor: "#8a541a",
+                        borderColor: "#8a5a1a",
                         backgroundColor: "rgba(163, 105, 32, 0.04)"
                       }
                     }}
@@ -727,7 +727,7 @@ const Paquetes = () => {
                   </Button>
 
                   {imagenPreview && (
-                    <Box sx={{ position: "relative", borderRadius: 2, overflow: "hidden", border: "2px solid #e0e0e0", maxWidth: "400px" }}>
+                    <Box sx={{ position: "relative", borderRadius: 2, overflow: "hidden", border: "2px solid #e7dfd0", maxWidth: "400px" }}>
                       <img
                         src={imagenPreview}
                         alt="Preview"
@@ -737,7 +737,7 @@ const Paquetes = () => {
                           maxHeight: "300px",
                           objectFit: "contain",
                           display: "block",
-                          backgroundColor: "#f5f5f5"
+                          backgroundColor: "#f5f2ea"
                         }}
                       />
                       <IconButton
@@ -746,10 +746,10 @@ const Paquetes = () => {
                           position: "absolute",
                           top: 8,
                           right: 8,
-                          backgroundColor: "rgba(211, 47, 47, 0.9)",
+                          backgroundColor: "rgba(179,65,46, 0.9)",
                           color: "white",
                           "&:hover": {
-                            backgroundColor: "rgba(211, 47, 47, 1)"
+                            backgroundColor: "rgba(179,65,46, 1)"
                           }
                         }}
                         size="small"
@@ -805,7 +805,7 @@ const Paquetes = () => {
                             mb: index < tratamientosSeleccionados.length - 1 ? 1.5 : 0,
                             backgroundColor: "white",
                             borderRadius: 2,
-                            border: "1px solid #e0e0e0",
+                            border: "1px solid #e7dfd0",
                           }}
                         >
                           <Box sx={{ 
@@ -835,7 +835,7 @@ const Paquetes = () => {
                           />
                           <IconButton
                             size="small"
-                            sx={{ color: "#d32f2f" }}
+                            sx={{ color: "#b3412e" }}
                             onClick={() => eliminarTratamiento(tratamiento.id)}
                           >
                             <Delete />
@@ -851,7 +851,7 @@ const Paquetes = () => {
                   <Box sx={{ 
                     p: 3, 
                     textAlign: "center", 
-                    backgroundColor: "#f5f5f5", 
+                    backgroundColor: "#f5f2ea", 
                     borderRadius: 2,
                     border: "2px dashed #ccc"
                   }}>
@@ -920,8 +920,8 @@ const Paquetes = () => {
                     p: 3, 
                     borderRadius: 3, 
                     background: Number(precioRegular) > 0 && Number(precioPaquete) > 0 && Number(precioPaquete) < Number(precioRegular)
-                      ? "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)"
-                      : "#e0e0e0",
+                      ? "linear-gradient(135deg, #5f7f52 0%, #66bb6a 100%)"
+                      : "#e7dfd0",
                     color: "white",
                     textAlign: "center",
                   }}>
@@ -940,7 +940,7 @@ const Paquetes = () => {
                     p: 2, 
                     borderRadius: 2, 
                     backgroundColor: "white",
-                    border: "1px solid #e0e0e0",
+                    border: "1px solid #e7dfd0",
                     textAlign: "center"
                   }}>
                     <Typography variant="h4" sx={{ fontWeight: "bold", color: "#a36920" }}>
@@ -1019,7 +1019,7 @@ const Paquetes = () => {
           </Grid>
         </DialogContent>
         
-        <DialogActions sx={{ p: 3, borderTop: "1px solid #e0e0e0", backgroundColor: "#fafafa" }}>
+        <DialogActions sx={{ p: 3, borderTop: "1px solid #e7dfd0", backgroundColor: "#fafafa" }}>
           <Button 
             onClick={() => setOpenModal(false)} 
             sx={{ color: "#666", px: 4, py: 1.5, borderRadius: 2 }}
@@ -1049,7 +1049,7 @@ const Paquetes = () => {
 
       {/* Modal de confirmación para eliminar */}
       <Dialog open={openConfirmarEliminar} onClose={() => setOpenConfirmarEliminar(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ backgroundColor: "#d32f2f", color: "white" }}>
+        <DialogTitle sx={{ backgroundColor: "#b3412e", color: "white" }}>
           Confirmar Eliminación
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -1057,12 +1057,12 @@ const Paquetes = () => {
             ¿Estás seguro de que deseas eliminar este paquete?
           </Typography>
           {paqueteEliminar && (
-            <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f5f5", borderRadius: 1 }}>
+            <Box sx={{ mt: 2, p: 2, backgroundColor: "#f5f2ea", borderRadius: 1 }}>
               <Typography variant="body2"><strong>Nombre:</strong> {paqueteEliminar.nombre}</Typography>
               <Typography variant="body2"><strong>Precio:</strong> S/ {paqueteEliminar.precio_paquete.toFixed(2)}</Typography>
             </Box>
           )}
-          <Typography sx={{ mt: 2, color: "#d32f2f", fontWeight: "bold" }}>
+          <Typography sx={{ mt: 2, color: "#b3412e", fontWeight: "bold" }}>
             Esta acción no se puede deshacer.
           </Typography>
         </DialogContent>
@@ -1074,8 +1074,8 @@ const Paquetes = () => {
             onClick={eliminarPaquete}
             variant="contained"
             sx={{
-              backgroundColor: "#d32f2f",
-              "&:hover": { backgroundColor: "#b71c1c" },
+              backgroundColor: "#b3412e",
+              "&:hover": { backgroundColor: "#86301f" },
             }}
           >
             Eliminar

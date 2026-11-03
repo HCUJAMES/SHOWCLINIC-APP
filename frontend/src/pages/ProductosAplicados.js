@@ -168,11 +168,11 @@ const ProductosAplicados = () => {
               width: 50,
               height: 50,
               borderRadius: "50%",
-              background: "linear-gradient(135deg, #B8860B 0%, #D4AF37 100%)",
+              background: "linear-gradient(135deg, #a36920 0%, #ba9a63 100%)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(184,134,11,0.3)",
+              boxShadow: "0 2px 8px rgba(163,105,32,0.3)",
             }}
           >
             <CalendarToday sx={{ color: "white", fontSize: 28 }} />
@@ -180,7 +180,7 @@ const ProductosAplicados = () => {
           <Box>
             <Typography
               sx={{
-                fontFamily: "'Cormorant Garamond', serif",
+                fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
                 fontWeight: 700,
                 fontSize: "1.8rem",
                 textTransform: "uppercase",
@@ -190,7 +190,7 @@ const ProductosAplicados = () => {
             >
               Productos Aplicados
             </Typography>
-            <Typography sx={{ fontFamily: "'DM Sans', sans-serif", fontSize: "0.9rem", color: "#8B7D6B" }}>
+            <Typography sx={{ fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", fontSize: "0.9rem", color: "#8B7D6B" }}>
               Historial de productos utilizados en tratamientos
             </Typography>
           </Box>
@@ -259,7 +259,7 @@ const ProductosAplicados = () => {
               startIcon={<Search />}
               onClick={cargarTratamientos}
               sx={{
-                backgroundColor: "#B8860B",
+                backgroundColor: "#a36920",
                 "&:hover": { backgroundColor: "#8a5a1a" },
                 fontWeight: 600,
                 boxShadow: "none",
@@ -283,10 +283,10 @@ const ProductosAplicados = () => {
               onClick={exportarExcel}
               disabled={tratamientosFiltrados.length === 0}
               sx={{
-                borderColor: "#B8860B",
-                color: "#B8860B",
+                borderColor: "#a36920",
+                color: "#a36920",
                 fontWeight: 600,
-                "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(184,134,11,0.08)" },
+                "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(163,105,32,0.08)" },
               }}
             >
               Exportar CSV
@@ -297,9 +297,9 @@ const ProductosAplicados = () => {
         {/* Tarjetas de resumen */}
         <Box sx={{ display: "flex", gap: 2, mt: 2.5, flexWrap: "wrap" }}>
           {[
-            { label: "Tratamientos", value: tratamientosFiltrados.length, color: "#2e7d32", bg: "rgba(76,175,80,0.12)" },
+            { label: "Tratamientos", value: tratamientosFiltrados.length, color: "#4f6d44", bg: "rgba(95,127,82,0.12)" },
             { label: "Códigos aplicados", value: totalCodigos, color: "#a36920", bg: "rgba(163,105,32,0.12)" },
-            { label: "Pacientes atendidos", value: pacientesUnicos, color: "#1565c0", bg: "rgba(33,150,243,0.12)" },
+            { label: "Pacientes atendidos", value: pacientesUnicos, color: "#4f6b80", bg: "rgba(95,127,150,0.12)" },
           ].map((stat) => (
             <Box
               key={stat.label}
@@ -368,7 +368,7 @@ const ProductosAplicados = () => {
             onClick={buscarPorCodigo}
             disabled={!codigoBusqueda.trim() || codigoLoading}
             sx={{
-              backgroundColor: "#B8860B",
+              backgroundColor: "#a36920",
               "&:hover": { backgroundColor: "#8a5a1a" },
               fontWeight: 600,
             }}
@@ -383,9 +383,9 @@ const ProductosAplicados = () => {
                 setCodigoResultados(null);
               }}
               sx={{
-                borderColor: "#B8860B",
-                color: "#B8860B",
-                "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(184,134,11,0.08)" },
+                borderColor: "#a36920",
+                color: "#a36920",
+                "&:hover": { borderColor: "#8a5a1a", backgroundColor: "rgba(163,105,32,0.08)" },
               }}
             >
               Limpiar
@@ -396,7 +396,7 @@ const ProductosAplicados = () => {
         {/* Resultados de la búsqueda por código */}
         {codigoLoading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-            <CircularProgress size={28} sx={{ color: "#B8860B" }} />
+            <CircularProgress size={28} sx={{ color: "#a36920" }} />
           </Box>
         ) : codigoResultados !== null ? (
           codigoResultados.length === 0 ? (
@@ -427,8 +427,8 @@ const ProductosAplicados = () => {
                         size="small"
                         sx={{
                           fontWeight: 600,
-                          backgroundColor: aplicado ? "rgba(76,175,80,0.15)" : "rgba(33,150,243,0.15)",
-                          color: aplicado ? "#2e7d32" : "#1565c0",
+                          backgroundColor: aplicado ? "rgba(95,127,82,0.15)" : "rgba(95,127,150,0.15)",
+                          color: aplicado ? "#4f6d44" : "#4f6b80",
                         }}
                       />
                     </Box>
@@ -480,7 +480,7 @@ const ProductosAplicados = () => {
       {/* Table */}
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
-          <CircularProgress sx={{ color: "#B8860B" }} />
+          <CircularProgress sx={{ color: "#a36920" }} />
         </Box>
       ) : (
         <TableContainer
@@ -530,7 +530,7 @@ const ProductosAplicados = () => {
                   <TableRow
                     key={t.id || idx}
                     sx={{
-                      "&:hover": { backgroundColor: "rgba(184,134,11,0.05)" },
+                      "&:hover": { backgroundColor: "rgba(163,105,32,0.05)" },
                       "&:nth-of-type(even)": { backgroundColor: "rgba(245,241,228,0.3)" },
                     }}
                   >
@@ -586,9 +586,9 @@ const ProductosAplicados = () => {
                           height: 22,
                           backgroundColor:
                             t.tipoAtencion === "urgencia"
-                              ? "rgba(244,67,54,0.15)"
-                              : "rgba(33,150,243,0.15)",
-                          color: t.tipoAtencion === "urgencia" ? "#c62828" : "#1565c0",
+                              ? "rgba(192,83,62,0.15)"
+                              : "rgba(95,127,150,0.15)",
+                          color: t.tipoAtencion === "urgencia" ? "#9e3626" : "#4f6b80",
                         }}
                       />
                     </TableCell>

@@ -77,7 +77,7 @@ export default function ReciboTicket({ open, onClose, datos }) {
               sx={{
                 fontWeight: 800,
                 fontSize: "1.2rem",
-                color: "#D4AF37",
+                color: "#ba9a63",
                 letterSpacing: 1,
                 fontFamily: "Arial, sans-serif",
               }}
@@ -179,7 +179,7 @@ export default function ReciboTicket({ open, onClose, datos }) {
               {descuento > 0 && (
                 <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem" }}>
                   <Typography sx={{ fontSize: "0.7rem" }}>Descuento:</Typography>
-                  <Typography sx={{ fontSize: "0.7rem", color: "#D4AF37" }}>
+                  <Typography sx={{ fontSize: "0.7rem", color: "#ba9a63" }}>
                     -{descuento}%
                   </Typography>
                 </Box>
@@ -213,7 +213,7 @@ export default function ReciboTicket({ open, onClose, datos }) {
                 sx={{
                   fontSize: "1.2rem",
                   fontWeight: 800,
-                  color: "#D4AF37",
+                  color: "#ba9a63",
                 }}
               >
                 S/ {Number(total || 0).toFixed(2)}
@@ -270,7 +270,7 @@ export default function ReciboTicket({ open, onClose, datos }) {
           variant="contained"
           startIcon={<Print />}
           sx={{
-            backgroundColor: "#D4AF37",
+            backgroundColor: "#ba9a63",
             "&:hover": { backgroundColor: "#B8941F" },
             fontWeight: 600,
           }}

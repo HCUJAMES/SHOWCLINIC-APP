@@ -18,7 +18,7 @@ const C = {
   primary: "#a36920",
   brown: "#5a3e1b",
   brownLight: "#ba9a63",
-  text: "#2E2E2E",
+  text: "#2b2219",
   muted: "#999",
   avatar: "#a36920",
 };
@@ -189,7 +189,7 @@ export default function SeguimientoPacientes() {
       <Typography sx={{ fontSize: 10, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", color: C.muted, mb: 0.5 }}>
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 28, fontWeight: 500, color: C.text, fontFamily: "'Cormorant Garamond', serif" }}>
+      <Typography sx={{ fontSize: 28, fontWeight: 500, color: C.text, fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif" }}>
         {value}
       </Typography>
     </Paper>
@@ -211,7 +211,7 @@ export default function SeguimientoPacientes() {
         {/* Title + Export */}
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 3 }}>
           <Box>
-            <Typography sx={{ fontSize: "1.85rem", fontWeight: 400, color: C.text, fontFamily: "'Cormorant Garamond', serif", lineHeight: 1.2 }}>
+            <Typography sx={{ fontSize: "1.85rem", fontWeight: 400, color: C.text, fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif", lineHeight: 1.2 }}>
               Seguimiento de pacientes
             </Typography>
             <Typography sx={{ fontSize: "0.85rem", color: C.muted, mt: 0.5 }}>
@@ -310,7 +310,7 @@ export default function SeguimientoPacientes() {
               const initials = getInitials(p.nombre, p.apellido);
               const fullName = `${p.nombre || ""} ${p.apellido || ""}`.trim();
               const colorTiempo =
-                p.tiempo.days >= 180 ? "#c62828" : p.tiempo.days >= 90 ? "#e65100" : C.brownLight;
+                p.tiempo.days >= 180 ? "#9e3626" : p.tiempo.days >= 90 ? "#a8612a" : C.brownLight;
 
               return (
                 <Paper
@@ -332,7 +332,7 @@ export default function SeguimientoPacientes() {
                     sx={{
                       width: 48, height: 48, mr: 2,
                       backgroundColor: C.avatar, fontSize: 16, fontWeight: 600,
-                      fontFamily: "'Inter', sans-serif",
+                      fontFamily: "'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                     }}
                   >
                     {initials}

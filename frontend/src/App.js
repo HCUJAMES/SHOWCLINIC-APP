@@ -28,24 +28,21 @@ const CodigosBarras = React.lazy(() => import("./pages/CodigosBarras"));
 const SeguimientoPacientes = React.lazy(() => import("./pages/SeguimientoPacientes"));
 const GestionDueno = React.lazy(() => import("./pages/GestionDueno"));
 
-// Spinner de carga mientras se descarga el chunk de la página
+// Pantalla de carga mientras se descarga el chunk de la página
 const PageLoader = () => (
   <div style={{
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     minHeight: "100vh",
-    background: "linear-gradient(rgba(255,255,255,0.9), rgba(232,211,57,0.3))",
+    background: "#faf8f1",
   }}>
-    <div style={{
-      width: 48,
-      height: 48,
-      border: "4px solid #e0c97a",
-      borderTop: "4px solid #a36920",
-      borderRadius: "50%",
-      animation: "spin 0.8s linear infinite",
-    }} />
-    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    <img
+      src="/brand/isotipo-arena.png"
+      alt=""
+      style={{ width: 64, height: 64, animation: "sc-latido 1.2s ease-in-out infinite" }}
+    />
+    <style>{`@keyframes sc-latido { 0%,100% { opacity: .45; transform: scale(.94) } 50% { opacity: 1; transform: scale(1) } }`}</style>
   </div>
 );
 

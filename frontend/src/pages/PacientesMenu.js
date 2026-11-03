@@ -112,9 +112,9 @@ export default function PacientesMenu() {
             sx={{
               fontSize: "2rem",
               fontWeight: 400,
-              color: "#2E2E2E",
+              color: "#2b2219",
               mb: 1,
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: "'The Amoret Collection Sans', 'Montserrat', sans-serif",
             }}
           >
             Pacientes
@@ -171,7 +171,7 @@ export default function PacientesMenu() {
                   sx={{
                     fontSize: "1rem",
                     fontWeight: 600,
-                    color: "#2E2E2E",
+                    color: "#2b2219",
                     mb: 0.8,
                     lineHeight: 1.3,
                   }}

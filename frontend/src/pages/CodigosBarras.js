@@ -420,8 +420,8 @@ export default function CodigosBarras() {
                       startIcon={<Print />}
                       onClick={imprimirStickers}
                       sx={{ 
-                        background: '#4caf50',
-                        '&:hover': { background: '#388e3c' }
+                        background: '#5f7f52',
+                        '&:hover': { background: '#4f6d44' }
                       }}
                     >
                       Imprimir en Xprinter (56mm x 30mm)

@@ -470,7 +470,7 @@ export default function CrearTratamiento() {
           borderRadius: 4,
           background:
             "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
-          border: "1px solid rgba(212,175,55,0.22)",
+          border: "1px solid rgba(186,154,99,0.22)",
           backdropFilter: "blur(10px)",
           zIndex: 1,
           width: "90%",
@@ -550,7 +550,7 @@ export default function CrearTratamiento() {
               variant="contained"
               sx={{
                 backgroundColor: colorPrincipal,
-                "&:hover": { backgroundColor: "#8a541a" },
+                "&:hover": { backgroundColor: "#8a5a1a" },
                 color: "white",
                 py: 1.2,
                 borderRadius: 3,
@@ -747,7 +747,7 @@ export default function CrearTratamiento() {
                         size="small"
                         onClick={() => eliminarTratamiento(t.id)}
                         title="Eliminar"
-                        sx={{ color: "#d32f2f" }}
+                        sx={{ color: "#b3412e" }}
                       >
                         <Delete fontSize="small" />
                       </IconButton>
@@ -758,7 +758,7 @@ export default function CrearTratamiento() {
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.3 }}>
-                        <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: "#1a1a1a" }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: "#2b2219" }}>
                           {t.nombre}
                         </Typography>
                         {t.procedimiento && (
@@ -770,11 +770,11 @@ export default function CrearTratamiento() {
                               fontSize: "0.65rem",
                               fontWeight: 700,
                               backgroundColor: t.procedimiento === "Armonización" ? "rgba(163,105,32,0.12)" :
-                                t.procedimiento === "Cosmiatría Facial" ? "rgba(76,175,80,0.12)" :
-                                "rgba(33,150,243,0.12)",
+                                t.procedimiento === "Cosmiatría Facial" ? "rgba(95,127,82,0.12)" :
+                                "rgba(95,127,150,0.12)",
                               color: t.procedimiento === "Armonización" ? "#a36920" :
-                                t.procedimiento === "Cosmiatría Facial" ? "#2e7d32" :
-                                "#1565c0",
+                                t.procedimiento === "Cosmiatría Facial" ? "#4f6d44" :
+                                "#4f6b80",
                             }}
                           />
                         )}
@@ -875,7 +875,7 @@ export default function CrearTratamiento() {
                     {/* Precio + Sesiones */}
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexShrink: 0 }}>
                       <Box sx={{ textAlign: "right" }}>
-                        <Typography sx={{ fontWeight: 800, fontSize: "0.88rem", color: "#1a1a1a" }}>
+                        <Typography sx={{ fontWeight: 800, fontSize: "0.88rem", color: "#2b2219" }}>
                           {t.precio != null && t.precio !== "" ? `S/ ${Number(t.precio).toFixed(2)}` : "—"}
                         </Typography>
                         <Typography sx={{ fontSize: "0.68rem", color: "#999" }}>
@@ -914,7 +914,7 @@ export default function CrearTratamiento() {
                             title="Eliminar"
                             sx={{
                               color: "#ccc",
-                              "&:hover": { color: "#d32f2f", backgroundColor: "rgba(211,47,47,0.06)" },
+                              "&:hover": { color: "#b3412e", backgroundColor: "rgba(179,65,46,0.06)" },
                             }}
                           >
                             <Delete fontSize="small" />
@@ -977,7 +977,7 @@ export default function CrearTratamiento() {
                   sx={{ 
                     backgroundColor: "rgba(163, 105, 32, 0.1)",
                     borderColor: colorPrincipal,
-                    "& .MuiChip-deleteIcon": { color: "#d32f2f" }
+                    "& .MuiChip-deleteIcon": { color: "#b3412e" }
                   }}
                   variant="outlined"
                 />
@@ -1020,11 +1020,11 @@ export default function CrearTratamiento() {
                         position: "absolute",
                         top: 2,
                         right: 2,
-                        backgroundColor: "rgba(211,47,47,0.85)",
+                        backgroundColor: "rgba(179,65,46,0.85)",
                         color: "white",
                         opacity: 0,
                         transition: "opacity 0.2s",
-                        "&:hover": { backgroundColor: "#d32f2f" },
+                        "&:hover": { backgroundColor: "#b3412e" },
                         padding: "2px",
                       }}
                     >
@@ -1108,7 +1108,7 @@ export default function CrearTratamiento() {
                   variant="contained"
                   startIcon={<Add />}
                   onClick={agregarProductoATratamiento}
-                  sx={{ backgroundColor: colorPrincipal, "&:hover": { backgroundColor: "#8a541a" }, height: 56 }}
+                  sx={{ backgroundColor: colorPrincipal, "&:hover": { backgroundColor: "#8a5a1a" }, height: 56 }}
                 >
                   Agregar
                 </Button>

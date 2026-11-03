@@ -95,7 +95,7 @@ const FotosPaciente = () => {
     <div
       style={{
         backgroundImage:
-          "linear-gradient(rgba(255,255,255,0.85), rgba(232,211,57,0.85)), url('/images/background-showclinic.jpg')",
+          "linear-gradient(rgba(255,255,255,0.85), rgba(186,154,99,0.85)), url('/images/background-showclinic.jpg')",
         backgroundSize: "cover",
         minHeight: "100vh",
         padding: "40px 20px",
@@ -108,10 +108,10 @@ const FotosPaciente = () => {
             borderRadius: "15px",
             background:
               "linear-gradient(180deg, rgba(255,249,236,0.98) 0%, rgba(255,255,255,0.92) 52%, rgba(247,234,193,0.55) 100%)",
-            border: "1px solid rgba(212,175,55,0.22)",
+            border: "1px solid rgba(186,154,99,0.22)",
             backdropFilter: "blur(10px)",
             boxShadow:
-              "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(212,175,55,0.10)",
+              "0 18px 46px rgba(0,0,0,0.14), 0 0 0 1px rgba(186,154,99,0.10)",
           }}
         >
           <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>

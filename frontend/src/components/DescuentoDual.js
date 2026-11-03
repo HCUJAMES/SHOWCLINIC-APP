@@ -212,7 +212,7 @@ export default function DescuentoDual({
                 backgroundColor: "transparent",
                 color: "#999",
                 border: "1px solid #e0d6c2",
-                "&:hover": { backgroundColor: "#f5f5f5", color: "#e53935" },
+                "&:hover": { backgroundColor: "#f5f2ea", color: "#b3412e" },
               }}
             />
           )}

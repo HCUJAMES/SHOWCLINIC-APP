@@ -4,20 +4,20 @@ const API = `${window.location.protocol}//${window.location.hostname}:4000`;
 
 // ─── Paleta ShowClinic ───
 const C = {
-  gold: "#C8A96E",
+  gold: "#ba9a63",
   goldDark: "#a36920",
-  brown: "#5D4037",
+  brown: "#5c3c12",
   cream: "#FFF8F0",
   white: "#FFFFFF",
-  green: "#4caf50",
-  greenDark: "#2e7d32",
+  green: "#5f7f52",
+  greenDark: "#4f6d44",
   blue: "#42a5f5",
   purple: "#9c63cf",
   muted: "#8B7D6B",
   border: "#E8DFD0",
 };
 
-const WEEK_BG = ["#FFFDE7", "#E8F5E9", "#E3F2FD", "#F3E5F5", "#FFF3E0", "#FCE4EC", "#E0F2F1", "#FFF8E1"];
+const WEEK_BG = ["#FFFDE7", "#eef2ea", "#E3F2FD", "#F3E5F5", "#f8efe0", "#FCE4EC", "#E0F2F1", "#FFF8E1"];
 const WEEK_BORDER = ["#f9e68c", "#a5d6a7", "#90caf9", "#ce93d8", "#ffcc80", "#f48fb1", "#80cbc4", "#ffe082"];
 
 const getInitials = (name) => {
@@ -346,7 +346,7 @@ const TreatmentCalendar = ({
             </span>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <button onClick={toggleEditMode} style={{ background: editMode ? "#e65100" : "transparent", color: editMode ? "#fff" : C.muted, border: `1px solid ${editMode ? "#e65100" : C.border}`, borderRadius: 8, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.2s" }}>
+            <button onClick={toggleEditMode} style={{ background: editMode ? "#a8612a" : "transparent", color: editMode ? "#fff" : C.muted, border: `1px solid ${editMode ? "#a8612a" : C.border}`, borderRadius: 8, padding: "6px 12px", fontWeight: 600, fontSize: 11, cursor: "pointer", transition: "all 0.2s" }}>
               {editMode ? "✓ Guardar" : "✏ Editar"}
             </button>
             {editMode && (
@@ -373,7 +373,7 @@ const TreatmentCalendar = ({
 
       {/* Connect mode instructions */}
       {connectMode && (
-        <div style={{ padding: "8px 24px", background: "rgba(200,169,110,0.08)", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ padding: "8px 24px", background: "rgba(186,154,99,0.08)", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 14 }}>⟡</span>
           <span style={{ fontSize: 11, color: C.gold, fontWeight: 600 }}>Haz clic en los nodos en el orden que deseas conectarlos. Clic de nuevo para quitar. Presiona "✓ Listo" al terminar.</span>
         </div>
@@ -474,7 +474,7 @@ const TreatmentCalendar = ({
                       onClick={(e) => { e.stopPropagation(); openModal(s); }}
                       style={{
                         display: "inline-flex", alignItems: "center", gap: 3,
-                        background: displayEsp ? "rgba(200,169,110,0.12)" : "rgba(0,0,0,0.04)",
+                        background: displayEsp ? "rgba(186,154,99,0.12)" : "rgba(0,0,0,0.04)",
                         border: `1px solid ${displayEsp ? C.gold : "rgba(0,0,0,0.08)"}`,
                         borderRadius: 10, padding: "2px 8px 2px 3px", cursor: "pointer",
                         maxWidth: 95, overflow: "hidden",
@@ -520,7 +520,7 @@ const TreatmentCalendar = ({
           onClick={closeModal}
           style={{
             position: "fixed", inset: 0, zIndex: 9999,
-            background: "rgba(93,64,55,0.3)", backdropFilter: "blur(4px)",
+            background: "rgba(92,60,18,0.3)", backdropFilter: "blur(4px)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
@@ -539,12 +539,12 @@ const TreatmentCalendar = ({
 
             {/* Status indicator */}
             {modalSesion.estado === "completada" ? (
-              <div style={{ background: "#e8f5e9", border: "1px solid rgba(76,175,80,0.3)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ background: "#eef2ea", border: "1px solid rgba(95,127,82,0.3)", borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 16 }}>✓</span>
                 <span style={{ fontWeight: 700, color: C.greenDark, fontSize: 13 }}>Completado</span>
               </div>
             ) : (
-              <div style={{ background: "rgba(200,169,110,0.08)", border: `1px solid ${C.gold}30`, borderRadius: 10, padding: "8px 14px", marginBottom: 14 }}>
+              <div style={{ background: "rgba(186,154,99,0.08)", border: `1px solid ${C.gold}30`, borderRadius: 10, padding: "8px 14px", marginBottom: 14 }}>
                 <span style={{ fontSize: 12, color: C.gold, fontWeight: 600 }}>
                   {especialistasPorSesion[`presupuesto_${modalSesion.id}`] ? "Especialista asignado" : "Selecciona un especialista"}
                 </span>
@@ -565,7 +565,7 @@ const TreatmentCalendar = ({
                       style={{
                         display: "flex", alignItems: "center", gap: 8,
                         padding: "8px 10px", borderRadius: 10, cursor: modalSesion.estado === "completada" ? "default" : "pointer",
-                        background: isSelected || isDoneEsp ? "rgba(200,169,110,0.15)" : "rgba(0,0,0,0.02)",
+                        background: isSelected || isDoneEsp ? "rgba(186,154,99,0.15)" : "rgba(0,0,0,0.02)",
                         border: `2px solid ${isSelected || isDoneEsp ? C.gold : "transparent"}`,
                         transition: "all 0.15s",
                       }}
@@ -595,7 +595,7 @@ const TreatmentCalendar = ({
                   disabled={!especialistasPorSesion[`presupuesto_${modalSesion.id}`]}
                   style={{
                     flex: 1, padding: "10px 0", border: "none", borderRadius: 10,
-                    background: especialistasPorSesion[`presupuesto_${modalSesion.id}`] ? C.green : "#e0e0e0",
+                    background: especialistasPorSesion[`presupuesto_${modalSesion.id}`] ? C.green : "#e7dfd0",
                     color: "#fff", fontWeight: 700, fontSize: 12, cursor: especialistasPorSesion[`presupuesto_${modalSesion.id}`] ? "pointer" : "not-allowed",
                   }}
                 >

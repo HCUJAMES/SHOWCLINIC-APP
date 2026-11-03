@@ -7,7 +7,7 @@
 export const COLORS = {
   PRIMARY: "#a36920",
   PRIMARY_RGB: [163, 105, 32],
-  PRIMARY_HOVER: "#8a541a",
+  PRIMARY_HOVER: "#8a5a1a",
   PRIMARY_LIGHT: "rgba(163,105,32,0.08)",
   PRIMARY_BORDER: "rgba(163,105,32,0.15)",
 };

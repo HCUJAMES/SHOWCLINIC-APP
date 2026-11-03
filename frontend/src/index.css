@@ -1,35 +1,58 @@
+/* Tipografía del imagotipo (Manual de Identidad ShowClinic 2025) */
 @font-face {
   font-family: 'The Amoret Collection Sans';
-  src: url('https://db.onlinewebfonts.com/t/38566e1fb22adb542cc0a4d11b7983f6.woff2') format('woff2'),
-    url('https://db.onlinewebfonts.com/t/38566e1fb22adb542cc0a4d11b7983f6.woff') format('woff'),
-    url('https://db.onlinewebfonts.com/t/38566e1fb22adb542cc0a4d11b7983f6.ttf') format('truetype');
+  src: url('./assets/fonts/AmoretSans.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
+:root {
+  --sc-oro: #a36920;
+  --sc-oro-oscuro: #8a5a1a;
+  --sc-arena: #ba9a63;
+  --sc-crema: #f5f1e4;
+  --sc-crema-clara: #faf8f1;
+  --sc-texto: #2b2219;
+  --sc-texto-suave: #6b5d4d;
+  --sc-font-titulo: 'The Amoret Collection Sans', 'Montserrat', sans-serif;
+  --sc-font-texto: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--sc-font-texto);
+  background-color: var(--sc-crema-clara);
+  color: var(--sc-texto);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
+/* Títulos: Amoret, como el imagotipo. Un Typography con component="h1"
+   pero otra variante decide su propia fuente. */
+h1:not(.MuiTypography-root),
+h2:not(.MuiTypography-root),
+h3:not(.MuiTypography-root),
+h4:not(.MuiTypography-root),
 .MuiTypography-h1,
 .MuiTypography-h2,
 .MuiTypography-h3,
-.MuiTypography-h4,
-.MuiTypography-h5,
-.MuiTypography-h6 {
-  font-family: 'Cormorant Garamond', Georgia, serif !important;
+.MuiTypography-h4 {
+  font-family: var(--sc-font-titulo) !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.04em;
 }
 
+/* Subtítulos: Montserrat seminegrita */
+h5:not(.MuiTypography-root),
+h6:not(.MuiTypography-root),
+.MuiTypography-h5,
+.MuiTypography-h6 {
+  font-family: var(--sc-font-texto);
+}
+
+/* Textos: Montserrat. Sin !important: así un título puesto a mano con
+   Amoret (fontFamily en sx) no queda pisado por la fuente de texto. */
 .MuiButton-root,
 .MuiInputBase-root,
 .MuiTableCell-root,
@@ -43,7 +66,7 @@ h6,
 .MuiTypography-subtitle2,
 .MuiTypography-caption,
 .MuiTypography-overline {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-family: var(--sc-font-texto);
 }
 
 code {
@@ -53,6 +76,41 @@ code {
 
 .nums,
 .font-numeric {
-  font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+  font-family: var(--sc-font-texto) !important;
   font-variant-numeric: tabular-nums;
+}
+
+/* Barra de desplazamiento discreta, en el tono de la marca */
+* {
+  scrollbar-color: rgba(163, 105, 32, 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(163, 105, 32, 0.28);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(163, 105, 32, 0.45);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+:focus-visible {
+  outline: 2px solid rgba(163, 105, 32, 0.55);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
