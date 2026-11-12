@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Typography, Tooltip } from "@mui/material";
 import { BRAND } from "../../brand";
-import { colorCita, suavizar, oscurecer } from "./colores";
+import { colorCita, textoSobre } from "./colores";
 import {
   hoy as hoyFn,
   ahoraMinutos,
@@ -95,20 +95,21 @@ function BloqueCita({ cita, tramo, dia, onAbrir, onIniciarArrastre, arrastrando 
         height: alto,
         left: `calc(${tramo.col * ancho}% + 2px)`,
         width: `calc(${ancho}% - 4px)`,
-        bgcolor: suavizar(color, 0.8),
-        borderLeft: `3px solid ${color}`,
+        // Igual que en Google Calendar: bloque del color del calendario, texto claro
+        bgcolor: color,
+        border: "1px solid #fff",
         borderRadius: "6px",
         px: 0.75,
         py: compacto ? 0.1 : 0.4,
         overflow: "hidden",
         cursor: "pointer",
-        color: oscurecer(color, 0.55),
+        color: textoSobre(color),
         boxShadow: arrastrando ? "0 6px 18px rgba(0,0,0,0.18)" : "none",
         opacity: arrastrando ? 0.85 : 1,
         zIndex: arrastrando ? 5 : 2,
         transition: "box-shadow .15s ease, filter .15s ease",
         userSelect: "none",
-        "&:hover": { filter: "brightness(0.97)", boxShadow: "0 2px 8px rgba(0,0,0,0.10)" },
+        "&:hover": { filter: "brightness(0.94)", boxShadow: "0 2px 8px rgba(0,0,0,0.18)" },
         "&:focus-visible": { outline: `2px solid ${BRAND.oro}`, outlineOffset: 1 },
       }}
     >
@@ -151,12 +152,28 @@ export default function VistaTiempo({ dias, citas, onCrear, onAbrir, onMover, on
 
   // Al abrir, se muestra desde la hora actual (si hoy está visible) o desde las 7:30
   const claveDias = dias.join(",");
-  const ajustadoACitas = useRef(false);
+  // Scroll automático: solo mientras la persona no haya movido la cuadrícula
+  const primeraAjustada = useRef(Infinity);
+  const usuarioMovio = useRef(false);
+  const scrollNuestro = useRef(false);
+  const ponerScroll = (px) => {
+    const el = scrollRef.current;
+    if (!el || Math.abs(el.scrollTop - px) < 1) return;
+    scrollNuestro.current = true;
+    el.scrollTop = px;
+  };
+  const alHacerScroll = () => {
+    if (scrollNuestro.current) {
+      scrollNuestro.current = false;
+      return;
+    }
+    usuarioMovio.current = true;
+  };
   useEffect(() => {
-    if (!scrollRef.current) return;
     const desde = dias.includes(hoy) ? Math.max(ahoraMinutos() - 90, 0) : 7.5 * 60;
-    scrollRef.current.scrollTop = desde * PX_MIN;
-    ajustadoACitas.current = false;
+    usuarioMovio.current = false;
+    primeraAjustada.current = Infinity;
+    ponerScroll(desde * PX_MIN);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claveDias]);
 
@@ -181,17 +198,20 @@ export default function VistaTiempo({ dias, citas, onCrear, onAbrir, onMover, on
   // Cuando llegan las citas, si la primera queda arriba de lo visible, se sube hasta ella
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || ajustadoACitas.current) return;
+    if (!el || usuarioMovio.current) return;
     const inicios = porDia.flat().map((t) => t.ini);
     if (!inicios.length) return;
-    ajustadoACitas.current = true;
     const primera = Math.min(...inicios);
-    if (primera * PX_MIN < el.scrollTop) el.scrollTop = Math.max(primera - 30, 0) * PX_MIN;
+    if (primera < primeraAjustada.current && primera * PX_MIN < el.scrollTop) {
+      ponerScroll(Math.max(primera - 30, 0) * PX_MIN);
+    }
+    primeraAjustada.current = Math.min(primeraAjustada.current, primera);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [porDia]);
 
   /* ───── Arrastrar para reprogramar (solo mouse) ───── */
   const iniciarArrastre = (e, cita, dia) => {
-    if (e.pointerType !== "mouse" || e.button !== 0 || !onMover) return;
+    if (e.pointerType !== "mouse" || e.button !== 0 || !onMover || cita.escribible === false) return;
     if (fechaDe(cita.inicio) !== fechaDe(cita.fin) && cita.fin.slice(11) !== "00:00") return; // varias fechas: solo desde el formulario
     const estado = { cita, dia, x0: e.clientX, y0: e.clientY, deltaMin: 0, deltaDia: 0, movido: false };
     arrastreRef.current = estado;
@@ -344,7 +364,7 @@ export default function VistaTiempo({ dias, citas, onCrear, onAbrir, onMover, on
                       onKeyDown={(e) => e.key === "Enter" && onAbrir(c)}
                       sx={{
                         bgcolor: color,
-                        color: "#fff",
+                        color: textoSobre(color),
                         borderRadius: "5px",
                         px: 0.75,
                         py: 0.2,
@@ -367,7 +387,7 @@ export default function VistaTiempo({ dias, citas, onCrear, onAbrir, onMover, on
       )}
 
       {/* Cuadrícula de horas */}
-      <Box ref={scrollRef} sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
+      <Box ref={scrollRef} onScroll={alHacerScroll} sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
         <Box sx={{ display: "flex", position: "relative", height: 24 * HORA_PX }}>
           {/* Horas */}
           <Box sx={{ width: GUTTER, flexShrink: 0, position: "relative" }}>

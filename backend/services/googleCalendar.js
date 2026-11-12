@@ -2,24 +2,23 @@
  * GOOGLE CALENDAR
  * ===============
  *
- * La clínica usa una sola cuenta de Google Calendar que todo el equipo ve en
- * sus celulares. El sistema se conecta a ESE MISMO calendario mediante una
- * "cuenta de servicio" de Google (un usuario-robot):
+ * La clínica usa la cuenta de Google showclinicyanahuara@gmail.com con VARIOS
+ * calendarios (uno por especialista: "Dra. Alicia Paez", "Carla Vargas", …),
+ * cada uno con su color. ShowClinic lee todos esos calendarios y los muestra
+ * juntos, con los mismos colores que se ven en Google.
  *
- *   1. En Google Cloud se crea la cuenta de servicio y se descarga su llave JSON.
- *   2. El calendario de la clínica se comparte con el correo de esa cuenta,
- *      con permiso "Hacer cambios en eventos".
- *   3. En ShowClinic (Agenda → Configurar) se sube el JSON y el ID del calendario.
+ * Dos formas de conectarse (se configura una sola vez en Agenda → ⚙️):
  *
- * Se eligió cuenta de servicio y no "Iniciar sesión con Google" porque el
- * servidor vive en la red local de la clínica: Google no acepta redirecciones
- * de login a una IP local, y la cuenta de servicio no caduca ni pide volver a
- * iniciar sesión.
+ *  - "oauth" (recomendada): se inicia sesión con la cuenta de la clínica desde
+ *    la computadora servidor. El sistema ve todos sus calendarios con sus
+ *    colores, y los calendarios nuevos aparecen solos.
+ *  - "service_account": un usuario-robot de Google al que se le comparte cada
+ *    calendario. Se mantiene por compatibilidad con la primera versión.
  *
- * No usa librerías nuevas: firma el token con jsonwebtoken y llama a la API
- * REST con axios (ambas ya instaladas).
+ * No usa librerías nuevas: tokens con jsonwebtoken/axios y la API REST.
  */
 
+import crypto from "crypto";
 import axios from "axios";
 import jwt from "jsonwebtoken";
 import { dbAll, dbGet, dbRun } from "../db/database.js";
@@ -31,6 +30,10 @@ const OFFSET = "-05:00";
 const API_BASE = process.env.GOOGLE_CALENDAR_API_BASE || "https://www.googleapis.com/calendar/v3";
 const SCOPE = "https://www.googleapis.com/auth/calendar";
 const TIMEOUT = 20000;
+const PARALELO = 5; // consultas simultáneas a Google
+
+export const redirectUriOAuth = () =>
+  process.env.GOOGLE_OAUTH_REDIRECT || `http://localhost:${process.env.PORT || 4000}/api/calendario/oauth/callback`;
 
 /* ─────────────────────────── Configuración ─────────────────────────── */
 
@@ -51,6 +54,14 @@ export const asegurarTabla = () => {
   return tablaLista;
 };
 
+const parsear = (texto, porDefecto = null) => {
+  try {
+    return texto ? JSON.parse(texto) : porDefecto;
+  } catch {
+    return porDefecto;
+  }
+};
+
 let cacheConfig = null;
 
 export const leerConfig = async () => {
@@ -59,16 +70,17 @@ export const leerConfig = async () => {
   const filas = await dbAll("SELECT clave, valor FROM google_calendar_config");
   const obj = {};
   filas.forEach((f) => (obj[f.clave] = f.valor));
-  let credenciales = null;
-  try {
-    credenciales = obj.service_account ? JSON.parse(obj.service_account) : null;
-  } catch {
-    credenciales = null;
-  }
+  const credenciales = parsear(obj.service_account);
+  const cliente = parsear(obj.oauth_cliente);
+  const modo = obj.modo || (credenciales ? "service_account" : null);
   cacheConfig = {
+    modo,
     credenciales,
-    calendarId: obj.calendar_id || null,
-    calendarNombre: obj.calendar_nombre || null,
+    cliente,
+    refreshToken: obj.oauth_refresh || null,
+    cuenta: obj.cuenta || credenciales?.client_email || null,
+    calendarId: obj.calendar_id || null, // calendario predeterminado para citas nuevas
+    preferencias: parsear(obj.calendarios_pref, {}) || {},
     conectadoEn: obj.conectado_en || null,
   };
   return cacheConfig;
@@ -81,26 +93,27 @@ const guardarClave = (clave, valor) =>
     [clave, valor]
   );
 
-export const guardarConfig = async ({ credenciales, calendarId, calendarNombre }) => {
-  await asegurarTabla();
-  await guardarClave("service_account", JSON.stringify(credenciales));
-  await guardarClave("calendar_id", calendarId);
-  await guardarClave("calendar_nombre", calendarNombre || "");
-  await guardarClave("conectado_en", fechaHoraLima(new Date()));
+const borrarClave = (clave) => dbRun("DELETE FROM google_calendar_config WHERE clave = ?", [clave]);
+
+const olvidarCaches = () => {
   cacheConfig = null;
   tokenCache = null;
+  cacheCalendarios = null;
 };
 
 export const borrarConfig = async () => {
   await asegurarTabla();
-  await dbRun("DELETE FROM google_calendar_config");
-  cacheConfig = null;
-  tokenCache = null;
+  // Las preferencias de calendarios (colores, especialistas) se conservan
+  // por si se vuelve a conectar la misma cuenta.
+  await dbRun("DELETE FROM google_calendar_config WHERE clave <> 'calendarios_pref'");
+  olvidarCaches();
 };
 
 export const estaConfigurado = async () => {
   const c = await leerConfig();
-  return Boolean(c.credenciales && c.calendarId);
+  if (c.modo === "oauth") return Boolean(c.cliente && c.refreshToken);
+  if (c.modo === "service_account") return Boolean(c.credenciales);
+  return false;
 };
 
 /** Revisa que el JSON subido sea una llave de cuenta de servicio válida. */
@@ -115,6 +128,31 @@ export const validarCredenciales = (cred) => {
   return null;
 };
 
+/** Acepta el JSON del "ID de cliente de OAuth" tal como lo descarga Google. */
+export const leerClienteOAuth = (json) => {
+  const c = json?.web || json?.installed || json;
+  if (!c || typeof c !== "object" || !c.client_id || !c.client_secret) {
+    return {
+      error:
+        'Ese archivo no es un "ID de cliente de OAuth". En Google Cloud → Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web, y descarga el JSON.',
+    };
+  }
+  if (json?.installed) {
+    return {
+      error:
+        'El cliente de OAuth es de tipo "Aplicación de escritorio". Crea uno de tipo "Aplicación web" con el URI de redirección indicado en la guía.',
+    };
+  }
+  return {
+    cliente: {
+      client_id: c.client_id,
+      client_secret: c.client_secret,
+      auth_uri: c.auth_uri || "https://accounts.google.com/o/oauth2/auth",
+      token_uri: c.token_uri || "https://oauth2.googleapis.com/token",
+    },
+  };
+};
+
 /* ─────────────────────────── Errores legibles ─────────────────────────── */
 
 export class ErrorGoogle extends Error {
@@ -124,7 +162,7 @@ export class ErrorGoogle extends Error {
   }
 }
 
-const traducirError = (err, email) => {
+const traducirError = (err, cfg) => {
   if (err instanceof ErrorGoogle) return err;
   const res = err.response;
   if (!res) {
@@ -139,10 +177,13 @@ const traducirError = (err, email) => {
   const data = res.data || {};
   const razon = data?.error?.errors?.[0]?.reason || data?.error?.status || data?.error || "";
   const msgGoogle = data?.error?.message || data?.error_description || "";
+  const oauth = cfg?.modo === "oauth";
 
   if (razon === "invalid_grant" || razon === "invalid_client" || status === 401)
     return new ErrorGoogle(
-      "Google rechazó las credenciales. Es posible que la llave haya sido eliminada en Google Cloud: vuelve a conectar el calendario con una llave nueva.",
+      oauth
+        ? "La sesión de Google se cerró o fue revocada. Un administrador debe entrar a Agenda → ⚙️ y volver a iniciar sesión con Google."
+        : "Google rechazó las credenciales. Es posible que la llave haya sido eliminada en Google Cloud: vuelve a conectar con una llave nueva.",
       502
     );
   if (razon === "accessNotConfigured" || /has not been used|is disabled/i.test(msgGoogle))
@@ -152,7 +193,9 @@ const traducirError = (err, email) => {
     );
   if (status === 404)
     return new ErrorGoogle(
-      `No se encontró el calendario o la cita. Verifica el ID del calendario y que esté compartido con ${email || "la cuenta de servicio"}.`,
+      oauth
+        ? "No se encontró el calendario o la cita en Google Calendar."
+        : `No se encontró el calendario o la cita. Verifica que el calendario esté compartido con ${cfg?.cuenta || "la cuenta de servicio"}.`,
       404
     );
   if (status === 410) return new ErrorGoogle("Esa cita ya fue eliminada en Google Calendar.", 410);
@@ -160,7 +203,9 @@ const traducirError = (err, email) => {
     return new ErrorGoogle("Google está limitando las consultas. Espera un momento y vuelve a intentar.", 429);
   if (status === 403)
     return new ErrorGoogle(
-      `El sistema no tiene permiso para modificar el calendario. Compártelo con ${email || "la cuenta de servicio"} con el permiso "Hacer cambios en eventos".`,
+      oauth
+        ? "La cuenta de Google conectada no tiene permiso para modificar ese calendario."
+        : `El sistema no tiene permiso para modificar el calendario. Compártelo con ${cfg?.cuenta || "la cuenta de servicio"} con el permiso "Hacer cambios en eventos".`,
       403
     );
   if (status === 400)
@@ -170,47 +215,59 @@ const traducirError = (err, email) => {
 
 /* ─────────────────────────── Token de acceso ─────────────────────────── */
 
-let tokenCache = null; // { token, vence, email }
+let tokenCache = null; // { token, vence, clave }
 
-const obtenerToken = async (credenciales) => {
+const postFormulario = (url, campos) =>
+  axios.post(url, new URLSearchParams(campos).toString(), {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    timeout: TIMEOUT,
+  });
+
+const obtenerToken = async (cfg) => {
   const ahora = Math.floor(Date.now() / 1000);
-  if (tokenCache && tokenCache.email === credenciales.client_email && tokenCache.vence - 120 > ahora) {
-    return tokenCache.token;
-  }
-  const tokenUri = credenciales.token_uri || "https://oauth2.googleapis.com/token";
-  let firmado;
+  const clave = cfg.modo === "oauth" ? `oauth:${cfg.refreshToken}` : `sa:${cfg.credenciales?.client_email}`;
+  if (tokenCache && tokenCache.clave === clave && tokenCache.vence - 120 > ahora) return tokenCache.token;
+
+  let data;
   try {
-    firmado = jwt.sign(
-      { iss: credenciales.client_email, scope: SCOPE, aud: tokenUri, iat: ahora, exp: ahora + 3600 },
-      credenciales.private_key,
-      { algorithm: "RS256" }
-    );
-  } catch {
-    throw new ErrorGoogle("La llave privada del archivo JSON no es válida. Descárgala de nuevo desde Google Cloud.", 400);
-  }
-  try {
-    const { data } = await axios.post(
-      tokenUri,
-      new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: firmado }).toString(),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: TIMEOUT }
-    );
-    tokenCache = {
-      token: data.access_token,
-      vence: ahora + Number(data.expires_in || 3600),
-      email: credenciales.client_email,
-    };
-    return data.access_token;
+    if (cfg.modo === "oauth") {
+      ({ data } = await postFormulario(cfg.cliente.token_uri, {
+        grant_type: "refresh_token",
+        refresh_token: cfg.refreshToken,
+        client_id: cfg.cliente.client_id,
+        client_secret: cfg.cliente.client_secret,
+      }));
+    } else {
+      const cred = cfg.credenciales;
+      const tokenUri = cred.token_uri || "https://oauth2.googleapis.com/token";
+      let firmado;
+      try {
+        firmado = jwt.sign(
+          { iss: cred.client_email, scope: SCOPE, aud: tokenUri, iat: ahora, exp: ahora + 3600 },
+          cred.private_key,
+          { algorithm: "RS256" }
+        );
+      } catch {
+        throw new ErrorGoogle("La llave privada del archivo JSON no es válida. Descárgala de nuevo desde Google Cloud.", 400);
+      }
+      ({ data } = await postFormulario(tokenUri, {
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: firmado,
+      }));
+    }
   } catch (err) {
-    throw traducirError(err, credenciales.client_email);
+    throw traducirError(err, cfg);
   }
+  tokenCache = { token: data.access_token, vence: ahora + Number(data.expires_in || 3600), clave };
+  return data.access_token;
 };
 
 /** Llamada genérica a la API con la configuración indicada (o la guardada). */
 const llamar = async (metodo, ruta, { params, data, config } = {}) => {
   const cfg = config || (await leerConfig());
-  if (!cfg.credenciales || !cfg.calendarId)
-    throw new ErrorGoogle("Google Calendar todavía no está conectado.", 409);
-  const token = await obtenerToken(cfg.credenciales);
+  const listo = cfg.modo === "oauth" ? cfg.cliente && cfg.refreshToken : cfg.credenciales;
+  if (!listo) throw new ErrorGoogle("Google Calendar todavía no está conectado.", 409);
+  const token = await obtenerToken(cfg);
   const intentar = () =>
     axios({
       method: metodo,
@@ -221,23 +278,113 @@ const llamar = async (metodo, ruta, { params, data, config } = {}) => {
       timeout: TIMEOUT,
     });
   try {
-    const res = await intentar();
-    return res.data;
+    return (await intentar()).data;
   } catch (err) {
     // Un error pasajero de Google (5xx) se reintenta una vez.
     if (err.response && err.response.status >= 500) {
       try {
-        const res = await intentar();
-        return res.data;
+        return (await intentar()).data;
       } catch (err2) {
-        throw traducirError(err2, cfg.credenciales.client_email);
+        throw traducirError(err2, cfg);
       }
     }
-    throw traducirError(err, cfg.credenciales.client_email);
+    throw traducirError(err, cfg);
   }
 };
 
 const enc = encodeURIComponent;
+
+/** Ejecuta tareas con un máximo de N a la vez. */
+const enParalelo = async (items, fn, n = PARALELO) => {
+  const resultados = new Array(items.length);
+  let i = 0;
+  const trabajador = async () => {
+    while (i < items.length) {
+      const k = i++;
+      try {
+        resultados[k] = { ok: true, valor: await fn(items[k], k) };
+      } catch (error) {
+        resultados[k] = { ok: false, error };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, trabajador));
+  return resultados;
+};
+
+/* ─────────────────────────── Inicio de sesión con Google ─────────────────────────── */
+
+const solicitudesOAuth = new Map(); // state → { cliente, volverA, vence }
+
+export const iniciarOAuth = ({ cliente, volverA }) => {
+  const ahora = Date.now();
+  for (const [k, v] of solicitudesOAuth) if (v.vence < ahora) solicitudesOAuth.delete(k);
+  const state = crypto.randomBytes(24).toString("hex");
+  solicitudesOAuth.set(state, { cliente, volverA, vence: ahora + 15 * 60 * 1000 });
+  const params = new URLSearchParams({
+    client_id: cliente.client_id,
+    redirect_uri: redirectUriOAuth(),
+    response_type: "code",
+    scope: SCOPE,
+    access_type: "offline",
+    prompt: "consent", // asegura que Google entregue el permiso permanente
+    include_granted_scopes: "true",
+    state,
+  });
+  return `${cliente.auth_uri}?${params.toString()}`;
+};
+
+export const volverADe = (state) => solicitudesOAuth.get(state)?.volverA || null;
+
+export const completarOAuth = async ({ code, state }) => {
+  const solicitud = solicitudesOAuth.get(state);
+  if (!solicitud || solicitud.vence < Date.now()) {
+    throw new ErrorGoogle("El inicio de sesión con Google expiró. Vuelve a intentarlo desde la Agenda.", 400);
+  }
+  solicitudesOAuth.delete(state);
+  const { cliente } = solicitud;
+  let tokens;
+  try {
+    ({ data: tokens } = await postFormulario(cliente.token_uri, {
+      grant_type: "authorization_code",
+      code,
+      client_id: cliente.client_id,
+      client_secret: cliente.client_secret,
+      redirect_uri: redirectUriOAuth(),
+    }));
+  } catch (err) {
+    const msg = err.response?.data?.error_description || err.response?.data?.error || "";
+    if (/redirect_uri/i.test(msg)) {
+      throw new ErrorGoogle(
+        `Google no reconoce el URI de redirección. En el cliente de OAuth agrega exactamente: ${redirectUriOAuth()}`,
+        400
+      );
+    }
+    throw traducirError(err, { modo: "oauth" });
+  }
+  if (!tokens.refresh_token) {
+    throw new ErrorGoogle(
+      "Google no entregó el permiso permanente. Entra a myaccount.google.com/permissions, quita el acceso de la app ShowClinic y vuelve a iniciar sesión.",
+      400
+    );
+  }
+  const config = { modo: "oauth", cliente, refreshToken: tokens.refresh_token };
+  tokenCache = null;
+  // El calendario principal tiene como ID el correo de la cuenta.
+  const principal = await llamar("get", "/calendars/primary", { config });
+
+  await asegurarTabla();
+  const actual = await leerConfig();
+  await guardarClave("modo", "oauth");
+  await guardarClave("oauth_cliente", JSON.stringify(cliente));
+  await guardarClave("oauth_refresh", tokens.refresh_token);
+  await guardarClave("cuenta", principal.id);
+  if (!actual.calendarId || actual.modo !== "oauth") await guardarClave("calendar_id", principal.id);
+  await guardarClave("conectado_en", fechaHoraLima(new Date()));
+  await borrarClave("service_account");
+  olvidarCaches();
+  return { cuenta: principal.id };
+};
 
 /* ─────────────────────────── Fechas ─────────────────────────── */
 
@@ -263,7 +410,69 @@ export const esFechaHora = (s) => typeof s === "string" && RE_FECHA_HORA.test(s)
 /** "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm" (hora Lima) → RFC3339 para Google. */
 const aRFC3339 = (s) => (s.length === 10 ? `${s}T00:00:00${OFFSET}` : `${s}:00${OFFSET}`);
 
-/* ─────────────────────────── Vínculo con pacientes ─────────────────────────── */
+const finExclusivo = (ymd) => {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
+/* ─────────────────────────── Colores (iguales a Google) ─────────────────────────── */
+
+/**
+ * La API devuelve el color de cada calendario con la paleta ANTIGUA de Google
+ * (por ejemplo "#9fe1e7"), pero la web de Google Calendar los dibuja con la
+ * paleta actual ("Pavo real" #039be5). Se traduce para que se vean idénticos.
+ * Un color personalizado (que no está en la tabla) se usa tal cual.
+ */
+const PALETA_CALENDARIO = {
+  "#ac725e": "#795548", // Cacao
+  "#d06b64": "#e67c73", // Flamenco
+  "#f83a22": "#d50000", // Tomate
+  "#fa573c": "#f4511e", // Mandarina
+  "#ff7537": "#ef6c00", // Calabaza
+  "#ffad46": "#f09300", // Mango
+  "#42d692": "#009688", // Eucalipto
+  "#16a765": "#0b8043", // Albahaca
+  "#7bd148": "#7cb342", // Pistacho
+  "#b3dc6c": "#c0ca33", // Aguacate
+  "#fbe983": "#e4c441", // Citrón
+  "#fad165": "#f6bf26", // Plátano
+  "#92e1c0": "#33b679", // Salvia
+  "#9fe1e7": "#039be5", // Pavo real
+  "#9fc6e7": "#4285f4", // Cobalto
+  "#4986e7": "#3f51b5", // Arándano
+  "#9a9cff": "#7986cb", // Lavanda
+  "#b99aff": "#b39ddb", // Glicina
+  "#c2c2c2": "#616161", // Grafito
+  "#cabdbf": "#a79b8e", // Abedul
+  "#cca6ac": "#ad1457", // Radicchio
+  "#f691b2": "#d81b60", // Flor de cerezo
+  "#cd74e6": "#8e24aa", // Uva
+  "#a47ae2": "#9e69af", // Amatista
+};
+
+/** Colores propios de una cita (cuando en Google le eligen un color distinto al del calendario). */
+const PALETA_EVENTO = {
+  1: "#7986cb", // Lavanda
+  2: "#33b679", // Salvia
+  3: "#8e24aa", // Uva
+  4: "#e67c73", // Flamenco
+  5: "#f6bf26", // Plátano
+  6: "#f4511e", // Mandarina
+  7: "#039be5", // Pavo real
+  8: "#616161", // Grafito
+  9: "#3f51b5", // Arándano
+  10: "#0b8043", // Albahaca
+  11: "#d50000", // Tomate
+};
+
+const ORO = "#a36920";
+const colorActual = (hex) => {
+  const h = String(hex || "").toLowerCase();
+  return PALETA_CALENDARIO[h] || (/^#[0-9a-f]{6}$/.test(h) ? h : null);
+};
+
+/* ─────────────────────────── Texto y especialistas ─────────────────────────── */
 
 const normalizar = (s) =>
   String(s || "")
@@ -276,6 +485,195 @@ const normalizar = (s) =>
 
 const soloDigitos = (s) => String(s || "").replace(/\D/g, "");
 
+const TITULOS = new Set(["dr", "dra", "doctor", "doctora", "lic", "licenciada", "licenciado", "de", "del", "la", "y"]);
+const palabrasNombre = (s) => normalizar(s).split(" ").filter((p) => p.length > 1 && !TITULOS.has(p));
+
+/**
+ * ¿Este calendario es de este especialista? Compara las palabras del nombre:
+ * "Dr. Erickson Espetia" ↔ "Dr. Erick Espetia", "DRA edith Carpio" ↔ "Dra. Edith Carpio".
+ */
+const puntaje = (nombreCal, nombreEsp) => {
+  const a = palabrasNombre(nombreCal);
+  const b = palabrasNombre(nombreEsp);
+  if (!a.length || !b.length) return 0;
+  const usadas = new Set();
+  let coinciden = 0;
+  for (const x of a) {
+    const j = b.findIndex(
+      (y, k) => !usadas.has(k) && (x === y || (Math.min(x.length, y.length) >= 4 && (x.startsWith(y) || y.startsWith(x))))
+    );
+    if (j >= 0) {
+      usadas.add(j);
+      coinciden++;
+    }
+  }
+  if (coinciden >= 2 || (coinciden === 1 && a.length === 1 && b.length === 1)) return coinciden / Math.max(a.length, b.length);
+  return 0;
+};
+
+const cargarEspecialistas = async () => {
+  try {
+    return await dbAll("SELECT id, nombre FROM especialistas");
+  } catch {
+    return [];
+  }
+};
+
+/* ─────────────────────────── Calendarios ─────────────────────────── */
+
+let cacheCalendarios = null; // { lista, creado }
+
+const esEspecial = (id) => /#(contacts|holiday|weeknum)@|@import\.calendar\.google\.com$/.test(id);
+
+/**
+ * Todos los calendarios de la cuenta, con el color de Google, el especialista
+ * al que pertenecen y si se muestran en ShowClinic.
+ */
+export const listarCalendarios = async ({ forzar = false } = {}) => {
+  if (!forzar && cacheCalendarios && Date.now() - cacheCalendarios.creado < 2 * 60 * 1000) {
+    return cacheCalendarios.lista;
+  }
+  const cfg = await leerConfig();
+  const items = [];
+  let pageToken;
+  let vueltas = 0;
+  do {
+    const data = await llamar("get", "/users/me/calendarList", {
+      params: { maxResults: 250, showHidden: true, pageToken },
+    });
+    items.push(...(data.items || []));
+    pageToken = data.nextPageToken;
+    vueltas++;
+  } while (pageToken && vueltas < 10);
+
+  const especialistas = await cargarEspecialistas();
+  const prefs = cfg.preferencias || {};
+
+  const lista = items
+    .filter((c) => !c.deleted)
+    .map((c) => {
+      const pref = prefs[c.id] || {};
+      const nombre = c.summaryOverride || c.summary || c.id;
+      const colorGoogle = colorActual(c.backgroundColor) || ORO;
+      // Especialista: el elegido a mano o, si no, el que coincide por nombre
+      let especialistaId = pref.especialistaId === undefined ? undefined : pref.especialistaId;
+      let especialistaAuto = false;
+      if (especialistaId === undefined) {
+        let mejor = null;
+        let mejorPuntaje = 0;
+        let empate = false;
+        for (const e of especialistas) {
+          const p = puntaje(nombre, e.nombre);
+          if (p > mejorPuntaje) {
+            mejor = e;
+            mejorPuntaje = p;
+            empate = false;
+          } else if (p > 0 && p === mejorPuntaje) empate = true;
+        }
+        especialistaId = mejor && !empate ? mejor.id : null;
+        especialistaAuto = Boolean(especialistaId);
+      }
+      const esp = especialistas.find((e) => e.id === especialistaId);
+      const escribible = c.accessRole === "owner" || c.accessRole === "writer";
+      return {
+        id: c.id,
+        nombre,
+        color: pref.color || colorGoogle,
+        colorGoogle,
+        colorPropio: Boolean(pref.color),
+        rol: c.accessRole,
+        escribible,
+        principal: Boolean(c.primary),
+        // Por defecto se muestran los mismos que están marcados en Google
+        visible: pref.visible === undefined ? Boolean(c.selected) && !esEspecial(c.id) : Boolean(pref.visible),
+        especialistaId: especialistaId || null,
+        especialistaNombre: esp?.nombre || null,
+        especialistaAuto,
+      };
+    })
+    .sort((a, b) => Number(b.principal) - Number(a.principal) || a.nombre.localeCompare(b.nombre, "es"));
+
+  cacheCalendarios = { lista, creado: Date.now() };
+  return lista;
+};
+
+export const guardarPreferencias = async ({ preferencias, predeterminado }) => {
+  await asegurarTabla();
+  const calendarios = await listarCalendarios({ forzar: true });
+  const ids = new Set(calendarios.map((c) => c.id));
+  const limpias = {};
+  for (const [id, p] of Object.entries(preferencias || {})) {
+    if (!ids.has(id) || !p || typeof p !== "object") continue;
+    const r = {};
+    if (typeof p.visible === "boolean") r.visible = p.visible;
+    if (p.especialistaId === null || Number.isInteger(p.especialistaId)) r.especialistaId = p.especialistaId;
+    if (typeof p.color === "string" && /^#[0-9a-f]{6}$/i.test(p.color)) r.color = p.color.toLowerCase();
+    limpias[id] = r;
+  }
+  await guardarClave("calendarios_pref", JSON.stringify(limpias));
+  if (predeterminado) {
+    const cal = calendarios.find((c) => c.id === predeterminado);
+    if (!cal) throw new ErrorGoogle("El calendario predeterminado no existe.", 400);
+    if (!cal.escribible) throw new ErrorGoogle("El calendario predeterminado debe permitir agregar citas.", 400);
+    await guardarClave("calendar_id", predeterminado);
+  }
+  olvidarCaches();
+  return listarCalendarios({ forzar: true });
+};
+
+/** Solo en modo cuenta de servicio: agrega un calendario que ya fue compartido. */
+export const agregarCalendarioCompartido = async (calendarId) => {
+  const cfg = await leerConfig();
+  try {
+    await llamar("post", "/users/me/calendarList", { data: { id: calendarId } });
+  } catch (err) {
+    if (err.status !== 409) {
+      if (err.status === 404 || err.status === 403) {
+        throw new ErrorGoogle(
+          `No se pudo acceder al calendario "${calendarId}". Compártelo con ${cfg.cuenta} con el permiso "Hacer cambios en eventos".`,
+          400
+        );
+      }
+      throw err;
+    }
+  }
+  if (!cfg.calendarId) await guardarClave("calendar_id", calendarId);
+  olvidarCaches();
+  return listarCalendarios({ forzar: true });
+};
+
+const calendarioPredeterminado = (cfg, calendarios) => {
+  const escribibles = calendarios.filter((c) => c.escribible);
+  return (
+    escribibles.find((c) => c.id === cfg.calendarId) ||
+    escribibles.find((c) => c.principal) ||
+    escribibles[0] ||
+    null
+  );
+};
+
+/** Calendario donde se guarda una cita: el elegido, el del especialista o el predeterminado. */
+const elegirCalendario = async ({ calendarId, especialistaId }) => {
+  const cfg = await leerConfig();
+  const calendarios = await listarCalendarios();
+  if (calendarId) {
+    const cal = calendarios.find((c) => c.id === calendarId);
+    if (!cal) throw new ErrorGoogle("Ese calendario ya no existe en la cuenta de Google.", 400);
+    if (!cal.escribible) throw new ErrorGoogle(`El calendario "${cal.nombre}" es de solo lectura.`, 403);
+    return cal;
+  }
+  if (especialistaId) {
+    const delEsp = calendarios.filter((c) => c.escribible && c.especialistaId === especialistaId);
+    const cal = delEsp.find((c) => c.visible) || delEsp[0];
+    if (cal) return cal;
+  }
+  const cal = calendarioPredeterminado(cfg, calendarios);
+  if (!cal) throw new ErrorGoogle("No hay ningún calendario donde se puedan agregar citas.", 409);
+  return cal;
+};
+
+/* ─────────────────────────── Vínculo con pacientes ─────────────────────────── */
+
 /**
  * Índice de pacientes para reconocer citas creadas a mano en Google
  * (por ejemplo "María Pérez - Botox" o "Botox 73384766"). Se reconstruye
@@ -283,10 +681,6 @@ const soloDigitos = (s) => String(s || "").replace(/\D/g, "");
  */
 let indice = null;
 let indiceCreado = 0;
-
-export const invalidarIndicePacientes = () => {
-  indice = null;
-};
 
 const obtenerIndice = async ({ forzar = false } = {}) => {
   if (!forzar && indice && Date.now() - indiceCreado < 60000) return indice;
@@ -323,7 +717,7 @@ const obtenerIndice = async ({ forzar = false } = {}) => {
 /** Busca a qué paciente corresponde un texto libre. Solo devuelve coincidencias únicas. */
 const detectarPaciente = (texto, idx) => {
   if (!texto) return null;
-  // 1) DNI (7-8 dígitos) o celular (9 dígitos que empiezan con 9)
+  // 1) DNI (7-8 dígitos) o celular (9 dígitos)
   const numeros = String(texto).match(/\d[\d\s-]{5,13}\d/g) || [];
   for (const bruto of numeros) {
     const n = soloDigitos(bruto);
@@ -356,12 +750,23 @@ const detectarPaciente = (texto, idx) => {
 const PRIVADO = "showclinic";
 const FIRMA = "— Agendado desde ShowClinic";
 const MARCA_DATOS = "— Datos de ShowClinic —";
+const SEP = "::"; // id de cita = "<calendario>::<evento>" (los IDs se repiten entre calendarios)
 
 const nombreCompleto = (p) =>
   [p?.nombre, p?.apellido].map((x) => String(x || "").trim()).filter(Boolean).join(" ");
 
+/** Separa el id compuesto. Un id viejo (sin calendario) es del calendario predeterminado. */
+const separarId = async (idCompuesto) => {
+  const s = String(idCompuesto || "");
+  const k = s.indexOf(SEP);
+  if (k > 0) return { calendarId: s.slice(0, k), eventId: s.slice(k + SEP.length) };
+  const cfg = await leerConfig();
+  const cal = calendarioPredeterminado(cfg, await listarCalendarios());
+  return { calendarId: cal?.id || cfg.calendarId, eventId: s };
+};
+
 /** Convierte un evento de Google al formato que usa la interfaz. */
-const mapearEvento = (ev, idx, especialistasPorId) => {
+const mapearEvento = (ev, cal, idx, especialistas) => {
   const priv = ev.extendedProperties?.private || {};
   const todoElDia = Boolean(ev.start?.date && !ev.start?.dateTime);
   const inicio = todoElDia ? ev.start.date : fechaHoraLima(new Date(ev.start?.dateTime));
@@ -388,11 +793,15 @@ const mapearEvento = (ev, idx, especialistasPorId) => {
     if (pacienteId) vinculo = "auto";
   }
   const p = pacienteId ? idx.porId.get(pacienteId) : null;
-  const especialistaId = Number(priv.especialista_id) || null;
-  const esp = especialistaId ? especialistasPorId.get(especialistaId) : null;
+  // Especialista: el elegido en ShowClinic o, si no, el dueño del calendario
+  const especialistaId = Number(priv.especialista_id) || cal.especialistaId || null;
+  const esp = especialistaId ? especialistas.find((e) => e.id === especialistaId) : null;
 
   return {
-    id: ev.id,
+    id: `${cal.id}${SEP}${ev.id}`,
+    calendarId: cal.id,
+    calendarioNombre: cal.nombre,
+    escribible: cal.escribible,
     titulo: ev.summary || "(Sin título)",
     descripcion: ev.description || "",
     notas: priv.notas ?? null,
@@ -400,6 +809,8 @@ const mapearEvento = (ev, idx, especialistasPorId) => {
     fin,
     todoElDia,
     colorId: ev.colorId || null,
+    // Igual que en Google: el color propio de la cita o, si no tiene, el del calendario
+    color: PALETA_EVENTO[ev.colorId] || cal.color,
     estado: ev.status, // confirmed | tentative
     ubicacion: ev.location || "",
     enlace: ev.htmlLink || null,
@@ -422,73 +833,101 @@ const mapearEvento = (ev, idx, especialistasPorId) => {
   };
 };
 
-const cargarEspecialistas = async () => {
-  try {
-    const filas = await dbAll("SELECT id, nombre FROM especialistas");
-    return new Map(filas.map((e) => [e.id, e]));
-  } catch {
-    return new Map();
-  }
-};
-
-/** Lista todas las citas entre dos fechas ("YYYY-MM-DD", fin exclusivo). */
-export const listarEventos = async ({ desde, hasta, q, filtroPrivado } = {}) => {
-  const cfg = await leerConfig();
+const traerEventosCalendario = async (calendarId, { desde, hasta, q, filtroPrivado }) => {
   const items = [];
   let pageToken;
   let vueltas = 0;
   do {
-    const params = {
-      singleEvents: true,
-      orderBy: "startTime",
-      maxResults: 2500,
-      timeZone: ZONA,
-      pageToken,
-    };
+    const params = { singleEvents: true, orderBy: "startTime", maxResults: 2500, timeZone: ZONA, pageToken };
     if (desde) params.timeMin = aRFC3339(desde);
     if (hasta) params.timeMax = aRFC3339(hasta);
     if (q) params.q = q;
     if (filtroPrivado) params.privateExtendedProperty = filtroPrivado;
-    const data = await llamar("get", `/calendars/${enc(cfg.calendarId)}/events`, { params });
+    const data = await llamar("get", `/calendars/${enc(calendarId)}/events`, { params });
     items.push(...(data.items || []));
     pageToken = data.nextPageToken;
     vueltas++;
   } while (pageToken && vueltas < 20);
+  return items.filter((ev) => ev.status !== "cancelled");
+};
 
+const mapearTodos = async (pares) => {
   let [idx, especialistas] = await Promise.all([obtenerIndice(), cargarEspecialistas()]);
   // Una paciente registrada hace instantes todavía no está en el índice: se reconstruye.
-  const faltaAlguna = items.some((ev) => {
+  const faltaAlguna = pares.some(({ ev }) => {
     const id = Number(ev.extendedProperties?.private?.paciente_id);
     return id && !idx.porId.has(id);
   });
   if (faltaAlguna && Date.now() - indiceCreado > 3000) idx = await obtenerIndice({ forzar: true });
-  return items.filter((ev) => ev.status !== "cancelled").map((ev) => mapearEvento(ev, idx, especialistas));
+  return pares.map(({ ev, cal }) => mapearEvento(ev, cal, idx, especialistas));
+};
+
+/**
+ * Citas entre dos fechas ("YYYY-MM-DD", fin exclusivo) de todos los
+ * calendarios visibles. Si un calendario falla, se informa sin perder el resto.
+ */
+export const listarEventos = async ({ desde, hasta, q, filtroPrivado, calendarios: soloEstos } = {}) => {
+  const calendarios = soloEstos || (await listarCalendarios()).filter((c) => c.visible);
+  const resultados = await enParalelo(calendarios, (cal) =>
+    traerEventosCalendario(cal.id, { desde, hasta, q, filtroPrivado })
+  );
+  const pares = [];
+  const avisos = [];
+  resultados.forEach((r, i) => {
+    const cal = calendarios[i];
+    if (r.ok) r.valor.forEach((ev) => pares.push({ ev, cal }));
+    else avisos.push(`No se pudo leer el calendario "${cal.nombre}": ${r.error.message}`);
+  });
+  // Si fallaron todos, es un problema general (sin internet, sesión cerrada…)
+  if (calendarios.length && avisos.length === calendarios.length) {
+    const primero = resultados.find((r) => !r.ok);
+    throw primero.error instanceof ErrorGoogle ? primero.error : traducirError(primero.error, await leerConfig());
+  }
+  const eventos = (await mapearTodos(pares)).sort((a, b) => a.inicio.localeCompare(b.inicio));
+  return { eventos, avisos };
 };
 
 /** Citas de una paciente: las vinculadas en ShowClinic y las reconocidas por nombre/DNI. */
 export const listarEventosPaciente = async (pacienteId, { desde, hasta }) => {
   const p = await dbGet("SELECT id, nombre, apellido, dni FROM patients WHERE id = ?", [pacienteId]);
   if (!p) throw new ErrorGoogle("Paciente no encontrada.", 404);
-  const busquedas = [listarEventos({ desde, hasta, filtroPrivado: `paciente_id=${p.id}` })];
+  const calendarios = (await listarCalendarios()).filter((c) => c.visible);
+  const busquedas = [listarEventos({ desde, hasta, filtroPrivado: `paciente_id=${p.id}`, calendarios })];
   const dni = soloDigitos(p.dni);
-  if (dni.length >= 7) busquedas.push(listarEventos({ desde, hasta, q: dni }));
-  const nombre = normalizar(p.nombre).split(" ")[0];
+  if (dni.length >= 7) busquedas.push(listarEventos({ desde, hasta, q: dni, calendarios }));
   const apellido = normalizar(p.apellido).split(" ")[0];
-  if (nombre && apellido) busquedas.push(listarEventos({ desde, hasta, q: apellido }));
+  if (apellido) busquedas.push(listarEventos({ desde, hasta, q: apellido, calendarios }));
 
   const resultados = await Promise.all(busquedas);
   const vistos = new Map();
-  resultados.flat().forEach((ev) => {
-    if (ev.paciente?.id === p.id && !vistos.has(ev.id)) vistos.set(ev.id, ev);
-  });
+  resultados
+    .flatMap((r) => r.eventos)
+    .forEach((ev) => {
+      if (ev.paciente?.id === p.id && !vistos.has(ev.id)) vistos.set(ev.id, ev);
+    });
   return [...vistos.values()].sort((a, b) => a.inicio.localeCompare(b.inicio));
 };
 
-export const obtenerEvento = async (eventId) => {
-  const cfg = await leerConfig();
-  const ev = await llamar("get", `/calendars/${enc(cfg.calendarId)}/events/${enc(eventId)}`);
-  const [idx, especialistas] = await Promise.all([obtenerIndice(), cargarEspecialistas()]);
-  return { crudo: ev, cita: mapearEvento(ev, idx, especialistas) };
+const buscarCalendario = async (calendarId) => {
+  const calendarios = await listarCalendarios();
+  return (
+    calendarios.find((c) => c.id === calendarId) || {
+      id: calendarId,
+      nombre: calendarId,
+      color: ORO,
+      escribible: true,
+      especialistaId: null,
+    }
+  );
+};
+
+const obtenerCrudo = (calendarId, eventId) =>
+  llamar("get", `/calendars/${enc(calendarId)}/events/${enc(eventId)}`);
+
+const mapearUno = async (ev, calendarId) => {
+  const cal = await buscarCalendario(calendarId);
+  const [idx, especialistas] = await Promise.all([obtenerIndice({ forzar: true }), cargarEspecialistas()]);
+  return mapearEvento(ev, cal, idx, especialistas);
 };
 
 /**
@@ -569,15 +1008,13 @@ export const construirEvento = async (datos, { usuario, previo } = {}) => {
   const cuerpo = {
     summary: titulo,
     description: descripcion,
+    // Sin color propio la cita toma el color del calendario, igual que en Google
     colorId: datos.colorId ? String(datos.colorId) : null,
     extendedProperties: { private: priv },
   };
   if (todoElDia) {
-    // En Google el fin de un evento de día completo es exclusivo (el día siguiente).
-    const finExclusivo = new Date(`${finReal}T00:00:00Z`);
-    finExclusivo.setUTCDate(finExclusivo.getUTCDate() + 1);
     cuerpo.start = { date: inicio, dateTime: null };
-    cuerpo.end = { date: finExclusivo.toISOString().slice(0, 10), dateTime: null };
+    cuerpo.end = { date: finExclusivo(finReal), dateTime: null };
   } else {
     cuerpo.start = { dateTime: `${inicio}:00`, timeZone: ZONA, date: null };
     cuerpo.end = { dateTime: `${finReal}:00`, timeZone: ZONA, date: null };
@@ -595,49 +1032,58 @@ const sinNulos = (obj) => {
 };
 
 export const crearEvento = async (datos, usuario) => {
-  const cfg = await leerConfig();
   const cuerpo = sinNulos(await construirEvento(datos, { usuario }));
-  const ev = await llamar("post", `/calendars/${enc(cfg.calendarId)}/events`, { data: cuerpo });
-  const [idx, especialistas] = await Promise.all([obtenerIndice({ forzar: true }), cargarEspecialistas()]);
-  return mapearEvento(ev, idx, especialistas);
+  const cal = await elegirCalendario(datos);
+  const ev = await llamar("post", `/calendars/${enc(cal.id)}/events`, { data: cuerpo });
+  return mapearUno(ev, cal.id);
 };
 
-export const actualizarEvento = async (eventId, datos, usuario) => {
-  const cfg = await leerConfig();
-  const { crudo } = await obtenerEvento(eventId);
+export const actualizarEvento = async (idCompuesto, datos, usuario) => {
+  const { calendarId, eventId } = await separarId(idCompuesto);
+  const origen = await buscarCalendario(calendarId);
+  if (!origen.escribible) throw new ErrorGoogle(`El calendario "${origen.nombre}" es de solo lectura.`, 403);
+  const crudo = await obtenerCrudo(calendarId, eventId);
   const cuerpo = await construirEvento(datos, { usuario, previo: crudo });
-  const ev = await llamar("patch", `/calendars/${enc(cfg.calendarId)}/events/${enc(eventId)}`, { data: cuerpo });
-  const [idx, especialistas] = await Promise.all([obtenerIndice({ forzar: true }), cargarEspecialistas()]);
-  return mapearEvento(ev, idx, especialistas);
+
+  // ¿Cambió de calendario? (por ejemplo, se pasó la cita a otra especialista)
+  let destino = calendarId;
+  if (datos.calendarId && datos.calendarId !== calendarId) {
+    const cal = await elegirCalendario({ calendarId: datos.calendarId });
+    await llamar("post", `/calendars/${enc(calendarId)}/events/${enc(eventId)}/move`, {
+      params: { destination: cal.id },
+    });
+    destino = cal.id;
+  }
+  const ev = await llamar("patch", `/calendars/${enc(destino)}/events/${enc(eventId)}`, { data: cuerpo });
+  return mapearUno(ev, destino);
 };
 
 /** Cambia solo fecha/hora (arrastrar o "reprogramar"), sin tocar el resto. */
-export const moverEvento = async (eventId, { inicio, fin, todoElDia }) => {
-  const cfg = await leerConfig();
+export const moverEvento = async (idCompuesto, { inicio, fin, todoElDia }) => {
   if (todoElDia) {
     if (!esFecha(inicio) || (fin && !esFecha(fin))) throw new ErrorGoogle("Fecha no válida.", 400);
   } else if (!esFechaHora(inicio) || !esFechaHora(fin) || fin <= inicio) {
     throw new ErrorGoogle("Horario no válido.", 400);
   }
-  const datos = {};
-  if (todoElDia) {
-    const finExclusivo = new Date(`${fin || inicio}T00:00:00Z`);
-    finExclusivo.setUTCDate(finExclusivo.getUTCDate() + 1);
-    datos.start = { date: inicio, dateTime: null };
-    datos.end = { date: finExclusivo.toISOString().slice(0, 10), dateTime: null };
-  } else {
-    datos.start = { dateTime: `${inicio}:00`, timeZone: ZONA, date: null };
-    datos.end = { dateTime: `${fin}:00`, timeZone: ZONA, date: null };
-  }
-  const ev = await llamar("patch", `/calendars/${enc(cfg.calendarId)}/events/${enc(eventId)}`, { data: datos });
-  const [idx, especialistas] = await Promise.all([obtenerIndice({ forzar: true }), cargarEspecialistas()]);
-  return mapearEvento(ev, idx, especialistas);
+  const { calendarId, eventId } = await separarId(idCompuesto);
+  const cal = await buscarCalendario(calendarId);
+  if (!cal.escribible) throw new ErrorGoogle(`El calendario "${cal.nombre}" es de solo lectura.`, 403);
+  const datos = todoElDia
+    ? { start: { date: inicio, dateTime: null }, end: { date: finExclusivo(fin || inicio), dateTime: null } }
+    : {
+        start: { dateTime: `${inicio}:00`, timeZone: ZONA, date: null },
+        end: { dateTime: `${fin}:00`, timeZone: ZONA, date: null },
+      };
+  const ev = await llamar("patch", `/calendars/${enc(calendarId)}/events/${enc(eventId)}`, { data: datos });
+  return mapearUno(ev, calendarId);
 };
 
-export const eliminarEvento = async (eventId) => {
-  const cfg = await leerConfig();
+export const eliminarEvento = async (idCompuesto) => {
+  const { calendarId, eventId } = await separarId(idCompuesto);
+  const cal = await buscarCalendario(calendarId);
+  if (!cal.escribible) throw new ErrorGoogle(`El calendario "${cal.nombre}" es de solo lectura.`, 403);
   try {
-    await llamar("delete", `/calendars/${enc(cfg.calendarId)}/events/${enc(eventId)}`);
+    await llamar("delete", `/calendars/${enc(calendarId)}/events/${enc(eventId)}`);
   } catch (err) {
     // Si ya no existe, el resultado es el mismo que se buscaba.
     if (err.status === 410 || err.status === 404) return;
@@ -645,15 +1091,16 @@ export const eliminarEvento = async (eventId) => {
   }
 };
 
-/* ─────────────────────────── Conexión ─────────────────────────── */
+/* ─────────────────────────── Conexión con cuenta de servicio ─────────────────────────── */
 
 /**
  * Prueba la conexión antes de guardarla: que la llave funcione, que el
  * calendario exista y que la cuenta de servicio tenga permiso de escritura.
  */
-export const probarConexion = async ({ credenciales, calendarId }) => {
-  const config = { credenciales, calendarId };
+export const conectarCuentaServicio = async ({ credenciales, calendarId }) => {
+  const config = { modo: "service_account", credenciales, cuenta: credenciales.client_email };
   const email = credenciales.client_email;
+  tokenCache = null;
   // Un calendario compartido no aparece solo en la lista de la cuenta de
   // servicio: se agrega para poder consultar el nivel de permiso.
   try {
@@ -674,34 +1121,40 @@ export const probarConexion = async ({ credenciales, calendarId }) => {
     entrada = await llamar("get", `/users/me/calendarList/${enc(calendarId)}`, { config });
   } catch (err) {
     if (err.status === 404) {
-      throw new ErrorGoogle(
-        `No se pudo acceder al calendario "${calendarId}". Verifica que esté compartido con ${email}.`,
-        400
-      );
+      throw new ErrorGoogle(`No se pudo acceder al calendario "${calendarId}". Verifica que esté compartido con ${email}.`, 400);
     }
     throw err;
   }
-  const rol = entrada.accessRole;
-  if (rol !== "owner" && rol !== "writer") {
+  if (entrada.accessRole !== "owner" && entrada.accessRole !== "writer") {
     throw new ErrorGoogle(
       `El calendario está compartido solo para ver. Cambia el permiso de ${email} a "Hacer cambios en eventos".`,
       400
     );
   }
-  return {
-    nombre: entrada.summaryOverride || entrada.summary || calendarId,
-    zonaHoraria: entrada.timeZone || null,
-    rol,
-  };
+  await asegurarTabla();
+  await guardarClave("modo", "service_account");
+  await guardarClave("service_account", JSON.stringify(credenciales));
+  await guardarClave("cuenta", email);
+  await guardarClave("calendar_id", calendarId);
+  await guardarClave("conectado_en", fechaHoraLima(new Date()));
+  await borrarClave("oauth_refresh");
+  olvidarCaches();
+  return { nombre: entrada.summaryOverride || entrada.summary || calendarId };
 };
 
 export default {
   leerConfig,
-  guardarConfig,
   borrarConfig,
   estaConfigurado,
   validarCredenciales,
-  probarConexion,
+  leerClienteOAuth,
+  iniciarOAuth,
+  completarOAuth,
+  volverADe,
+  conectarCuentaServicio,
+  listarCalendarios,
+  guardarPreferencias,
+  agregarCalendarioCompartido,
   listarEventos,
   listarEventosPaciente,
   crearEvento,

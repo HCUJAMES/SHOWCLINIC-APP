@@ -13,9 +13,18 @@ const BASE = "/api/calendario";
 export const agendaApi = {
   estado: () => api.get(`${BASE}/estado`).then((r) => r.data),
   conectar: (datos) => api.post(`${BASE}/conectar`, datos, { timeout: 45000 }).then((r) => r.data),
+  iniciarGoogle: (datos) => api.post(`${BASE}/oauth/iniciar`, datos).then((r) => r.data),
+  calendarios: ({ todos = false, forzar = false } = {}) =>
+    api
+      .get(`${BASE}/calendarios`, { params: { todos: todos ? 1 : undefined, forzar: forzar ? 1 : undefined } })
+      .then((r) => r.data),
+  guardarCalendarios: (datos) => api.put(`${BASE}/calendarios`, datos).then((r) => r.data),
+  agregarCalendario: (calendarId) => api.post(`${BASE}/calendarios/agregar`, { calendarId }).then((r) => r.data),
   desconectar: () => api.delete(`${BASE}/conectar`).then((r) => r.data),
-  listar: (desde, hasta) => api.get(`${BASE}/eventos`, { params: { desde, hasta } }).then((r) => r.data),
-  delPaciente: (pacienteId) => api.get(`${BASE}/paciente/${pacienteId}/eventos`).then((r) => r.data),
+  // Devuelve { eventos, avisos } (avisos: calendarios que no se pudieron leer)
+  listar: (desde, hasta) => api.get(`${BASE}/eventos`, { params: { desde, hasta }, timeout: 45000 }).then((r) => r.data),
+  delPaciente: (pacienteId) =>
+    api.get(`${BASE}/paciente/${pacienteId}/eventos`, { timeout: 45000 }).then((r) => r.data),
   crear: (datos) => api.post(`${BASE}/eventos`, datos).then((r) => r.data),
   actualizar: (id, datos) => api.put(`${BASE}/eventos/${encodeURIComponent(id)}`, datos).then((r) => r.data),
   mover: (id, datos) => api.patch(`${BASE}/eventos/${encodeURIComponent(id)}/mover`, datos).then((r) => r.data),

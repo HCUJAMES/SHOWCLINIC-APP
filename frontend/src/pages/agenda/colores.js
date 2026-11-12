@@ -20,17 +20,42 @@ export const COLORES_GOOGLE = [
 
 const POR_ID = Object.fromEntries(COLORES_GOOGLE.map((c) => [c.id, c.color]));
 
-// Orden en que se reparten los colores entre especialistas (los más
-// distinguibles primero).
-const ORDEN_ESPECIALISTAS = ["7", "2", "3", "4", "6", "1", "10", "9", "5", "11", "8"];
+/**
+ * Color con el que se pinta una cita: el mismo que en Google (el color propio
+ * de la cita o, si no tiene, el de su calendario). El servidor ya lo resuelve.
+ */
+export const colorCita = (cita) => cita?.color || POR_ID[cita?.colorId] || BRAND.oro;
 
-/** Color sugerido para un especialista (siempre el mismo para la misma persona). */
-export const colorIdEspecialista = (especialistaId) =>
-  especialistaId ? ORDEN_ESPECIALISTAS[(Number(especialistaId) - 1) % ORDEN_ESPECIALISTAS.length] : null;
-
-/** Color con el que se pinta una cita. */
-export const colorCita = (cita) =>
-  POR_ID[cita?.colorId] || POR_ID[colorIdEspecialista(cita?.especialistaId)] || BRAND.oro;
+/**
+ * Los 24 colores de calendario de Google (los que aparecen al elegir el color
+ * de un calendario), para que el administrador pueda corregir uno a mano.
+ */
+export const COLORES_CALENDARIO = [
+  { nombre: "Tomate", color: "#d50000" },
+  { nombre: "Flamenco", color: "#e67c73" },
+  { nombre: "Mandarina", color: "#f4511e" },
+  { nombre: "Plátano", color: "#f6bf26" },
+  { nombre: "Salvia", color: "#33b679" },
+  { nombre: "Albahaca", color: "#0b8043" },
+  { nombre: "Pavo real", color: "#039be5" },
+  { nombre: "Arándano", color: "#3f51b5" },
+  { nombre: "Lavanda", color: "#7986cb" },
+  { nombre: "Uva", color: "#8e24aa" },
+  { nombre: "Grafito", color: "#616161" },
+  { nombre: "Radicchio", color: "#ad1457" },
+  { nombre: "Flor de cerezo", color: "#d81b60" },
+  { nombre: "Calabaza", color: "#ef6c00" },
+  { nombre: "Mango", color: "#f09300" },
+  { nombre: "Citrón", color: "#e4c441" },
+  { nombre: "Aguacate", color: "#c0ca33" },
+  { nombre: "Pistacho", color: "#7cb342" },
+  { nombre: "Eucalipto", color: "#009688" },
+  { nombre: "Cobalto", color: "#4285f4" },
+  { nombre: "Glicina", color: "#b39ddb" },
+  { nombre: "Amatista", color: "#9e69af" },
+  { nombre: "Abedul", color: "#a79b8e" },
+  { nombre: "Cacao", color: "#795548" },
+];
 
 export const colorPorId = (id) => POR_ID[id] || BRAND.oro;
 
@@ -51,4 +76,17 @@ export const oscurecer = (hex, cantidad = 0.45) => {
   const n = parseInt(h, 16);
   const f = (c) => Math.round(c * (1 - cantidad));
   return `rgb(${f((n >> 16) & 255)}, ${f((n >> 8) & 255)}, ${f(n & 255)})`;
+};
+
+/** Texto blanco u oscuro según qué se lea mejor sobre ese color (como hace Google). */
+export const textoSobre = (hex) => {
+  const h = String(hex || "").replace("#", "");
+  if (h.length !== 6) return "#fff";
+  const n = parseInt(h, 16);
+  const canal = (c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const lum = 0.2126 * canal((n >> 16) & 255) + 0.7152 * canal((n >> 8) & 255) + 0.0722 * canal(n & 255);
+  return lum > 0.45 ? "#3c4043" : "#fff";
 };

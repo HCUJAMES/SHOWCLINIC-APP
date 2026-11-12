@@ -24,7 +24,7 @@ import {
 } from "@mui/material";
 import { Close, Delete, Check } from "../../iconos";
 import { BRAND } from "../../brand";
-import { COLORES_GOOGLE, colorIdEspecialista, colorPorId } from "./colores";
+import { COLORES_GOOGLE, colorPorId } from "./colores";
 import agendaApi, { mensajeError } from "./api";
 import {
   fechaDe,
@@ -136,6 +136,8 @@ export default function CitaDialog({
   cita,
   inicial,
   especialistas = [],
+  calendarios = [],
+  predeterminado = null,
   tratamientos = [],
   citasCargadas = [],
   onGuardado,
@@ -150,6 +152,7 @@ export default function CitaDialog({
   const [tituloEditado, setTituloEditado] = useState(false);
   const [tratamiento, setTratamiento] = useState("");
   const [especialistaId, setEspecialistaId] = useState("");
+  const [calendarId, setCalendarId] = useState("");
   const [fecha, setFecha] = useState(hoyFn());
   const [fechaFin, setFechaFin] = useState(hoyFn());
   const [todoElDia, setTodoElDia] = useState(false);
@@ -175,6 +178,7 @@ export default function CitaDialog({
       setTituloEditado(!p || (cita.titulo || "") !== tituloAuto(p, cita.tratamiento || ""));
       setTratamiento(cita.tratamiento || "");
       setEspecialistaId(cita.especialistaId ? String(cita.especialistaId) : "");
+      setCalendarId(cita.calendarId || "");
       setTodoElDia(Boolean(cita.todoElDia));
       setFecha(fechaDe(cita.inicio));
       setFechaFin(cita.todoElDia ? cita.fin : fechaDe(cita.inicio));
@@ -190,6 +194,7 @@ export default function CitaDialog({
       setTituloEditado(false);
       setTratamiento(inicial?.tratamiento || "");
       setEspecialistaId(inicial?.especialistaId ? String(inicial.especialistaId) : "");
+      setCalendarId(inicial?.calendarId || "");
       setTodoElDia(Boolean(inicial?.todoElDia));
       setFecha(fechaDe(ini));
       setFechaFin(fechaDe(ini));
@@ -200,6 +205,41 @@ export default function CitaDialog({
     }
   }, [open, cita, inicial]);
 
+  // Calendarios donde se puede agendar (si la cita está en uno oculto, igual se ofrece)
+  const escribibles = useMemo(() => {
+    const lista = calendarios.filter((c) => c.escribible);
+    if (cita?.calendarId && !lista.some((c) => c.id === cita.calendarId)) {
+      lista.push({ id: cita.calendarId, nombre: cita.calendarioNombre || cita.calendarId, color: cita.color, escribible: true });
+    }
+    return lista;
+  }, [calendarios, cita]);
+
+  const calendarioDeEspecialista = (espId) =>
+    espId ? escribibles.find((c) => String(c.especialistaId) === String(espId)) : null;
+
+  // Cita nueva: el calendario del especialista o, si no, el predeterminado
+  useEffect(() => {
+    if (!open || cita || calendarId || !escribibles.length) return;
+    const cal =
+      calendarioDeEspecialista(especialistaId) ||
+      escribibles.find((c) => c.id === predeterminado) ||
+      escribibles[0];
+    if (cal) setCalendarId(cal.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cita, calendarId, escribibles, predeterminado, especialistaId]);
+
+  // Especialista y calendario van juntos: al elegir uno se sugiere el otro
+  const cambiarEspecialista = (valor) => {
+    setEspecialistaId(valor);
+    const cal = calendarioDeEspecialista(valor);
+    if (cal) setCalendarId(cal.id);
+  };
+  const cambiarCalendario = (valor) => {
+    setCalendarId(valor);
+    const cal = escribibles.find((c) => c.id === valor);
+    if (cal?.especialistaId) setEspecialistaId(String(cal.especialistaId));
+  };
+
   // El título se arma solo (paciente – tratamiento) hasta que alguien lo edite
   useEffect(() => {
     if (!tituloEditado) setTitulo(tituloAuto(sinPaciente ? null : paciente, tratamiento));
@@ -209,8 +249,10 @@ export default function CitaDialog({
   const fin = todoElDia ? (fechaFin < fecha ? fecha : fechaFin) : sumarMinutos(`${fecha}T${hora}`, duracion);
 
   const especialista = especialistas.find((e) => String(e.id) === String(especialistaId));
-  const colorAuto = colorIdEspecialista(especialistaId);
-  const colorElegido = colorId || colorAuto || "";
+  const calendario = escribibles.find((c) => c.id === calendarId);
+  // Sin color propio, la cita lleva el color de su calendario (igual que en Google)
+  const colorVisible = colorId ? colorPorId(colorId) : calendario?.color || BRAND.oro;
+  const soloLectura = editando && cita?.escribible === false;
 
   // Avisos de choque de horario (no bloquean: la clínica decide)
   const avisos = useMemo(() => {
@@ -218,17 +260,19 @@ export default function CitaDialog({
     const yo = { inicio, fin };
     const otros = citasCargadas.filter((c) => !c.todoElDia && c.id !== cita?.id && seCruzan(yo, c));
     const lista = [];
-    if (especialistaId) {
-      const choque = otros.find((c) => String(c.especialistaId) === String(especialistaId));
-      if (choque)
-        lista.push(`${especialista?.nombre || "El especialista"} ya tiene una cita de ${horaDe(choque.inicio)} a ${horaDe(choque.fin)} (${choque.titulo}).`);
+    const choque =
+      (especialistaId && otros.find((c) => String(c.especialistaId) === String(especialistaId))) ||
+      (calendarId && otros.find((c) => c.calendarId === calendarId));
+    if (choque) {
+      const quien = especialista?.nombre || calendario?.nombre || "Ese calendario";
+      lista.push(`${quien} ya tiene una cita de ${horaDe(choque.inicio)} a ${horaDe(choque.fin)} (${choque.titulo}).`);
     }
     if (paciente && !sinPaciente) {
       const choque = otros.find((c) => c.paciente?.id === paciente.id);
       if (choque) lista.push(`Esta paciente ya tiene otra cita a esa hora (${horaDe(choque.inicio)} – ${horaDe(choque.fin)}).`);
     }
     return lista;
-  }, [citasCargadas, inicio, fin, especialistaId, especialista, paciente, sinPaciente, todoElDia, fecha, hora, cita]);
+  }, [citasCargadas, inicio, fin, especialistaId, especialista, calendarId, calendario, paciente, sinPaciente, todoElDia, fecha, hora, cita]);
 
   const opcionesDuracion = DURACIONES.includes(duracion) ? DURACIONES : [...DURACIONES, duracion].sort((a, b) => a - b);
   const nombresTratamientos = useMemo(
@@ -239,6 +283,7 @@ export default function CitaDialog({
   const validar = () => {
     if (!sinPaciente && !paciente) return "Elige una paciente o marca “Sin paciente”.";
     if (!titulo.trim()) return "Escribe un título para la cita.";
+    if (!calendarId) return "Elige el calendario donde se guardará la cita.";
     if (!fecha) return "Elige la fecha.";
     if (!todoElDia && !/^\d{2}:\d{2}$/.test(hora)) return "Escribe la hora de inicio.";
     if (todoElDia && fechaFin && fechaFin < fecha) return "La fecha final no puede ser antes de la inicial.";
@@ -258,12 +303,13 @@ export default function CitaDialog({
       pacienteId: sinPaciente ? null : paciente?.id || null,
       sinPaciente,
       especialistaId: especialistaId ? Number(especialistaId) : null,
+      calendarId,
       tratamiento: tratamiento.trim(),
       notas: notas.trim(),
       inicio,
       fin,
       todoElDia,
-      colorId: colorElegido || null,
+      colorId: colorId || null,
     };
     try {
       const resultado = editando ? await agendaApi.actualizar(cita.id, datos) : await agendaApi.crear(datos);
@@ -296,7 +342,7 @@ export default function CitaDialog({
   return (
     <Dialog open={open} onClose={cerrar} fullWidth maxWidth="sm" fullScreen={movil} scroll="paper">
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, pr: 1.5 }}>
-        <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: colorPorId(colorElegido) }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: colorVisible }} />
         <Typography component="span" sx={{ fontWeight: 700, fontSize: 18, flex: 1 }}>
           {editando ? "Editar cita" : "Nueva cita"}
         </Typography>
@@ -306,6 +352,12 @@ export default function CitaDialog({
       </DialogTitle>
 
       <DialogContent dividers sx={{ display: "flex", flexDirection: "column", gap: 2.25, pt: "20px !important" }}>
+        {soloLectura && (
+          <Alert severity="warning">
+            Esta cita está en el calendario “{cita.calendarioNombre}”, que es de solo lectura. Solo se puede modificar desde la
+            cuenta de Google dueña de ese calendario.
+          </Alert>
+        )}
         {cita?.recurrente && (
           <Alert severity="info">Esta cita se repite en Google Calendar: los cambios solo se aplican a esta fecha.</Alert>
         )}
@@ -344,20 +396,49 @@ export default function CitaDialog({
             onInputChange={(_, v) => setTratamiento(v)}
             renderInput={(params) => <TextField {...params} label="Tratamiento" placeholder="Ej. Botox, Evaluación…" />}
           />
-          <TextField select label="Especialista" value={especialistaId} onChange={(e) => setEspecialistaId(e.target.value)}>
+          <TextField select label="Especialista" value={especialistaId} onChange={(e) => cambiarEspecialista(e.target.value)}>
             <MenuItem value="">
               <em>Sin asignar</em>
             </MenuItem>
-            {especialistas.map((e) => (
-              <MenuItem key={e.id} value={String(e.id)}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: colorPorId(colorIdEspecialista(e.id)) }} />
-                  {e.nombre}
-                </Box>
-              </MenuItem>
-            ))}
+            {especialistas.map((e) => {
+              const cal = calendarioDeEspecialista(e.id);
+              return (
+                <MenuItem key={e.id} value={String(e.id)}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: cal?.color || "transparent", border: cal ? "none" : `1px solid ${BRAND.borde}` }} />
+                    {e.nombre}
+                  </Box>
+                </MenuItem>
+              );
+            })}
           </TextField>
         </Box>
+
+        <TextField
+          select
+          label="Calendario de Google"
+          value={escribibles.some((c) => c.id === calendarId) ? calendarId : ""}
+          onChange={(e) => cambiarCalendario(e.target.value)}
+          helperText={
+            editando && cita?.calendarId && calendarId !== cita.calendarId
+              ? `La cita se pasará del calendario “${cita.calendarioNombre}” a este.`
+              : "En este calendario se guardará la cita (igual que en Google)."
+          }
+        >
+          {escribibles.length === 0 && (
+            <MenuItem value="" disabled>
+              No hay calendarios disponibles
+            </MenuItem>
+          )}
+          {escribibles.map((c) => (
+            <MenuItem key={c.id} value={c.id}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ width: 12, height: 12, borderRadius: "3px", bgcolor: c.color }} />
+                {c.nombre}
+              </Box>
+            </MenuItem>
+          ))}
+        </TextField>
 
         <TextField
           label="Título en Google Calendar"
@@ -458,7 +539,7 @@ export default function CitaDialog({
         <Box>
           <Typography sx={{ fontSize: 13, color: BRAND.textoSuave, mb: 0.75 }}>Color en el calendario</Typography>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
-            <Tooltip title={especialista ? `Automático (color de ${especialista.nombre})` : "Automático"}>
+            <Tooltip title={calendario ? `Color del calendario “${calendario.nombre}”` : "Color del calendario"}>
               <Box
                 role="button"
                 tabIndex={0}
@@ -476,9 +557,11 @@ export default function CitaDialog({
                   cursor: "pointer",
                   border: `1.5px solid ${!colorId ? BRAND.oro : BRAND.borde}`,
                   color: !colorId ? BRAND.oro : BRAND.textoSuave,
+                  gap: 0.75,
                 }}
               >
-                Auto
+                <Box component="span" sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: calendario?.color || BRAND.oro }} />
+                Del calendario
               </Box>
             </Tooltip>
             {COLORES_GOOGLE.map((c) => (
@@ -530,7 +613,7 @@ export default function CitaDialog({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 2, gap: 1, flexWrap: "wrap" }}>
-        {editando && (
+        {editando && !soloLectura && (
           <Button
             color="error"
             startIcon={<Delete />}
@@ -553,7 +636,7 @@ export default function CitaDialog({
         <Button
           variant="contained"
           onClick={guardar}
-          disabled={guardando}
+          disabled={guardando || soloLectura}
           startIcon={guardando ? <CircularProgress size={16} color="inherit" /> : null}
         >
           {guardando ? "Guardando…" : editando ? "Guardar cambios" : "Agendar cita"}

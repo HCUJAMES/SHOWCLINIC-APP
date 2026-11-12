@@ -46,7 +46,7 @@ import { BRAND, FONTS } from "../../brand";
 import { useToast } from "../../components/ToastProvider";
 import useSocket from "../../hooks/useSocket";
 import agendaApi, { mensajeError } from "./api";
-import { colorCita, colorIdEspecialista, colorPorId } from "./colores";
+import { colorCita } from "./colores";
 import {
   hoy as hoyFn,
   rangoVista,
@@ -97,9 +97,7 @@ const normalizar = (s) =>
   String(s || "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-
-const SIN_ESPECIALISTA = "sin";
+    .replace(/[\u0300-\u036f]/g, "");
 
 /* ─────────── Mini calendario lateral ─────────── */
 function MiniCalendario({ fecha, vista, onElegir }) {
@@ -163,12 +161,8 @@ function MiniCalendario({ fecha, vista, onElegir }) {
   );
 }
 
-/* ─────────── Filtro de especialistas ─────────── */
-function FiltroEspecialistas({ especialistas, ocultos, onCambiar, conteos }) {
-  const opciones = [
-    ...especialistas.map((e) => ({ id: String(e.id), nombre: e.nombre, color: colorPorId(colorIdEspecialista(e.id)) })),
-    { id: SIN_ESPECIALISTA, nombre: "Sin especialista", color: BRAND.oro },
-  ];
+/* ─────────── Calendarios (igual que "Mis calendarios" en Google) ─────────── */
+function FiltroCalendarios({ calendarios, ocultos, onCambiar, conteos }) {
   const alternar = (id) => {
     const s = new Set(ocultos);
     if (s.has(id)) s.delete(id);
@@ -179,7 +173,7 @@ function FiltroEspecialistas({ especialistas, ocultos, onCambiar, conteos }) {
     <Box>
       <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
         <Typography sx={{ flex: 1, fontWeight: 700, fontSize: 13, letterSpacing: "0.04em", color: BRAND.textoSuave }}>
-          ESPECIALISTAS
+          CALENDARIOS
         </Typography>
         {ocultos.length > 0 && (
           <Button size="small" onClick={() => onCambiar([])} sx={{ fontSize: 12, py: 0, minWidth: 0 }}>
@@ -187,10 +181,14 @@ function FiltroEspecialistas({ especialistas, ocultos, onCambiar, conteos }) {
           </Button>
         )}
       </Box>
-      {opciones.map((o) => (
+      {calendarios.length === 0 && (
+        <Typography sx={{ fontSize: 12.5, color: BRAND.textoTenue, px: 0.5 }}>Cargando calendarios…</Typography>
+      )}
+      {calendarios.map((c) => (
         <Box
-          key={o.id}
+          key={c.id}
           component="label"
+          title={c.especialistaNombre ? `${c.nombre} · ${c.especialistaNombre}` : c.nombre}
           sx={{
             display: "flex",
             alignItems: "center",
@@ -203,14 +201,14 @@ function FiltroEspecialistas({ especialistas, ocultos, onCambiar, conteos }) {
         >
           <Checkbox
             size="small"
-            checked={!ocultos.includes(o.id)}
-            onChange={() => alternar(o.id)}
-            sx={{ color: o.color, "&.Mui-checked": { color: o.color }, p: 0.75 }}
+            checked={!ocultos.includes(c.id)}
+            onChange={() => alternar(c.id)}
+            sx={{ color: c.color, "&.Mui-checked": { color: c.color }, p: 0.75 }}
           />
           <Typography sx={{ fontSize: 13, flex: 1, minWidth: 0 }} noWrap>
-            {o.nombre}
+            {c.nombre}
           </Typography>
-          {conteos[o.id] > 0 && <Typography sx={{ fontSize: 11.5, color: BRAND.textoTenue }}>{conteos[o.id]}</Typography>}
+          {conteos[c.id] > 0 && <Typography sx={{ fontSize: 11.5, color: BRAND.textoTenue }}>{conteos[c.id]}</Typography>}
         </Box>
       ))}
     </Box>
@@ -235,7 +233,11 @@ export default function Agenda() {
   const [ultimaSync, setUltimaSync] = useState(null);
   const [especialistas, setEspecialistas] = useState([]);
   const [tratamientos, setTratamientos] = useState([]);
-  const [ocultos, setOcultos] = useState(() => leerLocal("agenda.ocultos", []));
+  const [calendarios, setCalendarios] = useState([]);
+  const [predeterminado, setPredeterminado] = useState(null);
+  const [avisos, setAvisos] = useState([]);
+  // Calendarios que cada persona apaga en su pantalla (como las casillas de Google)
+  const [ocultos, setOcultos] = useState(() => leerLocal("agenda.calOcultos", []));
   const [busqueda, setBusqueda] = useState("");
   const [detalle, setDetalle] = useState(null);
   const [formulario, setFormulario] = useState(null); // { cita } | { inicial }
@@ -246,7 +248,7 @@ export default function Agenda() {
   const pedido = useRef(0);
 
   useEffect(() => guardarLocal("agenda.vista", vista), [vista]);
-  useEffect(() => guardarLocal("agenda.ocultos", ocultos), [ocultos]);
+  useEffect(() => guardarLocal("agenda.calOcultos", ocultos), [ocultos]);
 
   /* ───── Estado de la conexión ───── */
   const cargarEstado = useCallback(async () => {
@@ -261,7 +263,36 @@ export default function Agenda() {
     cargarEstado();
   }, [cargarEstado]);
 
-  // Especialistas y tratamientos para filtros y formulario
+  // Calendarios de la cuenta de Google (nombres y colores)
+  const cargarCalendarios = useCallback(async () => {
+    try {
+      const r = await agendaApi.calendarios();
+      setCalendarios(r.calendarios || []);
+      setPredeterminado(r.predeterminado || null);
+    } catch {
+      /* el error se muestra al cargar las citas */
+    }
+  }, []);
+  useEffect(() => {
+    if (estado?.configurado) cargarCalendarios();
+  }, [estado?.configurado, cargarCalendarios]);
+
+  // Vuelta del inicio de sesión con Google (?google=ok | error)
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const resultado = q.get("google");
+    if (!resultado) return;
+    const mensaje = q.get("mensaje") || "";
+    if (resultado === "ok") {
+      showToast({ severity: "success", message: `Google Calendar conectado${mensaje ? ` con ${mensaje}` : ""}` });
+    } else {
+      showToast({ severity: "error", message: mensaje || "No se pudo conectar con Google." });
+    }
+    navigate(location.pathname, { replace: true });
+    cargarEstado();
+  }, [location.search, location.pathname, navigate, showToast, cargarEstado]);
+
+  // Especialistas y tratamientos para el formulario
   useEffect(() => {
     if (!estado?.configurado) return;
     agendaApi.especialistas().then(setEspecialistas).catch(() => setEspecialistas([]));
@@ -275,9 +306,10 @@ export default function Agenda() {
       const n = ++pedido.current;
       if (!silencioso) setCargando(true);
       try {
-        const lista = await agendaApi.listar(rango.desde, rango.hasta);
+        const r = await agendaApi.listar(rango.desde, rango.hasta);
         if (n !== pedido.current) return;
-        setCitas(lista);
+        setCitas(r.eventos || []);
+        setAvisos(r.avisos || []);
         setErrorCitas("");
         setUltimaSync(new Date());
       } catch (err) {
@@ -302,6 +334,7 @@ export default function Agenda() {
   // Otro dispositivo agendó algo en ShowClinic → refrescar
   useSocket("agenda:updated", () => {
     cargarEstado();
+    cargarCalendarios();
     cargarCitas({ silencioso: true });
   });
 
@@ -346,11 +379,10 @@ export default function Agenda() {
   const citasVisibles = useMemo(() => {
     const q = normalizar(busqueda.trim());
     return citas.filter((c) => {
-      const clave = c.especialistaId ? String(c.especialistaId) : SIN_ESPECIALISTA;
-      if (ocultos.includes(clave)) return false;
+      if (ocultos.includes(c.calendarId)) return false;
       if (!q) return true;
       const texto = normalizar(
-        [c.titulo, c.tratamiento, c.especialistaNombre, c.paciente?.nombre, c.paciente?.apellido, c.paciente?.dni].join(" ")
+        [c.titulo, c.tratamiento, c.especialistaNombre, c.calendarioNombre, c.paciente?.nombre, c.paciente?.apellido, c.paciente?.dni].join(" ")
       );
       return q.split(/\s+/).every((p) => texto.includes(p));
     });
@@ -359,16 +391,18 @@ export default function Agenda() {
   const conteos = useMemo(() => {
     const m = {};
     citas.forEach((c) => {
-      const k = c.especialistaId ? String(c.especialistaId) : SIN_ESPECIALISTA;
-      m[k] = (m[k] || 0) + 1;
+      m[c.calendarId] = (m[c.calendarId] || 0) + 1;
     });
     return m;
   }, [citas]);
 
   const hoy = hoyFn();
   const citasHoy = useMemo(
-    () => citas.filter((c) => citaEnDia(c, hoy)).sort((a, b) => a.inicio.localeCompare(b.inicio)),
-    [citas, hoy]
+    () =>
+      citas
+        .filter((c) => !ocultos.includes(c.calendarId) && citaEnDia(c, hoy))
+        .sort((a, b) => a.inicio.localeCompare(b.inicio)),
+    [citas, hoy, ocultos]
   );
   const hoyEnRango = hoy >= rango.desde && hoy < rango.hasta;
 
@@ -439,7 +473,7 @@ export default function Agenda() {
         {estado?.configurado && (
           <Typography noWrap sx={{ fontSize: 12, color: BRAND.textoTenue }}>
             <Box component="span" sx={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", bgcolor: errorCitas ? BRAND.error : BRAND.exito, mr: 0.75, verticalAlign: "middle" }} />
-            Google Calendar · {estado.calendarNombre || "conectado"}
+            Google Calendar · {estado.cuenta || "conectado"}
             {ultimaSync && !movil && ` · actualizado ${ultimaSync.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}`}
           </Typography>
         )}
@@ -580,11 +614,11 @@ export default function Agenda() {
           />
         )}
         {!ancho && (
-          <Tooltip title="Filtrar por especialista">
+          <Tooltip title="Calendarios">
             <IconButton
               onClick={(e) => setMenuFiltro(e.currentTarget)}
               sx={{ color: ocultos.length ? BRAND.oro : undefined }}
-              aria-label="Filtrar por especialista"
+              aria-label="Elegir calendarios"
             >
               <FilterList />
             </IconButton>
@@ -643,6 +677,11 @@ export default function Agenda() {
           {errorCitas}
         </Alert>
       )}
+      {avisos.length > 0 && !errorCitas && (
+        <Alert severity="warning" sx={{ mx: { xs: 1.5, sm: 3 }, mb: 1 }}>
+          {avisos.join(" · ")}
+        </Alert>
+      )}
       {busquedaActiva && (
         <Typography sx={{ px: { xs: 1.5, sm: 3 }, pb: 0.75, fontSize: 12.5, color: BRAND.textoSuave }}>
           {citasVisibles.length} {citasVisibles.length === 1 ? "cita coincide" : "citas coinciden"} con “{busqueda.trim()}” en este periodo
@@ -654,7 +693,7 @@ export default function Agenda() {
         {ancho && (
           <Box sx={{ width: 250, flexShrink: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2.5, pr: 0.5 }}>
             <MiniCalendario fecha={fecha} vista={vista} onElegir={(d) => setFecha(d)} />
-            <FiltroEspecialistas especialistas={especialistas} ocultos={ocultos} onCambiar={setOcultos} conteos={conteos} />
+            <FiltroCalendarios calendarios={calendarios} ocultos={ocultos} onCambiar={setOcultos} conteos={conteos} />
             {hoyEnRango && (
               <Box>
                 <Typography sx={{ fontWeight: 700, fontSize: 13, letterSpacing: "0.04em", color: BRAND.textoSuave, mb: 0.75 }}>
@@ -737,7 +776,7 @@ export default function Agenda() {
       )}
 
       <Menu anchorEl={menuFiltro} open={Boolean(menuFiltro)} onClose={() => setMenuFiltro(null)} PaperProps={{ sx: { p: 1.5, width: 280 } }}>
-        <FiltroEspecialistas especialistas={especialistas} ocultos={ocultos} onCambiar={setOcultos} conteos={conteos} />
+        <FiltroCalendarios calendarios={calendarios} ocultos={ocultos} onCambiar={setOcultos} conteos={conteos} />
       </Menu>
 
       <DetalleCita
@@ -755,6 +794,8 @@ export default function Agenda() {
         cita={formulario?.cita || null}
         inicial={formulario?.inicial || null}
         especialistas={especialistas}
+        calendarios={calendarios}
+        predeterminado={predeterminado}
         tratamientos={tratamientos}
         citasCargadas={citas}
         onClose={() => setFormulario(null)}
@@ -762,10 +803,10 @@ export default function Agenda() {
         onEliminado={alEliminar}
       />
 
-      <Dialog open={configAbierta} onClose={() => setConfigAbierta(false)} maxWidth="md" fullWidth fullScreen={movil}>
+      <Dialog open={configAbierta} onClose={() => setConfigAbierta(false)} maxWidth="lg" fullWidth fullScreen={movil}>
         <DialogTitle sx={{ display: "flex", alignItems: "center" }}>
           <Typography component="span" sx={{ flex: 1, fontWeight: 700, fontSize: 18 }}>
-            Conexión con Google Calendar
+            Google Calendar
           </Typography>
           <IconButton onClick={() => setConfigAbierta(false)} aria-label="Cerrar">
             <Close />
@@ -777,11 +818,21 @@ export default function Agenda() {
             onConectado={(r) => {
               setConfigAbierta(false);
               showToast({ severity: "success", message: `Conectado a ${r.calendarNombre}` });
-              cargarEstado().then(() => cargarCitas());
+              cargarEstado().then(() => {
+                cargarCalendarios();
+                cargarCitas();
+              });
+            }}
+            onCalendariosGuardados={(lista) => {
+              setCalendarios(lista.filter((c) => c.visible));
+              cargarCalendarios();
+              cargarCitas({ silencioso: true });
+              showToast({ severity: "success", message: "Calendarios actualizados" });
             }}
             onDesconectado={() => {
               setConfigAbierta(false);
               setCitas([]);
+              setCalendarios([]);
               showToast({ severity: "info", message: "Google Calendar desconectado" });
               cargarEstado();
             }}

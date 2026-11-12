@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Box, Typography, useMediaQuery } from "@mui/material";
 import { BRAND } from "../../brand";
-import { colorCita } from "./colores";
+import { colorCita, textoSobre } from "./colores";
 import { cuadriculaMes, citaEnDia, numeroDia, hoy as hoyFn, horaDe } from "./fechas";
 
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -129,7 +129,7 @@ export default function VistaMes({ fecha, citas, onAbrir, onIrADia, onCrearDia, 
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           ...(c.todoElDia
-                            ? { bgcolor: color, color: "#fff", fontWeight: 600 }
+                            ? { bgcolor: color, color: textoSobre(color), fontWeight: 600 }
                             : { color: BRAND.texto, "&:hover": { bgcolor: "rgba(163,105,32,0.08)" } }),
                         }}
                       >

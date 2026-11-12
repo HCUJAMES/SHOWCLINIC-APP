@@ -11,7 +11,7 @@ import {
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import { Close, Edit, OpenInNew, Person, Badge, MedicalServices, Description, Phone, AccessTime } from "../../iconos";
+import { Close, Edit, OpenInNew, Person, Badge, MedicalServices, Description, Phone, AccessTime, CalendarMonth } from "../../iconos";
 import { BRAND } from "../../brand";
 import { colorCita } from "./colores";
 import { textoDiaLargo, textoHorario, fechaDe } from "./fechas";
@@ -41,11 +41,13 @@ export default function DetalleCita({ cita, onClose, onEditar, onVerPaciente }) 
     <Dialog open={Boolean(cita)} onClose={onClose} fullWidth maxWidth="xs" fullScreen={movil}>
       <Box sx={{ height: 6, bgcolor: color }} />
       <Box sx={{ display: "flex", justifyContent: "flex-end", px: 1, pt: 1, gap: 0.5 }}>
-        <Tooltip title="Editar">
-          <IconButton onClick={() => onEditar(cita)} aria-label="Editar cita">
-            <Edit fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        {cita.escribible !== false && (
+          <Tooltip title="Editar">
+            <IconButton onClick={() => onEditar(cita)} aria-label="Editar cita">
+              <Edit fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
         {cita.enlace && (
           <Tooltip title="Abrir en Google Calendar">
             <IconButton component="a" href={cita.enlace} target="_blank" rel="noopener noreferrer" aria-label="Abrir en Google Calendar">
@@ -74,6 +76,18 @@ export default function DetalleCita({ cita, onClose, onEditar, onVerPaciente }) 
           <Typography sx={{ fontSize: 14 }}>{textoHorario(cita)}</Typography>
           {cita.recurrente && <Typography sx={{ fontSize: 12, color: BRAND.textoTenue }}>Cita que se repite</Typography>}
         </Fila>
+
+        {cita.calendarioNombre && (
+          <Fila icono={CalendarMonth}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Box sx={{ width: 10, height: 10, borderRadius: "3px", bgcolor: color, flexShrink: 0 }} />
+              <Typography sx={{ fontSize: 14 }}>{cita.calendarioNombre}</Typography>
+            </Box>
+            {cita.escribible === false && (
+              <Typography sx={{ fontSize: 12, color: BRAND.textoTenue }}>Calendario de solo lectura</Typography>
+            )}
+          </Fila>
+        )}
 
         <Fila icono={Person}>
           {p ? (
@@ -130,11 +144,11 @@ export default function DetalleCita({ cita, onClose, onEditar, onVerPaciente }) 
           <Button variant="contained" fullWidth onClick={() => onVerPaciente(p)}>
             Ver historial de la paciente
           </Button>
-        ) : (
+        ) : cita.escribible !== false ? (
           <Button variant="outlined" fullWidth onClick={() => onEditar(cita)}>
             Vincular a una paciente
           </Button>
-        )}
+        ) : null}
       </DialogActions>
     </Dialog>
   );

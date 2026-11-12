@@ -99,8 +99,9 @@ export default function VistaLista({ desde, hasta, citas, onAbrir, alto }) {
                       {c.titulo}
                     </Typography>
                     <Typography sx={{ fontSize: 12.5, color: BRAND.textoSuave }} noWrap>
-                      {[nombre && `Paciente: ${nombre}`, c.tratamiento, c.especialistaNombre].filter(Boolean).join(" · ") ||
-                        "Sin paciente vinculada"}
+                      {[nombre && `Paciente: ${nombre}`, c.tratamiento, c.calendarioNombre || c.especialistaNombre]
+                        .filter(Boolean)
+                        .join(" · ") || "Sin paciente vinculada"}
                     </Typography>
                   </Box>
                 </Box>

@@ -1,49 +1,55 @@
 # 📅 Agenda conectada a Google Calendar
 
-La **Agenda** de ShowClinic muestra el mismo Google Calendar que el equipo ya usa en sus celulares (cuenta **showclinicyanahuara@gmail.com**), cruzado con los datos de cada paciente.
+La **Agenda** de ShowClinic muestra **todos los calendarios** de la cuenta **showclinicyanahuara@gmail.com** (Dr. Erickson Espetia, Carla Vargas, Dra. Alicia Paez, Dra. Edith Carpio, etc.) juntos, **con los mismos colores que en Google**, y cruzados con los datos de cada paciente.
 
 - Lo que se agenda en ShowClinic aparece **al instante** en Google Calendar (y en los celulares).
 - Lo que se agenda directamente en Google aparece en ShowClinic (se actualiza solo cada minuto, o con el botón ⟳).
-- Si en Google escriben el **nombre y apellido** o el **DNI** de la paciente en el título (ej. `María Pérez - Botox`), el sistema la reconoce sola.
-
-> Nadie tiene que iniciar sesión con Google dentro de ShowClinic. La conexión se hace **una sola vez** y queda funcionando para todo el equipo.
+- Cada calendario está unido a su especialista: al agendar con la Dra. Paez, la cita se guarda en el calendario "Dra. Alicia Paez".
+- Si en Google escriben el **nombre y apellido** o el **DNI** de la paciente en el título, el sistema la reconoce sola.
 
 ---
 
-## Configuración (una sola vez, ~10 minutos)
+## Configuración (una sola vez, ~15 minutos)
 
-Hazlo en una computadora, con la sesión de Google de **showclinicyanahuara@gmail.com**.
+> ⚠️ Hazlo **en la computadora servidor** (donde está instalado ShowClinic), abriendo **http://localhost:4000/agenda** en su navegador. Google solo permite volver a esa dirección después de iniciar sesión.
 
 ### 1. Crear el proyecto y activar la API
-1. Entra a <https://console.cloud.google.com/>.
-2. Arriba, en el selector de proyectos → **Proyecto nuevo** → nombre: `ShowClinic` → **Crear**.
-3. Entra a <https://console.cloud.google.com/apis/library/calendar-json.googleapis.com> (con el proyecto ShowClinic seleccionado) y presiona **Habilitar**.
+1. Entra a <https://console.cloud.google.com/> con **showclinicyanahuara@gmail.com**.
+2. Selector de proyectos → **Proyecto nuevo** → nombre `ShowClinic` → **Crear**.
+3. Entra a <https://console.cloud.google.com/apis/library/calendar-json.googleapis.com> y presiona **Habilitar**.
 
-Es gratis: Google no cobra por el uso que hace una clínica.
+### 2. Pantalla de consentimiento (y publicarla)
+1. Entra a <https://console.cloud.google.com/apis/credentials/consent>.
+2. Tipo de usuario **Externo** → nombre de la app **ShowClinic**, correo de soporte y correo de contacto: showclinicyanahuara@gmail.com → **Guardar**.
+3. En la sección **Público**, presiona **Publicar app** → confirmar. Debe decir **"En producción"**.
 
-### 2. Crear la "cuenta de servicio" y descargar la llave
-1. Entra a <https://console.cloud.google.com/iam-admin/serviceaccounts>.
-2. **Crear cuenta de servicio** → nombre: `agenda-showclinic` → **Crear y continuar** → no asignes roles → **Listo**.
-3. Abre la cuenta creada → pestaña **Claves** → **Agregar clave** → **Crear clave nueva** → **JSON** → **Crear**.
-4. Se descarga un archivo `.json`. **Guárdalo en un lugar seguro**: es la llave de acceso al calendario.
+> ❗ Si se queda en "En prueba", Google desconecta el calendario **cada 7 días**.
 
-> Si Google muestra el aviso *"La creación de claves de cuentas de servicio está inhabilitada"*, ve a **IAM → Políticas de la organización**, busca `iam.disableServiceAccountKeyCreation` y desactívala. En cuentas Gmail normales esto no suele aparecer.
+### 3. Crear el "ID de cliente"
+1. Entra a <https://console.cloud.google.com/apis/credentials> → **Crear credenciales** → **ID de cliente de OAuth**.
+2. Tipo de aplicación: **Aplicación web**. Nombre: `ShowClinic`.
+3. En **URI de redireccionamiento autorizados** → **Agregar URI** → pega exactamente:
+   ```
+   http://localhost:4000/api/calendario/oauth/callback
+   ```
+4. **Crear** → **Descargar JSON**.
 
-### 3. Conectar en ShowClinic
-1. En ShowClinic entra con el usuario **master** (o doctor) → **Agenda**.
-2. Presiona **Subir archivo .json** y elige el archivo del paso 2.
-3. Aparecerá un correo parecido a `agenda-showclinic@showclinic-xxxx.iam.gserviceaccount.com`. Cópialo con el botón 📋.
+### 4. Conectar en ShowClinic
+1. En la computadora servidor abre **http://localhost:4000/agenda** con el usuario **master**.
+2. Pestaña **Iniciar sesión con Google** → **Subir archivo .json** (el del paso 3).
+3. Presiona **Iniciar sesión con Google**, elige **showclinicyanahuara@gmail.com** y acepta.
+   - Si aparece *"Google no verificó esta app"*: **Configuración avanzada → Ir a ShowClinic (no seguro)**. Es normal: la app es tuya y solo la usa la clínica.
+4. Vuelves a la Agenda con todos los calendarios y sus colores. ✅
 
-### 4. Compartir el calendario con ese correo
-1. Abre <https://calendar.google.com> (en la computadora, no en el celular).
-2. A la izquierda, en **Mis calendarios**, pasa el mouse sobre el calendario de la clínica → **⋮** → **Configuración y uso compartido**.
-3. **Compartir con personas específicas o grupos** → **Agregar personas y grupos** → pega el correo del paso 3.
-4. Permiso: **Hacer cambios en eventos** → **Enviar**.
+### 5. Revisar los calendarios (⚙️ en la Agenda)
+- **Mostrar**: por defecto se muestran los mismos que tienes marcados en Google. Puedes apagar los que no sean de citas (Cumpleaños, Marketing…).
+- **Especialista**: el sistema une cada calendario con su especialista por el nombre ("Detectado por el nombre"). Revisa que estén bien y corrige los que falten (por ejemplo "YUNY APOYO COSMIATRIA" → Yunianly Rodriguez).
+- **Predet.**: el calendario donde se guardan las citas que no tienen especialista.
+- **Color**: viene de Google. Solo si alguno no coincide, haz clic en el cuadrito y elige el mismo color que tiene en Google.
 
-### 5. Terminar
-1. Vuelve a ShowClinic. El **ID del calendario** ya viene escrito (`showclinicyanahuara@gmail.com`).
-   *Solo si usan un calendario secundario (no el principal), cópialo desde Google Calendar → Configuración → **Integrar el calendario → ID del calendario**.*
-2. Presiona **Conectar y probar**. El sistema revisa que todo funcione antes de guardar y, si algo falta, dice exactamente qué corregir.
+Presiona **Guardar cambios**.
+
+> Si ya tenías conectada la versión anterior (con la llave de "cuenta de servicio"), sigue funcionando. En ⚙️ aparece el botón **Cambiar a "Iniciar sesión con Google"** para ver todos los calendarios.
 
 ---
 
@@ -52,33 +58,35 @@ Es gratis: Google no cobra por el uso que hace una clínica.
 | Acción | Cómo |
 |---|---|
 | Ver citas | Menú principal → **Agenda**. Vistas: Día, Semana, Mes y Lista |
-| Agendar | Botón **Nueva cita**, o clic en un espacio vacío del calendario |
+| Ver u ocultar calendarios | Casillas de **Calendarios** a la izquierda (cada persona elige lo que ve) |
+| Agendar | **Nueva cita** o clic en un espacio vacío. Al elegir especialista se elige su calendario |
 | Agendar desde la ficha | **Historial clínico** → paciente → sección **Citas** → **Agendar cita** |
-| Reprogramar | Arrastra la cita con el mouse a otra hora o día, o ábrela → ✏️ |
-| Ver a la paciente | Abre la cita → **Ver historial de la paciente** |
-| Filtrar | Por especialista (panel izquierdo o botón de filtro) y con el buscador |
+| Reprogramar | Arrastra la cita con el mouse, o ábrela → ✏️ |
+| Pasar la cita a otra especialista | Ábrela → ✏️ → cambia el especialista o el calendario |
 
-- Cada especialista tiene un color fijo (el mismo que se ve en Google). Se puede cambiar por cita.
-- Si el especialista o la paciente ya tienen otra cita a esa hora, el formulario lo avisa.
-- El rol **doctora** ve la agenda, pero no los teléfonos de las pacientes (igual que en el resto del sistema).
-- Solo **master** y **doctor** pueden conectar o desconectar Google Calendar (botón ⚙️ en la Agenda).
+- Los calendarios **de solo lectura** (por ejemplo, uno personal compartido contigo) se ven, pero no se pueden editar desde ShowClinic.
+- Si el especialista ya tiene otra cita a esa hora, el formulario lo avisa.
+- El rol **doctora** ve la agenda pero no los teléfonos de las pacientes.
+- Solo **master** y **doctor** pueden conectar Google o cambiar los ajustes de calendarios.
 
 ---
 
 ## Actualizar el servidor
 
-No hay librerías nuevas ni migraciones manuales: la tabla de configuración se crea sola.
+No hay librerías nuevas ni migraciones manuales.
 
-1. `git pull`
-2. Volver a compilar el frontend (`npm run build` dentro de `frontend`)
+1. `git pull origin main`
+2. `cd frontend` y luego `npm run build`
 3. Reiniciar el backend
 
 ## Problemas frecuentes
 
 | Mensaje | Solución |
 |---|---|
-| "No se pudo acceder al calendario…" | Falta el paso 4 o el correo pegado no es el de la cuenta de servicio |
-| "El calendario está compartido solo para ver" | En el paso 4 elige **Hacer cambios en eventos** |
+| "Google no reconoce el URI de redirección" | En el ID de cliente (paso 3) el URI no es exactamente `http://localhost:4000/api/calendario/oauth/callback` |
+| La página de Google no vuelve / "no se puede acceder a localhost" | Lo hiciste desde otra computadora: repítelo en la computadora servidor |
+| "La sesión de Google se cerró o fue revocada" | Agenda → ⚙️ → **Volver a iniciar sesión con Google**. Revisa que la app esté **"En producción"** (paso 2) |
+| "Google no entregó el permiso permanente" | Entra a <https://myaccount.google.com/permissions>, quita el acceso de ShowClinic y vuelve a iniciar sesión |
 | "La Google Calendar API no está activada" | Repite el paso 1.3 y espera 2–3 minutos |
-| "Google rechazó las credenciales" | Se borró la llave en Google Cloud: crea una nueva (paso 2.3) y súbela con ⚙️ |
-| "No hay conexión con Google Calendar" | El servidor de la clínica no tiene internet |
+| Un calendario no aparece | Agenda → ⚙️ → botón ⟳ (volver a leer) y márcalo en **Mostrar** |
+| Un color no coincide | Agenda → ⚙️ → clic en el cuadrito de color de ese calendario y elige el mismo de Google |
