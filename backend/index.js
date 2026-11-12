@@ -26,6 +26,7 @@ import gestionDuenoRoutes from "./routes/gestionDuenoRoutes.js";
 import barcodeRoutes from "./routes/barcodeRoutes.js";
 import consultasRoutes from "./routes/consultasRoutes.js";
 import videosRoutes from "./routes/videosRoutes.js";
+import calendarioRoutes from "./routes/calendarioRoutes.js";
 import { ocultarContactoSegunRol } from "./middleware/privacidad.js";
 import bcrypt from "bcryptjs";
 import compression from "compression";
@@ -1470,6 +1471,7 @@ app.use("/api/gestion-dueno", gestionDuenoRoutes);
 app.use("/api/barcodes", barcodeRoutes);
 app.use("/api/consultas", consultasRoutes);
 app.use("/api/videos", videosRoutes);
+app.use("/api/calendario", calendarioRoutes);
 app.use("/uploads/docs", express.static("uploads/docs"));
 app.use("/uploads/especialistas", express.static("uploads/especialistas"));
 

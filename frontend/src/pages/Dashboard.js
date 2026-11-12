@@ -32,6 +32,7 @@ import {
   ScienceRounded,
   Crown,
   VideoLibrary,
+  CalendarMonth,
   LogoutRounded,
   ChevronRight,
 } from "../iconos";
@@ -58,6 +59,7 @@ const moduleIcons = {
   "Códigos de Barras": QrCodeScanner,
   "Gestión CEO": Crown,
   "Antes y Después": VideoLibrary,
+  Agenda: CalendarMonth,
 };
 
 /**
@@ -67,7 +69,7 @@ const moduleIcons = {
  * mismos de siempre. Un módulo que no esté aquí cae en "Otros".
  */
 const GRUPOS = [
-  { id: "atencion", label: "Atención", titulos: ["Pacientes", "Tratamientos", "Paquetes", "Gestión Clínica", "Antes y Después"] },
+  { id: "atencion", label: "Atención", titulos: ["Agenda", "Pacientes", "Tratamientos", "Paquetes", "Gestión Clínica", "Antes y Después"] },
   { id: "operacion", label: "Operación", titulos: ["Inventario", "Códigos de Barras", "Productos Aplicados", "Especialistas"] },
   { id: "direccion", label: "Dirección", titulos: ["Finanzas", "Gestión CEO", "Estadísticas"] },
   { id: "sistema", label: "Sistema", titulos: ["Gestionar", "Usuarios"] },
@@ -80,6 +82,16 @@ const MODULO_VIDEOS = {
   path: "/antes-despues",
   description: "Videos de antes y después de cada tratamiento realizado",
   tag: "VIDEOS",
+  hasAccess: true,
+};
+
+// Agenda (Google Calendar de la clínica): todo el equipo la ve, igual que hoy
+// ven el calendario desde sus celulares.
+const MODULO_AGENDA = {
+  title: "Agenda",
+  path: "/agenda",
+  description: "Citas del día y de la semana, conectadas con el Google Calendar de la clínica",
+  tag: "CITAS",
   hasAccess: true,
 };
 
@@ -211,8 +223,9 @@ export default function Dashboard() {
   // usuarios cuyo menú sale de sus permisos.
   const menuItems = useMemo(() => {
     const base = menuItemsByRole[role] || permissionMenuItems;
-    if (base.some((m) => m.path === MODULO_VIDEOS.path)) return base;
-    return [...base, MODULO_VIDEOS];
+    const conAgenda = base.some((m) => m.path === MODULO_AGENDA.path) ? base : [MODULO_AGENDA, ...base];
+    if (conAgenda.some((m) => m.path === MODULO_VIDEOS.path)) return conAgenda;
+    return [...conAgenda, MODULO_VIDEOS];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, permissionMenuItems]);
 

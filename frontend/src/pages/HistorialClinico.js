@@ -50,6 +50,7 @@ import TreatmentTimelineMatrix from "../components/TreatmentTimelineMatrix";
 import AsignacionEspecialistas from "../components/AsignacionEspecialistas";
 import DescuentoDual from "../components/DescuentoDual";
 import GaleriaTratamiento from "../components/GaleriaTratamiento";
+import CitasPaciente from "../components/CitasPaciente";
 
 // El mapa 3D usa three.js (~1 MB): se descarga solo cuando se abre
 const FacialMap3D = React.lazy(() => import("../components/FacialMap3D"));
@@ -4327,6 +4328,9 @@ const HistorialClinico = () => {
                   ) : null}
                 </Box>
               </Box>
+
+              {/* Citas en Google Calendar (agenda de la clínica) */}
+              <CitasPaciente paciente={pacienteSeleccionado} />
 
               {/* ========== SECCIÓN 1: DATOS DEL PACIENTE ========== */}
               <Paper
