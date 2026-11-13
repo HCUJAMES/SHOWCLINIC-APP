@@ -62,6 +62,7 @@ Presiona **Guardar cambios**.
 | Agendar | **Nueva cita** o clic en un espacio vacío. Al elegir especialista se elige su calendario |
 | Agendar desde la ficha | **Historial clínico** → paciente → sección **Citas** → **Agendar cita** |
 | Reprogramar | Arrastra la cita con el mouse, o ábrela → ✏️ |
+| Registrar a alguien que no está en el historial | Abre la cita → **Registrar paciente nueva** (nombre y apellido salen del título de la cita; se completa DNI y celular) y queda vinculada. También desde **Nueva cita**: si al buscar no aparece, **Registrar “…” como paciente nueva** |
 | Pasar la cita a otra especialista | Ábrela → ✏️ → cambia el especialista o el calendario |
 
 - Los **colores** son los de la cuenta showclinicyanahuara@gmail.com. Si alguien cambió los colores en su propio Google, en su celular puede verlos distintos: lo que manda es la cuenta de la clínica.

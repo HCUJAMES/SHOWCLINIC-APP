@@ -71,6 +71,7 @@ import VistaLista from "./VistaLista";
 import CitaDialog from "./CitaDialog";
 import DetalleCita from "./DetalleCita";
 import ConfigurarGoogle from "./ConfigurarGoogle";
+import RegistroRapidoPaciente, { sugerirDatosPaciente } from "./RegistroRapidoPaciente";
 
 const VISTAS = [
   { id: "dia", label: "Día" },
@@ -270,6 +271,12 @@ export default function Agenda() {
   const [detalle, setDetalle] = useState(null);
   const [formulario, setFormulario] = useState(null); // { cita } | { inicial }
   const [configAbierta, setConfigAbierta] = useState(false);
+  const [registro, setRegistro] = useState(null); // cita para la que se registra una paciente nueva
+  // Se calcula una sola vez por cita: así el formulario no se reinicia cuando la agenda se refresca
+  const registroInicial = useMemo(
+    () => (registro ? sugerirDatosPaciente(registro.titulo, registro.descripcion) : null),
+    [registro]
+  );
   const [menuFiltro, setMenuFiltro] = useState(null);
 
   const rango = useMemo(() => rangoVista(vista, fecha), [vista, fecha]);
@@ -479,6 +486,39 @@ export default function Agenda() {
     } catch (err) {
       setCitas((prev) => prev.map((c) => (c.id === cita.id ? anterior : c)));
       showToast({ severity: "error", message: mensajeError(err, "No se pudo mover la cita.") });
+    }
+  };
+
+  // Registrar a la persona de una cita como paciente nueva y dejarla vinculada
+  const vincularPacienteNueva = async (paciente, origen) => {
+    const cita = registro;
+    setRegistro(null);
+    try {
+      const actualizada = await agendaApi.actualizar(cita.id, {
+        titulo: cita.titulo,
+        calendarId: cita.calendarId,
+        pacienteId: paciente.id,
+        sinPaciente: false,
+        especialistaId: cita.especialistaId || null,
+        tratamiento: cita.tratamiento || "",
+        notas: cita.notas || "",
+        inicio: cita.inicio,
+        fin: cita.fin,
+        todoElDia: cita.todoElDia,
+        colorId: cita.colorId || null,
+      });
+      setCitas((prev) => prev.map((c) => (c.id === cita.id ? actualizada : c)));
+      setDetalle(actualizada);
+      showToast({
+        severity: "success",
+        message: origen === "nueva" ? "Paciente registrada y vinculada a la cita" : "Cita vinculada a la ficha de la paciente",
+      });
+      cargarCitas({ silencioso: true });
+    } catch (err) {
+      showToast({
+        severity: "error",
+        message: `${origen === "nueva" ? "La paciente se registró, pero no" : "No"} se pudo vincular a la cita: ${mensajeError(err, "error")}`,
+      });
     }
   };
 
@@ -837,6 +877,17 @@ export default function Agenda() {
           setFormulario({ cita: c });
         }}
         onVerPaciente={verPaciente}
+        onRegistrarPaciente={(c) => {
+          setDetalle(null);
+          setRegistro(c);
+        }}
+      />
+
+      <RegistroRapidoPaciente
+        open={Boolean(registro)}
+        inicial={registroInicial}
+        onClose={() => setRegistro(null)}
+        onCreada={vincularPacienteNueva}
       />
 
       <CitaDialog

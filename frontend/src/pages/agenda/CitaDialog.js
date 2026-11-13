@@ -26,6 +26,7 @@ import { Close, Delete, Check } from "../../iconos";
 import { BRAND } from "../../brand";
 import { COLORES_GOOGLE, colorPorId } from "./colores";
 import agendaApi, { mensajeError } from "./api";
+import RegistroRapidoPaciente, { sugerirDatosPaciente } from "./RegistroRapidoPaciente";
 import {
   fechaDe,
   horaDe,
@@ -51,7 +52,7 @@ const tituloAuto = (paciente, tratamiento) =>
 
 const seCruzan = (a, b) => a.inicio < b.fin && b.inicio < a.fin;
 
-function BuscadorPaciente({ value, onChange, disabled }) {
+function BuscadorPaciente({ value, onChange, disabled, onRegistrarNueva }) {
   const [texto, setTexto] = useState("");
   const [opciones, setOpciones] = useState([]);
   const [cargando, setCargando] = useState(false);
@@ -93,7 +94,27 @@ function BuscadorPaciente({ value, onChange, disabled }) {
       disabled={disabled}
       isOptionEqualToValue={(a, b) => a.id === b.id}
       getOptionLabel={(p) => `${nombrePaciente(p)}${p.dni ? ` · DNI ${p.dni}` : ""}`}
-      noOptionsText={texto.trim().length < 2 ? "Escribe al menos 2 letras del nombre o el DNI" : "No se encontró ninguna paciente"}
+      noOptionsText={
+        texto.trim().length < 2 ? (
+          "Escribe al menos 2 letras del nombre o el DNI"
+        ) : (
+          <Box>
+            No se encontró ninguna paciente.{" "}
+            <Box
+              component="span"
+              role="button"
+              tabIndex={0}
+              // mousedown sin efecto para que la lista no se cierre antes del clic
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onRegistrarNueva?.(texto.trim())}
+              onKeyDown={(e) => e.key === "Enter" && onRegistrarNueva?.(texto.trim())}
+              sx={{ color: BRAND.oro, fontWeight: 600, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+            >
+              Registrar “{texto.trim()}” como paciente nueva
+            </Box>
+          </Box>
+        )
+      }
       loadingText="Buscando…"
       renderOption={(props, p) => {
         const { key, ...resto } = props;
@@ -163,6 +184,7 @@ export default function CitaDialog({
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
+  const [registroInicial, setRegistroInicial] = useState(null); // abre el registro rápido
 
   // Cargar los datos al abrir
   useEffect(() => {
@@ -364,7 +386,29 @@ export default function CitaDialog({
 
         {/* Paciente */}
         <Box>
-          {!sinPaciente && <BuscadorPaciente value={paciente} onChange={setPaciente} disabled={guardando} />}
+          {!sinPaciente && (
+            <BuscadorPaciente
+              value={paciente}
+              onChange={setPaciente}
+              disabled={guardando}
+              onRegistrarNueva={(texto) => setRegistroInicial(sugerirDatosPaciente(texto))}
+            />
+          )}
+          {!sinPaciente && !paciente && (
+            <Typography sx={{ fontSize: 12.5, color: BRAND.textoSuave, mt: 0.75 }}>
+              ¿No está en el historial clínico?{" "}
+              <Box
+                component="span"
+                role="button"
+                tabIndex={0}
+                onClick={() => setRegistroInicial(sugerirDatosPaciente(cita?.titulo || "", cita?.descripcion || ""))}
+                onKeyDown={(e) => e.key === "Enter" && setRegistroInicial(sugerirDatosPaciente(cita?.titulo || "", cita?.descripcion || ""))}
+                sx={{ color: BRAND.oro, fontWeight: 600, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+              >
+                Registrar paciente nueva
+              </Box>
+            </Typography>
+          )}
           <FormControlLabel
             sx={{ mt: sinPaciente ? 0 : 0.5 }}
             control={
@@ -642,6 +686,16 @@ export default function CitaDialog({
           {guardando ? "Guardando…" : editando ? "Guardar cambios" : "Agendar cita"}
         </Button>
       </DialogActions>
+      <RegistroRapidoPaciente
+        open={Boolean(registroInicial)}
+        inicial={registroInicial}
+        onClose={() => setRegistroInicial(null)}
+        onCreada={(p) => {
+          setRegistroInicial(null);
+          setSinPaciente(false);
+          setPaciente({ id: p.id, nombre: p.nombre, apellido: p.apellido, dni: p.dni, celular: p.celular });
+        }}
+      />
     </Dialog>
   );
 }

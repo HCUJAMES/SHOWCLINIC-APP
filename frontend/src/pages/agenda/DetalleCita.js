@@ -11,7 +11,7 @@ import {
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import { Close, Edit, OpenInNew, Person, Badge, MedicalServices, Description, Phone, AccessTime, CalendarMonth } from "../../iconos";
+import { Close, Edit, OpenInNew, Person, Badge, MedicalServices, Description, Phone, AccessTime, CalendarMonth, PersonAdd } from "../../iconos";
 import { BRAND } from "../../brand";
 import { colorCita } from "./colores";
 import { textoDiaLargo, textoHorario, fechaDe } from "./fechas";
@@ -25,7 +25,7 @@ function Fila({ icono: Icono, children }) {
   );
 }
 
-export default function DetalleCita({ cita, onClose, onEditar, onVerPaciente }) {
+export default function DetalleCita({ cita, onClose, onEditar, onVerPaciente, onRegistrarPaciente }) {
   const movil = useMediaQuery("(max-width:600px)");
   if (!cita) return null;
   const color = colorCita(cita);
@@ -35,7 +35,9 @@ export default function DetalleCita({ cita, onClose, onEditar, onVerPaciente }) 
 
   // Para citas creadas en ShowClinic las notas ya vienen aparte; la
   // descripción se muestra solo si la escribieron a mano en Google.
-  const descripcion = cita.creadoDesde === "google" ? cita.descripcion : null;
+  // (sin el bloque "Datos de ShowClinic", que ya se ve arriba).
+  const descripcion =
+    cita.creadoDesde === "google" ? String(cita.descripcion || "").split("— Datos de ShowClinic —")[0].trim() || null : null;
 
   return (
     <Dialog open={Boolean(cita)} onClose={onClose} fullWidth maxWidth="xs" fullScreen={movil}>
@@ -145,9 +147,17 @@ export default function DetalleCita({ cita, onClose, onEditar, onVerPaciente }) 
             Ver historial de la paciente
           </Button>
         ) : cita.escribible !== false ? (
-          <Button variant="outlined" fullWidth onClick={() => onEditar(cita)}>
-            Vincular a una paciente
-          </Button>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1, width: "100%" }}>
+            <Typography sx={{ fontSize: 12.5, color: BRAND.textoSuave, textAlign: "center" }}>
+              Esta persona no está vinculada a ninguna ficha del historial clínico.
+            </Typography>
+            <Button variant="contained" fullWidth startIcon={<PersonAdd />} onClick={() => onRegistrarPaciente?.(cita)}>
+              Registrar paciente nueva
+            </Button>
+            <Button variant="outlined" fullWidth onClick={() => onEditar(cita)}>
+              Vincular a una paciente existente
+            </Button>
+          </Box>
         ) : null}
       </DialogActions>
     </Dialog>

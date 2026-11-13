@@ -32,6 +32,7 @@ export const agendaApi = {
 
   // Datos del sistema para el formulario
   buscarPacientes: (term) => api.get("/api/pacientes/buscar", { params: { term } }).then((r) => r.data),
+  registrarPaciente: (datos) => api.post("/api/pacientes/registrar", datos).then((r) => r.data),
   especialistas: () => api.get("/api/especialistas/listar").then((r) => r.data),
   tratamientos: () => api.get("/api/tratamientos/listar").then((r) => r.data),
 };

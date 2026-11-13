@@ -255,7 +255,8 @@ router.post("/registrar", requirePatientWrite, (req, res) => {
         return res.status(500).json({ message: "Error al registrar paciente" });
       }
       console.log("✅ Paciente registrado:", nombre, apellido);
-      res.json({ message: "Paciente registrado exitosamente" });
+      // El id permite vincular de inmediato a la paciente nueva (por ejemplo, desde la Agenda)
+      res.json({ message: "Paciente registrado exitosamente", id: this.lastID });
     }
   );
 });
