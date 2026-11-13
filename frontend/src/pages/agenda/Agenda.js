@@ -41,6 +41,8 @@ import {
   Close,
   FilterList,
   CalendarMonth,
+  ExpandMore,
+  ExpandLess,
 } from "../../iconos";
 import { BRAND, FONTS } from "../../brand";
 import { useToast } from "../../components/ToastProvider";
@@ -161,56 +163,81 @@ function MiniCalendario({ fecha, vista, onElegir }) {
   );
 }
 
-/* ─────────── Calendarios (igual que "Mis calendarios" en Google) ─────────── */
-function FiltroCalendarios({ calendarios, ocultos, onCambiar, conteos }) {
-  const alternar = (id) => {
-    const s = new Set(ocultos);
-    if (s.has(id)) s.delete(id);
-    else s.add(id);
-    onCambiar([...s]);
-  };
+/* ─────────── Calendarios (igual que "Mis calendarios" y "Otros calendarios" en Google) ─────────── */
+function GrupoCalendarios({ titulo, lista, marcado, onAlternar, conteos }) {
+  const [abierto, setAbierto] = useState(true);
+  if (!lista.length) return null;
+  return (
+    <Box sx={{ mb: 1 }}>
+      <Box
+        role="button"
+        tabIndex={0}
+        onClick={() => setAbierto((v) => !v)}
+        onKeyDown={(e) => e.key === "Enter" && setAbierto((v) => !v)}
+        sx={{ display: "flex", alignItems: "center", cursor: "pointer", py: 0.5, pl: 0.5, borderRadius: 1.5, "&:hover": { bgcolor: "rgba(163,105,32,0.05)" } }}
+      >
+        <Typography sx={{ flex: 1, fontWeight: 700, fontSize: 13.5, color: BRAND.texto }}>{titulo}</Typography>
+        {abierto ? <ExpandLess fontSize="small" sx={{ color: BRAND.textoSuave }} /> : <ExpandMore fontSize="small" sx={{ color: BRAND.textoSuave }} />}
+      </Box>
+      {abierto &&
+        lista.map((c) => (
+          <Box
+            key={c.id}
+            component="label"
+            title={c.especialistaNombre ? `${c.nombre} · ${c.especialistaNombre}` : c.nombre}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+              borderRadius: 1.5,
+              pr: 1,
+              cursor: "pointer",
+              "&:hover": { bgcolor: "rgba(163,105,32,0.05)" },
+            }}
+          >
+            <Checkbox
+              size="small"
+              checked={marcado(c)}
+              onChange={() => onAlternar(c)}
+              sx={{ color: c.color, "&.Mui-checked": { color: c.color }, p: 0.75 }}
+            />
+            <Typography sx={{ fontSize: 13, flex: 1, minWidth: 0 }} noWrap>
+              {c.nombre}
+            </Typography>
+            {conteos[c.id] > 0 && marcado(c) && (
+              <Typography sx={{ fontSize: 11.5, color: BRAND.textoTenue }}>{conteos[c.id]}</Typography>
+            )}
+          </Box>
+        ))}
+    </Box>
+  );
+}
+
+function FiltroCalendarios({ calendarios, marcado, onAlternar, onRestablecer, cambiado, conteos }) {
   return (
     <Box>
-      <Box sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
-        <Typography sx={{ flex: 1, fontWeight: 700, fontSize: 13, letterSpacing: "0.04em", color: BRAND.textoSuave }}>
-          CALENDARIOS
-        </Typography>
-        {ocultos.length > 0 && (
-          <Button size="small" onClick={() => onCambiar([])} sx={{ fontSize: 12, py: 0, minWidth: 0 }}>
-            Ver todos
-          </Button>
-        )}
-      </Box>
       {calendarios.length === 0 && (
         <Typography sx={{ fontSize: 12.5, color: BRAND.textoTenue, px: 0.5 }}>Cargando calendarios…</Typography>
       )}
-      {calendarios.map((c) => (
-        <Box
-          key={c.id}
-          component="label"
-          title={c.especialistaNombre ? `${c.nombre} · ${c.especialistaNombre}` : c.nombre}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 0.5,
-            borderRadius: 1.5,
-            pr: 1,
-            cursor: "pointer",
-            "&:hover": { bgcolor: "rgba(163,105,32,0.05)" },
-          }}
-        >
-          <Checkbox
-            size="small"
-            checked={!ocultos.includes(c.id)}
-            onChange={() => alternar(c.id)}
-            sx={{ color: c.color, "&.Mui-checked": { color: c.color }, p: 0.75 }}
-          />
-          <Typography sx={{ fontSize: 13, flex: 1, minWidth: 0 }} noWrap>
-            {c.nombre}
-          </Typography>
-          {conteos[c.id] > 0 && <Typography sx={{ fontSize: 11.5, color: BRAND.textoTenue }}>{conteos[c.id]}</Typography>}
-        </Box>
-      ))}
+      <GrupoCalendarios
+        titulo="Mis calendarios"
+        lista={calendarios.filter((c) => c.grupo !== "otros")}
+        marcado={marcado}
+        onAlternar={onAlternar}
+        conteos={conteos}
+      />
+      <GrupoCalendarios
+        titulo="Otros calendarios"
+        lista={calendarios.filter((c) => c.grupo === "otros")}
+        marcado={marcado}
+        onAlternar={onAlternar}
+        conteos={conteos}
+      />
+      {cambiado && (
+        <Button size="small" onClick={onRestablecer} sx={{ fontSize: 12, mt: 0.5 }}>
+          Marcar como en Google
+        </Button>
+      )}
     </Box>
   );
 }
@@ -236,8 +263,9 @@ export default function Agenda() {
   const [calendarios, setCalendarios] = useState([]);
   const [predeterminado, setPredeterminado] = useState(null);
   const [avisos, setAvisos] = useState([]);
-  // Calendarios que cada persona apaga en su pantalla (como las casillas de Google)
-  const [ocultos, setOcultos] = useState(() => leerLocal("agenda.calOcultos", []));
+  // Casillas de calendarios: empiezan como están en Google; cada persona puede
+  // cambiarlas en su pantalla (se recuerda solo en su navegador)
+  const [marcas, setMarcas] = useState(() => leerLocal("agenda.calMarcas", {}));
   const [busqueda, setBusqueda] = useState("");
   const [detalle, setDetalle] = useState(null);
   const [formulario, setFormulario] = useState(null); // { cita } | { inicial }
@@ -248,7 +276,7 @@ export default function Agenda() {
   const pedido = useRef(0);
 
   useEffect(() => guardarLocal("agenda.vista", vista), [vista]);
-  useEffect(() => guardarLocal("agenda.calOcultos", ocultos), [ocultos]);
+  useEffect(() => guardarLocal("agenda.calMarcas", marcas), [marcas]);
 
   /* ───── Estado de la conexión ───── */
   const cargarEstado = useCallback(async () => {
@@ -376,6 +404,14 @@ export default function Agenda() {
   }, [citas, citaPendiente, cargando, ultimaSync]);
 
   /* ───── Filtros ───── */
+  const marcado = useCallback(
+    (c) => (typeof marcas[c.id] === "boolean" ? marcas[c.id] : c.marcadoEnGoogle !== false),
+    [marcas]
+  );
+  const ocultos = useMemo(() => calendarios.filter((c) => !marcado(c)).map((c) => c.id), [calendarios, marcado]);
+  const alternarCalendario = (c) => setMarcas((m) => ({ ...m, [c.id]: !marcado(c) }));
+  const marcasCambiadas = calendarios.some((c) => typeof marcas[c.id] === "boolean" && marcas[c.id] !== (c.marcadoEnGoogle !== false));
+
   const citasVisibles = useMemo(() => {
     const q = normalizar(busqueda.trim());
     return citas.filter((c) => {
@@ -617,7 +653,7 @@ export default function Agenda() {
           <Tooltip title="Calendarios">
             <IconButton
               onClick={(e) => setMenuFiltro(e.currentTarget)}
-              sx={{ color: ocultos.length ? BRAND.oro : undefined }}
+              sx={{ color: marcasCambiadas ? BRAND.oro : undefined }}
               aria-label="Elegir calendarios"
             >
               <FilterList />
@@ -693,7 +729,14 @@ export default function Agenda() {
         {ancho && (
           <Box sx={{ width: 250, flexShrink: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2.5, pr: 0.5 }}>
             <MiniCalendario fecha={fecha} vista={vista} onElegir={(d) => setFecha(d)} />
-            <FiltroCalendarios calendarios={calendarios} ocultos={ocultos} onCambiar={setOcultos} conteos={conteos} />
+            <FiltroCalendarios
+              calendarios={calendarios}
+              marcado={marcado}
+              onAlternar={alternarCalendario}
+              onRestablecer={() => setMarcas({})}
+              cambiado={marcasCambiadas}
+              conteos={conteos}
+            />
             {hoyEnRango && (
               <Box>
                 <Typography sx={{ fontWeight: 700, fontSize: 13, letterSpacing: "0.04em", color: BRAND.textoSuave, mb: 0.75 }}>
@@ -776,7 +819,14 @@ export default function Agenda() {
       )}
 
       <Menu anchorEl={menuFiltro} open={Boolean(menuFiltro)} onClose={() => setMenuFiltro(null)} PaperProps={{ sx: { p: 1.5, width: 280 } }}>
-        <FiltroCalendarios calendarios={calendarios} ocultos={ocultos} onCambiar={setOcultos} conteos={conteos} />
+        <FiltroCalendarios
+              calendarios={calendarios}
+              marcado={marcado}
+              onAlternar={alternarCalendario}
+              onRestablecer={() => setMarcas({})}
+              cambiado={marcasCambiadas}
+              conteos={conteos}
+            />
       </Menu>
 
       <DetalleCita

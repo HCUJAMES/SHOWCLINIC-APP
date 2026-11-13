@@ -42,7 +42,7 @@ La **Agenda** de ShowClinic muestra **todos los calendarios** de la cuenta **sho
 4. Vuelves a la Agenda con todos los calendarios y sus colores. ✅
 
 ### 5. Revisar los calendarios (⚙️ en la Agenda)
-- **Mostrar**: por defecto se muestran los mismos que tienes marcados en Google. Puedes apagar los que no sean de citas (Cumpleaños, Marketing…).
+- **Mostrar**: por defecto aparecen **todos** los calendarios de la cuenta ("Mis calendarios" y "Otros calendarios"). Desmarca aquí solo los que no quieras que aparezcan nunca en ShowClinic.
 - **Especialista**: el sistema une cada calendario con su especialista por el nombre ("Detectado por el nombre"). Revisa que estén bien y corrige los que falten (por ejemplo "YUNY APOYO COSMIATRIA" → Yunianly Rodriguez).
 - **Predet.**: el calendario donde se guardan las citas que no tienen especialista.
 - **Color**: viene de Google. Solo si alguno no coincide, haz clic en el cuadrito y elige el mismo color que tiene en Google.
@@ -58,12 +58,14 @@ Presiona **Guardar cambios**.
 | Acción | Cómo |
 |---|---|
 | Ver citas | Menú principal → **Agenda**. Vistas: Día, Semana, Mes y Lista |
-| Ver u ocultar calendarios | Casillas de **Calendarios** a la izquierda (cada persona elige lo que ve) |
+| Ver u ocultar calendarios | Casillas de **Mis calendarios / Otros calendarios** a la izquierda. Empiezan marcadas igual que en Google; cada persona puede cambiarlas y volver con **Marcar como en Google** |
 | Agendar | **Nueva cita** o clic en un espacio vacío. Al elegir especialista se elige su calendario |
 | Agendar desde la ficha | **Historial clínico** → paciente → sección **Citas** → **Agendar cita** |
 | Reprogramar | Arrastra la cita con el mouse, o ábrela → ✏️ |
 | Pasar la cita a otra especialista | Ábrela → ✏️ → cambia el especialista o el calendario |
 
+- Los **colores** son los de la cuenta showclinicyanahuara@gmail.com. Si alguien cambió los colores en su propio Google, en su celular puede verlos distintos: lo que manda es la cuenta de la clínica.
+- **Tasks (Tareas de Google)** no es un calendario de citas y Google no lo entrega por esta conexión, así que no aparece.
 - Los calendarios **de solo lectura** (por ejemplo, uno personal compartido contigo) se ven, pero no se pueden editar desde ShowClinic.
 - Si el especialista ya tiene otra cita a esa hora, el formulario lo avisa.
 - El rol **doctora** ve la agenda pero no los teléfonos de las pacientes.

@@ -523,7 +523,8 @@ const cargarEspecialistas = async () => {
 
 let cacheCalendarios = null; // { lista, creado }
 
-const esEspecial = (id) => /#(contacts|holiday|weeknum)@|@import\.calendar\.google\.com$/.test(id);
+// El calendario de cumpleaños aparece en "Mis calendarios" aunque sea de solo lectura
+const esCumpleanos = (id) => /#contacts@group\.v\.calendar\.google\.com$/.test(id);
 
 /**
  * Todos los calendarios de la cuenta, con el color de Google, el especialista
@@ -584,8 +585,12 @@ export const listarCalendarios = async ({ forzar = false } = {}) => {
         rol: c.accessRole,
         escribible,
         principal: Boolean(c.primary),
-        // Por defecto se muestran los mismos que están marcados en Google
-        visible: pref.visible === undefined ? Boolean(c.selected) && !esEspecial(c.id) : Boolean(pref.visible),
+        // Igual que en Google: todos los calendarios de la lista están disponibles
+        // (salvo los que se ocultaron de la lista en Google o el administrador quite)…
+        visible: pref.visible === undefined ? !c.hidden : Boolean(pref.visible),
+        // …y cada uno empieza marcado o desmarcado tal como está en Google
+        marcadoEnGoogle: Boolean(c.selected),
+        grupo: c.accessRole === "owner" || esCumpleanos(c.id) ? "mios" : "otros",
         especialistaId: especialistaId || null,
         especialistaNombre: esp?.nombre || null,
         especialistaAuto,
