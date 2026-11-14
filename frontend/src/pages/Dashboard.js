@@ -71,7 +71,7 @@ const moduleIcons = {
  * mismos de siempre. Un módulo que no esté aquí cae en "Otros".
  */
 const GRUPOS = [
-  { id: "atencion", label: "Atención", titulos: ["Agenda", "Pacientes", "Tratamientos", "Paquetes", "Gestión Clínica", "Antes y Después"] },
+  { id: "atencion", label: "Atención", titulos: ["Pacientes", "Tratamientos", "Paquetes", "Gestión Clínica", "Antes y Después", "Agenda"] },
   { id: "operacion", label: "Operación", titulos: ["Inventario", "Códigos de Barras", "Productos Aplicados", "Especialistas"] },
   { id: "direccion", label: "Dirección", titulos: ["Finanzas", "Gestión CEO", "Estadísticas"] },
   { id: "sistema", label: "Sistema", titulos: ["Gestionar", "Usuarios"] },
@@ -227,9 +227,11 @@ export default function Dashboard() {
   // usuarios cuyo menú sale de sus permisos.
   const menuItems = useMemo(() => {
     const base = menuItemsByRole[role] || permissionMenuItems;
-    const conAgenda = base.some((m) => m.path === MODULO_AGENDA.path) ? base : [MODULO_AGENDA, ...base];
-    if (conAgenda.some((m) => m.path === MODULO_VIDEOS.path)) return conAgenda;
-    return [...conAgenda, MODULO_VIDEOS];
+    // La Agenda va siempre justo después de "Antes y Después"
+    const sinAgenda = base.filter((m) => m.path !== MODULO_AGENDA.path);
+    const conVideos = sinAgenda.some((m) => m.path === MODULO_VIDEOS.path) ? sinAgenda : [...sinAgenda, MODULO_VIDEOS];
+    const i = conVideos.findIndex((m) => m.path === MODULO_VIDEOS.path);
+    return [...conVideos.slice(0, i + 1), MODULO_AGENDA, ...conVideos.slice(i + 1)];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role, permissionMenuItems]);
 
