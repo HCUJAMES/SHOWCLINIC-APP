@@ -13,6 +13,7 @@ import {
   ListItemButton,
   ListItemText,
   CircularProgress,
+  useMediaQuery,
 } from "@mui/material";
 import {
   People,
@@ -39,6 +40,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import PanelRecordatorios from "../components/PanelRecordatorios";
+import CitasHoy from "./agenda/CitasHoy";
 import { BRAND, FONTS, LOGOS } from "../brand";
 
 const MotionBox = motion(Box);
@@ -113,6 +115,8 @@ const subir = {
 
 export default function Dashboard() {
   const role = localStorage.getItem("role");
+  // Citas de hoy: en un lateral en pantallas grandes, arriba de los módulos en tablet y celular
+  const citasEnLateral = useMediaQuery((t) => t.breakpoints.up("lg"));
   const navigate = useNavigate();
   const [openAccessDenied, setOpenAccessDenied] = useState(false);
   const [deniedModule, setDeniedModule] = useState("");
@@ -668,13 +672,35 @@ export default function Dashboard() {
           position: "relative",
           zIndex: 1,
           width: "100%",
-          maxWidth: 1240,
+          maxWidth: { xs: 1240, lg: 1520 },
           mx: "auto",
           px: { xs: 2, sm: 3, md: 4 },
           pt: { xs: 3.5, sm: 5 },
           pb: 5,
+          // En pantallas grandes: módulos a la izquierda y las citas de hoy en un lateral
+          display: { lg: "grid" },
+          gridTemplateColumns: { lg: "minmax(0, 1fr) 360px" },
+          columnGap: { lg: 4 },
+          alignItems: "start",
         }}
       >
+        {/* Lateral: citas de hoy (fijo al bajar) */}
+        {citasEnLateral && (
+        <Box
+          sx={{
+            gridColumn: 2,
+            gridRow: 1,
+            position: "sticky",
+            top: 96,
+            height: "calc(100vh - 120px)",
+            minHeight: 420,
+          }}
+        >
+          <CitasHoy />
+        </Box>
+        )}
+
+        <Box sx={{ gridColumn: { lg: 1 }, minWidth: 0 }}>
         <MotionBox variants={subir} initial="hidden" animate="show" sx={{ mb: { xs: 3.5, sm: 5 } }}>
           <Typography
             sx={{
@@ -703,6 +729,13 @@ export default function Dashboard() {
             ¿Con qué módulo quieres trabajar hoy?
           </Typography>
         </MotionBox>
+
+        {/* En tablet y celular, las citas de hoy van arriba de los módulos */}
+        {!citasEnLateral && (
+          <Box sx={{ mb: { xs: 3.5, sm: 4 } }}>
+            <CitasHoy compacto />
+          </Box>
+        )}
 
         {secciones.map((sec, si) => (
           <Box key={sec.id} sx={{ mb: { xs: 3, sm: 4 }, "&:last-of-type": { mb: 0 } }}>
@@ -737,7 +770,8 @@ export default function Dashboard() {
                   xs: "1fr",
                   sm: "repeat(2, minmax(0, 1fr))",
                   md: "repeat(3, minmax(0, 1fr))",
-                  lg: "repeat(4, minmax(0, 1fr))",
+                  lg: "repeat(3, minmax(0, 1fr))",
+                  xl: "repeat(4, minmax(0, 1fr))",
                 },
                 gap: { xs: 1.25, sm: 2 },
               }}
@@ -746,6 +780,7 @@ export default function Dashboard() {
             </Box>
           </Box>
         ))}
+        </Box>
       </Box>
 
       {/* Footer */}

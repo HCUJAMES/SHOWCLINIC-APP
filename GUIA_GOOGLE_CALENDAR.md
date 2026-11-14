@@ -57,6 +57,7 @@ Presiona **Guardar cambios**.
 
 | Acción | Cómo |
 |---|---|
+| Ver las citas de hoy | **Menú principal**: panel **Citas de hoy** (al costado en computadora, arriba en celular). Muestra quién está en atención, quién viene y en cuánto tiempo; clic en una cita para abrirla en la Agenda |
 | Ver citas | Menú principal → **Agenda**. Vistas: Día, Semana, Mes y Lista |
 | Ver u ocultar calendarios | Casillas de **Mis calendarios / Otros calendarios** a la izquierda. Empiezan marcadas igual que en Google; cada persona puede cambiarlas y volver con **Marcar como en Google** |
 | Agendar | **Nueva cita** o clic en un espacio vacío. Al elegir especialista se elige su calendario |
