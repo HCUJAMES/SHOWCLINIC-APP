@@ -51,6 +51,8 @@ import AsignacionEspecialistas from "../components/AsignacionEspecialistas";
 import DescuentoDual from "../components/DescuentoDual";
 import GaleriaTratamiento from "../components/GaleriaTratamiento";
 import CitasPaciente from "../components/CitasPaciente";
+import agendaApi from "./agenda/api";
+import { hoy as hoyLima, citaEnDia } from "./agenda/fechas";
 
 // El mapa 3D usa three.js (~1 MB): se descarga solo cuando se abre
 const FacialMap3D = React.lazy(() => import("../components/FacialMap3D"));
@@ -585,6 +587,10 @@ const HistorialClinico = () => {
   const [consultaGlobalSeleccion, setConsultaGlobalSeleccion] = useState(null); // { tipo: 'paquete'|'presupuesto', item: {...} }
   const [montoConsultaGlobal, setMontoConsultaGlobal] = useState(100);
   const [metodoPagoConsultaGlobal, setMetodoPagoConsultaGlobal] = useState("efectivo");
+  // Quién atendió la consulta: si la paciente no se hace tratamiento hasta fin
+  // de mes, a esa especialista se le paga la consulta. "ninguna" = no corresponde.
+  const [especialistaConsultaGlobal, setEspecialistaConsultaGlobal] = useState("");
+  const [especialistaConsultaDeCita, setEspecialistaConsultaDeCita] = useState(false);
 
   // Estados para editar pago de presupuesto/paquete (solo master)
   const [modalEditarPagoPresupuesto, setModalEditarPagoPresupuesto] = useState(false);
@@ -612,6 +618,31 @@ const HistorialClinico = () => {
   // Estados para especialistas
   const [especialistas, setEspecialistas] = useState([]);
   const [especialistasPorSesion, setEspecialistasPorSesion] = useState({});
+
+  // Al abrir "Pagar consulta": si la paciente tiene cita hoy en la Agenda, la
+  // especialista de esa cita viene elegida.
+  useEffect(() => {
+    if (!modalPagoConsultaGlobal) return;
+    setEspecialistaConsultaGlobal("");
+    setEspecialistaConsultaDeCita(false);
+    const pacienteId = pacienteSeleccionado?.id;
+    if (!pacienteId) return;
+    let vigente = true;
+    const hoy = hoyLima();
+    agendaApi
+      .delPaciente(pacienteId)
+      .then((r) => {
+        if (!vigente) return;
+        const deHoy = (r?.eventos || []).filter((c) => citaEnDia(c, hoy) && c.especialistaId);
+        if (deHoy.length === 0) return;
+        setEspecialistaConsultaGlobal((actual) => actual || deHoy[0].especialistaId);
+        setEspecialistaConsultaDeCita(true);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [modalPagoConsultaGlobal, pacienteSeleccionado?.id]);
   const [especialistaPorPresupuesto, setEspecialistaPorPresupuesto] = useState({});
   // Especialista previsto por tratamiento: { [ofertaId]: { [nombreTratamiento]: especialistaId } }
   // Permite que un presupuesto con varios tratamientos se reparta entre especialistas.
@@ -9541,6 +9572,43 @@ const HistorialClinico = () => {
                 );
               })()}
 
+              {consultaGlobalSeleccion?.tipo === 'directo' && (() => {
+                const esp = especialistas.find((e) => String(e.id) === String(especialistaConsultaGlobal));
+                const tarifa = Number(esp?.tarifa_consulta) || 0;
+                return (
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel>¿Quién atendió la consulta?</InputLabel>
+                    <Select
+                      value={especialistaConsultaGlobal}
+                      onChange={(e) => { setEspecialistaConsultaGlobal(e.target.value); setEspecialistaConsultaDeCita(false); }}
+                      label="¿Quién atendió la consulta?"
+                    >
+                      {especialistas.map((e) => (
+                        <MenuItem key={e.id} value={e.id}>
+                          {e.nombre}
+                          {Number(e.tarifa_consulta) > 0 && (
+                            <Typography component="span" sx={{ ml: 1, fontSize: "0.75rem", color: "#999" }}>
+                              · consulta S/ {Number(e.tarifa_consulta).toFixed(0)}
+                            </Typography>
+                          )}
+                        </MenuItem>
+                      ))}
+                      <MenuItem value="ninguna"><em>Nadie / no corresponde</em></MenuItem>
+                    </Select>
+                    <Typography sx={{ mt: 0.75, fontSize: "0.78rem", color: "#7a6a58" }}>
+                      {!especialistaConsultaGlobal
+                        ? "Elige a la doctora que la evaluó."
+                        : especialistaConsultaGlobal === "ninguna"
+                        ? "No se le pagará esta consulta a nadie."
+                        : tarifa > 0
+                        ? `Si la paciente no se hace tratamiento hasta fin de mes, se le pagan S/ ${tarifa.toFixed(2)} por esta consulta. Si se lo hace, cobra su comisión del tratamiento.`
+                        : `${esp?.nombre || "Esta especialista"} no tiene tarifa de consulta (se configura en Gestión Clínica).`}
+                      {especialistaConsultaDeCita && especialistaConsultaGlobal && especialistaConsultaGlobal !== "ninguna" && " · Tomado de su cita de hoy."}
+                    </Typography>
+                  </FormControl>
+                );
+              })()}
+
               <TextField
                 fullWidth
                 label="Monto de Consulta (S/)"
@@ -9605,7 +9673,7 @@ const HistorialClinico = () => {
           </Button>
           <Button
             variant="contained"
-            disabled={!consultaGlobalSeleccion || Number(montoConsultaGlobal) <= 0}
+            disabled={!consultaGlobalSeleccion || Number(montoConsultaGlobal) <= 0 || (consultaGlobalSeleccion?.tipo === 'directo' && !especialistaConsultaGlobal)}
             onClick={async () => {
               if (!consultaGlobalSeleccion || Number(montoConsultaGlobal) <= 0) return;
               try {
@@ -9614,6 +9682,7 @@ const HistorialClinico = () => {
                     paciente_id: pacienteSeleccionado.id,
                     monto: Number(montoConsultaGlobal),
                     metodo_pago: metodoPagoConsultaGlobal,
+                    especialista_id: especialistaConsultaGlobal && especialistaConsultaGlobal !== "ninguna" ? Number(especialistaConsultaGlobal) : null,
                   }, { headers: authHeaders });
                   showToast({ severity: "success", message: "Pago de consulta registrado en caja" });
                 } else if (consultaGlobalSeleccion.tipo === 'paquete') {

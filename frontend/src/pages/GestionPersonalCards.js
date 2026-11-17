@@ -109,10 +109,16 @@ const GestionPersonalCards = () => {
     especialidad: '',
     pago_fijo: 0,
     comision_porcentaje: 20,
+    tarifa_consulta: 0,
     cuenta_bancaria: '',
     foto_perfil: ''
   });
   const [subiendoFoto, setSubiendoFoto] = useState(false);
+
+  // Consultas cobradas sin decir quién atendió (no se le pueden pagar a nadie)
+  const [consultasSinDoctora, setConsultasSinDoctora] = useState([]);
+  const [modalSinDoctora, setModalSinDoctora] = useState(false);
+  const [todosEspecialistas, setTodosEspecialistas] = useState([]);
   const [fotosError, setFotosError] = useState({});
 
   const token = localStorage.getItem("token");
@@ -141,8 +147,9 @@ const GestionPersonalCards = () => {
 
       const res = await axios.get(`${API_BASE_URL}/api/gestion-clinica/estadisticas`, {
         headers: authHeaders,
-        params: { fechaInicio, fechaFin }
+        params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin }
       });
+      cargarConsultasSinDoctora();
 
       let datos = res.data.estadisticas || [];
       if (rolFiltro) {
@@ -154,6 +161,38 @@ const GestionPersonalCards = () => {
       showToast({ severity: "error", message: "Error al cargar datos" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cargarConsultasSinDoctora = async () => {
+    try {
+      const { fechaInicio, fechaFin } = getFechasRango();
+      const [res, esp] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/consultas/sin-especialista`, {
+          headers: authHeaders,
+          params: { fecha_inicio: fechaInicio, fecha_fin: fechaFin }
+        }),
+        axios.get(`${API_BASE_URL}/api/especialistas/listar`, { headers: authHeaders })
+      ]);
+      setConsultasSinDoctora(Array.isArray(res.data) ? res.data : []);
+      setTodosEspecialistas(Array.isArray(esp.data) ? esp.data : []);
+    } catch {
+      setConsultasSinDoctora([]);
+    }
+  };
+
+  const asignarDoctoraConsulta = async (consultaId, especialistaId) => {
+    try {
+      await axios.put(
+        `${API_BASE_URL}/api/consultas/${consultaId}/especialista`,
+        { especialista_id: especialistaId },
+        { headers: authHeaders }
+      );
+      setConsultasSinDoctora(prev => prev.filter(c => c.id !== consultaId));
+      showToast({ severity: "success", message: "Consulta asignada" });
+      cargarDatos();
+    } catch (error) {
+      showToast({ severity: "error", message: error.response?.data?.message || "No se pudo asignar la consulta" });
     }
   };
 
@@ -314,6 +353,7 @@ const GestionPersonalCards = () => {
       'Ingresos Generados': Number(trabajador.total_ingresos).toFixed(2),
       'Comision %': Number(trabajador.comision_porcentaje).toFixed(0),
       'Comision Calculada': Number(trabajador.comision_calculada).toFixed(2),
+      'Consultas sin tratamiento': Number(trabajador.pago_consultas || 0).toFixed(2),
       'Sueldo Fijo': Number(trabajador.pago_fijo).toFixed(2),
       'Total a Pagar': Number(trabajador.pago_total_especialista).toFixed(2),
     }];
@@ -351,6 +391,7 @@ const GestionPersonalCards = () => {
         especialidad: res.data.especialidad || '',
         pago_fijo: res.data.pago_fijo || 0,
         comision_porcentaje: res.data.comision_porcentaje || 20,
+        tarifa_consulta: res.data.tarifa_consulta || 0,
         cuenta_bancaria: res.data.cuenta_bancaria || '',
         foto_perfil: res.data.foto_perfil || ''
       });
@@ -363,6 +404,7 @@ const GestionPersonalCards = () => {
         especialidad: '',
         pago_fijo: trabajador.pago_fijo || 0,
         comision_porcentaje: trabajador.comision_porcentaje || 20,
+        tarifa_consulta: 0,
         cuenta_bancaria: '',
         foto_perfil: ''
       });
@@ -413,6 +455,7 @@ const GestionPersonalCards = () => {
         especialidad: datoEditarCard.especialidad,
         pago_fijo: datoEditarCard.pago_fijo,
         comision_porcentaje: datoEditarCard.comision_porcentaje,
+        tarifa_consulta: datoEditarCard.tarifa_consulta,
         cuenta_bancaria: datoEditarCard.cuenta_bancaria
       };
       
@@ -495,6 +538,20 @@ const GestionPersonalCards = () => {
           </Select>
         </FormControl>
       </Box>
+
+      {consultasSinDoctora.length > 0 && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => setModalSinDoctora(true)}>
+              Asignar
+            </Button>
+          }
+        >
+          {consultasSinDoctora.length === 1 ? 'Hay 1 consulta' : `Hay ${consultasSinDoctora.length} consultas`} de {mesNombres[mesSeleccionado - 1]} sin doctora asignada. Si no se hacen tratamiento, no se le pueden pagar a nadie.
+        </Alert>
+      )}
 
       {/* Cards de Personal */}
       {loading ? (
@@ -684,20 +741,24 @@ const GestionPersonalCards = () => {
                 const comisionCalculada = totalPagado * (comisionPct / 100);
                 const sueldoFijo = Number(trabajadorActual.pago_fijo || 0);
                 const totalCargos = cargosExtra.reduce((sum, c) => sum + Number(c.monto || 0), 0);
-                const totalAPagar = sueldoFijo + comisionCalculada + totalCargos;
+                const tc = detalleData?.totales || {};
+                const pagoConsultas = Number(tc.pago_consultas ?? trabajadorActual.pago_consultas ?? 0);
+                const consultasAPagar = Number(tc.consultas_a_pagar ?? trabajadorActual.consultas_a_pagar ?? 0);
+                const consultasEnEspera = Number(tc.consultas_en_espera ?? trabajadorActual.consultas_en_espera ?? 0);
+                const totalAPagar = sueldoFijo + comisionCalculada + pagoConsultas + totalCargos;
                 return (
                   <>
                   <Grid container spacing={2} sx={{ mb: 2 }}>
-                    <Grid item xs={4}>
-                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
+                    <Grid item xs={6} sm={3}>
+                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2, height: '100%' }}>
                         <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Sueldo fijo</Typography>
                         <Typography variant="h6" sx={{ color: '#333', fontWeight: 600, fontSize: '1.05rem' }}>
                           S/ {sueldoFijo.toFixed(2)}
                         </Typography>
                       </Paper>
                     </Grid>
-                    <Grid item xs={4}>
-                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
+                    <Grid item xs={6} sm={3}>
+                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2, height: '100%' }}>
                         <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Comisión ({comisionPct.toFixed(0)}%)</Typography>
                         <Typography variant="h6" sx={{ color: '#8a5a1a', fontWeight: 600, fontSize: '1.05rem' }}>
                           S/ {comisionCalculada.toFixed(2)}
@@ -707,8 +768,22 @@ const GestionPersonalCards = () => {
                         </Typography>
                       </Paper>
                     </Grid>
-                    <Grid item xs={4}>
-                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2 }}>
+                    <Grid item xs={6} sm={3}>
+                      <Paper
+                        onClick={() => setTabDetalle(3)}
+                        sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2, height: '100%', cursor: 'pointer', '&:hover': { borderColor: '#ba9a63' } }}
+                      >
+                        <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Consultas sin tratamiento</Typography>
+                        <Typography variant="h6" sx={{ color: '#5f7f96', fontWeight: 600, fontSize: '1.05rem' }}>
+                          S/ {pagoConsultas.toFixed(2)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#999', fontSize: '0.6rem', display: 'block' }}>
+                          {consultasAPagar} a pagar{consultasEnEspera > 0 ? ` · ${consultasEnEspera} en espera` : ''}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Paper sx={{ p: 2, backgroundColor: '#FDF8F0', textAlign: 'center', border: '1px solid #FAEEDA', borderRadius: 2, height: '100%' }}>
                         <Typography variant="caption" sx={{ color: '#666', fontSize: '0.7rem' }}>Pagos extra</Typography>
                         <Typography variant="h6" sx={{ color: '#9B7EBD', fontWeight: 600, fontSize: '1.05rem' }}>
                           S/ {totalCargos.toFixed(2)}
@@ -724,7 +799,7 @@ const GestionPersonalCards = () => {
                     <Box>
                       <Typography variant="caption" sx={{ color: '#FAEEDA', fontSize: '0.75rem' }}>Total a pagar</Typography>
                       <Typography variant="caption" sx={{ color: '#FAEEDA', fontSize: '0.65rem', display: 'block' }}>
-                        Fijo + Comisión + Pagos extra
+                        Fijo + Comisión + Consultas + Pagos extra
                       </Typography>
                     </Box>
                     <Typography variant="h4" sx={{ color: 'white', fontWeight: 700, fontSize: '1.8rem' }}>
@@ -797,6 +872,7 @@ const GestionPersonalCards = () => {
                   <Tab label="Presupuestos asignados" />
                   <Tab label="Tratamientos realizados" />
                   <Tab label="Historial de pagos" />
+                  <Tab label={`Consultas (${detalleData?.consultas?.length || 0})`} />
                 </Tabs>
               </Box>
 
@@ -967,6 +1043,14 @@ const GestionPersonalCards = () => {
                         </TableContainer>
                       )}
                     </Box>
+                  )}
+
+                  {/* Tab 3: Consultas */}
+                  {tabDetalle === 3 && (
+                    <TablaConsultas
+                      consultas={detalleData?.consultas || []}
+                      tarifa={Number(detalleData?.totales?.tarifa_consulta || 0)}
+                    />
                   )}
                 </>
               )}
@@ -1141,6 +1225,18 @@ const GestionPersonalCards = () => {
                   inputProps={{ min: 0, max: 100, step: 1 }}
                 />
               </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Pago por consulta sin tratamiento (S/)"
+                  type="number"
+                  value={datoEditarCard.tarifa_consulta}
+                  onChange={(e) => setDatoEditarCard(prev => ({ ...prev, tarifa_consulta: parseFloat(e.target.value) || 0 }))}
+                  fullWidth
+                  size="small"
+                  inputProps={{ min: 0, step: 5 }}
+                  helperText="Se le paga si la paciente que evaluó no se hace tratamiento hasta fin de mes. Déjalo en 0 si no cobra consultas."
+                />
+              </Grid>
             </Grid>
           </Box>
         </DialogContent>
@@ -1157,8 +1253,123 @@ const GestionPersonalCards = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      {/* Modal: consultas sin doctora */}
+      <Dialog open={modalSinDoctora} onClose={() => setModalSinDoctora(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ color: '#8a5a1a', fontWeight: 600 }}>
+          Consultas sin doctora · {mesNombres[mesSeleccionado - 1]}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
+            Elige quién atendió cada consulta. Si la paciente no se hace tratamiento hasta fin de mes, se le paga la consulta con su tarifa.
+          </Typography>
+          {consultasSinDoctora.length === 0 ? (
+            <Alert severity="success">Todas las consultas del mes tienen doctora.</Alert>
+          ) : (
+            <Stack spacing={1.25}>
+              {consultasSinDoctora.map((c) => (
+                <Paper key={c.id} sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2, backgroundColor: '#FDF8F0', border: '1px solid #FAEEDA', flexWrap: 'wrap' }}>
+                  <Box sx={{ flex: 1, minWidth: 160 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '0.9rem', color: '#333' }}>
+                      {c.paciente_nombre} {c.paciente_apellido || ''}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: '#888' }}>
+                      {formatearFechaCorta(String(c.fecha).slice(0, 10))} · S/ {Number(c.monto || 0).toFixed(2)}{c.creado_por ? ` · cobró ${c.creado_por}` : ''}
+                    </Typography>
+                  </Box>
+                  <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel>¿Quién atendió?</InputLabel>
+                    <Select
+                      value=""
+                      label="¿Quién atendió?"
+                      onChange={(e) => asignarDoctoraConsulta(c.id, e.target.value)}
+                      sx={{ backgroundColor: 'white' }}
+                    >
+                      {todosEspecialistas.map((e) => (
+                        <MenuItem key={e.id} value={e.id}>{e.nombre}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Paper>
+              ))}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setModalSinDoctora(false)} sx={{ color: '#666' }}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
+
+const ESTADO_CONSULTA = {
+  a_pagar: { label: 'Se paga', color: '#5f7f52', bg: 'rgba(95,127,82,0.12)' },
+  en_espera: { label: 'En espera', color: '#c9862e', bg: 'rgba(201,134,46,0.12)' },
+  convertida: { label: 'Hizo tratamiento', color: '#5f7f96', bg: 'rgba(95,127,150,0.12)' },
+};
+
+const POR_QUE = {
+  presupuesto: 'consulta descontada de su presupuesto',
+  pago: 'pagó un tratamiento',
+  tratamiento: 'tiene un tratamiento registrado',
+};
+
+/** Consultas que atendió la especialista en el mes y si se le pagan o no. */
+function TablaConsultas({ consultas, tarifa }) {
+  if (consultas.length === 0) {
+    return (
+      <Alert severity="info">
+        No hay consultas con esta especialista en el período. Se registran al cobrar la consulta en el historial clínico, eligiendo quién atendió.
+      </Alert>
+    );
+  }
+  return (
+    <Box>
+      <Typography variant="body2" sx={{ color: '#666', mb: 1.5 }}>
+        {tarifa > 0
+          ? `Tarifa por consulta: S/ ${tarifa.toFixed(2)}. Se paga si la paciente no se hizo tratamiento hasta fin de ese mes.`
+          : 'Esta especialista no tiene tarifa de consulta (edítala con el lápiz de su tarjeta).'}
+      </Typography>
+      <TableContainer sx={{ backgroundColor: '#FDF8F0', borderRadius: 1, border: '1px solid #FAEEDA' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#FAEEDA' }}>
+              <TableCell sx={{ color: '#8a5a1a', fontWeight: 600 }}>Fecha</TableCell>
+              <TableCell sx={{ color: '#8a5a1a', fontWeight: 600 }}>Paciente</TableCell>
+              <TableCell sx={{ color: '#8a5a1a', fontWeight: 600 }}>Resultado</TableCell>
+              <TableCell align="right" sx={{ color: '#8a5a1a', fontWeight: 600 }}>Pago</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {consultas.map((c) => {
+              const est = ESTADO_CONSULTA[c.estado_pago] || ESTADO_CONSULTA.en_espera;
+              return (
+                <TableRow key={c.id}>
+                  <TableCell sx={{ color: '#333', whiteSpace: 'nowrap' }}>{formatearFechaCorta(c.fecha)}</TableCell>
+                  <TableCell sx={{ color: '#333' }}>
+                    {c.paciente_nombre} {c.paciente_apellido || ''}
+                  </TableCell>
+                  <TableCell>
+                    <Chip label={est.label} size="small" sx={{ backgroundColor: est.bg, color: est.color, fontWeight: 600, fontSize: '0.7rem' }} />
+                    <Typography sx={{ fontSize: '0.68rem', color: '#999', mt: 0.25 }}>
+                      {c.estado_pago === 'convertida'
+                        ? POR_QUE[c.convertida_por] || ''
+                        : c.estado_pago === 'en_espera'
+                        ? `puede cerrar la venta hasta el ${formatearFechaCorta(c.cierre)}`
+                        : 'no se hizo tratamiento ese mes'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right" sx={{ color: c.pago > 0 ? '#5f7f52' : '#999', fontWeight: 600 }}>
+                    {c.pago > 0 ? `S/ ${Number(c.pago).toFixed(2)}` : '—'}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
+}
 
 export default GestionPersonalCards;

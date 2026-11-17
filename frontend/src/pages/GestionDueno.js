@@ -2481,12 +2481,15 @@ function EspecialistaDetalleView({ detalle, onBack, onEditEspecialistaComision, 
             <Box sx={{ textAlign: "center", p: "14px", bgcolor: colors.primaryDark, borderRadius: "14px" }}>
               <Typography sx={{ color: "rgba(255,255,255,0.75)", fontWeight: 500, fontSize: "11px", fontFamily: fonts.body, mb: "2px" }}>Total a pagar</Typography>
               <Typography sx={{ fontWeight: 700, color: colors.white, fontFamily: fonts.title, fontSize: "20px", lineHeight: 1.2 }}>
-                {formatMoney(kpisCalc.comisionTotal + (Number(resumen?.pago_fijo) || 0) + totalExtras)}
+                {formatMoney(kpisCalc.comisionTotal + (Number(resumen?.pago_fijo) || 0) + totalExtras + (Number(resumen?.pago_consultas) || 0))}
               </Typography>
-              {(Number(resumen?.pago_fijo) > 0 || totalExtras !== 0) && (
+              {(Number(resumen?.pago_fijo) > 0 || totalExtras !== 0 || Number(resumen?.pago_consultas) > 0) && (
                 <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: "10px", fontFamily: fonts.body }}>
                   {[
                     Number(resumen?.pago_fijo) > 0 ? `fijo ${formatMoney(resumen.pago_fijo)}` : null,
+                    Number(resumen?.pago_consultas) > 0
+                      ? `${resumen.consultas_a_pagar} consulta${resumen.consultas_a_pagar === 1 ? "" : "s"} ${formatMoney(resumen.pago_consultas)}`
+                      : null,
                     totalExtras !== 0 ? `extras ${formatMoney(totalExtras)}` : null,
                   ].filter(Boolean).join(" · ")}
                 </Typography>

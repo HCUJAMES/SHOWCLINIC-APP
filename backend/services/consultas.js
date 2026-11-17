@@ -48,8 +48,20 @@ export async function ensureConsultasSchema() {
      ON consultas_paciente(paciente_id, estado)`
   );
 
+  // Quién atendió la consulta y cuánto se le paga si no termina en tratamiento
+  await agregarColumna("consultas_paciente", "especialista_id INTEGER");
+  await agregarColumna("especialistas", "tarifa_consulta REAL DEFAULT 0");
+
   schemaReady = true;
 }
+
+const agregarColumna = async (tabla, definicion) => {
+  try {
+    await dbRun(`ALTER TABLE ${tabla} ADD COLUMN ${definicion}`);
+  } catch (e) {
+    if (!String(e.message).includes("duplicate column")) throw e;
+  }
+};
 
 /**
  * Rescata las consultas directas que ya existían en finanzas y todavía no
@@ -83,13 +95,13 @@ export async function migrarConsultasHistoricas() {
 }
 
 /** Registra una consulta pagada como crédito disponible del paciente. */
-export async function registrarConsulta({ paciente_id, monto, metodo_pago, fecha, finanza_id, creado_por, notas }) {
+export async function registrarConsulta({ paciente_id, monto, metodo_pago, fecha, finanza_id, creado_por, notas, especialista_id }) {
   await ensureConsultasSchema();
   const r = await dbRun(
     `INSERT INTO consultas_paciente
-      (paciente_id, monto, metodo_pago, fecha, estado, finanza_id, creado_en, creado_por, notas)
-     VALUES (?, ?, ?, ?, 'disponible', ?, ?, ?, ?)`,
-    [paciente_id, monto, metodo_pago || "efectivo", fecha, finanza_id || null, fecha, creado_por || "sistema", notas || null]
+      (paciente_id, monto, metodo_pago, fecha, estado, finanza_id, creado_en, creado_por, notas, especialista_id)
+     VALUES (?, ?, ?, ?, 'disponible', ?, ?, ?, ?, ?)`,
+    [paciente_id, monto, metodo_pago || "efectivo", fecha, finanza_id || null, fecha, creado_por || "sistema", notas || null, especialista_id || null]
   );
   return r.lastID;
 }
@@ -111,8 +123,10 @@ export async function consultasDePaciente(pacienteId) {
   await ensureConsultasSchema();
   return dbAll(
     `SELECT c.*, pa.id as presupuesto_id
+     , e.nombre as especialista_nombre
      FROM consultas_paciente c
      LEFT JOIN presupuestos_asignados pa ON pa.id = c.presupuesto_aplicado_id
+     LEFT JOIN especialistas e ON e.id = c.especialista_id
      WHERE c.paciente_id = ?
      ORDER BY c.fecha DESC`,
     [pacienteId]
@@ -289,4 +303,155 @@ export async function revertirConsulta({ consulta_id, usuario }) {
   );
 
   return { presupuesto_id: presupuestoId, monto: Number(c.monto) || 0 };
+}
+
+
+/* ======================================================================
+   PAGO DE CONSULTAS A LA DOCTORA
+   ----------------------------------------------------------------------
+   Regla de la clínica:
+     - Si la paciente se hace tratamiento, la doctora cobra su comisión del
+       tratamiento (20 % o la que tenga) y la consulta NO se paga aparte.
+     - Si hasta el CIERRE DEL MES de la consulta no hubo tratamiento, a la
+       doctora se le paga la consulta con su tarifa fija (especialistas.
+       tarifa_consulta). Tarifa 0 = a esa persona no se le pagan consultas.
+     - Si la paciente vuelve después del cierre y se hace el tratamiento, la
+       doctora cobra además su comisión completa (la consulta ya pagada se
+       queda como está).
+   "Hizo tratamiento" = la consulta se descontó de un presupuesto, o la
+   paciente pagó algo que no es consulta, o tiene un tratamiento registrado,
+   entre el día de la consulta y el fin de ese mes.
+====================================================================== */
+
+const hoyLima = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Lima" });
+
+/** "2026-11-14" → "2026-11-30" */
+export const finDeMes = (ymd) => {
+  const [y, m] = String(ymd).slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+};
+
+/** ¿La paciente "cerró la venta" entre la consulta y el fin de ese mes? */
+async function seConvirtio(c, hasta) {
+  const desde = String(c.fecha).slice(0, 10);
+  if (c.estado === "aplicada" && c.aplicada_en && String(c.aplicada_en).slice(0, 10) <= hasta) return "presupuesto";
+  const pago = await dbGet(
+    `SELECT 1 FROM finanzas
+     WHERE paciente_id = ? AND tipo = 'ingreso'
+       AND COALESCE(categoria, '') != 'consulta'
+       AND COALESCE(referencia_tipo, '') != 'consulta_directa'
+       AND DATE(fecha) BETWEEN ? AND ?
+     LIMIT 1`,
+    [c.paciente_id, desde, hasta]
+  );
+  if (pago) return "pago";
+  const trat = await dbGet(
+    `SELECT 1 FROM tratamientos_realizados
+     WHERE paciente_id = ? AND DATE(fecha) BETWEEN ? AND ? LIMIT 1`,
+    [c.paciente_id, desde, hasta]
+  ).catch(() => null);
+  if (trat) return "tratamiento";
+  return null;
+}
+
+/**
+ * Consultas atendidas por cada especialista en el periodo (por fecha de la
+ * consulta), con su estado para el pago:
+ *   convertida → hizo tratamiento: no se paga la consulta
+ *   a_pagar    → el mes ya cerró sin tratamiento: se paga la tarifa
+ *   en_espera  → el mes sigue abierto: todavía puede cerrar la venta
+ * Devuelve Map(especialista_id → { consultas, a_pagar, en_espera, convertidas, pago_consultas, tarifa }).
+ */
+export async function consultasDeEspecialistas({ fecha_inicio, fecha_fin, especialista_id } = {}) {
+  await ensureConsultasSchema();
+  const cond = ["c.especialista_id IS NOT NULL"];
+  const params = [];
+  if (fecha_inicio) { cond.push("DATE(c.fecha) >= ?"); params.push(fecha_inicio); }
+  if (fecha_fin) { cond.push("DATE(c.fecha) <= ?"); params.push(fecha_fin); }
+  if (especialista_id) { cond.push("c.especialista_id = ?"); params.push(Number(especialista_id)); }
+
+  const filas = await dbAll(
+    `SELECT c.id, c.paciente_id, c.monto, c.metodo_pago, c.fecha, c.estado, c.aplicada_en,
+            c.presupuesto_aplicado_id, c.especialista_id, c.creado_por,
+            p.nombre as paciente_nombre, p.apellido as paciente_apellido, p.dni as paciente_dni,
+            COALESCE(e.tarifa_consulta, 0) as tarifa
+     FROM consultas_paciente c
+     JOIN especialistas e ON e.id = c.especialista_id
+     LEFT JOIN patients p ON p.id = c.paciente_id
+     WHERE ${cond.join(" AND ")}
+     ORDER BY c.fecha DESC`,
+    params
+  );
+
+  const hoy = hoyLima();
+  const porEsp = new Map();
+  for (const c of filas) {
+    const cierre = finDeMes(c.fecha);
+    const como = await seConvirtio(c, cierre);
+    const estado_pago = como ? "convertida" : hoy > cierre ? "a_pagar" : "en_espera";
+    const tarifa = Number(c.tarifa) || 0;
+    const item = {
+      ...c,
+      fecha: String(c.fecha).slice(0, 10),
+      cierre,
+      estado_pago,
+      convertida_por: como,
+      pago: estado_pago === "a_pagar" ? tarifa : 0,
+    };
+    const acc = porEsp.get(c.especialista_id) || {
+      consultas: [], a_pagar: 0, en_espera: 0, convertidas: 0, pago_consultas: 0, pago_en_espera: 0, tarifa,
+    };
+    acc.consultas.push(item);
+    if (estado_pago === "a_pagar") { acc.a_pagar += 1; acc.pago_consultas += tarifa; }
+    else if (estado_pago === "en_espera") { acc.en_espera += 1; acc.pago_en_espera += tarifa; }
+    else acc.convertidas += 1;
+    porEsp.set(c.especialista_id, acc);
+  }
+  return porEsp;
+}
+
+/** Resumen vacío para quien no tuvo consultas. */
+export const SIN_CONSULTAS = Object.freeze({
+  consultas: [], a_pagar: 0, en_espera: 0, convertidas: 0, pago_consultas: 0, pago_en_espera: 0, tarifa: 0,
+});
+
+/** Campos que se agregan a cada especialista en los reportes de pago. */
+export const camposConsultas = (r = SIN_CONSULTAS) => ({
+  consultas_atendidas: r.consultas.length,
+  consultas_convertidas: r.convertidas,
+  consultas_a_pagar: r.a_pagar,
+  consultas_en_espera: r.en_espera,
+  pago_consultas: Math.round(r.pago_consultas * 100) / 100,
+  pago_consultas_en_espera: Math.round(r.pago_en_espera * 100) / 100,
+});
+
+/** Consultas directas (saldo a favor) sin doctora asignada, para completarlas. */
+export async function consultasSinEspecialista({ fecha_inicio, fecha_fin } = {}) {
+  await ensureConsultasSchema();
+  const cond = ["c.especialista_id IS NULL"];
+  const params = [];
+  if (fecha_inicio) { cond.push("DATE(c.fecha) >= ?"); params.push(fecha_inicio); }
+  if (fecha_fin) { cond.push("DATE(c.fecha) <= ?"); params.push(fecha_fin); }
+  return dbAll(
+    `SELECT c.id, c.paciente_id, c.monto, c.fecha, c.estado, c.creado_por,
+            p.nombre as paciente_nombre, p.apellido as paciente_apellido, p.dni as paciente_dni
+     FROM consultas_paciente c
+     LEFT JOIN patients p ON p.id = c.paciente_id
+     WHERE ${cond.join(" AND ")}
+     ORDER BY c.fecha DESC`,
+    params
+  );
+}
+
+/** Asigna (o cambia, o quita con null) la especialista que atendió la consulta. */
+export async function asignarEspecialistaConsulta({ consulta_id, especialista_id }) {
+  await ensureConsultasSchema();
+  const c = await dbGet("SELECT id FROM consultas_paciente WHERE id = ?", [consulta_id]);
+  if (!c) throw new Error("Consulta no encontrada");
+  if (especialista_id != null) {
+    const e = await dbGet("SELECT id FROM especialistas WHERE id = ?", [especialista_id]);
+    if (!e) throw new Error("Especialista no encontrado");
+  }
+  await dbRun("UPDATE consultas_paciente SET especialista_id = ? WHERE id = ?", [especialista_id ?? null, consulta_id]);
+  return { id: Number(consulta_id), especialista_id: especialista_id ?? null };
 }

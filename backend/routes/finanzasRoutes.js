@@ -620,6 +620,9 @@ router.post("/pagar", (req, res) => {
 //    poder descontarlo del presupuesto que se le arme después.
 router.post("/consulta-directa", async (req, res) => {
   const { paciente_id, monto, metodo_pago } = req.body;
+  // Quién atendió la consulta: si la paciente no se hace tratamiento ese mes,
+  // a esa especialista se le paga la consulta (ver services/consultas.js)
+  const especialistaId = Number(req.body.especialista_id) || null;
 
   if (!paciente_id || !monto || !metodo_pago) {
     return res.status(400).json({ message: "Paciente, monto y método de pago son obligatorios" });
@@ -651,6 +654,7 @@ router.post("/consulta-directa", async (req, res) => {
           fecha: fechaAhora,
           finanza_id: finanzaId,
           creado_por: req.user?.username || "sistema",
+          especialista_id: especialistaId,
         });
       } catch (e) {
         // El ingreso ya quedó registrado; el crédito se puede recuperar luego

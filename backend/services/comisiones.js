@@ -22,6 +22,7 @@
  */
 
 import { dbAll, dbGet } from "../db/database.js";
+import { consultasDeEspecialistas, camposConsultas } from "./consultas.js";
 
 export const PCT_COMISION_DEFECTO = 20;
 
@@ -398,10 +399,15 @@ export async function rendimientoEspecialistas({ fecha_inicio, fecha_fin } = {})
     "SELECT id, nombre, especialidad, comision_porcentaje, pago_fijo, foto_perfil FROM especialistas"
   );
 
+  // Consultas que no terminaron en tratamiento (se pagan con la tarifa de consulta)
+  const consultasMap = await consultasDeEspecialistas({ fecha_inicio, fecha_fin });
+
   return especialistas
     .map((e) => {
       const a = acumulado.get(e.id);
+      const consultas = camposConsultas(consultasMap.get(e.id));
       return {
+        ...consultas,
         id: e.id,
         nombre: e.nombre,
         especialidad: e.especialidad,
@@ -412,7 +418,7 @@ export async function rendimientoEspecialistas({ fecha_inicio, fecha_fin } = {})
         pacientes_atendidos: a ? a.pacientes.size : 0,
         ingresos_generados: a ? redondear(a.valor_generado) : 0,
         comision_a_pagar: a ? redondear(a.comision) : 0,
-        total_a_pagar: redondear((a ? a.comision : 0) + (Number(e.pago_fijo) || 0)),
+        total_a_pagar: redondear((a ? a.comision : 0) + (Number(e.pago_fijo) || 0) + consultas.pago_consultas),
       };
     })
     .sort((x, y) => y.ingresos_generados - x.ingresos_generados);

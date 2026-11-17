@@ -249,6 +249,7 @@ router.put("/:id", authMiddleware, requireDoctor, (req, res) => {
     metodo_pago, 
     sueldo_fijo,
     pago_fijo,
+    tarifa_consulta,
     comision_porcentaje, 
     cuenta_bancaria 
   } = req.body;
@@ -280,6 +281,12 @@ router.put("/:id", authMiddleware, requireDoctor, (req, res) => {
   if (metodo_pago !== undefined) {
     updates.push("metodo_pago = ?");
     params.push(metodo_pago);
+  }
+  if (tarifa_consulta !== undefined) {
+    const t = Number(tarifa_consulta);
+    if (isNaN(t) || t < 0) return res.status(400).json({ message: "La tarifa de consulta debe ser 0 o más" });
+    updates.push("tarifa_consulta = ?");
+    params.push(t);
   }
   if (sueldo_fijo !== undefined || pago_fijo !== undefined) {
     updates.push("pago_fijo = ?");

@@ -855,6 +855,13 @@ const db = new sqlite3.Database("./db/showclinic.db", (err) => {
       }
     });
 
+    // Tarifa que se le paga a la especialista por una consulta que no terminó en tratamiento
+    db.run(`ALTER TABLE especialistas ADD COLUMN tarifa_consulta REAL DEFAULT 0`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error("Error agregando columna tarifa_consulta a especialistas:", err.message);
+      }
+    });
+
     // Agregar columna tipo a especialistas
     db.run(`ALTER TABLE especialistas ADD COLUMN tipo TEXT DEFAULT 'doctor'`, (err) => {
       if (err && !err.message.includes('duplicate column')) {

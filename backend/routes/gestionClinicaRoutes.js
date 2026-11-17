@@ -1,6 +1,7 @@
 import express from "express";
 import db, { dbAll, dbGet } from "../db/database.js";
 import { authMiddleware } from "../middleware/auth.js";
+import { consultasDeEspecialistas, camposConsultas } from "../services/consultas.js";
 
 const router = express.Router();
 
@@ -236,16 +237,21 @@ router.get("/estadisticas", authMiddleware, async (req, res) => {
       });
     });
 
+    // Consultas que no terminaron en tratamiento: se pagan con la tarifa de cada especialista
+    const consultasMap = await consultasDeEspecialistas({ fecha_inicio, fecha_fin, especialista_id });
+
     // Calcular comisiones y ganancias
     const estadisticas = Array.from(especialistasMap.values()).map(esp => {
       const porcentaje = esp.comision_porcentaje || 20;
       const pagoFijo = esp.pago_fijo || 0;
       const comision_calculada = esp.total_ingresos * (porcentaje / 100);
-      const pago_total_especialista = comision_calculada + pagoFijo;
-      const ganancia_clinica = Math.max(0, esp.total_ingresos - pago_total_especialista);
+      const consultas = camposConsultas(consultasMap.get(esp.especialista_id));
+      const pago_total_especialista = comision_calculada + pagoFijo + consultas.pago_consultas;
+      const ganancia_clinica = Math.max(0, esp.total_ingresos - comision_calculada - pagoFijo);
       
       return {
         ...esp,
+        ...consultas,
         promedio_por_sesion: esp.total_atenciones > 0 ? esp.total_ingresos / esp.total_atenciones : 0,
         comision_porcentaje: porcentaje,
         pago_fijo: pagoFijo,
@@ -473,8 +479,10 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
 
     const totalIngresos = ingresosPaquetes + ingresosPresupuestos + ingresosIndividuales;
     const comisionCalculada = totalIngresos * (comisionPorcentaje / 100);
-    const pagoTotalEspecialista = comisionCalculada + pagoFijo;
-    const gananciaClinica = Math.max(0, totalIngresos - pagoTotalEspecialista);
+    const consultasEsp = (await consultasDeEspecialistas({ fecha_inicio, fecha_fin, especialista_id: especialistaId })).get(especialistaId);
+    const consultas = camposConsultas(consultasEsp);
+    const pagoTotalEspecialista = comisionCalculada + pagoFijo + consultas.pago_consultas;
+    const gananciaClinica = Math.max(0, totalIngresos - comisionCalculada - pagoFijo);
 
     const totales = {
       total_sesiones: todasSesiones.length,
@@ -488,7 +496,9 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
       comision_calculada: comisionCalculada,
       pago_total_especialista: pagoTotalEspecialista,
       ganancia_clinica: gananciaClinica,
-      comision_20: comisionCalculada
+      comision_20: comisionCalculada,
+      ...consultas,
+      tarifa_consulta: consultasEsp?.tarifa ?? null
     };
 
     console.log(`📊 Detalle ${nombreEspecialista}: ${totales.total_sesiones} sesiones, S/ ${totales.total_ingresos.toFixed(2)} (paq:${ingresosPaquetes} pres:${ingresosPresupuestos} ind:${ingresosIndividuales})`);
@@ -497,6 +507,7 @@ router.get("/especialista/:id/detalle", authMiddleware, async (req, res) => {
       sesiones: todasSesiones,
       tratamientos,
       totales,
+      consultas: consultasEsp?.consultas || [],
       especialista: {
         id: especialistaId,
         nombre: nombreEspecialista,

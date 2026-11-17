@@ -13,6 +13,11 @@ import {
   saldoDisponible,
   aplicarConsultas,
   revertirConsulta,
+  consultasDeEspecialistas,
+  consultasSinEspecialista,
+  asignarEspecialistaConsulta,
+  camposConsultas,
+  SIN_CONSULTAS,
 } from "../services/consultas.js";
 
 const router = express.Router();
@@ -123,6 +128,49 @@ router.get("/pendientes", puedeVer, async (req, res) => {
   } catch (err) {
     console.error("❌ Error listando consultas pendientes:", err.message);
     res.status(500).json({ message: "Error al listar consultas pendientes" });
+  }
+});
+
+/* Consultas que atendió una especialista en el periodo, con su estado de pago */
+router.get("/especialista/:id", puedeVer, async (req, res) => {
+  try {
+    await asegurarDatos();
+    const { fecha_inicio, fecha_fin } = req.query;
+    const mapa = await consultasDeEspecialistas({ fecha_inicio, fecha_fin, especialista_id: req.params.id });
+    const r = mapa.get(Number(req.params.id)) || SIN_CONSULTAS;
+    res.json({ ...camposConsultas(r), tarifa: r.tarifa, consultas: r.consultas });
+  } catch (err) {
+    console.error("❌ Error listando consultas de especialista:", err.message);
+    res.status(500).json({ message: "Error al obtener las consultas" });
+  }
+});
+
+/* Consultas cobradas sin decir qué doctora atendió (para completarlas) */
+router.get("/sin-especialista", puedeVer, async (req, res) => {
+  try {
+    await asegurarDatos();
+    const { fecha_inicio, fecha_fin } = req.query;
+    res.json(await consultasSinEspecialista({ fecha_inicio, fecha_fin }));
+  } catch (err) {
+    console.error("❌ Error listando consultas sin especialista:", err.message);
+    res.status(500).json({ message: "Error al obtener las consultas" });
+  }
+});
+
+/* Asignar / cambiar la doctora que atendió una consulta */
+router.put("/:consulta_id/especialista", puedeAplicar, async (req, res) => {
+  try {
+    await asegurarDatos();
+    const v = req.body?.especialista_id;
+    const especialista_id = v === null || v === "" || v === undefined ? null : Number(v);
+    if (especialista_id !== null && !Number.isInteger(especialista_id)) {
+      return res.status(400).json({ message: "Especialista no válido" });
+    }
+    const r = await asignarEspecialistaConsulta({ consulta_id: req.params.consulta_id, especialista_id });
+    res.json({ message: "✅ Consulta actualizada", ...r });
+  } catch (err) {
+    console.error("❌ Error asignando especialista a consulta:", err.message);
+    res.status(400).json({ message: err.message });
   }
 });
 

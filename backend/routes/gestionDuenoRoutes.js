@@ -12,6 +12,7 @@ import {
   redondear,
 } from "../services/comisiones.js";
 import PDFDocument from "pdfkit";
+import { consultasDeEspecialistas, camposConsultas } from "../services/consultas.js";
 
 const router = express.Router();
 
@@ -949,6 +950,10 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
     const extras = await pagosExtraDe(id, { fecha_inicio, fecha_fin });
     const totalExtras = redondear(extras.reduce((a, e) => a + (Number(e.monto) || 0), 0));
 
+    // Consultas que no terminaron en tratamiento
+    const consultasEsp = (await consultasDeEspecialistas({ fecha_inicio, fecha_fin, especialista_id: id })).get(Number(id));
+    const consultas = camposConsultas(consultasEsp);
+
     // KPI overrides por periodo
     const periodoKey = `${fecha_inicio || "all"}_${fecha_fin || "all"}`;
     const kpiOv = await dbGet(
@@ -970,8 +975,11 @@ router.get("/especialistas/:id/perfil", authMiddleware, requireOwner, async (req
         pago_fijo: Number(especialista.pago_fijo) || 0,
         pagos_extra_total: totalExtras,
         pagos_extra_cantidad: extras.length,
-        total_a_pagar: redondear(comisionTotal + (Number(especialista.pago_fijo) || 0) + totalExtras),
+        ...consultas,
+        tarifa_consulta: Number(especialista.tarifa_consulta) || 0,
+        total_a_pagar: redondear(comisionTotal + (Number(especialista.pago_fijo) || 0) + totalExtras + consultas.pago_consultas),
       },
+      consultas: consultasEsp?.consultas || [],
       kpi_overrides: kpiOv || null,
       pagos_extra: extras,
       presupuestos
@@ -1346,7 +1354,10 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
     const pagoFijo = Number(especialista.pago_fijo) || 0;
     const extras = await pagosExtraDe(id, { fecha_inicio, fecha_fin });
     const totalExtras = redondear(extras.reduce((a, e) => a + (Number(e.monto) || 0), 0));
-    const totalAPagar = redondear(totalComision + pagoFijo + totalExtras);
+    const consultasPdf = camposConsultas(
+      (await consultasDeEspecialistas({ fecha_inicio, fecha_fin, especialista_id: id })).get(Number(id))
+    );
+    const totalAPagar = redondear(totalComision + pagoFijo + totalExtras + consultasPdf.pago_consultas);
 
     // Generar PDF premium
     const doc = new PDFDocument({ size: "A4", margin: 40 });
@@ -1480,6 +1491,14 @@ router.get("/especialistas/:id/pdf-resumen", authMiddleware, requireOwner, async
     const filasExtra = [
       ...(pagoFijo > 0
         ? [{ concepto: "Pago fijo del periodo", fecha: "", tipo: "Fijo", monto: pagoFijo }]
+        : []),
+      ...(consultasPdf.pago_consultas > 0
+        ? [{
+            concepto: `Consultas sin tratamiento (${consultasPdf.consultas_a_pagar})`,
+            fecha: "",
+            tipo: "Consulta",
+            monto: consultasPdf.pago_consultas,
+          }]
         : []),
       ...extras.map((e) => ({
         concepto: e.concepto,
@@ -1812,6 +1831,8 @@ router.get("/especialistas", authMiddleware, requireOwner, async (req, res) => {
         sesiones_realizadas: r.sesiones_realizadas,
         pacientes_atendidos: r.pacientes_atendidos,
         pago_fijo: r.pago_fijo,
+        consultas_a_pagar: r.consultas_a_pagar,
+        pago_consultas: r.pago_consultas,
         total_a_pagar: r.total_a_pagar,
         comision_pendiente: Number(pendiente?.t) || 0,
         comision_liquidada: Number(liquidada?.t) || 0,
